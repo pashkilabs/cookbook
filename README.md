@@ -43,9 +43,14 @@ Open the repo root in VS Code and run Claude Code from there so it picks up
 
 ## Status
 
-**Phase 0, roughly half done.** `packages/core` is built and tested — 60 tests,
+**Phase 0, over half done.** `packages/core` is built and tested — 89 tests,
 typecheck clean, no DOM or network dependencies, so it runs identically in
 Next.js, Expo and the import worker.
 
-Next up: the AI eval set, which turns model selection into a measurement rather
-than an argument.
+The eval harness is in (`pnpm --filter @pashki/core eval`), which turns model
+selection into a measurement rather than an argument. It runs against three
+placeholder fixtures today.
+
+Next up: real fixtures. 50+ recipes from actual sources — URLs, pasted captions,
+reel screenshots — each with hand-checked expected output. See
+`packages/core/eval/README.md` for the format.
