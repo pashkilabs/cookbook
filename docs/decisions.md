@@ -611,12 +611,11 @@ allowing two "one per week" plans — the UI picks by highest `updated_at`, then
 `id`); then `ON DELETE CASCADE`, which is server behaviour; and last, reluctantly,
 local `CHECK` constraints, whose loss means the local store is not a schema we own.
 
-**One consequence that is not free.** Cascades hard-delete children with no
-`deleted_at`, so a device holding `recipe_ingredients` for a deleted recipe learns
-nothing unless the engine observes hard deletes. Criterion 3 therefore has a second
-half: either the engine replicates hard deletes, or the eight cascading composite
-keys become soft-delete propagation. Which is better depends on the engine, so the
-order — choose, then migrate — is deliberate.
+**One consequence that is not free**, and criterion 3 has a second half because of
+it: cascades hard-delete children with no `deleted_at`. See *Open: cascade deletions
+and tombstones* below — it is stated as a question rather than answered here,
+because the answer depends on the engine and guessing now would just be a guess with
+a section number.
 
 *Would change if:* an engine fails one criterion but is otherwise so far ahead that
 the criterion is worth re-examining. Re-examining is allowed; conceding quietly
@@ -678,11 +677,73 @@ migration rather than a rename, and that is the intended cost.
 
 ---
 
+## Open: cascade deletions and tombstones
+
+**Not resolved. This waits on the sync engine choice, and exists so the evaluation
+has it as a criterion instead of rediscovering it.**
+
+`ON DELETE CASCADE` hard-deletes children. Deleting a recipe removes its
+`recipe_ingredients`, `recipe_steps`, `ratings`, `photos` and `shortlist_entries`
+rows outright — eight cascading composite keys in total — and writes no `deleted_at`
+anywhere. Every other deletion in this schema is a tombstone a device can observe,
+per §5's conventions. These are not.
+
+So a device holding those rows learns nothing about their removal unless the engine
+itself reports the deletion. A recipe would vanish locally while its ingredients
+remained, attached to a parent that no longer exists.
+
+**Scope, which is narrower than it first looks.** Cascades from `families` — account
+teardown — are not part of this question. A household being deleted corresponds to a
+device wipe, which §20 already does on sign-out. The question is only about
+deletions *within* a live household: a recipe, a meal plan.
+
+### Option A — the engine replicates hard deletes
+
+Change nothing. A `DELETE` appears in the write-ahead log, so a WAL-based engine can
+see it and propagate the removal.
+
+- **Cost:** none to the schema.
+- **Risk:** an engine that detects change by polling `updated_at` cannot see a row
+  that is gone — there is nothing left to have a timestamp. A device offline during
+  the delete may only recover by re-syncing from scratch, and *silently* holding
+  orphans until it does.
+- **What to test during the evaluation:** delete a recipe on the server while a
+  device is offline, bring the device back, and check whether the children disappear
+  locally without a full re-sync. This is the single most informative test of the
+  engine's change feed, so run it early.
+
+### Option B — replace cascades with soft-delete propagation
+
+A trigger sets `deleted_at` on children when a parent is soft-deleted, so every
+deletion becomes a row update the engine already replicates.
+
+- **Cost:** eight constraints become triggers, and triggers are the thing this
+  schema has otherwise kept to one job (`updated_at`). Tombstones accumulate with no
+  reaper, so a household that deletes a lot never reclaims the space. Hard deletes
+  must then be treated as an administrative operation that devices cannot observe —
+  which is fine only if nothing normal does one.
+- **Benefit:** it does not depend on the engine seeing anything we did not write.
+  Deletion becomes an ordinary update, which is the same mechanism that already
+  works.
+
+### What decides it
+
+Whether the chosen engine's change feed is WAL-based or timestamp-based. If WAL,
+Option A is free and Option B is work for nothing. If timestamp-based, Option A does
+not function and Option B is the only one that does.
+
+A likely landing point is both: Option B for household deletions, cascades retained
+for account teardown where a wipe is correct anyway. Recording that so it is a
+considered outcome rather than a compromise arrived at under pressure.
+
+---
+
 ## Unresolved
 
 | Question | Why it blocks | Who can answer |
 |---|---|---|
 | Apple's outside-purchase rules | Could dictate the whole billing architecture | Apple's live guidelines + someone who ships subscription apps |
 | Sync engine | Highest-risk dependency | Evaluation against current options, using §24's criteria |
+| Cascade deletions vs tombstones | A device can hold orphaned children forever, silently | Follows the engine choice — see *Open: cascade deletions and tombstones* |
 | Copyright posture on imported photos and prose | Changes what you store and display | Someone who does this professionally |
 | Free tier / trial / paid-only | Affects quota design and cost exposure | You |

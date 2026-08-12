@@ -300,9 +300,9 @@ disqualified, not weighed.
 children; `recipe_ingredients` rows vanish with no `deleted_at` written. A device
 holding them learns nothing unless the engine observes hard deletes. So criterion 3
 above has a second half: *either* the engine replicates hard deletes, *or* the
-eight cascading composite keys become soft-delete propagation. This is a
-schema change we may owe the sync engine, and knowing which is better after the
-engine is chosen is the right order.
+eight cascading composite keys become soft-delete propagation. Both options, their
+costs, and the one test that distinguishes them are written up as an open item in
+`docs/decisions.md` — deliberately unanswered, because it follows the engine choice.
 
 **`photos.storage_path` assumed the object already exists.** Fixed rather than
 deferred, because it was a migration and it was small: `upload_state` is
