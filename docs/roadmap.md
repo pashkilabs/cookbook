@@ -45,11 +45,16 @@ rebuild, and everything else depends on it.*
       `createCatalog(SEED_CATALOG)`, and
       `scripts/check-seed-catalog-usage.mjs` (wired into `pnpm check`) fails if
       anything outside seeding and tests references the constant.
-- [ ] `packages/platform-client` — `getSession`, `getEntitlement`,
-      `consumeQuota`, `registerDevice`. The seam. Design the interface as though
-      three more apps will use it.
-- [ ] Entitlement token: signing, validity window, grace period, read-only
-      degradation.
+- [x] `packages/platform-client` — `getSession`, `getEntitlement`,
+      `consumeQuota`, `registerDevice`. The seam, behind a `PlatformStore` port
+      with Supabase and in-memory implementations. Quota spending is one atomic
+      conditional `UPDATE`, verified under twenty concurrent spends.
+      `scripts/check-platform-tables.mjs` fails `pnpm check` if anything outside
+      the seam queries a platform table.
+- [x] Entitlement token: Ed25519, key ids for rotation, inclusive validity and
+      grace boundaries, degradation to read-only and never locked. 59 tests
+      covering tampering, forged signatures, unknown key ids, malformed input and
+      both window boundaries to the millisecond.
 - [ ] Stripe subscription + webhook → entitlement issuance.
 
 ---

@@ -9,7 +9,8 @@
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
     "build": "turbo run build",
-    "check": "node scripts/check-seed-catalog-usage.mjs && pnpm typecheck && pnpm test"
+    "check:boundaries": "node scripts/check-seed-catalog-usage.mjs && node scripts/check-platform-tables.mjs",
+    "check": "pnpm check:boundaries && pnpm typecheck && pnpm test"
   },
   "devDependencies": {
     "turbo": "^2.3.3",

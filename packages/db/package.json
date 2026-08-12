@@ -8,6 +8,10 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./test-support": {
+      "types": "./test/local-instance.ts",
+      "default": "./test/local-instance.ts"
     }
   },
   "scripts": {

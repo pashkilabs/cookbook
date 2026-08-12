@@ -259,6 +259,25 @@ Refreshed opportunistically whenever there's signal. Between `valid_until` and `
 
 Device limits are enforced at sign-in against the `devices` table, not on every action.
 
+### As built
+
+*Implemented in `packages/platform-client`. If this and the code disagree, the code is right.*
+
+The wire format is `pashki1.<keyId>.<payload base64url>.<signature base64url>`, signed **Ed25519**.
+
+- **No algorithm field.** The verifier knows the algorithm. A token that names its own is how JWT implementations end up accepting `alg: none`, or being talked into checking an RSA signature with an HMAC key.
+- **Asymmetric, not an HMAC**, so app #2's server can verify a platform-issued token while holding only a public key. A shared secret would mean anything that can verify can also mint.
+- **Keys addressed by id**, so a rotation can complete: a verifier holds several public keys while tokens from the retired one are still inside grace. An unknown key id is refused rather than searched for.
+- **Grace is not a column.** `entitlements` stores `valid_until`; the grace window is policy applied by the client (default 7 days) and carried in the token. Changing it needs no migration.
+- **Window boundaries are inclusive** — valid *until* means the instant itself still counts.
+- **Payload carries display names only.** No emails, no ratings; a leaked token must not become a privacy incident.
+
+Access is `full` → `grace` → `read-only`, with deliberately no fourth state. `Access.canRead` is an always-true field rather than an absence, so introducing a lock would be a visible change to the type rather than something that slips in behind a boolean.
+
+**Quota is server-authoritative.** The token's balance is a snapshot for offline display. Spending goes through `public.platform_spend_quota`, a service-role-only function doing one conditional `UPDATE` — read-then-write would let two devices both spend the last import and leave numbers that still looked plausible afterwards.
+
+The seam is a port: `PlatformStore` is the only interface that knows platform tables exist, with a Supabase implementation and an in-memory one the tests drive the client through. Extraction for app #2 is writing another implementation, not touching callers. `scripts/check-platform-tables.mjs` fails the build if anything outside the seam queries a platform table.
+
 ### Fair-use quota — do this from day one
 
 A flat subscription against variable AI cost is an unbounded liability. One enthusiastic user importing 400 saved reels in a weekend costs real money. Put an import quota in the entitlement token now; adding one later is nearly impossible without upsetting people. Generous is fine — a ceiling that only abuse touches.

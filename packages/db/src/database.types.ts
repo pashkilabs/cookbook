@@ -800,7 +800,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      platform_spend_quota: {
+        Args: {
+          p_amount: number
+          p_app_key: string
+          p_family_id: string
+          p_quota: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
