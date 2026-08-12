@@ -93,13 +93,24 @@ describe.skipIf(instance === null)("timestamps and deletion belong to the databa
       expect(Math.abs(stamped - Date.now())).toBeLessThan(60_000);
     });
 
-    it("refuses to re-key a row or move it between households", async () => {
-      // not an edit: the identity of a row is what a peer reconciles against
+    it("refuses to re-key a row, because identity is what a peer reconciles against", async () => {
       const rekey = await household.client
         .from("recipes")
         .update({ id: "22222222-2222-2222-2222-222222222222" })
         .eq("id", recipeId);
       expect(rekey.error?.code).toBe(NO_PRIVILEGE);
+    });
+
+    it("leaves moving a row between households to RLS, which is where it is tested", async () => {
+      // family_id stays client-updatable on purpose (091500). Revoking it refused the
+      // write before the UPDATE policy was consulted, which masked the policy and made
+      // two mutations in test:mutate stop failing — the trap CLAUDE.md describes, one
+      // layer up.
+      const { error } = await household.client
+        .from("recipes")
+        .update({ family_id: household.familyId })
+        .eq("id", recipeId);
+      expect(error).toBeNull();
     });
   });
 

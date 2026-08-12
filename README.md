@@ -45,7 +45,7 @@ Open the repo root in VS Code and run Claude Code from there so it picks up
 
 ## Status
 
-**End of Phase 2's backend work.** 498 tests across four packages, typecheck clean.
+**End of Phase 2's backend work.** 499 tests across four packages, typecheck clean.
 
 | | |
 |---|---|

@@ -5,7 +5,7 @@ itself, and Phase 3 is next.**
 
 Built: `packages/core`, `packages/db` (19 tables, RLS, photo bucket, job queue),
 `packages/platform-client` (the seam, entitlement token, HTTP surface),
-`packages/import` (tiers 0–3, shared cache, photo storage, job runner). 498 tests
+`packages/import` (tiers 0–3, shared cache, photo storage, job runner). 499 tests
 across four packages.
 
 One Phase 1 item remains open, deliberately: **Stripe → entitlement issuance** is
