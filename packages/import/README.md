@@ -23,6 +23,7 @@ if (outcome.ok) {
 | `structured-data` | the machine-readable recipe data the page publishes | free |
 | `microdata` | `itemprop` attributes and recipe-plugin markup | free |
 | `llm` | a model over the page's text, schema-constrained | ¢ |
+| `vision` | a vision model over user-supplied screenshots, fused | ¢¢ |
 
 The deterministic tiers are more accurate than a model, because they read what the
 site said rather than interpreting it (decisions §6). **Deterministic before AI is
@@ -30,7 +31,6 @@ the control flow here, not a preference:** tier 2 only runs when the first two f
 nothing, and only when a cascade is passed in. `importRecipe` with no `llm` option
 calls no model at all.
 
-Tier 3 (vision) is not built.
 
 ## Tier 2 is structured, not tuned
 
@@ -72,6 +72,54 @@ nothing, so the harness can report which tier answered and what the cheaper ones
 That hit rate is the cost lever, and it cannot be reported if the cascade only returns
 its winner.
 
+## Tier 3: screenshots, fused
+
+```ts
+const outcome = await importFromImages(frames, {
+  cascade,                                    // needs cascade.visionModels
+  preparer: createSharpImagePreparer(),       // from @pashki/import/sharp
+});
+```
+
+Same provider interface as tier 2 — `LlmRequest.images` is the only difference, so a
+vision model is a **config value** (`cascade.visionModels`) and not a second code
+path. Also not tuned, and `PLACEHOLDER_VISION_CASCADE` is not a recommendation.
+Vision is the weakest link in the cascade (decisions §7): stylised text over food is
+materially harder than document OCR, and a phone screenshot of a reel is the worst
+input in the product. Expect fixtures to show it.
+
+**Every frame goes in one call.** A reel splits its recipe across the on-screen card,
+the caption and a pinned comment, so fusing them *is* the task. Three separate
+extractions produce three partial recipes and leave the merge to code that cannot see
+the pictures.
+
+**Estimated amounts are a first-class field.** Reels say "a splash of cream", so the
+schema asks per ingredient whether the amount was read or inferred, and a true flag
+becomes `estimated` on the parsed ingredient — which is already a column
+(`recipe_ingredients.is_estimated`). A note would be prose nobody queries; a boolean
+can be a filter and a visible marker on the review screen.
+
+Lines are parsed **one at a time** rather than through `parseIngredientList`, because
+that discards lines it cannot read and every following flag would shift onto the wrong
+ingredient. A misplaced "we guessed this" marker is worse than none — it tells someone
+a number is trustworthy when it is not.
+
+**The model chooses the dish photo, by index.** This is the one case where it may
+choose an image, because it is selecting among images the *user supplied* rather than
+inventing a URL. An out-of-range or non-integer index becomes no photo rather than a
+wrong one.
+
+**Downscaled before sending.** Pixels above a vision model's tile ceiling are paid for
+and then discarded. `createSharpImagePreparer` resizes to the longest-edge limit and
+re-encodes as JPEG; the passthrough preparer validates and **rejects** oversized
+images with a reason rather than forwarding them. Note that byte reduction is
+content-dependent — a small, highly regular PNG can re-encode to a larger JPEG — so
+what is guaranteed is the dimension and byte ceilings, not "always smaller".
+
+**Not cached.** The cache is keyed by URL hash and screenshots have none. Keying by
+image content would mean a shared table whose keys reveal that two households hold the
+same screenshot, for a hit rate near zero — everyone's crop differs.
+
 ## Driving it from the eval harness
 
 ```ts
@@ -80,8 +128,13 @@ const extractor = createImportExtractor({ fetcher, cache, llm });
 ```
 
 `url` fixtures run the whole cascade; `caption` fixtures go straight to tier 2, which
-is the path it exists for; `screenshot` returns null so the harness records a skip
-rather than scoring zero against an extractor that never claimed to handle images.
+is the path it exists for; `screenshot` fixtures run tier 3 over every frame they list.
+Null is returned only when a tier cannot be attempted at all — no cascade configured,
+no image loader, or a missing fixture file — so the harness records a skip rather than
+scoring zero against something that was never wired up.
+
+The screenshot fixture kind gained `extraImagePaths`, because a fixture with one image
+cannot measure fusion and fusion is the thing tier 3 does.
 
 **Server-only**, and enforced: a browser cannot fetch other websites, the cache needs
 the service role, and an inference key must never reach a client bundle.

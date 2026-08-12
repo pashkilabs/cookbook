@@ -18,7 +18,9 @@ export type Tier =
   /** microdata attributes and recipe-plugin markup */
   | "microdata"
   /** a model over the page's text, schema-constrained */
-  | "llm";
+  | "llm"
+  /** a vision model over user-supplied screenshots, fused into one recipe */
+  | "vision";
 
 /**
  * What one tier attempt did.
@@ -92,7 +94,11 @@ export type ImportFailure =
   | { kind: "fetch-failed"; url: string; status?: number; detail: string }
   | { kind: "not-html"; url: string; detail: string }
   | { kind: "no-recipe-found"; url: string; triedTiers: Tier[] }
-  | { kind: "recipe-incomplete"; url: string; tier: Tier; missing: string[] };
+  | { kind: "recipe-incomplete"; url: string; tier: Tier; missing: string[] }
+  /** every supplied screenshot failed to decode or was too large to send */
+  | { kind: "no-usable-images"; rejected: Array<{ image: string; detail: string }> }
+  /** screenshots were supplied but no vision model is configured */
+  | { kind: "vision-not-configured" };
 
 export interface ImportSuccess {
   recipe: ExtractedRecipe;

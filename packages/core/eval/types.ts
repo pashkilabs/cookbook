@@ -20,7 +20,20 @@ export type FixtureKind = "url" | "caption" | "screenshot";
 export type FixtureInput =
   | { kind: "url"; url: string; text?: string }
   | { kind: "caption"; text: string }
-  | { kind: "screenshot"; imagePath: string; text?: string };
+  | {
+      kind: "screenshot";
+      imagePath: string;
+      /**
+       * Further frames of the same recipe, when one is not enough.
+       *
+       * A reel splits its recipe across the on-screen card, the caption and a pinned
+       * comment, and the extractor is expected to fuse them into one recipe. A fixture
+       * with a single path cannot measure that, so the format allows several — the
+       * first is `imagePath` so a one-image fixture stays the simple case.
+       */
+      extraImagePaths?: string[];
+      text?: string;
+    };
 
 /** The only ingredient fields the eval scores. Amounts are as written, not in base units. */
 export interface EvalIngredient {

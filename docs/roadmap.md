@@ -97,10 +97,19 @@ rebuild, and everything else depends on it.*
       **Deliberately not tuned, and no production model chosen** —
       `PLACEHOLDER_CASCADE` is a stand-in. Both are measurements and the eval set
       still has three placeholder fixtures.
-- [ ] Tier 3 (vision). Needs the reel-screenshot fixtures.
-- [ ] **Choose the tier-2 model, and tune the prompt.** Blocked on real eval
-      fixtures — that Phase 0 item is now the only thing standing between the
-      cascade and a measured model choice.
+- [x] `packages/import` **tier 3 structure**: same provider interface extended with
+      images, so a vision model is a config value; every frame fused in one call;
+      estimated amounts flagged per ingredient; the model picks the dish photo by
+      index among the user's own images; screenshots downscaled before sending
+      (`@pashki/import/sharp`). Wired as an eval `Extractor`, and the screenshot
+      fixture kind now takes several frames so fusion is measurable.
+      **Not tuned, no model chosen** — vision is the weakest link (decisions §7) and
+      needs the reel-screenshot fixtures more than any other tier.
+- [ ] **Choose the tier-2 and tier-3 models, and tune both prompts.** Blocked on real
+      eval fixtures — that Phase 0 item is now the only thing standing between a
+      complete cascade and a measured model choice, and it blocks four separate
+      decisions: text model, vision model, whether the model or core should parse
+      amounts, and the image size limits.
 - [x] `import_cache` keyed by URL hash, not by family. Table in `packages/db`,
       reader and writer in `packages/import`. URLs are normalised before hashing, so
       the same page shared four ways is one row.

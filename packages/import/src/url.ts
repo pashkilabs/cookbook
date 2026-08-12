@@ -36,7 +36,9 @@ export interface NormalisedUrl {
  *
  * The fragment goes: it is never sent to a server, so it cannot change the response.
  */
-export function normaliseUrl(input: string): NormalisedUrl | ImportFailure {
+export function normaliseUrl(
+  input: string,
+): NormalisedUrl | Extract<ImportFailure, { kind: "invalid-url" }> {
   const trimmed = String(input ?? "").trim();
   if (!trimmed) return { kind: "invalid-url", url: trimmed, detail: "empty" };
 
@@ -71,7 +73,9 @@ export function normaliseUrl(input: string): NormalisedUrl | ImportFailure {
   return { href: url.toString(), host: url.hostname };
 }
 
-export function blockedPlatform(host: string): ImportFailure | null {
+export function blockedPlatform(
+  host: string,
+): Extract<ImportFailure, { kind: "blocked-platform" }> | null {
   for (const entry of BLOCKED) {
     if (entry.pattern.test(host)) {
       return {

@@ -26,6 +26,15 @@ export interface ModelConfig {
   maxOutputTokens?: number;
 }
 
+/**
+ * An image to send. Bytes plus the media type the provider should declare — a
+ * provider base64s it however its API wants.
+ */
+export interface ImageInput {
+  mediaType: "image/jpeg" | "image/png" | "image/webp";
+  bytes: Uint8Array;
+}
+
 export interface LlmRequest {
   model: ModelConfig;
   /**
@@ -48,6 +57,20 @@ export interface LlmRequest {
    * from a third-party page.
    */
   content: string;
+  /**
+   * Images, for tier 3.
+   *
+   * On the same interface rather than a separate `extractFromImages` method, so a
+   * vision model is a config value and not a second code path — the difference
+   * between tier 2 and tier 3 is which `ModelConfig` list the cascade reaches for,
+   * and whether this array is populated.
+   *
+   * Several images are sent in **one** call on purpose: a reel splits its recipe
+   * across the on-screen card, the caption and a pinned comment, and fusing them is
+   * the job. Three separate extractions would produce three partial recipes and leave
+   * the merging to code that cannot see the pictures.
+   */
+  images?: readonly ImageInput[];
 }
 
 export interface LlmUsage {
@@ -80,6 +103,15 @@ export interface LlmCascade {
   provider: LlmProvider;
   /** in order. The first is the workhorse; later entries are escalation. */
   models: ModelConfig[];
+  /**
+   * Models that accept images, in the same escalation order. Absent means tier 3 is
+   * not configured and screenshots are refused rather than guessed at.
+   *
+   * A separate list rather than a flag on the models above, because the escalation
+   * order for vision is its own question — decisions §7 puts vision on different
+   * models from the text workhorse.
+   */
+  visionModels?: ModelConfig[];
 }
 
 /**
@@ -94,6 +126,19 @@ export interface LlmCascade {
 export const PLACEHOLDER_CASCADE: ModelConfig[] = [
   { provider: "openai", model: "gpt-5.6-luna", region: "us", temperature: 0 },
   // escalation, on schema-validation failure only
+  { provider: "anthropic", model: "claude-haiku-4-5", region: "us", temperature: 0 },
+];
+
+/**
+ * Placeholder vision cascade. **Also not a recommendation.**
+ *
+ * Vision is the weakest link in the cascade (decisions §7): stylised text over food
+ * is materially harder than document OCR, and the input — a phone screenshot of a
+ * reel — is the worst material in the product. Expect real fixtures to show that, and
+ * expect this list to change more than the text one.
+ */
+export const PLACEHOLDER_VISION_CASCADE: ModelConfig[] = [
+  { provider: "google", model: "gemini-flash-lite", region: "us", temperature: 0 },
   { provider: "anthropic", model: "claude-haiku-4-5", region: "us", temperature: 0 },
 ];
 

@@ -49,8 +49,10 @@ export { extractMicrodata, extractSiteName } from "./microdata.js";
 export {
   EXTRACTION_INSTRUCTIONS,
   PLACEHOLDER_CASCADE,
+  PLACEHOLDER_VISION_CASCADE,
   RECIPE_JSON_SCHEMA,
   validateRecipePayload,
+  type ImageInput,
   type JsonSchema,
   type LlmCascade,
   type LlmProvider,
@@ -63,3 +65,28 @@ export {
 } from "./provider.js";
 export { extractWithLlm, pageToText, type Tier2Input, type Tier2Result } from "./tier2.js";
 export { createImportExtractor, type ImportExtractorOptions } from "./eval-extractor.js";
+export {
+  DEFAULT_IMAGE_LIMITS,
+  createPassthroughImagePreparer,
+  type ImageLimits,
+  type ImagePreparer,
+  type PrepareFailure,
+  type PrepareResult,
+  type PreparedImage,
+  type SourceImage,
+} from "./prepare-image.js";
+export {
+  VISION_INSTRUCTIONS,
+  VISION_JSON_SCHEMA,
+  extractFromImages,
+  importFromImages,
+  validateVisionPayload,
+  type SelectedPhoto,
+  type VisionImportOptions,
+  type VisionImportOutcome,
+  type VisionIngredient,
+  type VisionInput,
+  type VisionPayload,
+  type VisionResult,
+  type VisionValidation,
+} from "./vision.js";
