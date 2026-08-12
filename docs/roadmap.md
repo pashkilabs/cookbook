@@ -81,10 +81,12 @@ rebuild, and everything else depends on it.*
 ## Phase 2 — Web app
 
 - [ ] `apps/web` — Next.js shell, auth flow, household setup.
-- [ ] **An HTTP surface for the seam.** `platform-client` needs the service role,
-      so it cannot run in a browser or an app bundle. Web can call it server-side,
-      but Phase 3's Expo app cannot — it needs routes in front of it. Cheaper to
-      draw now than to retrofit when the native app is waiting on it.
+- [x] **An HTTP surface for the seam.** Session, entitlement, quota spend and device
+      registration, as a framework-agnostic router plus a Fetch adapter, so Next.js
+      in Phase 2 and any host in Phase 3 share one implementation. The account is
+      resolved from the caller's Supabase JWT and there is **no `accountId`
+      parameter anywhere** — verified with real tokens, including one household
+      naming another in its body. Handlers only; no app around them yet.
 - [x] `packages/import` — **tiers 0 and 1**: structured recipe data, then microdata
       and plugin markup. Deterministic, no model calls. Typed failures rather than
       exceptions, image references resolved through the graph, images validated by

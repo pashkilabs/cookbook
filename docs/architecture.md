@@ -294,6 +294,14 @@ Refreshed opportunistically whenever there's signal. Between `valid_until` and `
 
 Device limits are enforced at sign-in against the `devices` table, not on every action.
 
+The seam is reached over HTTP by anything that cannot hold the service role — which is
+every client. `packages/platform-client` exposes a framework-agnostic router
+(`/session`, `/entitlement/:appKey`, `/entitlement/:appKey/quota`, `/devices`) plus a
+Fetch adapter, so a Next.js route handler and a Phase 3 native host share one
+implementation. The caller authenticates with its Supabase JWT and the account is
+resolved from it; **no route accepts an `accountId`**, which is what stops one token
+acting for another account.
+
 ### As built
 
 *Implemented in `packages/platform-client`. If this and the code disagree, the code is right.*

@@ -30,6 +30,7 @@ const SERVER_ONLY = [
   "@pashki/import/sharp",
   "@pashki/import/photo-storage",
   "@pashki/platform-client/crypto",
+  "@pashki/platform-client/auth",
   "@pashki/platform-client/supabase",
 ];
 

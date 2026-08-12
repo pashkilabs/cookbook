@@ -24,6 +24,60 @@ await platform.consumeQuota("recipes", 1);   // allowed | exceeded | no-entitlem
 await platform.registerDevice("ios");        // deviceId
 ```
 
+## The HTTP surface
+
+```ts
+// a Next.js route handler is this and nothing more
+export const GET = toFetchHandler(
+  createPlatformRouter({
+    authenticator: createSupabaseAuthenticator(serviceRoleClient),
+    clientFor: (accountId) => createPlatformClient({ store, accountId, signer }),
+  }),
+  { basePath: "/api/platform" },
+);
+```
+
+| | |
+|---|---|
+| `GET /session` | account, family, members |
+| `GET /entitlement/:appKey` | access level, tier, quota, and the signed token |
+| `POST /entitlement/:appKey/quota` | spend, `{ amount, quota? }` |
+| `POST /devices` | register, `{ platform, deviceId? }` |
+
+This package needs the service role, so it cannot run in a browser or an app bundle
+(decisions §16). Web can call it server-side; Phase 3's Expo app cannot — these routes
+are how native reaches the seam, drawn while nothing depends on them rather than with
+the native app waiting.
+
+**The security property is that there is no `accountId` parameter anywhere.** The
+account is resolved from the caller's bearer token and handed to `clientFor`; no path,
+query or body field can influence whose data comes back. That is structural rather than
+validated — there is no check to get wrong, because there is nothing to check. Tested
+with real Supabase JWTs: one household's token spending quota while naming the other
+household in its body charges its own allowance and leaves the other untouched.
+
+**The token is checked by the auth server, not verified locally.** No component here
+holds the JWT secret, and a revoked session stops working immediately rather than at
+expiry — which is what "sign out everywhere" has to mean. The cost is a network call per
+request; the alternative is a secret in one more place and a revocation list to keep.
+
+Authentication happens **before the route is matched**, so a caller without a token
+cannot learn which routes exist. An auth-server outage answers 503, not 401 — telling
+somebody their token is bad when the checker is down sends them to re-authenticate for
+nothing.
+
+**Quota spend is a caller of the existing function**, not a second implementation: it
+goes through `consumeQuota` to the one atomic statement in the database. Exceeding it
+answers 429 rather than 403, because the caller may succeed once the period rolls.
+
+**The entitlement route returns the token, not the row.** A client gets the signed
+artefact it can carry offline plus what it needs to render — never the entitlement
+record, which is platform-owned and would invite clients to reason about it.
+
+Framework-agnostic by design: the router works over plain objects so it is testable
+without constructing a `Request`, and `toFetchHandler` is the thin adapter to the Fetch
+API that Next.js, Deno, Bun and Cloudflare all speak. One implementation, two hosts.
+
 ## Three entry points, on purpose
 
 | | |
@@ -31,6 +85,7 @@ await platform.registerDevice("ios");        // deviceId
 | `@pashki/platform-client` | types, client, access rules, token parsing. **No crypto, no database driver** — bundles for React Native |
 | `@pashki/platform-client/crypto` | Ed25519 signing and verification. Server only |
 | `@pashki/platform-client/supabase` | the Supabase `PlatformStore`. Server only, service role |
+| `@pashki/platform-client/auth` | the Supabase token authenticator. Server only |
 
 Splitting them is not tidiness. If signing lived in the main entry, importing the
 package anywhere in the Expo app would drag `node:crypto` into the bundle and
@@ -54,10 +109,12 @@ rather than expressing that as an absence, so adding a locking state later is a
 visible change to the type instead of something that slips in behind a boolean.
 There is a test asserting no point on the timeline denies reading.
 
-**Grace is policy, not a column.** `entitlements` stores `valid_until` only; the
-grace window is computed by this package (`graceDays`, default 7) and carried in
-the token. That is decisions §9, and it means changing the grace period does not
-need a migration.
+**Grace is a column, read not computed.** It used to be computed here on the reasoning
+that grace is issuance policy — but once the database enforces read-only degradation
+through an RLS predicate, the predicate and the token have to agree about when grace
+ends, and the only way to guarantee that is for both to read `entitlements.grace_until`.
+`graceUntilFor` remains for whoever issues an entitlement to compute a window with; it
+is no longer consulted on the read path. Decisions §9.
 
 **Boundaries are inclusive.** A token is valid *until* `validUntil`, so at exactly
 that instant it is still valid. Same for grace. The other convention expires a
