@@ -278,9 +278,11 @@ describe.skipIf(instance === null)("row-level security", () => {
     });
 
     it("cannot delete another household's recipe", async () => {
+      // deletion for a client is a tombstone (091300), so this exercises the UPDATE
+      // policy — which is what actually decides isolation now that DELETE is revoked
       const { data, error } = await alpha.client
         .from("recipes")
-        .delete()
+        .update({ deleted_at: new Date().toISOString() })
         .eq("id", beta.recipeId)
         .select("id");
       expect(error).toBeNull();
@@ -428,14 +430,16 @@ describe.skipIf(instance === null)("row-level security", () => {
     it("cannot delete", async () => {
       await lapse(alpha.familyId, -1);
       try {
-        // DELETE has no with-check clause, so this refusal is quiet: zero rows
+        // This refusal used to be quiet — zero rows — because DELETE has no with-check
+        // clause to fail. Since 091300 a client deletes by writing deleted_at, so the
+        // entitlement predicate applies and the refusal is loud like every other write.
         const { data, error } = await alpha.client
           .from("recipes")
-          .delete()
+          .update({ deleted_at: new Date().toISOString() })
           .eq("id", alpha.recipeId)
           .select("id");
-        expect(error).toBeNull();
-        expect(data).toEqual([]);
+        expect(error?.code).toBe(RLS_VIOLATION);
+        expect(data).toBeNull();
 
         const { count } = await admin
           .from("recipes")
@@ -764,9 +768,10 @@ describe.skipIf(instance === null)("row-level security", () => {
     });
 
     it("cannot delete another household's public recipe", async () => {
+      // a visible row is not a writable one, and tombstoning is a write
       const { data, error } = await alpha.client
         .from("recipes")
-        .delete()
+        .update({ deleted_at: new Date().toISOString() })
         .eq("id", beta.publicRecipeId)
         .select("id");
       expect(error).toBeNull();
