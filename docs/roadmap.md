@@ -5,7 +5,7 @@ itself, and Phase 3 is next.**
 
 Built: `packages/core`, `packages/db` (19 tables, RLS, photo bucket, job queue),
 `packages/platform-client` (the seam, entitlement token, HTTP surface),
-`packages/import` (tiers 0–3, shared cache, photo storage, job runner). 499 tests
+`packages/import` (tiers 0–3, shared cache, photo storage, job runner). 501 tests
 across four packages.
 
 One Phase 1 item remains open, deliberately: **Stripe → entitlement issuance** is
@@ -264,11 +264,10 @@ Reviewed at the Phase 2/3 checkpoint. Two closed there; the rest carry forward.
    check that would catch it inspects the address the socket actually connected to,
    which belongs in the `Fetcher` adapter — a custom lookup or agent, and the only
    remaining half of decisions §26's request-forgery finding.
-7. **`accounts` has an `accounts_update_self` policy and no matching grant.** It
-   decides nothing today. It would become live the moment somebody grants
-   `UPDATE` on `accounts` to a client, which is the sort of line that arrives in a
-   migration about something else. Dormant policies are how a grant becomes a
-   feature nobody reviewed.
+7. ~~**`accounts` has an `accounts_update_self` policy and no matching grant.**~~
+   Closed: the policy is dropped, so a future `grant update on accounts` fails
+   closed rather than silently opening the table, and
+   `assert_rls_invariants()` refuses any client write policy on a platform table.
 
 ### Fails loudly when it fails
 
@@ -285,12 +284,14 @@ Reviewed at the Phase 2/3 checkpoint. Two closed there; the rest carry forward.
    household loses one import from an allowance of fifty; a reservation protocol
    costs more than the failure does.
 
-**Not a gap, but observed:** running the `db` suite immediately after
-`supabase db reset` produced three misleading failures — an authenticated
-`UPDATE` returning zero rows rather than an auth error, most likely a session
-signed against an auth container that then restarted. It passes on a settled
-instance. `readLocalInstance` retries so the suite cannot silently skip, but it
-does not wait for auth to settle.
+**Closed:** the post-reset flake. It was two bugs, not one. Discovery gave up after
+nine seconds and skipped the whole integration suite while reporting green — now
+`test/global-setup.ts` waits once per run for both GoTrue and PostgREST to answer,
+and a stack that is present but unreachable fails rather than skips. And the
+forged-signature test flipped the last base64url character of a signature, which
+decodes to the same bytes four times in sixty-four. Turbo also cached the `test`
+task on source hashes, so three reproduction attempts were replays; `test` is no
+longer cached.
 
 ---
 

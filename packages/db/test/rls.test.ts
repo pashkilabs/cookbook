@@ -861,6 +861,36 @@ describe.skipIf(instance === null)("row-level security", () => {
     });
   });
 
+  describe("platform tables are read-only to clients", () => {
+    it("reads its own account row", async () => {
+      const { data, error } = await alpha.client
+        .from("accounts")
+        .select("id, email")
+        .eq("id", alpha.accountId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(1);
+    });
+
+    it("cannot write it, and no policy pretends otherwise", async () => {
+      // regression: accounts_update_self existed with no matching grant. It decided
+      // nothing — and RLS denies by default, so removing it means a future
+      // `grant update on accounts` still fails closed rather than silently opening the
+      // table (decisions §16, asserted in assert_rls_invariants).
+      const { error } = await alpha.client
+        .from("accounts")
+        .update({ email: "taken-over@example.com" })
+        .eq("id", alpha.accountId);
+      expect(error?.code).toBe(RLS_VIOLATION);
+
+      const { data } = await admin
+        .from("accounts")
+        .select("email")
+        .eq("id", alpha.accountId)
+        .single();
+      expect(data?.email).toBe(alpha.email);
+    });
+  });
+
   describe("updated_at", () => {
     it("is maintained by the database, not the caller", async () => {
       const before = await admin
