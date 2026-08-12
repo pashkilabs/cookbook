@@ -85,6 +85,10 @@ export interface ImportedPhoto {
  */
 export type ImportFailure =
   | { kind: "invalid-url"; url: string; detail: string }
+  // a client-supplied URL naming a host only the worker can reach. Refused before any
+  // request, because the fetch happens server-side and the result is readable by the
+  // household that asked for it
+  | { kind: "private-address"; url: string; host: string }
   /**
    * Facebook, Instagram and TikTok never resolve. Rejected before a request is
    * made, with the route the user should take instead — four doomed attempts and a

@@ -98,3 +98,76 @@ describe("resolving relative URLs", () => {
     expect(absoluteUrl("", "https://example.com/")).toBeNull();
   });
 });
+
+describe("a URL naming a host only the worker can reach", () => {
+  const refused = (url: string) => {
+    const result = normaliseUrl(url);
+    if (!("kind" in result)) throw new Error(`${url} was accepted as ${result.href}`);
+    return result.kind;
+  };
+
+  it("refuses loopback, however it is spelled", () => {
+    // regression: the URL in an import job is client-supplied and fetched server-side by
+    // a worker inside our network, and the result is written where the submitting
+    // household can read it — a request forgery with a return channel
+    for (const url of [
+      "http://127.0.0.1/x",
+      "https://127.0.0.1:8000/x",
+      // the parser normalises all three of these to 127.0.0.1 before we see them
+      "http://2130706433/x",
+      "http://0x7f.0.0.1/x",
+      "http://127.1/x",
+      "http://[::1]/x",
+      "http://[::ffff:127.0.0.1]/x",
+      "http://localhost/x",
+      "http://api.localhost/x",
+    ]) {
+      expect(refused(url), url).toBe("private-address");
+    }
+  });
+
+  it("refuses the private ranges and the link-local block a cloud metadata service sits on", () => {
+    for (const url of [
+      "http://10.0.0.5/x",
+      "http://172.16.0.1/x",
+      "http://172.31.255.255/x",
+      "http://192.168.1.1/x",
+      "http://169.254.169.254/latest/meta-data/",
+      "http://100.64.0.1/x",
+      "http://0.0.0.0/x",
+      "http://[fd00::1]/x",
+      "http://[fe80::1]/x",
+    ]) {
+      expect(refused(url), url).toBe("private-address");
+    }
+  });
+
+  it("refuses a dotless hostname, which only an internal resolver can answer", () => {
+    expect(refused("http://metadata/computeMetadata/v1/")).toBe("private-address");
+    expect(refused("http://redis/x")).toBe("private-address");
+  });
+
+  it("refuses internal suffixes", () => {
+    for (const url of ["http://db.internal/x", "http://nas.local/x", "http://x.home.arpa/y"]) {
+      expect(refused(url), url).toBe("private-address");
+    }
+  });
+
+  it("refuses credentials, which would be sent to whatever host follows them", () => {
+    expect(refused("https://user:pw@example.com/x")).toBe("invalid-url");
+  });
+
+  it("still accepts an ordinary recipe URL, including a public IP", () => {
+    const site = normaliseUrl("https://example.com/recipes/carbonara");
+    expect("kind" in site).toBe(false);
+    const publicIp = normaliseUrl("https://93.184.216.34/recipes/carbonara");
+    expect("kind" in publicIp).toBe(false);
+  });
+
+  it("does not pretend to cover a public name pointing at a private address", () => {
+    // checking the host cannot see DNS. Only checking the address the socket connected to
+    // can, and that belongs in the Fetcher adapter — see docs/roadmap.md
+    const rebinding = normaliseUrl("https://rebind.example.com/x");
+    expect("kind" in rebinding).toBe(false);
+  });
+});
