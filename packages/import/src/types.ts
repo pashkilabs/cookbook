@@ -98,7 +98,11 @@ export type ImportFailure =
   /** every supplied screenshot failed to decode or was too large to send */
   | { kind: "no-usable-images"; rejected: Array<{ image: string; detail: string }> }
   /** screenshots were supplied but no vision model is configured */
-  | { kind: "vision-not-configured" };
+  | { kind: "vision-not-configured" }
+  /** a queued job of a kind the runner does not drain yet */
+  | { kind: "unsupported-job-kind"; jobKind: string }
+  /** the household is out of allowance, or has no entitlement to spend against */
+  | { kind: "quota-exceeded"; reason: "exceeded" | "no-entitlement"; detail?: string };
 
 export interface ImportSuccess {
   recipe: ExtractedRecipe;

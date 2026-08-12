@@ -66,6 +66,19 @@ export {
 export { extractWithLlm, pageToText, type Tier2Input, type Tier2Result } from "./tier2.js";
 export { createImportExtractor, type ImportExtractorOptions } from "./eval-extractor.js";
 export {
+  drainQueue,
+  runNextJob,
+  type ClaimableKind,
+  type FinishJobInput,
+  type ImportJob,
+  type JobOutcome,
+  type JobQueue,
+  type JobResult,
+  type JobRunnerOptions,
+  type QuotaMeter,
+  type QuotaVerdict,
+} from "./job-runner.js";
+export {
   DEFAULT_IMAGE_LIMITS,
   createPassthroughImagePreparer,
   type ImageLimits,
