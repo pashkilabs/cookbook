@@ -63,6 +63,9 @@ importers:
       '@pashki/db':
         specifier: workspace:^
         version: link:../db
+      '@pashki/platform-client':
+        specifier: workspace:^
+        version: link:../platform-client
       '@supabase/supabase-js':
         specifier: ^2.112.3
         version: 2.112.3

@@ -199,9 +199,17 @@ photos              id, family_id, recipe_id, storage_path, source, width, heigh
                     -- review. anon sees a photo only when the recipe is published
                     -- and source = 'camera'.
 import_jobs         id, family_id, kind, input_ref, status, result_json, error,
+                    attempts, claimed_at, worker, quota_consumed_at, finished_at,
                     created_at, updated_at, deleted_at
                     -- kind in (url|text|screenshot|video)
-                    -- status includes 'review': no import saves unseen
+                    -- status includes 'review': no import saves unseen, so the runner
+                    -- finishes here and creates no recipe rows
+                    -- claimed atomically by public.import_claim_next_job with
+                    -- FOR UPDATE SKIP LOCKED; claimed_at doubles as a lease so a dead
+                    -- worker's job returns to the queue, and attempts makes a poison
+                    -- message visible
+                    -- quota_consumed_at stops a retry charging twice
+                    -- result_json holds the typed ImportFailure, not a message
 ```
 
 **The catalog** — global reference data, no `family_id`. Readable by any signed-in

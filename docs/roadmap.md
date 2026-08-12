@@ -129,7 +129,13 @@ rebuild, and everything else depends on it.*
       anon surface. Decisions §17 records flag-not-token; §18 records that the two
       previously-`masked` mutations now report `caught`, which was the acceptance
       criterion. Rendering the pages is still to do, and needs no further schema.
-- [ ] Batch import with a job queue. *`import_jobs` exists; nothing drains it.*
+- [x] Batch import with a job queue. `import_claim_next_job` claims atomically with
+      `FOR UPDATE SKIP LOCKED`, leases expire so a dead worker's job returns to the
+      queue, quota is spent once per job through the seam and never for a cached URL,
+      and terminal states carry the typed `ImportFailure`. A runner callable from a
+      test or a route; `apps/worker` as a container is still a separate decision.
+      Concurrency proven by twenty workers racing twelve jobs, and the test verified
+      by breaking the claim.
 
 **Ship this. Use it as a family for a month before writing native code.**
 

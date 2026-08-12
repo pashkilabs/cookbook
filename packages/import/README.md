@@ -173,6 +173,52 @@ the recipe is published *and* `source = 'camera'`. There are **no client write
 policies**: objects arrive via the service role, and camera upload is a Phase 3
 concern that will need a policy written deliberately.
 
+## Draining import_jobs
+
+```ts
+const outcomes = await drainQueue({
+  queue: createSupabaseJobQueue(serviceRoleClient),   // @pashki/import/job-queue
+  quota: createQuotaMeter({ store, appKey: "recipes" }),
+  worker: "route-1",
+  imports: { fetcher, cache, llm },
+  maxJobs: 25,
+});
+```
+
+A runner, not a container: callable from a test and from a route, so batch import works
+before `apps/worker` exists and the deployment shape stays a separate decision.
+
+**The claim is atomic in SQL.** `import_claim_next_job` uses `FOR UPDATE SKIP LOCKED`,
+so two workers running at the same instant get different rows — the second steps over
+the locked row rather than reading it, finding it `queued`, and taking it too. That is
+the same race `platform_spend_quota` exists to avoid. Proven by twenty workers racing
+for twelve jobs and asserting `attempts = 1` on every row; replacing the claim with a
+naive read-then-write makes that test report 17 jobs processed.
+
+**A finished job lands in `review`, never `saved`.** No import saves without the user
+seeing it, so the runner creates no recipe rows at all — which settles what idempotency
+means here: a retried job cannot produce two recipes because it produces none. What it
+could duplicate is quota and stored photos, so quota is recorded on the row
+(`quota_consumed_at`) and the photo is stored under the **job id**, meaning a retry
+overwrites instead of orphaning an object nobody can reach.
+
+**A dead worker's job is reclaimed** once its lease expires, with `attempts` making a
+poison message visible rather than infinite. The retry does not charge again.
+
+**Quota goes through the seam**, family-scoped: a worker acts for a household rather
+than as one of its adults, so `createQuotaMeter` in `@pashki/platform-client` is the
+route rather than `PlatformClient`, which resolves everything from an account. Counting
+locally would put a second opinion about the balance beside the one the database
+enforces.
+
+**A cached URL costs no quota**, because it costs no model call. The cache is peeked
+before charging — charging first and refunding is the version that goes wrong.
+
+**Terminal states carry the typed failure**, not a sentence: `result_json` holds the
+`ImportFailure` itself, so a UI can say "Instagram links never resolve, share a
+screenshot instead" by branching on `failure.kind`. `error` holds a one-line summary
+for logs only.
+
 ## Failures are values
 
 Every failure is a variant of `ImportFailure`, not an exception. Each one is
