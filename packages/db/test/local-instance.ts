@@ -18,17 +18,27 @@ const packageRoot = fileURLToPath(new URL("..", import.meta.url));
  * against a real JWT — a mocked version would assert that our mock filters rows,
  * which proves nothing about whether another household's data is reachable.
  */
-export function readLocalInstance(): LocalInstance | null {
-  let raw: string;
-  try {
-    raw = execFileSync("npx", ["supabase", "status", "-o", "json"], {
-      cwd: packageRoot,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-      timeout: 120_000,
-    });
-  } catch {
-    return null;
+export function readLocalInstance(attempts = 3): LocalInstance | null {
+  let raw = "";
+  // `db reset` ends by restarting containers, so a suite started straight after it
+  // asks a stack that is briefly gone. Without the retry the whole integration suite
+  // skips itself and reports green having tested nothing — silence reading as success,
+  // which is the same trap the mutation harness had.
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      raw = execFileSync("npx", ["supabase", "status", "-o", "json"], {
+        cwd: packageRoot,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+        timeout: 120_000,
+      });
+      break;
+    } catch {
+      if (attempt === attempts - 1) return null;
+      // a container restart takes a few seconds; a genuinely absent stack fails all
+      // three and still skips
+      execFileSync("sleep", ["3"]);
+    }
   }
 
   let status: Record<string, unknown>;
