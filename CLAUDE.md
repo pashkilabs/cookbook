@@ -128,6 +128,13 @@ models be good enough. Do not add a silent-save path.
 - **To test an RLS policy, make it permissive — don't remove it.** RLS denies by
   default, so a dropped policy makes the table *more* restrictive and the
   isolation test passes for the wrong reason. See `packages/db` `test:mutate`.
+- **Silence reads as success.** Any check that can produce *no* result must
+  distinguish "no result" from "passed", or an unusable run looks like a clean one.
+  This has bitten twice: a mutation harness treating zero matched tests as a pass,
+  and instance discovery skipping every integration test because the API had not
+  finished restarting. Two rules follow. A check reports three outcomes, not two —
+  passed, failed, and could-not-measure, with different exit codes. And a skip that
+  infrastructure timing could have caused gets retried before it is believed.
 - **Storage rows cannot be deleted with SQL.** A `storage.protect_delete()` trigger
   refuses direct deletes from `storage.buckets` and `storage.objects` to stop objects
   being orphaned, so cleanup goes through the Storage API — `.remove()` for objects,
