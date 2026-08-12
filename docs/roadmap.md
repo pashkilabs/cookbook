@@ -5,7 +5,7 @@ itself, and Phase 3 is next.**
 
 Built: `packages/core`, `packages/db` (19 tables, RLS, photo bucket, job queue),
 `packages/platform-client` (the seam, entitlement token, HTTP surface),
-`packages/import` (tiers 0–3, shared cache, photo storage, job runner). 437 tests
+`packages/import` (tiers 0–3, shared cache, photo storage, job runner). 451 tests
 across four packages.
 
 One Phase 1 item remains open, deliberately: **Stripe → entitlement issuance** is
@@ -157,6 +157,44 @@ rebuild, and everything else depends on it.*
 - [ ] RevenueCat for cross-platform entitlements.
 - [ ] TestFlight — **far earlier than feels comfortable.**
 
+### What Phase 3 will hit that the list above does not say
+
+Found at the Phase 2/3 checkpoint by reading the built code against these tasks.
+Five dependencies, none of them Expo problems.
+
+**Nothing issues a token to a device, and nothing can verify one there.** The HTTP
+surface returns a signed entitlement token, and `authoriseToken` checks it — but
+only where a public key is in hand. There is no distribution story for that key,
+no refresh schedule, and nowhere on the device for a token to live. Offline
+entitlement is the point of signing them, and the last mile does not exist. This
+blocks the shopping mode's no-signal requirement, not just billing.
+
+**Local SQLite has no row-level security.** Every isolation guarantee that has been
+built is a server-side predicate — `private.current_family_ids()` and the policy
+loop. A local database has none of it, so on-device household isolation is
+enforced by nothing that exists. It matters less on a personal device and more
+than nothing: a shared iPad, or a sync bug that pulls a row down, has no floor
+under it. Decide deliberately whether the local store is per-household or
+per-device, before the sync engine decides for you.
+
+**Camera has no write path.** The photo bucket deliberately has no client write
+policy — imports are fetched and stored server-side. Photographing the plate needs
+a storage write policy written from scratch, plus a decision about whether the
+device uploads directly or posts to a route. This is the only Phase 3 task that
+needs new SQL.
+
+**The share target receives a link for exactly the platforms that never resolve.**
+Instagram and TikTok hand over a URL, and decisions §12 says reject those up
+front. So the share-sheet path that a user will reach for most is the one ruled
+out, and the routes that do work — screenshots and video files — are the ones
+nothing implements yet. Tier 3 accepts images and Phase 4 owns video, so the share
+target's real job is triage, not receiving. Build it as triage.
+
+**`import_jobs` has a drain but no scheduler.** The runner claims work atomically
+and is callable from a route; nothing calls it on a timer. A device that submits an
+import and closes waits forever. Cron, a queue trigger, or a Supabase scheduled
+function — the choice is small, its absence is not.
+
 ---
 
 ## Phase 4 — Media
@@ -180,22 +218,59 @@ Generalise what app #2 actually needs. Not before.
 
 ## Known gaps in the foundations
 
-Found by reviewing Phase 1 against itself. None of these are Phase 2 features;
-they are load-bearing behaviour that nothing currently proves.
+Load-bearing behaviour that nothing currently proves. **Ranked by how quietly it
+fails, not by how much work it is** — a gap that throws is a gap that gets fixed
+the day it matters, and a gap that returns a plausible wrong answer can sit in
+production for a year. Anything that would fail loudly is at the bottom on
+purpose.
 
-**`verify()` does not check expiry.** It checks the signature and nothing else;
-the window is evaluated separately by `evaluateAccess`. Defensible — verification
-is not authorisation — but it means every caller has to remember to do both, and
-nothing enforces the pairing.
+Reviewed at the Phase 2/3 checkpoint. Two closed there; the rest carry forward.
 
-**Untested paths that carry weight:**
+### Fails silently, wrong answer looks right
 
-- Composite foreign keys are tested on `recipe_ingredients` only, not on `ratings`,
-  `photos`, `plan_entries` or `shortlist_entries`.
-- Seed idempotency was verified by hand, not by a test.
-- `platform_spend_quota` being service-role-only was verified by hand.
-- `registerDevice`'s revoked-device path.
-- The `child_has_no_login` constraint.
+1. ~~**`verify()` does not check expiry.**~~ Closed: `authoriseToken` pairs the
+   signature check with the window and returns a union with no expired state.
+   `verify()` keeps its narrow meaning, and there is a test pinning that it still
+   accepts an expired token on its own.
+2. ~~**Composite foreign keys tested on one table of seven.**~~ Closed, and it
+   found two references that were single-column — `ratings.family_member_id` and
+   `recipes.created_by`. `assert_rls_invariants()` now refuses any migration that
+   adds a single-column reference between household tables.
+3. **Nothing reaps orphaned photo objects.** An import that fetches and stores a
+   photo, then fails or is abandoned at the review screen, leaves the object in
+   the bucket with no `photos` row pointing at it. Nothing lists it, nothing bills
+   for it visibly, and nothing deletes it. It accumulates. Storage cost is the
+   symptom; the real problem is that an object with no row has no household, so
+   it is outside every access rule that has been written.
+4. **`assert_rls_invariants()` only runs if a migration remembers to call it.**
+   It is the guard behind three separate invariants now, and its own enforcement
+   is a convention. Two existing migrations legitimately skip it (they add no
+   tables) which is exactly what makes an omission hard to spot by eye.
+5. **`platform_spend_quota` being service-role-only was verified by hand.** If a
+   grant slips, quota stops being server-authoritative and the failure is a
+   number that is merely wrong.
+
+### Fails loudly when it fails
+
+6. **`registerDevice`'s revoked-device path.** Untested.
+7. **The `child_has_no_login` constraint.** Untested. Violating it raises.
+8. **Seed idempotency** was verified by hand — but the catalog round-trip test
+   would fail loudly if a second seed duplicated rows. Downgraded from where it
+   sat before.
+
+### Known and accepted
+
+9. **Quota double-charge window.** A crash between the spend and recording the
+   job charges an import that never ran. One statement cannot span both. The
+   household loses one import from an allowance of fifty; a reservation protocol
+   costs more than the failure does.
+
+**Not a gap, but observed:** running the `db` suite immediately after
+`supabase db reset` produced three misleading failures — an authenticated
+`UPDATE` returning zero rows rather than an auth error, most likely a session
+signed against an auth container that then restarted. It passes on a settled
+instance. `readLocalInstance` retries so the suite cannot silently skip, but it
+does not wait for auth to settle.
 
 ---
 

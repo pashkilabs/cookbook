@@ -152,13 +152,27 @@ insert, update, delete — on the same predicate. Child tables reference
 `(parent_id, family_id)` as a **composite foreign key**, so a row cannot claim a
 household its parent does not belong to.
 
+That applies to *every* reference between household tables, not only to obvious
+parent-child pairs: `ratings.family_member_id` and `recipes.created_by` point at
+`family_members` compositely too, or a household could attribute a rating to
+somebody it has never met. `private.assert_rls_invariants()` fails any migration
+that adds a single-column reference between two tables that both carry
+`family_id`, because these constraints are written per table and that is where a
+typo hides. References to `families` itself stay single-column — there is no
+second column to pair with — and the invariant skips them for that reason rather
+than by name.
+
 ```
 recipes             id, family_id, title, source_url, source_name, servings,
                     time_minutes, status, visibility, make_again, times_made,
                     created_by, created_at, updated_at, deleted_at
-                    -- created_by -> family_members, so the UI can name a person
-                    -- who may not have a login. UNIQUE (id, family_id) is the
-                    -- target for every child table's composite FK.
+                    -- created_by -> family_members (id, family_id), so the UI
+                    -- can name a person who may not have a login. Nullable —
+                    -- most recipes are imported and nobody typed them. ON DELETE
+                    -- SET NULL (created_by) names the column, or removing a
+                    -- member would try to null family_id and fail instead.
+                    -- UNIQUE (id, family_id) is the target for every child
+                    -- table's composite FK.
                     -- visibility: 'private' (default) or 'public'. Public is
                     -- world-readable and indexable by anon, not an unlisted link
                     -- (decisions §17). anon reads it through column grants, so
@@ -182,6 +196,8 @@ ratings             id, family_id, recipe_id, family_member_id, score, rated_at,
                     -- score 1-5, matching the product's five-point scale, which
                     -- the "whole family likes it" filter needs
                     -- one live rating per member per recipe (partial unique index)
+                    -- family_member_id -> family_members (id, family_id): a
+                    -- rating cannot be attributed to another household's person
 meal_plans          id, family_id, week_start, created_at, updated_at, deleted_at
 plan_entries        id, family_id, meal_plan_id, date, recipe_id, scale, cooked_at,
                     created_at, updated_at, deleted_at
