@@ -2,9 +2,9 @@
 
 **Current position: end of Phase 1. Phase 2 is next.**
 
-Built: `packages/core` (88 tests), `packages/db` (18 tables, RLS, seeded catalog),
-`packages/platform-client` (the seam, entitlement token). 176 tests across three
-packages.
+Built: `packages/core`, `packages/db` (19 tables, RLS, seeded catalog),
+`packages/platform-client` (the seam, entitlement token), `packages/import`
+(deterministic tiers 0 and 1). 293 tests across four packages.
 
 One Phase 1 item remains open, deliberately: **Stripe → entitlement issuance** is
 blocked on Apple's outside-purchase rules (`docs/decisions.md`, Unresolved).
@@ -85,21 +85,27 @@ rebuild, and everything else depends on it.*
       so it cannot run in a browser or an app bundle. Web can call it server-side,
       but Phase 3's Expo app cannot — it needs routes in front of it. Cheaper to
       draw now than to retrofit when the native app is waiting on it.
-- [ ] `packages/import` — tier 0 (structured recipe data), tier 1 (microdata and
-      plugin markup), tier 2 (LLM cascade), tier 3 (vision). One provider
+- [x] `packages/import` — **tiers 0 and 1**: structured recipe data, then microdata
+      and plugin markup. Deterministic, no model calls. Typed failures rather than
+      exceptions, image references resolved through the graph, images validated by
+      decoding, blocked platforms rejected before a request. Wired to
+      `import_cache` by URL hash. 76 tests.
+- [ ] `packages/import` tiers 2 (LLM cascade) and 3 (vision). One provider
       interface; model as config.
-      *Tiers 2 and 3 cannot be judged until the eval set has real fixtures — the
-      harness is built but three placeholders measure nothing. That Phase 0 item is
-      a real dependency of this one.*
-- [x] `import_cache` keyed by URL hash, not by family. Built in `packages/db`:
-      no `family_id`, no policies, service-role only. Needs a reader and writer.
+      **Blocked in practice:** neither can be judged until the eval set has real
+      fixtures. The harness is built; three placeholders measure nothing. That
+      Phase 0 item is a hard dependency of this one.
+- [x] `import_cache` keyed by URL hash, not by family. Table in `packages/db`,
+      reader and writer in `packages/import`. URLs are normalised before hashing, so
+      the same page shared four ways is one row.
 - [ ] Photo pipeline: fetch server-side, resize, store, CDN. *No Storage bucket or
       its policies exist yet; `photos.storage_path` is a column pointing at
       nothing.*
 - [ ] Port the prototype's screens: recipe list, detail with per-member ratings,
       week planner, shopping list with the split display, pantry.
       *`plan_entries.recipe_id` is NOT NULL, so a free-text planner entry
-      ("leftovers") needs a migration.*
+      ("leftovers") needs a migration. The method now has somewhere to live:
+      `recipe_steps`, decisions §19.*
 - [x] **Schema and policies for public recipe pages.** `recipes.visibility`, anon
       RLS policies plus column grants, and a migration self-check over the whole
       anon surface. Decisions §17 records flag-not-token; §18 records that the two

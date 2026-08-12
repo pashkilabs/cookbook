@@ -128,6 +128,11 @@ models be good enough. Do not add a silent-save path.
 - **To test an RLS policy, make it permissive — don't remove it.** RLS denies by
   default, so a dropped policy makes the table *more* restrictive and the
   isolation test passes for the wrong reason. See `packages/db` `test:mutate`.
+- **As `anon`, `select *` on a public recipe fails.** Public reads are limited by
+  **column** grants as well as row policies, and asking for a column you cannot
+  read is a permission error rather than a filtered subset. Public reads need an
+  explicit column list. The error is the safe direction: a caller has to name what
+  it wants.
 - **A PostgREST bulk insert ignores column defaults.** It sends the union of the
   keys across every row in the batch and passes NULL for whatever a row omits, so
   a row that leaves out a column with a default gets NULL rather than the default

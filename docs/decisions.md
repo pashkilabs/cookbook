@@ -424,6 +424,37 @@ the work and the one under test is unverified.
 
 ---
 
+## 19. The method is a child table, and is not published
+
+`recipe_steps` — one row per instruction, ordered by `position` — rather than a
+`text[]` on `recipes`.
+
+The array is simpler and was rejected on two counts:
+
+- **Last-write-wins is per row** (§11). Two people editing different steps of the
+  same recipe would conflict on a single array and one edit would vanish. A row per
+  step lets last-write-wins resolve each independently, which is the behaviour §11
+  assumes is adequate.
+- **Cook mode is per-step** (Phase 3): a timer, a checked-off box, an ingredient
+  pinned to step 4. Each needs a step to have an identity. An array element has
+  none, so every one of those features would have started with this migration
+  anyway.
+
+It also matches `recipe_ingredients`, so both halves of a recipe have one shape.
+
+**Steps are not readable by anon**, and that is a position rather than an omission.
+An ingredient list is close to a list of facts; the method is the source's prose —
+what §12 says not to reproduce, and the substance of the unresolved copyright
+question. A public page shows ingredients, times and attribution, and links back
+for the method. The migration asserts anon has no privilege on the table.
+
+*Would change if:* the copyright posture lands somewhere that permits republishing
+method text — for household-authored recipes it already would. Widening is a column
+grant and one policy mirroring `recipe_ingredients`, and it should be a deliberate
+act rather than a default.
+
+---
+
 ## Unresolved
 
 | Question | Why it blocks | Who can answer |

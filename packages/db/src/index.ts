@@ -31,6 +31,7 @@ export type Update<T extends keyof Tables> = Tables[T]["Update"];
 export const APP_TABLES = [
   "recipes",
   "recipe_ingredients",
+  "recipe_steps",
   "ingredients",
   "grocery_packages",
   "ratings",
@@ -73,6 +74,7 @@ export const EVERY_TABLE_IS_CLASSIFIED: NoUnlistedTables = true;
 export const HOUSEHOLD_TABLES = [
   "recipes",
   "recipe_ingredients",
+  "recipe_steps",
   "ratings",
   "meal_plans",
   "plan_entries",

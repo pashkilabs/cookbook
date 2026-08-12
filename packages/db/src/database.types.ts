@@ -653,6 +653,47 @@ export type Database = {
           },
         ]
       }
+      recipe_steps: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          family_id: string
+          id: string
+          position: number
+          recipe_id: string
+          text: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          family_id: string
+          id?: string
+          position: number
+          recipe_id: string
+          text: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          family_id?: string
+          id?: string
+          position?: number
+          recipe_id?: string
+          text?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_steps_recipe"
+            columns: ["recipe_id", "family_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id", "family_id"]
+          },
+        ]
+      }
       recipes: {
         Row: {
           created_at: string

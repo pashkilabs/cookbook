@@ -1,0 +1,33 @@
+{
+  "name": "@pashki/import",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Server-side recipe import. Deterministic tiers only: structured recipe data, then microdata and plugin markup.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./supabase": {
+      "types": "./src/supabase-cache.ts",
+      "default": "./src/supabase-cache.ts"
+    }
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@pashki/db": "workspace:^",
+    "@supabase/supabase-js": "^2.112.3",
+    "@types/node": "^26.2.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  },
+  "dependencies": {
+    "@pashki/core": "workspace:^"
+  }
+}

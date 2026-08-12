@@ -134,9 +134,11 @@ subscriptions       id, family_id, provider, external_id, status, renews_at,
                     -- provider in (stripe|app_store|play); UNIQUE (provider,
                     -- external_id) makes a replayed webhook an upsert
 entitlements        id, family_id, app_key, tier, quota_json, valid_until,
-                    created_at, updated_at
-                    -- UNIQUE (family_id, app_key). No grace column: grace is an
-                    -- issuance policy carried in the token, per decisions §9
+                    grace_until, created_at, updated_at
+                    -- UNIQUE (family_id, app_key), CHECK (grace_until >= valid_until)
+                    -- grace_until is a column because the RLS predicate that
+                    -- enforces read-only reads it, and it must agree with the token
+                    -- to the millisecond (decisions §9)
 ```
 
 **The critical split: `family_members` are not `accounts`.** Adults have logins. Children get rated but never sign in. The prototype stumbled onto this with its separate "eaters" list; here it's formalised. Every app in the portfolio inherits this family definition rather than asking users to rebuild it.
@@ -160,6 +162,15 @@ recipes             id, family_id, title, source_url, source_name, servings,
                     -- (decisions §17). anon reads it through column grants, so
                     -- family_id / make_again / times_made / created_by / status
                     -- are not selectable by anon at all.
+recipe_steps        id, family_id, recipe_id, position, text,
+                    created_at, updated_at, deleted_at
+                    -- the method, one row per step. A child table rather than a
+                    -- text[] for two reasons: last-write-wins is per row, so an
+                    -- array would lose one of two people's simultaneous edits to
+                    -- different steps; and cook mode's per-step state (timers,
+                    -- check-off, an ingredient pinned to a step) needs a step to
+                    -- have an id. NOT public — the method is the source's prose,
+                    -- which is the unresolved copyright question. See decisions §19.
 recipe_ingredients  id, family_id, recipe_id, position, amount, unit, item_text,
                     ingredient_id?, note, is_estimated,
                     created_at, updated_at, deleted_at

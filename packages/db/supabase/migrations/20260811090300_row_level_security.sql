@@ -408,79 +408,89 @@ $do$;
 -- locked state.
 -- ---------------------------------------------------------------------------
 
-do $do$
-declare
-  offenders text[];
-begin
-  select coalesce(array_agg(c.relname || '.' || p.polname order by c.relname), '{}')
-  into offenders
-  from pg_policy p
-  join pg_class c on c.oid = p.polrelid
-  join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'
-  where p.polcmd in ('r', '*')
-    and coalesce(pg_get_expr(p.polqual, p.polrelid), '') like '%household_can_write%';
-
-  if array_length(offenders, 1) > 0 then
-    raise exception
-      'a SELECT policy depends on the entitlement window, which would lock a household out of its own data: %',
-      array_to_string(offenders, ', ');
-  end if;
-
-  -- and the converse: every household table's write policies must carry it, or one
-  -- table silently stays writable after grace
-  select coalesce(array_agg(distinct c.relname || ' ' || p.polname order by c.relname || ' ' || p.polname), '{}')
-  into offenders
-  from pg_policy p
-  join pg_class c on c.oid = p.polrelid
-  join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'
-  join pg_attribute a on a.attrelid = c.oid and a.attname = 'family_id'
-  where p.polcmd in ('a', 'w', 'd')
-    and c.relname not in ('subscriptions', 'entitlements', 'family_members')
-    and coalesce(pg_get_expr(p.polqual, p.polrelid), '')
-        || coalesce(pg_get_expr(p.polwithcheck, p.polrelid), '') not like '%household_can_write%';
-
-  if array_length(offenders, 1) > 0 then
-    raise exception
-      'write policies without an entitlement check would stay writable after grace: %',
-      array_to_string(offenders, ', ');
-  end if;
-end;
-$do$;
-
 -- ---------------------------------------------------------------------------
--- Self-check: updated_at is maintained everywhere it exists.
+-- The invariants, as a callable function.
 --
--- A table carrying the column but missing the trigger is the quiet kind of broken:
--- everything works, and last-write-wins sync silently starts resolving conflicts
--- against a timestamp that stopped moving. Nothing in an application test would
--- notice, so it is asserted here across every table at once.
+-- These were inline DO blocks, which meant they only ever described the schema as
+-- it stood in *this* migration — a table added by a later one was never checked. A
+-- function fixes that: every migration that adds a household table calls it, and
+-- forgetting to is a failed `db reset` rather than a silent hole.
 -- ---------------------------------------------------------------------------
 
-do $do$
-declare
-  missing text[];
+create or replace function private.assert_rls_invariants()
+returns void
+language plpgsql
+set search_path = ''
+as $fn$
 begin
-  select coalesce(array_agg(c.relname order by c.relname), '{}')
-  into missing
-  from pg_class c
-  join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'
-  join pg_attribute a on a.attrelid = c.oid and a.attname = 'updated_at' and a.attnum > 0
-  where c.relkind = 'r'
-    and not exists (
-      select 1
-      from pg_trigger t
-      join pg_proc f on f.oid = t.tgfoid
-      join pg_namespace fn on fn.oid = f.pronamespace
-      where t.tgrelid = c.oid
-        and not t.tgisinternal
-        and fn.nspname = 'private'
-        and f.proname = 'set_updated_at'
-    );
+  declare
+    offenders text[];
+  begin
+    select coalesce(array_agg(c.relname || '.' || p.polname order by c.relname), '{}')
+    into offenders
+    from pg_policy p
+    join pg_class c on c.oid = p.polrelid
+    join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'
+    where p.polcmd in ('r', '*')
+      and coalesce(pg_get_expr(p.polqual, p.polrelid), '') like '%household_can_write%';
+  
+    if array_length(offenders, 1) > 0 then
+      raise exception
+        'a SELECT policy depends on the entitlement window, which would lock a household out of its own data: %',
+        array_to_string(offenders, ', ');
+    end if;
+  
+    -- and the converse: every household table's write policies must carry it, or one
+    -- table silently stays writable after grace
+    select coalesce(array_agg(distinct c.relname || ' ' || p.polname order by c.relname || ' ' || p.polname), '{}')
+    into offenders
+    from pg_policy p
+    join pg_class c on c.oid = p.polrelid
+    join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'
+    join pg_attribute a on a.attrelid = c.oid and a.attname = 'family_id'
+    where p.polcmd in ('a', 'w', 'd')
+      and c.relname not in ('subscriptions', 'entitlements', 'family_members')
+      and coalesce(pg_get_expr(p.polqual, p.polrelid), '')
+          || coalesce(pg_get_expr(p.polwithcheck, p.polrelid), '') not like '%household_can_write%';
+  
+    if array_length(offenders, 1) > 0 then
+      raise exception
+        'write policies without an entitlement check would stay writable after grace: %',
+        array_to_string(offenders, ', ');
+    end if;
+  end;
 
-  if array_length(missing, 1) > 0 then
-    raise exception
-      'tables have updated_at but no trigger to maintain it, which breaks last-write-wins: %',
-      array_to_string(missing, ', ');
-  end if;
+  declare
+    missing text[];
+  begin
+    select coalesce(array_agg(c.relname order by c.relname), '{}')
+    into missing
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'
+    join pg_attribute a on a.attrelid = c.oid and a.attname = 'updated_at' and a.attnum > 0
+    where c.relkind = 'r'
+      and not exists (
+        select 1
+        from pg_trigger t
+        join pg_proc f on f.oid = t.tgfoid
+        join pg_namespace fn on fn.oid = f.pronamespace
+        where t.tgrelid = c.oid
+          and not t.tgisinternal
+          and fn.nspname = 'private'
+          and f.proname = 'set_updated_at'
+      );
+  
+    if array_length(missing, 1) > 0 then
+      raise exception
+        'tables have updated_at but no trigger to maintain it, which breaks last-write-wins: %',
+        array_to_string(missing, ', ');
+    end if;
+  end;
 end;
-$do$;
+$fn$;
+
+comment on function private.assert_rls_invariants is
+  'Asserts the household-table invariants: reads never depend on billing, writes always do, and updated_at is maintained. Call from every migration that adds a table.';
+
+do $do$ begin perform private.assert_rls_invariants(); end; $do$;
+
