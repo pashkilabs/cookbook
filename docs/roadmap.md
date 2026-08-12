@@ -90,11 +90,17 @@ rebuild, and everything else depends on it.*
       exceptions, image references resolved through the graph, images validated by
       decoding, blocked platforms rejected before a request. Wired to
       `import_cache` by URL hash. 76 tests.
-- [ ] `packages/import` tiers 2 (LLM cascade) and 3 (vision). One provider
-      interface; model as config.
-      **Blocked in practice:** neither can be judged until the eval set has real
-      fixtures. The harness is built; three placeholders measure nothing. That
-      Phase 0 item is a hard dependency of this one.
+- [x] `packages/import` **tier 2 structure**: one provider interface, model as a
+      config value, provider-enforced JSON schema, our own validation deciding
+      escalation, every tier attempt recorded, and the whole thing wired as an eval
+      `Extractor`. Cached by URL hash alongside tiers 0 and 1.
+      **Deliberately not tuned, and no production model chosen** —
+      `PLACEHOLDER_CASCADE` is a stand-in. Both are measurements and the eval set
+      still has three placeholder fixtures.
+- [ ] Tier 3 (vision). Needs the reel-screenshot fixtures.
+- [ ] **Choose the tier-2 model, and tune the prompt.** Blocked on real eval
+      fixtures — that Phase 0 item is now the only thing standing between the
+      cascade and a measured model choice.
 - [x] `import_cache` keyed by URL hash, not by family. Table in `packages/db`,
       reader and writer in `packages/import`. URLs are normalised before hashing, so
       the same page shared four ways is one row.

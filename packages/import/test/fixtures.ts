@@ -1,4 +1,4 @@
-import type { FetchedBytes, FetchedPage, Fetcher, ImportCache, ExtractedRecipe } from "../src/index.js";
+import type { CachedImport, FetchedBytes, FetchedPage, Fetcher, ImportCache } from "../src/index.js";
 
 /** A fetcher over a fixed map of URLs, so no test touches the network. */
 export function createFakeFetcher(
@@ -33,8 +33,8 @@ export function createFakeFetcher(
   };
 }
 
-export function createFakeCache(): ImportCache & { store: Map<string, ExtractedRecipe>; gets: string[]; puts: string[] } {
-  const store = new Map<string, ExtractedRecipe>();
+export function createFakeCache(): ImportCache & { store: Map<string, CachedImport>; gets: string[]; puts: string[] } {
+  const store = new Map<string, CachedImport>();
   const gets: string[] = [];
   const puts: string[] = [];
   return {
@@ -45,9 +45,9 @@ export function createFakeCache(): ImportCache & { store: Map<string, ExtractedR
       gets.push(urlHash);
       return store.get(urlHash) ?? null;
     },
-    async put(urlHash, recipe) {
+    async put(urlHash, entry) {
       puts.push(urlHash);
-      store.set(urlHash, recipe);
+      store.set(urlHash, entry);
     },
   };
 }

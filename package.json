@@ -9,7 +9,7 @@
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
     "build": "turbo run build",
-    "check:boundaries": "node scripts/check-seed-catalog-usage.mjs && node scripts/check-platform-tables.mjs",
+    "check:boundaries": "node scripts/check-seed-catalog-usage.mjs && node scripts/check-platform-tables.mjs && node scripts/check-server-only.mjs",
     "check": "pnpm check:boundaries && pnpm typecheck && pnpm test"
   },
   "devDependencies": {

@@ -4,6 +4,7 @@ import type {
   ImportOutcome,
   ImportedPhoto,
   Tier,
+  TierAttempt,
 } from "./types.js";
 import {
   buildNodeIndex,
@@ -14,33 +15,39 @@ import {
 } from "./jsonld.js";
 import { extractMicrodata, extractSiteName } from "./microdata.js";
 import { mapRecipeNode, missingFields } from "./recipe.js";
+import { extractWithLlm, pageToText } from "./tier2.js";
 import { decodeImage } from "./image.js";
 import { blockedPlatform, hashUrl, normaliseUrl } from "./url.js";
 
-const TIERS: Tier[] = ["structured-data", "microdata"];
+/** Cheapest first. Tier 2 only runs when a cascade is configured. */
+const DETERMINISTIC_TIERS: Tier[] = ["structured-data", "microdata"];
 
 /**
- * Import a recipe from a URL, deterministically.
+ * Import a recipe from a URL.
  *
  * Order of operations is deliberate, cheapest first:
  *
  *   1. Normalise and reject platforms that never resolve — no request at all.
  *   2. Ask the shared cache. A recipe doing the rounds is parsed once for everybody.
- *   3. Fetch the page once, then try tier 0 and tier 1 against the same HTML.
- *   4. Fetch and decode the image.
+ *   3. Fetch the page once, then try each tier against the same HTML.
+ *   4. Tier 2, only if the deterministic tiers found nothing and a cascade is
+ *      configured. A model is never the first attempt (decisions §6).
+ *   5. Fetch and decode the image.
  *
  * Never throws for an expected condition. Every failure is a typed `ImportFailure`,
  * because each one is something the review screen has to explain to a person, and a
  * caught exception has already lost the detail that makes it explicable.
  */
 export async function importRecipe(url: string, options: ImportOptions): Promise<ImportOutcome> {
+  const attempts: TierAttempt[] = [];
+
   const normalised = normaliseUrl(url);
-  if ("kind" in normalised) return { ok: false, failure: normalised };
+  if ("kind" in normalised) return { ok: false, failure: normalised, attempts };
 
   const blocked = blockedPlatform(normalised.host);
   if (blocked) {
     // the original URL is more useful in the message than the bare host
-    return { ok: false, failure: { ...blocked, url } };
+    return { ok: false, failure: { ...blocked, url }, attempts };
   }
 
   const urlHash = hashUrl(normalised.href);
@@ -50,11 +57,14 @@ export async function importRecipe(url: string, options: ImportOptions): Promise
     if (cached) {
       return {
         ok: true,
-        recipe: cached,
+        recipe: cached.recipe,
+        // the tier that originally answered, not a guess: a cache hit that claimed
+        // tier 0 would quietly corrupt the hit rate that decides model spend
+        tier: cached.tier,
+        attempts: [{ tier: cached.tier, outcome: "hit", detail: "from cache" }],
         // the image is not cached: storing it is the photo pipeline's job, and the
         // recipe carries the URL so a caller can fetch it if it wants to
         photo: null,
-        tier: "structured-data",
         fromCache: true,
         urlHash,
       };
@@ -72,6 +82,7 @@ export async function importRecipe(url: string, options: ImportOptions): Promise
         url: normalised.href,
         detail: thrown instanceof Error ? thrown.message : String(thrown),
       },
+      attempts,
     };
   }
 
@@ -86,41 +97,74 @@ export async function importRecipe(url: string, options: ImportOptions): Promise
         url: normalised.href,
         detail: `content type ${page.contentType}`,
       },
+      attempts,
     };
   }
 
   const siteName = extractSiteName(page.html) ?? normalised.host;
-  const tried: Tier[] = [];
   let recipe: ExtractedRecipe | null = null;
   let usedTier: Tier | null = null;
 
-  for (const tier of TIERS) {
-    tried.push(tier);
+  for (const tier of DETERMINISTIC_TIERS) {
     const found = extractTier(tier, page.html, page.finalUrl, normalised.href, siteName);
-    if (!found) continue;
-    // a tier that produced something unusable should not stop the next one trying
-    if (missingFields(found).length > 0) continue;
+    if (!found) {
+      attempts.push({ tier, outcome: "no-data" });
+      continue;
+    }
+    const missing = missingFields(found);
+    if (missing.length > 0) {
+      // a tier that produced something unusable should not stop the next one trying
+      attempts.push({ tier, outcome: "incomplete", detail: missing.join(", ") });
+      continue;
+    }
+    attempts.push({ tier, outcome: "hit" });
     recipe = found;
     usedTier = tier;
     break;
   }
 
+  // Tier 2, last and only if asked for. Deterministic before AI is not a preference
+  // here, it is the control flow.
+  if (!recipe && options.llm) {
+    const llm = await extractWithLlm({
+      content: pageToText(page.html),
+      sourceUrl: normalised.href,
+      sourceName: siteName,
+      cascade: options.llm,
+    });
+    attempts.push(...llm.attempts);
+    if (llm.recipe && missingFields(llm.recipe).length === 0) {
+      recipe = llm.recipe;
+      usedTier = "llm";
+      // the model is not asked for an image, so take whatever the markup offered
+      const fromMarkup = imageFromMarkup(page.html, page.finalUrl, normalised.href, siteName);
+      if (fromMarkup) recipe = { ...recipe, imageUrl: fromMarkup };
+    }
+  }
+
   if (!recipe || !usedTier) {
-    // report what the best tier was missing, rather than a bare "nothing found",
-    // when a tier did fire but came up short
-    const partial = firstPartial(page.html, page.finalUrl, normalised.href, siteName);
-    if (partial) {
+    const incomplete = attempts.find((attempt) => attempt.outcome === "incomplete");
+    if (incomplete) {
       return {
         ok: false,
         failure: {
           kind: "recipe-incomplete",
           url: normalised.href,
-          tier: partial.tier,
-          missing: missingFields(partial.recipe),
+          tier: incomplete.tier,
+          missing: (incomplete.detail ?? "").split(", ").filter(Boolean),
         },
+        attempts,
       };
     }
-    return { ok: false, failure: { kind: "no-recipe-found", url: normalised.href, triedTiers: tried } };
+    return {
+      ok: false,
+      failure: {
+        kind: "no-recipe-found",
+        url: normalised.href,
+        triedTiers: [...new Set(attempts.map((attempt) => attempt.tier))],
+      },
+      attempts,
+    };
   }
 
   // `imageUrl` keeps whatever the page claimed even when the bytes would not decode.
@@ -131,14 +175,14 @@ export async function importRecipe(url: string, options: ImportOptions): Promise
 
   if (options.cache) {
     try {
-      await options.cache.put(urlHash, recipe);
+      await options.cache.put(urlHash, { recipe, tier: usedTier });
     } catch {
       // a cache write failing costs a re-parse next time, which is not worth failing
       // an import the user is watching
     }
   }
 
-  return { ok: true, recipe, photo, tier: usedTier, fromCache: false, urlHash };
+  return { ok: true, recipe, attempts, photo, tier: usedTier, fromCache: false, urlHash };
 }
 
 function extractTier(
@@ -157,7 +201,7 @@ function extractTier(
     // an image reference usually points at an ImageObject defined elsewhere
     index = buildNodeIndex(nodes);
     node = findRecipeNode(nodes);
-  } else {
+  } else if (tier === "microdata") {
     node = extractMicrodata(html);
   }
 
@@ -165,15 +209,22 @@ function extractTier(
   return mapRecipeNode({ node, index, baseUrl, sourceUrl, sourceName });
 }
 
-function firstPartial(
+/**
+ * The image a page's markup offered, for when tier 2 answered.
+ *
+ * A model is never asked for an image URL — it would invent a plausible one, and a
+ * wrong photo on somebody's recipe is worse than no photo. So even when the text came
+ * from a model, the image still comes from the page.
+ */
+function imageFromMarkup(
   html: string,
   baseUrl: string,
   sourceUrl: string,
   sourceName: string | null,
-): { tier: Tier; recipe: ExtractedRecipe } | null {
-  for (const tier of TIERS) {
-    const recipe = extractTier(tier, html, baseUrl, sourceUrl, sourceName);
-    if (recipe) return { tier, recipe };
+): string | null {
+  for (const tier of DETERMINISTIC_TIERS) {
+    const found = extractTier(tier, html, baseUrl, sourceUrl, sourceName);
+    if (found?.imageUrl) return found.imageUrl;
   }
   return null;
 }

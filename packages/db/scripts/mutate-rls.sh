@@ -24,6 +24,37 @@
 
 cd "$(dirname "$0")/.." || exit 1
 
+# Exit codes are distinguished on purpose:
+#   0  every mutation behaved as documented
+#   1  at least one NOT CAUGHT — a real regression, some policy is not guarding
+#   2  nothing regressed, but at least one mutation COULD NOT BE MEASURED
+#
+# The third outcome exists because reporting an unusable run as a failure is
+# indistinguishable from a policy regression, and a harness that cries wolf gets
+# ignored. `db reset` ends by restarting containers, so a run started immediately
+# after it can race the API coming back: vitest exits before printing a summary, no
+# test matched, and the measurement is worthless rather than bad news.
+
+API_URL="${SUPABASE_API_URL:-http://127.0.0.1:54321}"
+
+# Wait for the REST API, not just the database: the tests talk to PostgREST, and it
+# comes back after Postgres does.
+await_api() {
+  local attempt=0
+  until curl -sf -o /dev/null "$API_URL/rest/v1/" -H "apikey: ignored" 2>/dev/null \
+     || curl -s -o /dev/null -w '%{http_code}' "$API_URL/rest/v1/" 2>/dev/null | grep -qE '^[24]'; do
+    attempt=$((attempt+1))
+    if [ "$attempt" -ge 60 ]; then
+      echo "the REST API at $API_URL never became ready; is the stack running?" >&2
+      return 1
+    fi
+    sleep 1
+  done
+  return 0
+}
+
+if ! await_api; then exit 2; fi
+
 PRED="family_id in (select private.current_family_ids())"
 # writes additionally require a live entitlement; these restore strings must match
 # the migration exactly or a restore would quietly leave the table writable after
@@ -36,7 +67,8 @@ UPD_OK="drop policy if exists recipes_update_in_household on public.recipes;
 INS_OK="drop policy if exists recipes_insert_in_household on public.recipes;
         create policy recipes_insert_in_household on public.recipes for insert to authenticated with check ($WPRED);"
 
-wrong=0
+regressions=0
+unmeasured=0
 
 psql() { docker exec -i supabase_db_db psql -U postgres -d postgres -q -v ON_ERROR_STOP=1 -c "$1" >/dev/null 2>&1; }
 
@@ -46,33 +78,57 @@ psql() { docker exec -i supabase_db_db psql -U postgres -d postgres -q -v ON_ERR
 # by a SPACE, not by " > ". A filter that matches nothing runs zero tests and exits
 # 0, which would read as "the mutation was not caught" — so the match count is
 # asserted before the outcome is believed. The harness must not be able to lie.
-mutate() {
-  local label="$1" expect="$2" mutation="$3" restore="$4" filter="$5"
-  psql "$mutation" || { printf '%-52s SETUP FAILED (mutation SQL)\n' "$label"; wrong=$((wrong+1)); return; }
-
-  local out tests_line passed failed matched outcome
+# Run the filtered test once and report how many tests matched and how many failed,
+# as "<matched> <failed>". Matched 0 means the measurement is worthless.
+measure() {
+  local filter="$1" out tests_line passed failed
   out=$(npx vitest run -t "$filter" 2>&1)
-  psql "$restore" || printf '            WARNING: restore failed for %s\n' "$label"
-
   tests_line=$(grep -E '^ *Tests ' <<<"$out" | head -1)
   passed=$(grep -oE '[0-9]+ passed' <<<"$tests_line" | grep -oE '[0-9]+' | head -1)
   failed=$(grep -oE '[0-9]+ failed' <<<"$tests_line" | grep -oE '[0-9]+' | head -1)
   passed=${passed:-0}; failed=${failed:-0}
-  matched=$((passed + failed))
+  echo "$((passed + failed)) $failed"
+}
 
-  if [ "$matched" -ne 1 ]; then
-    printf '%-52s NO SINGLE TEST MATCHED (%s matched) — filter: %s\n' "$label" "$matched" "$filter"
-    wrong=$((wrong+1))
+mutate() {
+  local label="$1" expect="$2" mutation="$3" restore="$4" filter="$5"
+  if ! psql "$mutation"; then
+    printf '%-52s COULD NOT MEASURE (mutation SQL failed)\n' "$label"
+    unmeasured=$((unmeasured+1))
     return
   fi
 
+  local result matched failed
+  read -r matched failed <<<"$(measure "$filter")"
+
+  # A run that matched nothing is usually the API still coming back after a restart.
+  # Retry once, after waiting: a filter that genuinely matches nothing fails twice and
+  # is still reported as unmeasurable, so the retry cannot hide a wrong filter.
+  if [ "$matched" -eq 0 ]; then
+    await_api || true
+    read -r matched failed <<<"$(measure "$filter")"
+  fi
+
+  psql "$restore" || printf '            WARNING: restore failed for %s\n' "$label"
+
+  if [ "$matched" -ne 1 ]; then
+    printf '%-52s COULD NOT MEASURE (%s tests matched) — filter: %s\n' "$label" "$matched" "$filter"
+    unmeasured=$((unmeasured+1))
+    return
+  fi
+
+  local outcome
   if [ "$failed" -gt 0 ]; then outcome=failed; else outcome=passed; fi
 
-  local verdict
-  if [ "$expect" = catch ] && [ "$outcome" = failed ]; then verdict="caught (as expected)"
-  elif [ "$expect" = masked ] && [ "$outcome" = passed ]; then verdict="masked by SELECT policy (as expected)"
-  else verdict="UNEXPECTED: test $outcome, expected to be ${expect/catch/caught}"; wrong=$((wrong+1)); fi
-  printf '%-52s %s\n' "$label" "$verdict"
+  if [ "$expect" = catch ] && [ "$outcome" = failed ]; then
+    printf '%-52s caught (as expected)\n' "$label"
+  elif [ "$expect" = masked ] && [ "$outcome" = passed ]; then
+    printf '%-52s masked by SELECT policy (as expected)\n' "$label"
+  else
+    printf '%-52s NOT CAUGHT — test %s, expected to be %s\n' \
+      "$label" "$outcome" "${expect/catch/caught}"
+    regressions=$((regressions+1))
+  fi
 }
 
 printf '%-52s %s\n' "mutation" "outcome"
@@ -148,9 +204,16 @@ mutate "anon granted the household column" catch \
   "cannot read the household behind the page"
 
 printf -- '-%.0s' {1..100}; echo
-if [ "$wrong" -eq 0 ]; then
-  echo "every mutation behaved as documented"
-else
-  echo "$wrong mutation(s) did not behave as documented"
+
+if [ "$regressions" -gt 0 ]; then
+  echo "$regressions mutation(s) NOT CAUGHT — a policy is not guarding what a test claims"
+  [ "$unmeasured" -eq 0 ] || echo "$unmeasured also could not be measured"
+  exit 1
 fi
-[ "$wrong" -eq 0 ] || exit 1
+
+if [ "$unmeasured" -gt 0 ]; then
+  echo "no regressions, but $unmeasured mutation(s) could not be measured — re-run before trusting this"
+  exit 2
+fi
+
+echo "every mutation behaved as documented"

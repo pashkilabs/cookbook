@@ -1,6 +1,6 @@
 # @pashki/import
 
-Server-side recipe import. **Deterministic tiers only** — no model calls.
+Server-side recipe import. Deterministic tiers first; a model only when they find nothing.
 
 ```ts
 const outcome = await importRecipe(url, {
@@ -18,18 +18,75 @@ if (outcome.ok) {
 }
 ```
 
-| Tier | Reads |
-|---|---|
-| `structured-data` | the machine-readable recipe data the page publishes |
-| `microdata` | `itemprop` attributes and recipe-plugin markup |
+| Tier | Reads | Cost |
+|---|---|---|
+| `structured-data` | the machine-readable recipe data the page publishes | free |
+| `microdata` | `itemprop` attributes and recipe-plugin markup | free |
+| `llm` | a model over the page's text, schema-constrained | ¢ |
 
-Both are free, instant and more accurate than a model, because they read what the
-site said rather than interpreting it (decisions §6). Tiers 2 (LLM over page text)
-and 3 (vision) plug in behind the same `ImportOutcome` and **cannot be judged until
-the eval set has real fixtures** — the harness exists, the fixtures don't.
+The deterministic tiers are more accurate than a model, because they read what the
+site said rather than interpreting it (decisions §6). **Deterministic before AI is
+the control flow here, not a preference:** tier 2 only runs when the first two found
+nothing, and only when a cascade is passed in. `importRecipe` with no `llm` option
+calls no model at all.
 
-**Server-only.** A browser cannot fetch other websites, and the cache needs the
-service role.
+Tier 3 (vision) is not built.
+
+## Tier 2 is structured, not tuned
+
+**Nothing here is tuned and no production model is chosen.** Both are measurements,
+and the eval set has three placeholder fixtures. `PLACEHOLDER_CASCADE` exists to
+make the cascade runnable and is **not a recommendation** — the names come from the
+routing table in decisions §7, which is itself an August 2026 snapshot due for
+re-benchmarking.
+
+What *is* decided:
+
+**Schema-constrained output, enforced by the provider.** `LlmRequest.responseSchema`
+is not a suggestion in a prompt — a provider is required to use its structured-output
+mode. A prompt asking politely for JSON produces prose apologies at the worst
+moment, and the point of tier 2 is output a machine can check.
+
+**We validate anyway.** `validateRecipePayload` re-checks the output in our own code,
+because a structured-output mode that silently degrades, a proxy that rewrites a
+response, or a provider having a bad day all produce something close enough to cause
+damage. That check is what decides escalation.
+
+**Escalation is on validation failure only** — not on a low-confidence feeling and
+not a retry loop. That is what makes running cheap models safe: there is a
+machine-checkable signal for when one was not good enough.
+
+**The model returns verbatim ingredient lines; `packages/core` parses them.** Core's
+parser is already tested against `1 (14.5 oz) can`, `2 to 3 cloves` and `T` versus
+`t`; a model re-deriving that is a second implementation to keep honest. It also means
+all three tiers produce ingredients through the same code, so an eval comparison
+between tiers measures extraction rather than two different parsers. Whether that is
+the right split is exactly what the fixtures are for.
+
+**A model is never asked for an image URL.** It would invent a plausible one, and a
+wrong photo on somebody's recipe is worse than none. Even when tier 2 wrote the text,
+the image comes from the page's markup.
+
+**Every tier attempt is recorded** on the outcome, including the ones that found
+nothing, so the harness can report which tier answered and what the cheaper ones did.
+That hit rate is the cost lever, and it cannot be reported if the cascade only returns
+its winner.
+
+## Driving it from the eval harness
+
+```ts
+const extractor = createImportExtractor({ fetcher, cache, llm });
+// then hand it to runEval() from @pashki/core/eval
+```
+
+`url` fixtures run the whole cascade; `caption` fixtures go straight to tier 2, which
+is the path it exists for; `screenshot` returns null so the harness records a skip
+rather than scoring zero against an extractor that never claimed to handle images.
+
+**Server-only**, and enforced: a browser cannot fetch other websites, the cache needs
+the service role, and an inference key must never reach a client bundle.
+`scripts/check-server-only.mjs` fails the build if this package is imported from a
+`"use client"` file or from `apps/mobile`.
 
 ## Failures are values
 

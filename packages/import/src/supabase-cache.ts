@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ExtractedRecipe, ImportCache } from "./types.js";
+import type { CachedImport, ExtractedRecipe, ImportCache, Tier } from "./types.js";
 
 /**
  * `import_cache` as the shared cache.
@@ -18,22 +18,21 @@ import type { ExtractedRecipe, ImportCache } from "./types.js";
  */
 export function createSupabaseImportCache(supabase: SupabaseClient): ImportCache {
   return {
-    async get(urlHash: string): Promise<ExtractedRecipe | null> {
+    async get(urlHash: string): Promise<CachedImport | null> {
       const { data, error } = await supabase
         .from("import_cache")
         .select("extracted_json")
         .eq("url_hash", urlHash)
         .maybeSingle();
       if (error) throw error;
-      const stored = data?.extracted_json;
-      return isExtractedRecipe(stored) ? stored : null;
+      return toCachedImport(data?.extracted_json);
     },
 
-    async put(urlHash: string, recipe: ExtractedRecipe): Promise<void> {
+    async put(urlHash: string, entry: CachedImport): Promise<void> {
       const { error } = await supabase.from("import_cache").upsert(
         {
           url_hash: urlHash,
-          extracted_json: recipe as unknown as Record<string, unknown>,
+          extracted_json: entry as unknown as Record<string, unknown>,
           fetched_at: new Date().toISOString(),
         },
         { onConflict: "url_hash" },
@@ -50,6 +49,14 @@ export function createSupabaseImportCache(supabase: SupabaseClient): ImportCache
  * would otherwise surface as an undefined field deep in the review screen. Anything
  * that does not look like a recipe is treated as a miss and re-fetched.
  */
+function toCachedImport(value: unknown): CachedImport | null {
+  if (typeof value !== "object" || value === null) return null;
+  const candidate = value as Record<string, unknown>;
+  const tier = candidate.tier;
+  if (tier !== "structured-data" && tier !== "microdata" && tier !== "llm") return null;
+  return isExtractedRecipe(candidate.recipe) ? { recipe: candidate.recipe, tier: tier as Tier } : null;
+}
+
 function isExtractedRecipe(value: unknown): value is ExtractedRecipe {
   if (typeof value !== "object" || value === null) return false;
   const candidate = value as Record<string, unknown>;

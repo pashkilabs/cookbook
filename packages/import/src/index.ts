@@ -1,15 +1,17 @@
 /**
- * @pashki/import — server-side recipe import, deterministic tiers only.
+ * @pashki/import — server-side recipe import.
  *
  * Tier 0 reads the structured recipe data a page publishes. Tier 1 reads microdata
  * and recipe-plugin markup. Both are free, instant, and more accurate than a model,
  * because they read what the site said rather than interpreting it (decisions §6).
+ * Tier 2 is a schema-constrained model, reached only when those found nothing and a
+ * cascade was passed in. Tier 3 (vision) is not built.
  *
- * No model calls. Tiers 2 (LLM over page text) and 3 (vision) plug in behind the
- * same `ImportOutcome`, and cannot be judged until the eval set has real fixtures.
+ * The tier-2 model is **not chosen and the prompt is not tuned**: both are
+ * measurements, and the eval set still holds placeholder fixtures.
  *
- * Server-only: a browser cannot fetch other websites, and the cache needs the
- * service role.
+ * Server-only: a browser cannot fetch other websites, the cache needs the service
+ * role, and an inference key must never reach a client bundle.
  */
 export * from "./types.js";
 export { importRecipe } from "./pipeline.js";
@@ -44,3 +46,20 @@ export {
   type JsonValue,
 } from "./jsonld.js";
 export { extractMicrodata, extractSiteName } from "./microdata.js";
+export {
+  EXTRACTION_INSTRUCTIONS,
+  PLACEHOLDER_CASCADE,
+  RECIPE_JSON_SCHEMA,
+  validateRecipePayload,
+  type JsonSchema,
+  type LlmCascade,
+  type LlmProvider,
+  type LlmRequest,
+  type LlmResponse,
+  type LlmUsage,
+  type ModelConfig,
+  type RecipePayload,
+  type ValidationResult,
+} from "./provider.js";
+export { extractWithLlm, pageToText, type Tier2Input, type Tier2Result } from "./tier2.js";
+export { createImportExtractor, type ImportExtractorOptions } from "./eval-extractor.js";

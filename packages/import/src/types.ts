@@ -1,20 +1,49 @@
 import type { ParsedIngredient } from "@pashki/core";
+import type { LlmCascade } from "./provider.js";
 
 /**
- * Recipe import, deterministic tiers only.
+ * Recipe import.
  *
- * Nothing here calls a model. Tier 0 reads the machine-readable recipe data a page
- * published; tier 1 reads microdata and recipe-plugin markup. Both are free and
- * more accurate than any model, because they read what the site said rather than
- * interpreting it (decisions §6). Tiers 2 and 3 arrive behind the same
- * `ImportOutcome`, and cannot be judged until the eval set has real fixtures.
+ * Tier 0 reads the machine-readable recipe data a page published; tier 1 reads
+ * microdata and recipe-plugin markup. Both are free and more accurate than any model,
+ * because they read what the site said rather than interpreting it (decisions §6).
+ * Tier 2 is a schema-constrained model, and runs only when the deterministic tiers
+ * found nothing and a cascade was configured — deterministic before AI is the control
+ * flow, not a preference. Tier 3 (vision) is not built.
  */
 
 export type Tier =
   /** structured recipe data published by the page */
   | "structured-data"
   /** microdata attributes and recipe-plugin markup */
-  | "microdata";
+  | "microdata"
+  /** a model over the page's text, schema-constrained */
+  | "llm";
+
+/**
+ * What one tier attempt did.
+ *
+ * Recorded for every tier tried, in order, so the eval harness can report which tier
+ * answered and what the cheaper ones did — that hit rate is the cost lever
+ * (decisions §6), and it cannot be reported if the cascade only returns its winner.
+ */
+export interface TierAttempt {
+  tier: Tier;
+  outcome:
+    /** produced a usable recipe */
+    | "hit"
+    /** the tier found nothing to read */
+    | "no-data"
+    /** found a recipe but it was unusable, e.g. no ingredients */
+    | "incomplete"
+    /** the model returned output that failed schema validation — escalate */
+    | "invalid-output"
+    /** the provider itself failed */
+    | "provider-error";
+  /** which model, for the llm tier */
+  model?: string;
+  detail?: string;
+}
 
 /** What an extraction produced, before it becomes rows. */
 export interface ExtractedRecipe {
@@ -67,6 +96,8 @@ export type ImportFailure =
 
 export interface ImportSuccess {
   recipe: ExtractedRecipe;
+  /** every tier tried, in order — including the ones that did not answer */
+  attempts: TierAttempt[];
   /** null when the page had no usable image, or the candidate failed to decode */
   photo: ImportedPhoto | null;
   tier: Tier;
@@ -78,7 +109,7 @@ export interface ImportSuccess {
 
 export type ImportOutcome =
   | ({ ok: true } & ImportSuccess)
-  | { ok: false; failure: ImportFailure };
+  | { ok: false; failure: ImportFailure; attempts: TierAttempt[] };
 
 // ---------------------------------------------------------------------------
 // Ports
@@ -117,14 +148,31 @@ export interface Fetcher {
  * base (architecture §11), so this is deliberately not household-scoped and holds
  * nothing household-identifying.
  */
+/**
+ * What the cache holds. The tier is stored alongside the recipe so a cache hit can
+ * report which tier originally answered — otherwise every hit would have to claim a
+ * tier it does not know, and the tier-0 hit rate, which is the metric that matters
+ * most, would be quietly wrong.
+ */
+export interface CachedImport {
+  recipe: ExtractedRecipe;
+  tier: Tier;
+}
+
 export interface ImportCache {
-  get(urlHash: string): Promise<ExtractedRecipe | null>;
-  put(urlHash: string, recipe: ExtractedRecipe): Promise<void>;
+  get(urlHash: string): Promise<CachedImport | null>;
+  put(urlHash: string, entry: CachedImport): Promise<void>;
 }
 
 export interface ImportOptions {
   fetcher: Fetcher;
   cache?: ImportCache;
+  /**
+   * Tier 2. Omitted means the deterministic tiers only, which is this pipeline's
+   * behaviour until a cascade is configured — no model is called unless one is
+   * passed in.
+   */
+  llm?: LlmCascade;
   /** skip the cache read; still writes. For re-parsing after a parser fix. */
   refresh?: boolean;
   /** don't fetch the image, e.g. when only the text is wanted */

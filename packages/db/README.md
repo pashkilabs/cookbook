@@ -136,6 +136,22 @@ carrying `family_id` without RLS, or with RLS and no policies, aborts
 pnpm --filter @pashki/db test:mutate
 ```
 
+Exit codes are distinguished, because "the measurement failed" and "a policy stopped
+guarding" are different news:
+
+| code | meaning |
+|---|---|
+| 0 | every mutation behaved as documented |
+| 1 | **NOT CAUGHT** — a policy is not guarding what a test claims |
+| 2 | nothing regressed, but a mutation could not be measured |
+
+The third exists because `db reset` ends by restarting containers, so a run started
+straight after it can race the API coming back: vitest exits before printing a
+summary, nothing matched, and the result is worthless rather than bad news. Reporting
+that as a failure is indistinguishable from a real regression, and a harness that
+cries wolf gets ignored. The script now waits for the REST API before starting and
+retries an unmeasurable run once.
+
 A passing isolation test is worthless if it would also pass against a table with
 RLS switched off. `scripts/mutate-rls.sh` weakens one policy at a time and
 requires the test meant to catch it to fail. Twelve mutations, each with a stated

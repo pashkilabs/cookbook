@@ -1,0 +1,239 @@
+/**
+ * Tier 2: one provider interface, model as a config value.
+ *
+ * Decisions §7 puts every model behind a single interface precisely so that
+ * switching one is a config change rather than a code path — the landscape moved
+ * materially in six months and will again. Nothing in this file names a production
+ * model, and nothing in it is tuned: **both need the eval fixtures, which do not
+ * exist yet.** The placeholder in `PLACEHOLDER_CASCADE` is a stand-in to make the
+ * cascade runnable, not a recommendation.
+ *
+ * **Server-side only.** An inference key must never reach a client bundle
+ * (CLAUDE.md), which is why this lives in a package the boundary guard keeps out of
+ * client contexts.
+ */
+
+/** Which model to call. A second model is a row here, never a branch in code. */
+export interface ModelConfig {
+  /** provider key, e.g. "openai" — resolved by whatever wires up an LlmProvider */
+  provider: string;
+  /** the model identifier the provider expects */
+  model: string;
+  /** US-hosted only, per decisions §7. Recorded so a config can be audited. */
+  region: "us";
+  /** low for extraction: this is transcription, not composition */
+  temperature?: number;
+  maxOutputTokens?: number;
+}
+
+export interface LlmRequest {
+  model: ModelConfig;
+  /**
+   * The schema the output MUST satisfy.
+   *
+   * A provider is required to enforce this with its structured-output mode, not to
+   * pass it along in a prompt and hope. A prompt asking politely for JSON produces
+   * prose apologies at the worst moment, and the whole point of tier 2 is that its
+   * output is machine-checkable.
+   */
+  responseSchema: JsonSchema;
+  /** how to behave. Carries no recipe content and no household data. */
+  instructions: string;
+  /**
+   * The material to extract from — page text or a pasted caption, and nothing else.
+   *
+   * Prompts carry recipe content only. Never names, emails, children's names or
+   * ratings (CLAUDE.md). That is what keeps the compliance surface small, and it is
+   * structural here: the only things this function can see are a URL and text taken
+   * from a third-party page.
+   */
+  content: string;
+}
+
+export interface LlmUsage {
+  model: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  costUsd?: number;
+}
+
+export interface LlmResponse {
+  /** already parsed. A provider that cannot produce JSON should throw. */
+  json: unknown;
+  usage: LlmUsage;
+}
+
+/**
+ * The seam. One method, because extraction is the only thing tier 2 does.
+ *
+ * An implementation is expected to: use the provider's enforced-JSON mode against
+ * `responseSchema`, keep the key server-side, and throw on transport failure so the
+ * cascade can escalate.
+ */
+export interface LlmProvider {
+  readonly key: string;
+  extract(request: LlmRequest): Promise<LlmResponse>;
+}
+
+/** A cascade: try each model in turn, escalating when the output will not validate. */
+export interface LlmCascade {
+  provider: LlmProvider;
+  /** in order. The first is the workhorse; later entries are escalation. */
+  models: ModelConfig[];
+}
+
+/**
+ * A placeholder cascade so the code runs.
+ *
+ * **This is not a model recommendation.** Choosing one is a measurement, and the
+ * eval harness that would make it is built but has three placeholder fixtures. The
+ * names come from the routing table in decisions §7, which is itself an August 2026
+ * snapshot due for re-benchmarking. Replace this once there are real fixtures — and
+ * expect the answer to differ from the table.
+ */
+export const PLACEHOLDER_CASCADE: ModelConfig[] = [
+  { provider: "openai", model: "gpt-5.6-luna", region: "us", temperature: 0 },
+  // escalation, on schema-validation failure only
+  { provider: "anthropic", model: "claude-haiku-4-5", region: "us", temperature: 0 },
+];
+
+// ---------------------------------------------------------------------------
+// The schema
+// ---------------------------------------------------------------------------
+
+export type JsonSchema = Record<string, unknown>;
+
+/**
+ * What tier 2 must return.
+ *
+ * Note what it does **not** ask for: parsed amounts and units. The model returns
+ * ingredient lines verbatim and `packages/core` parses them, because core's parser
+ * is already tested against the awkward real shapes — `1 (14.5 oz) can`,
+ * `2 to 3 cloves`, `T` versus `t` — and a model re-deriving that is a second
+ * implementation to keep honest. It also means tier 0, tier 1 and tier 2 all produce
+ * ingredients through the same code, so an eval comparison between tiers measures
+ * extraction rather than two different parsers.
+ *
+ * Whether that is the right split is exactly the sort of thing the eval set is for.
+ */
+export const RECIPE_JSON_SCHEMA: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["title", "servings", "totalMinutes", "ingredientLines", "steps"],
+  properties: {
+    title: { type: "string", description: "The recipe's name, as the source gives it." },
+    servings: {
+      type: ["integer", "null"],
+      description: "How many people it serves. null if the source does not say.",
+    },
+    totalMinutes: {
+      type: ["integer", "null"],
+      description: "Total time in minutes. null if the source does not say.",
+    },
+    ingredientLines: {
+      type: "array",
+      items: { type: "string" },
+      description:
+        "Each ingredient exactly as written, one per entry, including amount and unit. Do not reformat, convert, or infer an amount that is not stated.",
+    },
+    steps: {
+      type: "array",
+      items: { type: "string" },
+      description: "The method, one instruction per entry, in order.",
+    },
+  },
+};
+
+/** The instructions. Deliberately terse and untuned — tuning needs fixtures. */
+export const EXTRACTION_INSTRUCTIONS = [
+  "Extract the recipe from the text below into the given JSON schema.",
+  "Copy ingredient lines verbatim, including the amount and unit as written.",
+  "Never invent an amount the text does not state.",
+  "If the text contains no recipe, return an empty ingredientLines array.",
+].join(" ");
+
+// ---------------------------------------------------------------------------
+// Validation
+// ---------------------------------------------------------------------------
+
+export interface RecipePayload {
+  title: string;
+  servings: number | null;
+  totalMinutes: number | null;
+  ingredientLines: string[];
+  steps: string[];
+}
+
+export type ValidationResult =
+  | { ok: true; value: RecipePayload }
+  | { ok: false; errors: string[] };
+
+/**
+ * Validate the model's output against the schema, in our own code.
+ *
+ * The provider is asked to enforce the schema and is not trusted to have done it. A
+ * structured-output mode that silently degrades, a proxy that rewrites the response,
+ * or a provider that simply has a bad day all produce output that looks close
+ * enough to cause damage downstream. This is the check that decides whether to
+ * escalate.
+ *
+ * Hand-written rather than a validator dependency: the schema is five fields, and
+ * the errors it produces are what the escalation records, so they should read like
+ * something a person can act on.
+ */
+export function validateRecipePayload(value: unknown): ValidationResult {
+  const errors: string[] = [];
+
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return { ok: false, errors: ["output is not an object"] };
+  }
+  const candidate = value as Record<string, unknown>;
+
+  const title = candidate.title;
+  if (typeof title !== "string") errors.push("title is not a string");
+  else if (!title.trim()) errors.push("title is empty");
+
+  for (const field of ["servings", "totalMinutes"] as const) {
+    const raw = candidate[field];
+    if (raw === null || raw === undefined) continue;
+    if (typeof raw !== "number" || !Number.isFinite(raw)) {
+      errors.push(`${field} is not a number or null`);
+    } else if (raw <= 0) {
+      errors.push(`${field} is not positive`);
+    }
+  }
+
+  const lines = candidate.ingredientLines;
+  if (!Array.isArray(lines)) {
+    errors.push("ingredientLines is not an array");
+  } else if (lines.some((line) => typeof line !== "string")) {
+    errors.push("ingredientLines contains a non-string");
+  } else if (lines.length === 0) {
+    // a recipe with no ingredients is not a recipe. Reported as a validation
+    // failure so the cascade escalates rather than saving an empty shell.
+    errors.push("ingredientLines is empty");
+  }
+
+  const steps = candidate.steps;
+  if (!Array.isArray(steps)) errors.push("steps is not an array");
+  else if (steps.some((step) => typeof step !== "string")) {
+    errors.push("steps contains a non-string");
+  }
+
+  if (errors.length > 0) return { ok: false, errors };
+
+  return {
+    ok: true,
+    value: {
+      title: (title as string).trim(),
+      servings: numberOrNull(candidate.servings),
+      totalMinutes: numberOrNull(candidate.totalMinutes),
+      ingredientLines: (lines as string[]).filter((line) => line.trim().length > 0),
+      steps: (steps as string[]).map((step) => step.trim()).filter(Boolean),
+    },
+  };
+}
+
+function numberOrNull(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? Math.round(value) : null;
+}

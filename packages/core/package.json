@@ -8,6 +8,10 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./eval": {
+      "types": "./eval/index.ts",
+      "default": "./eval/index.ts"
+    },
     "./test-fixtures": {
       "types": "./test/fixtures/catalog.ts",
       "default": "./test/fixtures/catalog.ts"

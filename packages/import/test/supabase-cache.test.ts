@@ -55,7 +55,10 @@ describe.skipIf(instance === null)("supabase import cache", () => {
       .eq("url_hash", urlHash)
       .single();
     expect(data?.url_hash).toBe(urlHash);
-    expect((data?.extracted_json as { title: string }).title).toBe("Apple Pie");
+    expect((data?.extracted_json as { tier: string; recipe: { title: string } }).recipe.title).toBe(
+      "Apple Pie",
+    );
+    expect((data?.extracted_json as { tier: string }).tier).toBe("structured-data");
   });
 
   it("is hit on a repeat, without fetching", async () => {
