@@ -268,40 +268,55 @@ export type Database = {
       }
       import_jobs: {
         Row: {
+          attempts: number
+          claimed_at: string | null
           created_at: string
           deleted_at: string | null
           error: string | null
           family_id: string
+          finished_at: string | null
           id: string
           input_ref: string
           kind: string
+          quota_consumed_at: string | null
           result_json: Json | null
           status: string
           updated_at: string
+          worker: string | null
         }
         Insert: {
+          attempts?: number
+          claimed_at?: string | null
           created_at?: string
           deleted_at?: string | null
           error?: string | null
           family_id: string
+          finished_at?: string | null
           id?: string
           input_ref: string
           kind: string
+          quota_consumed_at?: string | null
           result_json?: Json | null
           status?: string
           updated_at?: string
+          worker?: string | null
         }
         Update: {
+          attempts?: number
+          claimed_at?: string | null
           created_at?: string
           deleted_at?: string | null
           error?: string | null
           family_id?: string
+          finished_at?: string | null
           id?: string
           input_ref?: string
           kind?: string
+          quota_consumed_at?: string | null
           result_json?: Json | null
           status?: string
           updated_at?: string
+          worker?: string | null
         }
         Relationships: [
           {
@@ -847,6 +862,36 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      import_claim_next_job: {
+        Args: { p_lease_seconds?: number; p_worker: string }
+        Returns: {
+          attempts: number
+          claimed_at: string | null
+          created_at: string
+          deleted_at: string | null
+          error: string | null
+          family_id: string
+          finished_at: string | null
+          id: string
+          input_ref: string
+          kind: string
+          quota_consumed_at: string | null
+          result_json: Json | null
+          status: string
+          updated_at: string
+          worker: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "import_jobs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      import_mark_quota_consumed: {
+        Args: { p_job_id: string }
+        Returns: string
+      }
       platform_spend_quota: {
         Args: {
           p_amount: number
