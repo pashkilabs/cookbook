@@ -141,6 +141,38 @@ the service role, and an inference key must never reach a client bundle.
 `scripts/check-server-only.mjs` fails the build if this package is imported from a
 `"use client"` file or from `apps/mobile`.
 
+## Storing an imported photo
+
+```ts
+const stored = await storeImportedPhoto(
+  { familyId, bytes: outcome.photo.bytes },
+  { supabase: serviceRoleClient },        // from @pashki/import/photo-storage
+);
+// stored.storagePath goes in photos.storage_path when the user accepts the review
+```
+
+Resized once on ingest to a 1600px longest edge and re-encoded as JPEG; display sizes
+come from Supabase's image transformation CDN on read, so storing four crops of every
+photo would be paying twice. EXIF is dropped — a photo lifted off a page can carry a
+location and a camera serial.
+
+**It does not insert the `photos` row.** No import saves without the user seeing it, so
+the row is written when they accept — and because every storage policy resolves through
+`photos.storage_path`, an object with no row is readable by nobody but the service
+role. An abandoned import leaves an unreachable object rather than a visible one, and
+the review screen gets at its picture through a short-lived signed URL
+(`createReviewPhotoUrl`).
+
+The bucket is **private**, which is the load-bearing part: a public Supabase bucket
+serves every object to anyone with the URL and bypasses row-level security entirely,
+so the policies would exist and decide nothing. The migration asserts it.
+
+Read access mirrors the `photos` table by consulting the same row rather than
+restating its conditions — a household sees its own, and anon sees a photo only when
+the recipe is published *and* `source = 'camera'`. There are **no client write
+policies**: objects arrive via the service role, and camera upload is a Phase 3
+concern that will need a policy written deliberately.
+
 ## Failures are values
 
 Every failure is a variant of `ImportFailure`, not an exception. Each one is

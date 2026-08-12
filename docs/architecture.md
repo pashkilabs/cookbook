@@ -192,6 +192,12 @@ pantry_items        id, family_id, ingredient_id?, name, amount, unit,
 photos              id, family_id, recipe_id, storage_path, source, width, height,
                     created_at, updated_at, deleted_at
                     -- source in (import|camera|upload)
+                    -- storage_path names an object in the private `recipe-photos`
+                    -- bucket. Storage read policies resolve through this column, so
+                    -- an object with no row here is reachable only by the service
+                    -- role — which is the correct state for an import awaiting
+                    -- review. anon sees a photo only when the recipe is published
+                    -- and source = 'camera'.
 import_jobs         id, family_id, kind, input_ref, status, result_json, error,
                     created_at, updated_at, deleted_at
                     -- kind in (url|text|screenshot|video)

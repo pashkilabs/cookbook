@@ -113,9 +113,12 @@ rebuild, and everything else depends on it.*
 - [x] `import_cache` keyed by URL hash, not by family. Table in `packages/db`,
       reader and writer in `packages/import`. URLs are normalised before hashing, so
       the same page shared four ways is one row.
-- [ ] Photo pipeline: fetch server-side, resize, store, CDN. *No Storage bucket or
-      its policies exist yet; `photos.storage_path` is a column pointing at
-      nothing.*
+- [x] Photo pipeline: fetch server-side, resize, store. Private `recipe-photos`
+      bucket whose read policies consult the `photos` row, so storage and table agree
+      by construction rather than by restatement; no client write policy; the
+      migration asserts the bucket is private and that every anon read path checks
+      recipe visibility. Display sizes come from the transformation CDN rather than
+      stored variants. 18 tests, mostly negative.
 - [ ] Port the prototype's screens: recipe list, detail with per-member ratings,
       week planner, shopping list with the split display, pantry.
       *`plan_entries.recipe_id` is NOT NULL, so a free-text planner entry
