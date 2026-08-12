@@ -128,6 +128,11 @@ models be good enough. Do not add a silent-save path.
 - **To test an RLS policy, make it permissive — don't remove it.** RLS denies by
   default, so a dropped policy makes the table *more* restrictive and the
   isolation test passes for the wrong reason. See `packages/db` `test:mutate`.
+- **Storage rows cannot be deleted with SQL.** A `storage.protect_delete()` trigger
+  refuses direct deletes from `storage.buckets` and `storage.objects` to stop objects
+  being orphaned, so cleanup goes through the Storage API — `.remove()` for objects,
+  the bucket endpoint for buckets. Found when a probe bucket would not go away and
+  the migration could not tidy up after itself.
 - **`git status` cannot tell you what has been committed.** It describes the working
   tree and nothing else, so a dirty tree at the end of a session says nothing about
   whether previous sessions landed. Run `git log` before any claim about repository
