@@ -45,17 +45,17 @@ Open the repo root in VS Code and run Claude Code from there so it picks up
 
 ## Status
 
-**End of Phase 1.** 176 tests across three packages, typecheck clean.
+**End of Phase 1.** 197 tests across three packages, typecheck clean.
 
 | | |
 |---|---|
 | `packages/core` | Parser, units, catalog matching, package maths, consolidation. No DOM, no network, so it runs identically in Next.js, Expo and the worker. Plus the eval harness. |
 | `packages/db` | 18 tables, row-level security on every household table, generated types, seeded grocery catalog. |
-| `packages/platform-client` | The seam: session, entitlements, quota, devices. Ed25519 entitlement token that degrades to read-only rather than locking. |
+| `packages/platform-client` | The seam: session, entitlements, quota, devices. Ed25519 entitlement token, with read-only degradation enforced by RLS rather than by convention. |
 
-Phase 2 is the web app. Two things to settle before or during it: **Stripe is
-blocked** on Apple's outside-purchase rules, and **read-only degradation is not yet
-enforced server-side** — see `docs/roadmap.md`, "Known gaps in the foundations".
+Phase 2 is the web app. **Stripe remains blocked** on Apple's outside-purchase
+rules; everything it will write to exists. See `docs/roadmap.md` for the remaining
+"Known gaps in the foundations".
 
 Still outstanding from Phase 0: **real eval fixtures.** The harness runs against
 three placeholders, which measure nothing, and the import tiers in Phase 2 cannot

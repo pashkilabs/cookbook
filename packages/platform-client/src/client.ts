@@ -26,7 +26,6 @@ export const DEFAULT_QUOTA = "imports";
 export function createPlatformClient(options: PlatformClientOptions): PlatformClient {
   const { store, accountId, signer } = options;
   const clock = options.clock ?? systemClock;
-  const graceDays = options.graceDays ?? DEFAULT_GRACE_DAYS;
 
   async function getSession(): Promise<Session> {
     const account = await store.findAccount(accountId);
@@ -47,15 +46,16 @@ export function createPlatformClient(options: PlatformClientOptions): PlatformCl
     const entitlement = await store.findEntitlement(family.id, appKey);
     if (!entitlement) return null;
 
-    // Grace is policy, so it is computed here rather than read from the row.
-    const graceUntil = graceUntilFor(entitlement.validUntil, graceDays);
-    const window = { validUntil: entitlement.validUntil, graceUntil };
+    // The grace window comes from the row, because the RLS predicate that actually
+    // enforces read-only reads the same column. Computing it here would give the
+    // client and the database two opinions about when writing stops.
+    const window = {
+      validUntil: entitlement.validUntil,
+      graceUntil: entitlement.graceUntil,
+    };
     const access = evaluateAccess(window, clock());
 
-    const result: EntitlementResult = {
-      entitlement: { ...entitlement, graceUntil },
-      access,
-    };
+    const result: EntitlementResult = { entitlement, access };
 
     if (signer) {
       const members = await store.listMembers(family.id);
@@ -75,7 +75,7 @@ export function createPlatformClient(options: PlatformClientOptions): PlatformCl
         },
         issuedAt: clock().toISOString(),
         validUntil: entitlement.validUntil,
-        graceUntil,
+        graceUntil: entitlement.graceUntil,
       };
       const token: SignedToken = { token: await signer.sign(payload), payload };
       result.token = token;

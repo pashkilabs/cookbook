@@ -126,12 +126,38 @@ it.
 *Non-negotiable on timing:* adding a quota later is nearly impossible without
 upsetting people.
 
-*Revisited after building it.* The metering is real and atomic — a conditional
-`UPDATE` that refuses rather than exceeding, verified under concurrent spends. Two
-things are not done: **nothing resets a counter** (`resetsAt` is stored, displayed,
-and acted on by nobody, so a monthly allowance is currently a lifetime one), and
-the numbers themselves are unset because they depend on the free-tier question
-below. The mechanism does not depend on that answer; the numbers do.
+### Where it is enforced
+
+**In `public.platform_spend_quota`, service role only** — one database function
+holding a row lock, doing the period rollover and the spend as a single indivisible
+decision. Verified under twenty concurrent spends, and under twenty concurrent
+spends that straddle a period boundary.
+
+**The rollover is deliberately not a scheduled job.** A nightly reset and a spend
+interleaving over the same row is exactly the race the function exists to avoid:
+one of them works from a balance the other has already replaced, and afterwards the
+numbers still look plausible. Rolling over as part of the spend means there is only
+ever one writer — a counter whose period has elapsed is reset by whoever next tries
+to use it. Nothing has to run on a timer, which is also one fewer thing to
+monitor.
+
+Details that were decided rather than fallen into:
+
+- `periodDays` on the counter drives it. Absent means a **one-off** allowance: it
+  renews once when `resetsAt` passes and then never again.
+- A long gap advances by **whole periods until the deadline is in the future**, so a
+  household that did not import for three months lands on the right date instead of
+  three resets behind.
+- The rollover is persisted **even when the spend is then refused**. Time passing is
+  a fact about the counter, not about the request, and leaving it unrecorded would
+  show a `used` figure from a period that has ended.
+- The client mirrors the same logic in its in-memory store, on purpose. A fake that
+  skipped the rollover would let the unit tests pass while the real thing behaved
+  differently.
+
+Still open: **the numbers themselves.** They are set at issuance and depend on the
+free-tier question below. The mechanism does not depend on that answer; the numbers
+do.
 
 ---
 
@@ -142,18 +168,44 @@ travel on the device as a signed token with a validity window and a grace
 period. After grace, the app degrades to **read-only, not locked** — a family
 should never lose access to their own recipes because a card expired mid-shop.
 
-*Revisited after building it.* The decision stands, but it is **only half
-implemented, and the missing half is the enforcing one.** `evaluateAccess` decides
-the level and the client is expected to honour it. Nothing on the server does:
-row-level security proves which household a row belongs to and never asks whether
-that household is paid up, so a lapsed family can still write through the API.
-Read-only is currently a UI convention.
+### Where it is enforced
 
-Worth being precise about what that does and does not cost. The token being
-offline-readable is right, and a device deciding its own level from a signed token
-is right. What is missing is the server refusing writes once grace has passed, and
-that has no hook in the schema today. It is the largest gap in Phase 1 and it is
-tracked as a Phase 2 task rather than left implicit here.
+**In the row-level security policies, on writes only.** `private.household_can_write(family_id, app_key)`
+is ANDed into the insert, update and delete policies of every household table, and
+is **never referenced by a SELECT policy**.
+
+That placement is the decision. Three options were on the table:
+
+- *The seam's HTTP surface.* Rejected: it is exactly the "application logic you
+  have to remember everywhere" that §5 rejected for household isolation. Every new
+  mutating route would be a fresh chance to forget.
+- *Route all writes through database functions.* Rejected: it means abandoning
+  PostgREST for writes, an enormous change bought for nothing while Phase 2 is
+  still unwritten.
+- *An RLS predicate.* Chosen. Isolation is already a database guarantee; billing
+  state belongs in the same place, for the same reason.
+
+The property that makes this the right shape: because no SELECT policy consults
+it, **there is no code path that could deny a read.** Read-only is the floor by
+construction rather than by discipline. A migration self-check asserts that no
+SELECT policy ever references the predicate, so adding one "for symmetry" breaks
+`db reset` instead of quietly inventing the locked state this decision forbids.
+
+Consequences worth knowing:
+
+- An update by a lapsed household **fails loudly** (`42501`), so the API can say
+  "you are read-only". A delete is refused **quietly** — zero rows — because
+  DELETE has no `with check` clause to fail.
+- The service role bypasses RLS, so entitlement issuance, webhooks and the import
+  service keep working for a household that cannot write. That is correct: the
+  server is the thing deciding.
+- **`grace_until` became a column**, reversing the earlier choice to compute it in
+  the client. Once the database enforces the window, the predicate and the token
+  have to agree about when it closes, and a client constant plus a server constant
+  that drift is worse than a column. It also makes extending one family's grace a
+  support gesture rather than a deploy. `graceUntilFor` remains for issuance.
+- A household with **no entitlement at all** cannot write. Absence is not an
+  unmetered allowance.
 
 ---
 

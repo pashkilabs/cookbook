@@ -76,6 +76,18 @@ describe.skipIf(instance === null)("row-level security", () => {
         .single();
       if (member.error) throw member.error;
 
+      // a live entitlement, so the write tests below are exercising household
+      // isolation rather than the new read-only enforcement
+      const entitlement = await admin.from("entitlements").insert({
+        family_id: familyId,
+        app_key: "recipes",
+        tier: "full",
+        quota_json: { imports: { limit: 100, used: 0, resetsAt: null } },
+        valid_until: new Date(Date.now() + 30 * 86400000).toISOString(),
+        grace_until: new Date(Date.now() + 37 * 86400000).toISOString(),
+      });
+      if (entitlement.error) throw entitlement.error;
+
       const recipe = await admin
         .from("recipes")
         .insert({ family_id: familyId, title: `${label} carbonara` })
@@ -140,6 +152,7 @@ describe.skipIf(instance === null)("row-level security", () => {
     // round-trip test counts ingredients, and a stray row from this file would
     // fail it. Household rows are left alone — they are namespaced by family_id
     // and cannot be seen by anything else.
+    await admin.from("entitlements").delete().in("family_id", [alpha.familyId, beta.familyId]);
     await admin.from("ingredients").delete().eq("id", ingredientId);
     await admin.from("import_cache").delete().eq("url_hash", cacheKey);
   });
@@ -278,6 +291,157 @@ describe.skipIf(instance === null)("row-level security", () => {
       for (const table of ["recipes", "families", "family_members", "ratings"]) {
         const { data } = await anon.from(table).select("*");
         expect(data ?? [], table).toEqual([]);
+      }
+    });
+  });
+
+  describe("read-only after grace", () => {
+    /** Move a household's window into the past. Both dates: grace cannot precede validity. */
+    const lapse = async (familyId: string, graceOffsetMs: number) => {
+      const { error } = await admin
+        .from("entitlements")
+        .update({
+          valid_until: new Date(Date.now() - 8 * 86400000).toISOString(),
+          grace_until: new Date(Date.now() + graceOffsetMs).toISOString(),
+        })
+        .eq("family_id", familyId);
+      if (error) throw error;
+    };
+
+    const restore = async (familyId: string) => {
+      const { error } = await admin
+        .from("entitlements")
+        .update({
+          valid_until: new Date(Date.now() + 30 * 86400000).toISOString(),
+          grace_until: new Date(Date.now() + 37 * 86400000).toISOString(),
+        })
+        .eq("family_id", familyId);
+      if (error) throw error;
+    };
+
+    it("still reads everything it owns", async () => {
+      // decisions §9: a family must not lose access to their own recipes because a
+      // card expired mid-shop. This is the half that must keep working.
+      await lapse(alpha.familyId, -1);
+      try {
+        const { data, error } = await alpha.client.from("recipes").select("id, title");
+        expect(error).toBeNull();
+        expect(data?.length).toBeGreaterThan(0);
+
+        // every household table, not just recipes
+        for (const table of ["recipe_ingredients", "ratings", "meal_plans", "pantry_items"]) {
+          const result = await alpha.client.from(table).select("id");
+          expect(result.error, table).toBeNull();
+        }
+      } finally {
+        await restore(alpha.familyId);
+      }
+    });
+
+    it("cannot insert", async () => {
+      await lapse(alpha.familyId, -1);
+      try {
+        const { error } = await alpha.client
+          .from("recipes")
+          .insert({ family_id: alpha.familyId, title: "after grace" });
+        expect(error?.code).toBe(RLS_VIOLATION);
+      } finally {
+        await restore(alpha.familyId);
+      }
+    });
+
+    it("cannot update", async () => {
+      await lapse(alpha.familyId, -1);
+      try {
+        const { error } = await alpha.client
+          .from("recipes")
+          .update({ title: "renamed after grace" })
+          .eq("id", alpha.recipeId);
+        expect(error?.code).toBe(RLS_VIOLATION);
+
+        const { data } = await admin
+          .from("recipes")
+          .select("title")
+          .eq("id", alpha.recipeId)
+          .single();
+        expect(data?.title).toBe("alpha carbonara");
+      } finally {
+        await restore(alpha.familyId);
+      }
+    });
+
+    it("cannot delete", async () => {
+      await lapse(alpha.familyId, -1);
+      try {
+        // DELETE has no with-check clause, so this refusal is quiet: zero rows
+        const { data, error } = await alpha.client
+          .from("recipes")
+          .delete()
+          .eq("id", alpha.recipeId)
+          .select("id");
+        expect(error).toBeNull();
+        expect(data).toEqual([]);
+
+        const { count } = await admin
+          .from("recipes")
+          .select("id", { count: "exact", head: true })
+          .eq("id", alpha.recipeId);
+        expect(count).toBe(1);
+      } finally {
+        await restore(alpha.familyId);
+      }
+    });
+
+    it("still writes while inside the grace window", async () => {
+      // grace means keep working and nag, not stop
+      await lapse(alpha.familyId, 60_000);
+      try {
+        const { error } = await alpha.client
+          .from("recipes")
+          .insert({ family_id: alpha.familyId, title: "during grace" });
+        expect(error).toBeNull();
+      } finally {
+        await restore(alpha.familyId);
+      }
+    });
+
+    it("does not affect another household", async () => {
+      await lapse(alpha.familyId, -1);
+      try {
+        const { error } = await beta.client
+          .from("recipes")
+          .insert({ family_id: beta.familyId, title: "beta unaffected" });
+        expect(error).toBeNull();
+      } finally {
+        await restore(alpha.familyId);
+      }
+    });
+
+    it("is refused for a household with no entitlement at all", async () => {
+      // absence is not an unmetered allowance
+      const { error: removed } = await admin
+        .from("entitlements")
+        .delete()
+        .eq("family_id", alpha.familyId);
+      if (removed) throw removed;
+      try {
+        const { error } = await alpha.client
+          .from("recipes")
+          .insert({ family_id: alpha.familyId, title: "no entitlement" });
+        expect(error?.code).toBe(RLS_VIOLATION);
+        // and reading is still fine
+        const { error: readError } = await alpha.client.from("recipes").select("id");
+        expect(readError).toBeNull();
+      } finally {
+        const { error } = await admin.from("entitlements").insert({
+          family_id: alpha.familyId,
+          app_key: "recipes",
+          tier: "full",
+          quota_json: { imports: { limit: 100, used: 0, resetsAt: null } },
+          valid_until: new Date(Date.now() + 30 * 86400000).toISOString(),
+          grace_until: new Date(Date.now() + 37 * 86400000).toISOString(),
+        });
+        if (error) throw error;
       }
     });
   });

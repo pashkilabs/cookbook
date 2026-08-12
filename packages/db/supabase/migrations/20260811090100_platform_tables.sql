@@ -93,9 +93,17 @@ create table public.subscriptions (
   constraint subscriptions_provider_identity unique (provider, external_id)
 );
 
--- What the signed entitlement token is minted from (architecture §6). The token
--- carries a grace window; that is an issuance policy, so it is deliberately not a
--- column here — decisions §9 keeps grace in the token, not the row.
+-- What the signed entitlement token is minted from (architecture §6).
+--
+-- grace_until IS a column, reversing the earlier choice to treat grace as pure
+-- issuance policy computed by the client. Once the database has to enforce
+-- read-only degradation, the RLS predicate and the token must agree about when
+-- grace ends, and the only way to guarantee that is for both to read the same
+-- value. A client-side constant and a server-side constant that drift are worse
+-- than a column.
+--
+-- It also makes per-household grace possible, which is what a support gesture
+-- looks like — extend one family's window without a deploy.
 create table public.entitlements (
   id uuid primary key default gen_random_uuid(),
   family_id uuid not null references public.families (id) on delete cascade,
@@ -106,9 +114,15 @@ create table public.entitlements (
   -- the shape will move and this table should not need a migration each time.
   quota_json jsonb not null default '{}'::jsonb,
   valid_until timestamptz not null,
+  -- After this instant the household is read-only. Enforced by RLS on every write
+  -- policy, so this is not advisory. NOT NULL and no default: issuance must state
+  -- the window rather than inherit one silently.
+  grace_until timestamptz not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint entitlements_one_per_app unique (family_id, app_key)
+  constraint entitlements_one_per_app unique (family_id, app_key),
+  -- grace extends the window; it cannot end before it starts
+  constraint entitlements_grace_after_valid check (grace_until >= valid_until)
 );
 
 create index families_owner_account_id on public.families (owner_account_id);

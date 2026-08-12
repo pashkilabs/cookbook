@@ -10,7 +10,7 @@ import type {
   QuotaCounter,
   RegisterDeviceInput,
   SpendQuotaInput,
-  StoredEntitlement,
+  Entitlement,
   Tier,
 } from "./types.js";
 
@@ -100,10 +100,10 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
       }));
     },
 
-    async findEntitlement(familyId: string, appKey: string): Promise<StoredEntitlement | null> {
+    async findEntitlement(familyId: string, appKey: string): Promise<Entitlement | null> {
       const { data, error } = await supabase
         .from("entitlements")
-        .select("family_id, app_key, tier, quota_json, valid_until")
+        .select("family_id, app_key, tier, quota_json, valid_until, grace_until")
         .eq("family_id", familyId)
         .eq("app_key", appKey)
         .maybeSingle();
@@ -116,6 +116,7 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
         tier: data.tier as Tier,
         quota: toQuota(data.quota_json),
         validUntil: data.valid_until,
+        graceUntil: data.grace_until,
       };
     },
 
@@ -195,9 +196,14 @@ function asCounter(raw: unknown): QuotaCounter | null {
   const used = Number(candidate.used);
   if (!Number.isFinite(limit) || !Number.isFinite(used)) return null;
   const resetsAt = candidate.resetsAt;
+  const periodDays = Number(candidate.periodDays);
   return {
     limit,
     used,
     resetsAt: typeof resetsAt === "string" ? resetsAt : null,
+    // absent means a one-off allowance; the rollover in platform_spend_quota reads
+    // the same field, so dropping it here would make the client disagree with what
+    // the database will actually do
+    ...(Number.isFinite(periodDays) && periodDays > 0 ? { periodDays } : {}),
   };
 }

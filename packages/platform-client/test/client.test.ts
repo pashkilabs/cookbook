@@ -17,7 +17,9 @@ const fixedClock = (iso: string): Clock => () => new Date(iso);
 const INSIDE = "2026-08-11T00:00:00.000Z";
 
 function setup(seed: Seed = standardSeed(), now = INSIDE) {
-  const store = createInMemoryStore(seed);
+  // same clock for both: the store decides period rollover, the client decides
+  // access level, and a test that gave them different clocks would prove nothing
+  const store = createInMemoryStore(seed, fixedClock(now));
   const client = createPlatformClient({
     store,
     accountId: ACCOUNT_ID,
@@ -81,22 +83,22 @@ describe("getEntitlement", () => {
     expect(result?.entitlement.tier).toBe("full");
   });
 
-  it("computes the grace window rather than reading it from storage", async () => {
-    // grace is issuance policy, not a column — decisions §9
+  it("reads the grace window from the row, not from a local policy constant", async () => {
+    // the RLS predicate that actually enforces read-only reads this same column;
+    // computing it here would give the client and the database two opinions
     const { client } = setup();
     expect((await client.getEntitlement("recipes"))?.entitlement.graceUntil).toBe(
       "2026-09-18T00:00:00.000Z",
     );
   });
 
-  it("honours a different grace policy without touching storage", async () => {
-    const store = createInMemoryStore(standardSeed());
-    const client = createPlatformClient({
-      store,
-      accountId: ACCOUNT_ID,
-      clock: fixedClock(INSIDE),
-      graceDays: 30,
+  it("honours whatever window the row carries, including an extended one", async () => {
+    const seed = standardSeed();
+    const store = createInMemoryStore({
+      ...seed,
+      entitlements: [{ ...seed.entitlements![0]!, graceUntil: "2026-10-11T00:00:00.000Z" }],
     });
+    const client = createPlatformClient({ store, accountId: ACCOUNT_ID, clock: fixedClock(INSIDE) });
     expect((await client.getEntitlement("recipes"))?.entitlement.graceUntil).toBe(
       "2026-10-11T00:00:00.000Z",
     );
@@ -140,6 +142,7 @@ describe("getEntitlement", () => {
           tier: "full",
           quota: { things: { limit: 3, used: 0, resetsAt: null } },
           validUntil: "2026-09-11T00:00:00.000Z",
+          graceUntil: "2026-09-18T00:00:00.000Z",
         },
       ],
     });
@@ -249,5 +252,52 @@ describe("registerDevice", () => {
     const { client, store } = setup();
     await client.registerDevice("web", "not-a-device");
     expect(store.devices).toHaveLength(1);
+  });
+});
+
+describe("quota period rollover", () => {
+  const period = (used: number, resetsAt: string, periodDays?: number) =>
+    standardSeed({
+      imports: { limit: 10, used, resetsAt, ...(periodDays === undefined ? {} : { periodDays }) },
+    });
+
+  it("spends against a fresh balance once the period has elapsed", async () => {
+    // §8 is defeated entirely if a monthly allowance is really a lifetime one
+    const { client } = setup(period(10, "2026-08-01T00:00:00.000Z", 30), INSIDE);
+    const outcome = await client.consumeQuota("recipes", 1);
+    expect(outcome).toMatchObject({ status: "allowed", counter: { used: 1 } });
+  });
+
+  it("advances the deadline into the future rather than by one period", async () => {
+    // three months of not importing must not leave three resets owing
+    const { client, store } = setup(period(10, "2026-05-01T00:00:00.000Z", 30), INSIDE);
+    await client.consumeQuota("recipes", 1);
+    const resets = store.peekEntitlement(FAMILY_ID, "recipes")?.quota.imports?.resetsAt;
+    expect(Date.parse(resets!)).toBeGreaterThan(Date.parse(INSIDE));
+  });
+
+  it("does not roll over while the period is still running", async () => {
+    const { client } = setup(period(10, "2026-09-01T00:00:00.000Z", 30), INSIDE);
+    expect((await client.consumeQuota("recipes", 1)).status).toBe("exceeded");
+  });
+
+  it("rolls over exactly once, not on every spend", async () => {
+    const { client, store } = setup(period(10, "2026-08-01T00:00:00.000Z", 30), INSIDE);
+    await client.consumeQuota("recipes", 4);
+    await client.consumeQuota("recipes", 4);
+    expect(store.peekEntitlement(FAMILY_ID, "recipes")?.quota.imports?.used).toBe(8);
+  });
+
+  it("treats a one-off allowance as renewing once and then never", async () => {
+    const { client, store } = setup(period(10, "2026-08-01T00:00:00.000Z"), INSIDE);
+    expect((await client.consumeQuota("recipes", 10)).status).toBe("allowed");
+    expect(store.peekEntitlement(FAMILY_ID, "recipes")?.quota.imports?.resetsAt).toBeNull();
+    // and with no deadline left there is nothing to roll over
+    expect((await client.consumeQuota("recipes", 1)).status).toBe("exceeded");
+  });
+
+  it("leaves a counter with no deadline alone", async () => {
+    const { client } = setup(standardSeed({ imports: { limit: 10, used: 10, resetsAt: null } }));
+    expect((await client.consumeQuota("recipes", 1)).status).toBe("exceeded");
   });
 });

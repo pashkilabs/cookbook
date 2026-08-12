@@ -76,6 +76,7 @@ export type Database = {
           app_key: string
           created_at: string
           family_id: string
+          grace_until: string
           id: string
           quota_json: Json
           tier: string
@@ -86,6 +87,7 @@ export type Database = {
           app_key: string
           created_at?: string
           family_id: string
+          grace_until: string
           id?: string
           quota_json?: Json
           tier: string
@@ -96,6 +98,7 @@ export type Database = {
           app_key?: string
           created_at?: string
           family_id?: string
+          grace_until?: string
           id?: string
           quota_json?: Json
           tier?: string

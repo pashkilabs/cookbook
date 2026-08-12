@@ -111,6 +111,47 @@ comment on function private.current_family_ids is
   'Families the authenticated account is a member of. SECURITY DEFINER to avoid recursing through family_members RLS.';
 
 -- ---------------------------------------------------------------------------
+-- May this household still write?
+--
+-- Row-level security proves which household a row belongs to. On its own it never
+-- asks whether that household is still paid up, which left read-only degradation
+-- as a thing the client politely observed — a lapsed family could write through the
+-- API all day. This predicate is what makes decisions §9 a guarantee.
+--
+-- It is applied to insert, update and delete policies and **never to select**.
+-- That is the whole design: there is no code path that can deny a read, so
+-- read-only is the floor by construction rather than by discipline. The self-check
+-- at the end of this file asserts no SELECT policy ever references it.
+--
+-- `now() <= grace_until` is inclusive, matching evaluateAccess in
+-- packages/platform-client so the client and the database agree to the millisecond
+-- about when writing stops.
+--
+-- The service role bypasses RLS, so server-side work — issuing entitlements,
+-- webhooks, the import service — is unaffected. That is correct: the server is the
+-- thing deciding, and it must be able to write for a household that cannot.
+-- ---------------------------------------------------------------------------
+
+create or replace function private.household_can_write(p_family_id uuid, p_app_key text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from public.entitlements e
+    where e.family_id = p_family_id
+      and e.app_key = p_app_key
+      and now() <= e.grace_until
+  )
+$$;
+
+comment on function private.household_can_write is
+  'True while the household is inside its entitlement window including grace. Used by write policies only — never by a SELECT policy, so reading never depends on billing.';
+
+-- ---------------------------------------------------------------------------
 -- Household tables: full CRUD, scoped to the caller's families.
 --
 -- Written as a loop rather than 36 hand-copied policies. The security property
@@ -119,9 +160,13 @@ comment on function private.current_family_ids is
 -- entirely, and the isolation tests assert the resulting policy set.
 -- ---------------------------------------------------------------------------
 
+-- 'recipes' is this app's key. These are recipe-app tables; when app #2 adds its
+-- own, its policies pass its own key, and a household entitled to one app cannot
+-- write another's data.
 do $do$
 declare
   target text;
+  app_key constant text := 'recipes';
   household_tables text[] := array[
     'recipes',
     'recipe_ingredients',
@@ -143,11 +188,15 @@ begin
         using (family_id in (select private.current_family_ids()))
     $p$, target || '_select_in_household', target);
 
+    -- writes additionally require a live entitlement; reads never do
     execute format($p$
       create policy %I on public.%I
         for insert to authenticated
-        with check (family_id in (select private.current_family_ids()))
-    $p$, target || '_insert_in_household', target);
+        with check (
+          family_id in (select private.current_family_ids())
+          and private.household_can_write(family_id, %L)
+        )
+    $p$, target || '_insert_in_household', target, app_key);
 
     -- both clauses matter: `using` stops a caller reaching another household's
     -- row, `with check` stops them moving one of their own rows into a household
@@ -159,18 +208,31 @@ begin
     -- which is verified in scripts/mutate-rls.sh. If public recipe pages ever
     -- loosen the SELECT policy, this policy stops being redundant and becomes the
     -- only guard. Re-run the mutation harness then.
+    -- The entitlement check goes in `with check`, not `using`. A lapsed household
+    -- can still *reach* its rows — which is what keeps reading intact — and the
+    -- write fails loudly with a policy violation the API can turn into "you are
+    -- read-only" rather than a silent zero-rows-updated that looks like the row
+    -- had vanished.
     execute format($p$
       create policy %I on public.%I
         for update to authenticated
         using (family_id in (select private.current_family_ids()))
-        with check (family_id in (select private.current_family_ids()))
-    $p$, target || '_update_in_household', target);
+        with check (
+          family_id in (select private.current_family_ids())
+          and private.household_can_write(family_id, %L)
+        )
+    $p$, target || '_update_in_household', target, app_key);
 
+    -- DELETE has no with-check clause, so this one is necessarily quiet: a lapsed
+    -- household's delete matches no rows rather than raising. Refused either way.
     execute format($p$
       create policy %I on public.%I
         for delete to authenticated
-        using (family_id in (select private.current_family_ids()))
-    $p$, target || '_delete_in_household', target);
+        using (
+          family_id in (select private.current_family_ids())
+          and private.household_can_write(family_id, %L)
+        )
+    $p$, target || '_delete_in_household', target, app_key);
   end loop;
 end;
 $do$;
@@ -332,6 +394,93 @@ begin
   if has_table_privilege('authenticated', 'public.import_cache', 'select')
      or has_table_privilege('anon', 'public.import_cache', 'select') then
     raise exception 'import_cache is granted to a client role; it must be service-role only';
+  end if;
+end;
+$do$;
+
+-- ---------------------------------------------------------------------------
+-- Self-check: reading must never depend on billing.
+--
+-- Read-only is the floor (decisions §9). The way that is guaranteed is that no
+-- SELECT policy mentions household_can_write — so a lapsed household loses writes
+-- and nothing else. Asserting it here means someone adding the predicate to a
+-- SELECT policy for symmetry breaks `db reset` instead of quietly inventing a
+-- locked state.
+-- ---------------------------------------------------------------------------
+
+do $do$
+declare
+  offenders text[];
+begin
+  select coalesce(array_agg(c.relname || '.' || p.polname order by c.relname), '{}')
+  into offenders
+  from pg_policy p
+  join pg_class c on c.oid = p.polrelid
+  join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'
+  where p.polcmd in ('r', '*')
+    and coalesce(pg_get_expr(p.polqual, p.polrelid), '') like '%household_can_write%';
+
+  if array_length(offenders, 1) > 0 then
+    raise exception
+      'a SELECT policy depends on the entitlement window, which would lock a household out of its own data: %',
+      array_to_string(offenders, ', ');
+  end if;
+
+  -- and the converse: every household table's write policies must carry it, or one
+  -- table silently stays writable after grace
+  select coalesce(array_agg(distinct c.relname || ' ' || p.polname order by c.relname || ' ' || p.polname), '{}')
+  into offenders
+  from pg_policy p
+  join pg_class c on c.oid = p.polrelid
+  join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'
+  join pg_attribute a on a.attrelid = c.oid and a.attname = 'family_id'
+  where p.polcmd in ('a', 'w', 'd')
+    and c.relname not in ('subscriptions', 'entitlements', 'family_members')
+    and coalesce(pg_get_expr(p.polqual, p.polrelid), '')
+        || coalesce(pg_get_expr(p.polwithcheck, p.polrelid), '') not like '%household_can_write%';
+
+  if array_length(offenders, 1) > 0 then
+    raise exception
+      'write policies without an entitlement check would stay writable after grace: %',
+      array_to_string(offenders, ', ');
+  end if;
+end;
+$do$;
+
+-- ---------------------------------------------------------------------------
+-- Self-check: updated_at is maintained everywhere it exists.
+--
+-- A table carrying the column but missing the trigger is the quiet kind of broken:
+-- everything works, and last-write-wins sync silently starts resolving conflicts
+-- against a timestamp that stopped moving. Nothing in an application test would
+-- notice, so it is asserted here across every table at once.
+-- ---------------------------------------------------------------------------
+
+do $do$
+declare
+  missing text[];
+begin
+  select coalesce(array_agg(c.relname order by c.relname), '{}')
+  into missing
+  from pg_class c
+  join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'
+  join pg_attribute a on a.attrelid = c.oid and a.attname = 'updated_at' and a.attnum > 0
+  where c.relkind = 'r'
+    and not exists (
+      select 1
+      from pg_trigger t
+      join pg_proc f on f.oid = t.tgfoid
+      join pg_namespace fn on fn.oid = f.pronamespace
+      where t.tgrelid = c.oid
+        and not t.tgisinternal
+        and fn.nspname = 'private'
+        and f.proname = 'set_updated_at'
+    );
+
+  if array_length(missing, 1) > 0 then
+    raise exception
+      'tables have updated_at but no trigger to maintain it, which breaks last-write-wins: %',
+      array_to_string(missing, ', ');
   end if;
 end;
 $do$;

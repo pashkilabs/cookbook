@@ -93,11 +93,23 @@ tombstones is the application's job at query time.
 ## Isolation
 
 Every household table carries `family_id` and gets four policies — select,
-insert, update, delete — all keyed on the same predicate:
+insert, update, delete — keyed on the same predicate:
 
 ```sql
 family_id in (select private.current_family_ids())
 ```
+
+Writes carry a second predicate, `private.household_can_write(family_id, 'recipes')`,
+which is what makes read-only degradation a guarantee instead of a UI convention.
+**No SELECT policy references it**, so there is no code path that could deny a read
+— read-only is the floor by construction. A migration self-check asserts both
+halves: that no SELECT policy consults the entitlement window, and that no write
+policy forgets to.
+
+An update by a lapsed household fails loudly with `42501`; a delete is refused
+quietly, because DELETE has no `with check` clause to fail. The service role
+bypasses RLS, so issuance and the import service keep working for a household that
+cannot write.
 
 Three details that matter:
 
@@ -126,8 +138,13 @@ pnpm --filter @pashki/db test:mutate
 
 A passing isolation test is worthless if it would also pass against a table with
 RLS switched off. `scripts/mutate-rls.sh` weakens one policy at a time and
-requires the test meant to catch it to fail. Nine mutations, each with a stated
-expectation.
+requires the test meant to catch it to fail. Ten mutations, each with a stated
+expectation, including one that drops the entitlement check from a write policy.
+
+The harness also asserts that each filter selected **exactly one** test before it
+believes an outcome. `vitest -t` joins describe blocks with a space, not `" > "`,
+and a filter that matches nothing exits 0 — which would read as "the mutation was
+not caught". It reported exactly that once, on a filter written with `" > "`.
 
 Two findings from building it, both counter-intuitive enough to be worth keeping:
 

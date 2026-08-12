@@ -77,7 +77,8 @@ describe.skipIf(instance === null)("supabase platform store", () => {
       app_key: "recipes",
       tier: "full",
       quota_json: { imports: { limit: 10, used: 0, resetsAt: null } },
-      valid_until: new Date(Date.parse(`${new Date().getFullYear() + 1}-01-01`)).toISOString(),
+      valid_until: new Date(Date.now() + 30 * 86400000).toISOString(),
+      grace_until: new Date(Date.now() + 37 * 86400000).toISOString(),
     });
     if (entitlement.error) throw entitlement.error;
 
@@ -164,6 +165,80 @@ describe.skipIf(instance === null)("supabase platform store", () => {
     expect((data?.quota_json as { imports: { used: number } }).imports.used).toBe(10);
   });
 
+  describe("quota period rollover", () => {
+    const setCounter = async (counter: Record<string, unknown>) => {
+      const { error } = await admin
+        .from("entitlements")
+        .update({ quota_json: { imports: counter } })
+        .eq("family_id", familyId);
+      if (error) throw error;
+    };
+
+    const readCounter = async () => {
+      const { data } = await admin
+        .from("entitlements")
+        .select("quota_json")
+        .eq("family_id", familyId)
+        .single();
+      return (data?.quota_json as { imports: { used: number; resetsAt: string | null } }).imports;
+    };
+
+    it("spends against a fresh balance once the period has elapsed", async () => {
+      await setCounter({
+        limit: 10,
+        used: 10,
+        periodDays: 30,
+        resetsAt: new Date(Date.now() - 2 * 86400000).toISOString(),
+      });
+      const outcome = await client.consumeQuota("recipes", 1);
+      expect(outcome).toMatchObject({ status: "allowed", counter: { used: 1 } });
+      expect(Date.parse((await readCounter()).resetsAt!)).toBeGreaterThan(Date.now());
+    });
+
+    it("does not roll over while the period is still running", async () => {
+      await setCounter({
+        limit: 10,
+        used: 10,
+        periodDays: 30,
+        resetsAt: new Date(Date.now() + 5 * 86400000).toISOString(),
+      });
+      expect((await client.consumeQuota("recipes", 1)).status).toBe("exceeded");
+      expect((await readCounter()).used).toBe(10);
+    });
+
+    it("rolls over exactly once under concurrent spends across the boundary", async () => {
+      // the reason the rollover lives inside the spend: a separate reset job and a
+      // spend interleaving here would hand out a second fresh allowance
+      await setCounter({
+        limit: 8,
+        used: 8,
+        periodDays: 30,
+        resetsAt: new Date(Date.now() - 1000).toISOString(),
+      });
+
+      const attempts = await Promise.all(
+        Array.from({ length: 20 }, () => client.consumeQuota("recipes", 1)),
+      );
+      const allowed = attempts.filter((a) => a.status === "allowed").length;
+
+      // exactly one fresh period, spent exactly to its limit
+      expect(allowed).toBe(8);
+      expect((await readCounter()).used).toBe(8);
+      expect(Date.parse((await readCounter()).resetsAt!)).toBeGreaterThan(Date.now());
+    });
+
+    it("advances a long gap into the future rather than one period at a time", async () => {
+      await setCounter({
+        limit: 10,
+        used: 10,
+        periodDays: 30,
+        resetsAt: new Date(Date.now() - 95 * 86400000).toISOString(),
+      });
+      await client.consumeQuota("recipes", 1);
+      expect(Date.parse((await readCounter()).resetsAt!)).toBeGreaterThan(Date.now());
+    });
+  });
+
   it("registers a device, then reuses it", async () => {
     const first = await client.registerDevice("ios");
     expect(first.platform).toBe("ios");
@@ -175,6 +250,95 @@ describe.skipIf(instance === null)("supabase platform store", () => {
       .select("id", { count: "exact", head: true })
       .eq("account_id", accountId);
     expect(count).toBe(1);
+  });
+
+  describe("an adult invited into a household they do not own", () => {
+    /**
+     * The branch that was dead in every test until now: an account owning no
+     * household, found through its membership. It is also the one query with a
+     * hand-written cast over an embedded resource, so it is the most likely to be
+     * quietly wrong.
+     */
+    let invitedId: string;
+    let invitedClient: PlatformClient;
+
+    beforeAll(async () => {
+      if (!instance) return;
+      const created = await admin.auth.admin.createUser({
+        email: `invited-${stamp}@pashki.test`,
+        password: `pw-invited-${stamp}`,
+        email_confirm: true,
+      });
+      if (created.error) throw created.error;
+      invitedId = created.data.user!.id;
+
+      const account = await admin
+        .from("accounts")
+        .insert({ id: invitedId, email: `invited-${stamp}@pashki.test` });
+      if (account.error) throw account.error;
+
+      // a member of the existing household, and the owner of nothing
+      const member = await admin.from("family_members").insert({
+        family_id: familyId,
+        account_id: invitedId,
+        display_name: "Invited",
+        colour: null,
+        is_child: false,
+      });
+      if (member.error) throw member.error;
+
+      invitedClient = createPlatformClient({
+        store: createSupabasePlatformStore(admin),
+        accountId: invitedId,
+        signer,
+      });
+    });
+
+    afterAll(async () => {
+      if (!instance || !invitedId) return;
+      await admin.from("family_members").delete().eq("account_id", invitedId);
+      await admin.from("accounts").delete().eq("id", invitedId);
+      await admin.auth.admin.deleteUser(invitedId);
+    });
+
+    it("resolves the household through its membership", async () => {
+      const session = await invitedClient.getSession();
+      expect(session.family.id).toBe(familyId);
+      expect(session.account.id).toBe(invitedId);
+    });
+
+    it("owns nothing, so the owner is somebody else", async () => {
+      const session = await invitedClient.getSession();
+      expect(session.family.ownerAccountId).toBe(accountId);
+      expect(session.family.ownerAccountId).not.toBe(invitedId);
+    });
+
+    it("sees the household's entitlement, not an absence", async () => {
+      const result = await invitedClient.getEntitlement("recipes");
+      expect(result?.entitlement.familyId).toBe(familyId);
+      expect(result?.access.canRead).toBe(true);
+    });
+
+    it("returns null when the account is a member of nothing", async () => {
+      const orphan = await admin.auth.admin.createUser({
+        email: `orphan-${stamp}@pashki.test`,
+        password: `pw-orphan-${stamp}`,
+        email_confirm: true,
+      });
+      if (orphan.error) throw orphan.error;
+      const orphanId = orphan.data.user!.id;
+      await admin.from("accounts").insert({ id: orphanId, email: `orphan-${stamp}@pashki.test` });
+      try {
+        const client = createPlatformClient({
+          store: createSupabasePlatformStore(admin),
+          accountId: orphanId,
+        });
+        await expect(client.getSession()).rejects.toThrow(/belongs to no family/);
+      } finally {
+        await admin.from("accounts").delete().eq("id", orphanId);
+        await admin.auth.admin.deleteUser(orphanId);
+      }
+    });
   });
 });
 

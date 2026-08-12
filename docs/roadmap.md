@@ -6,16 +6,10 @@ Built: `packages/core` (88 tests), `packages/db` (18 tables, RLS, seeded catalog
 `packages/platform-client` (the seam, entitlement token). 176 tests across three
 packages.
 
-Two Phase 1 items remain open, both deliberately:
-
-- **Stripe → entitlement issuance** is blocked on Apple's outside-purchase rules
-  (`docs/decisions.md`, Unresolved). Everything it will write to is built:
-  `subscriptions` is `provider` + `external_id`, and `entitlements` is what the
-  token is minted from.
-- **Read-only degradation is not enforced server-side.** The token and
-  `evaluateAccess` decide it, and the client honours it, but nothing stops a
-  lapsed household writing through the API. See "Known gaps" below — this is the
-  largest hole in the foundations and it belongs to Phase 2, not Phase 3.
+One Phase 1 item remains open, deliberately: **Stripe → entitlement issuance** is
+blocked on Apple's outside-purchase rules (`docs/decisions.md`, Unresolved).
+Everything it will write to is built — `subscriptions` is `provider` +
+`external_id`, and `entitlements` is what the token is minted from.
 
 Tasks are written to be picked up one at a time. Each should end with
 `pnpm check` passing.
@@ -72,9 +66,15 @@ rebuild, and everything else depends on it.*
       both window boundaries to the millisecond.
 - [ ] Stripe subscription + webhook → entitlement issuance. **Blocked** on Apple's
       outside-purchase rules — verify those before designing the flow.
-- [ ] **Enforce read-only server-side.** RLS proves which household a row belongs
-      to; nothing currently proves the household is still paid up. Every mutating
-      path has to consult the entitlement, and the schema has no hook for it yet.
+- [x] **Read-only enforced server-side.** `private.household_can_write` is ANDed
+      into every household table's insert, update and delete policy and referenced
+      by no SELECT policy, so reading can never be denied — asserted by a migration
+      self-check. `grace_until` became a column so the predicate and the token read
+      the same window.
+- [x] **Quota resets.** The period rollover happens inside
+      `platform_spend_quota`, in the same locked statement as the spend, so no
+      reset job can race it. Tested at the boundary and under concurrent spends
+      across it.
 
 ---
 
@@ -150,27 +150,13 @@ Generalise what app #2 actually needs. Not before.
 Found by reviewing Phase 1 against itself. None of these are Phase 2 features;
 they are load-bearing behaviour that nothing currently proves.
 
-**Read-only degradation is advisory.** `evaluateAccess` says `canWrite: false`
-after grace and the client is expected to obey. The database does not care: RLS
-checks which household a row belongs to, never whether that household is paid up.
-A lapsed family — or anyone replaying their own valid session — can still write.
-This is the biggest hole in Phase 1.
-
 **`verify()` does not check expiry.** It checks the signature and nothing else;
 the window is evaluated separately by `evaluateAccess`. Defensible — verification
 is not authorisation — but it means every caller has to remember to do both, and
 nothing enforces the pairing.
 
-**Quota never resets.** `resetsAt` is stored and displayed and no job acts on it.
-A monthly allowance is currently a lifetime one.
-
 **Untested paths that carry weight:**
 
-- `findFamilyForAccount`'s invited-member branch. The integration test's account
-  owns its household, so the embedded-resource join — the part with a hand-written
-  cast — never executes.
-- The `updated_at` trigger is asserted on `recipes` only. A table missing it would
-  silently break last-write-wins sync, and nothing checks all 18.
 - Composite foreign keys are tested on `recipe_ingredients` only, not on `ratings`,
   `photos`, `plan_entries` or `shortlist_entries`.
 - Seed idempotency was verified by hand, not by a test.

@@ -69,6 +69,15 @@ export interface QuotaCounter {
   used: number;
   /** when `used` returns to zero; null for a non-renewing allowance */
   resetsAt: string | null;
+  /**
+   * Length of a period in days. Absent means a one-off allowance: it renews when
+   * `resetsAt` passes and then never again.
+   *
+   * The rollover happens inside the same statement that spends — see
+   * `platform_spend_quota`. A separate reset job would race the spend it is
+   * resetting.
+   */
+  periodDays?: number;
 }
 
 /** Named counters, e.g. `{ imports: { limit: 500, used: 160, resetsAt: … } }`. */
@@ -78,22 +87,25 @@ export type Quota = Record<string, QuotaCounter>;
 export type Tier = "full";
 
 /**
- * An entitlement as stored. Note the absence of a grace window: grace is an
- * issuance policy, not a fact about the row (decisions §9 keeps it in the token),
- * so storage cannot be asked for it and the client is the only thing that decides
- * it.
+ * An entitlement, exactly as stored.
+ *
+ * `graceUntil` is a column rather than something this package computes. It used to
+ * be computed here, on the reasoning that grace is issuance policy — but once the
+ * database enforces read-only degradation through an RLS predicate, the predicate
+ * and the token have to agree about when grace ends, and the only way to guarantee
+ * that is for both to read the same value.
+ *
+ * `graceUntilFor` is still exported for whoever issues an entitlement to compute a
+ * window with; it is just no longer consulted on the read path.
  */
-export interface StoredEntitlement {
+export interface Entitlement {
   familyId: string;
   appKey: string;
   tier: Tier;
   quota: Quota;
   /** ISO 8601 */
   validUntil: string;
-}
-
-export interface Entitlement extends StoredEntitlement {
-  /** ISO 8601. After this the app degrades to read-only; it never locks. */
+  /** ISO 8601. After this the household is read-only; it never locks. */
   graceUntil: string;
 }
 
@@ -194,7 +206,7 @@ export interface PlatformStore {
   /** The account's own household if it owns one, otherwise its earliest membership. */
   findFamilyForAccount(accountId: string): Promise<Family | null>;
   listMembers(familyId: string): Promise<FamilyMember[]>;
-  findEntitlement(familyId: string, appKey: string): Promise<StoredEntitlement | null>;
+  findEntitlement(familyId: string, appKey: string): Promise<Entitlement | null>;
   /**
    * Atomically add `amount` to a counter, refusing if it would exceed the limit.
    *
@@ -254,6 +266,4 @@ export interface PlatformClientOptions {
   accountId: string;
   signer?: TokenSigner;
   clock?: Clock;
-  /** how long after validUntil the app keeps working before read-only */
-  graceDays?: number;
 }

@@ -3,13 +3,14 @@ import type {
   Device,
   Family,
   FamilyMember,
+  Clock,
   Platform,
   PlatformStore,
   Quota,
   QuotaCounter,
   RegisterDeviceInput,
   SpendQuotaInput,
-  StoredEntitlement,
+  Entitlement,
 } from "../src/index.js";
 
 /**
@@ -23,16 +24,17 @@ export interface Seed {
   accounts?: Account[];
   families?: Family[];
   members?: FamilyMember[];
-  entitlements?: StoredEntitlement[];
+  entitlements?: Entitlement[];
 }
 
 export interface InMemoryStore extends PlatformStore {
   /** what the store holds now, for assertions the client interface does not expose */
-  peekEntitlement(familyId: string, appKey: string): StoredEntitlement | undefined;
+  peekEntitlement(familyId: string, appKey: string): Entitlement | undefined;
   devices: Device[];
 }
 
-export function createInMemoryStore(seed: Seed = {}): InMemoryStore {
+/** `clock` lets a test drive the quota period rollover without waiting for one. */
+export function createInMemoryStore(seed: Seed = {}, clock: Clock = () => new Date()): InMemoryStore {
   const accounts = [...(seed.accounts ?? [])];
   const families = [...(seed.families ?? [])];
   const members = [...(seed.members ?? [])];
@@ -71,8 +73,15 @@ export function createInMemoryStore(seed: Seed = {}): InMemoryStore {
       return found ? { ...found, quota: structuredClone(found.quota) } : null;
     },
 
-    // mirrors the database function: refuse rather than exceed, and refuse an
-    // unknown counter rather than treating it as unlimited
+    /**
+     * Mirrors `platform_spend_quota`: roll the period over if it has elapsed, then
+     * refuse rather than exceed. An unknown counter is a refusal, not an unlimited
+     * allowance.
+     *
+     * Kept in step with the SQL deliberately. A fake that skipped the rollover would
+     * let the client tests pass while the real thing behaved differently, which is
+     * the failure mode that makes fakes worse than no test.
+     */
     async spendQuota(input: SpendQuotaInput): Promise<QuotaCounter | null> {
       const entitlement = entitlements.find(
         (e) => e.familyId === input.familyId && e.appKey === input.appKey,
@@ -80,6 +89,22 @@ export function createInMemoryStore(seed: Seed = {}): InMemoryStore {
       if (!entitlement) return null;
       const counter = entitlement.quota[input.quota];
       if (!counter) return null;
+
+      const now = clock().getTime();
+      const resets = counter.resetsAt === null ? null : Date.parse(counter.resetsAt);
+      if (resets !== null && now > resets) {
+        counter.used = 0;
+        if (counter.periodDays !== undefined && counter.periodDays > 0) {
+          const period = counter.periodDays * 86_400_000;
+          // advance by whole periods so a long gap lands on the right date rather
+          // than several resets behind
+          const elapsed = Math.ceil((now - resets) / period);
+          counter.resetsAt = new Date(resets + elapsed * period).toISOString();
+        } else {
+          counter.resetsAt = null;
+        }
+      }
+
       if (counter.used + input.amount > counter.limit) return null;
       counter.used += input.amount;
       return { ...counter };
@@ -134,6 +159,7 @@ export function standardSeed(
         tier: "full",
         quota,
         validUntil: "2026-09-11T00:00:00.000Z",
+        graceUntil: "2026-09-18T00:00:00.000Z",
       },
     ],
   };
