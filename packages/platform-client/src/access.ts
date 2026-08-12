@@ -1,4 +1,4 @@
-import type { Access, Clock, TokenPayload } from "./types.js";
+import type { Access, Clock, TokenPayload, TokenVerifier } from "./types.js";
 
 /**
  * What the app may do, given a validity window and the time.
@@ -45,3 +45,41 @@ export function graceUntilFor(validUntil: string, graceDays: number): string {
 }
 
 export const systemClock: Clock = () => new Date();
+
+/**
+ * Verify a token *and* evaluate its window, in one call.
+ *
+ * `TokenVerifier.verify` checks the signature and nothing else, which is correct —
+ * verification is not authorisation — but it left every caller responsible for
+ * remembering to evaluate the window too, and nothing enforced the pairing. A caller
+ * that verified and acted would accept a lapsed household indefinitely, and it would
+ * look like it was working. That is exactly the mistake a native client is placed to
+ * make.
+ *
+ * So the two are joined here, and the result is a union a caller cannot read past
+ * without deciding what to do about `read-only`. There is deliberately no "expired"
+ * status: past grace the household is read-only, never locked (decisions §9).
+ */
+export type TokenAuthorisation =
+  /** the signature did not check out, or the token is not a token */
+  | { status: "invalid" }
+  /** inside the window, or inside grace: writes are allowed */
+  | { status: "active"; payload: TokenPayload; access: Access }
+  /** past grace: reads only, and never nothing */
+  | { status: "read-only"; payload: TokenPayload; access: Access };
+
+export async function authoriseToken(input: {
+  token: string;
+  verifier: TokenVerifier;
+  now?: Date;
+}): Promise<TokenAuthorisation> {
+  const payload = await input.verifier.verify(input.token);
+  if (!payload) return { status: "invalid" };
+
+  const access = evaluateAccess(payload, input.now ?? new Date());
+  // `canWrite` rather than the level, so adding a level later cannot silently land on
+  // the wrong branch
+  return access.canWrite
+    ? { status: "active", payload, access }
+    : { status: "read-only", payload, access };
+}

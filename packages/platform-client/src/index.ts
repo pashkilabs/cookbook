@@ -20,7 +20,14 @@ export {
   type FamilyQuotaMeter,
   type FamilyQuotaVerdict,
 } from "./client.js";
-export { DEFAULT_GRACE_DAYS, evaluateAccess, graceUntilFor, systemClock } from "./access.js";
+export {
+  DEFAULT_GRACE_DAYS,
+  authoriseToken,
+  evaluateAccess,
+  graceUntilFor,
+  systemClock,
+  type TokenAuthorisation,
+} from "./access.js";
 export {
   createPlatformRouter,
   toFetchHandler,

@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_GRACE_DAYS, evaluateAccess, graceUntilFor } from "../src/access.js";
+import {
+  DEFAULT_GRACE_DAYS,
+  authoriseToken,
+  evaluateAccess,
+  graceUntilFor,
+} from "../src/access.js";
+import {
+  createEd25519Signer,
+  createEd25519Verifier,
+  generateEd25519KeyPair,
+} from "../src/crypto.js";
+import type { TokenPayload } from "../src/types.js";
 
 const validUntil = "2026-09-11T00:00:00.000Z";
 const graceUntil = "2026-09-18T00:00:00.000Z";
@@ -92,5 +103,80 @@ describe("graceUntilFor", () => {
 
   it("refuses a validity date it cannot read rather than inventing one", () => {
     expect(() => graceUntilFor("nonsense", 7)).toThrow(/not a date/);
+  });
+});
+
+describe("authoriseToken", () => {
+  const keys = generateEd25519KeyPair();
+  const other = generateEd25519KeyPair();
+  const signer = createEd25519Signer({ keyId: "k1", privateKeyPem: keys.privateKeyPem });
+  const verifier = createEd25519Verifier({ publicKeysPem: { k1: keys.publicKeyPem } });
+
+  const payload: TokenPayload = {
+    v: 1,
+    familyId: "fam-1",
+    accountId: "acc-1",
+    members: [],
+    entitlements: { recipes: { tier: "full", quota: {} } },
+    issuedAt: "2026-08-11T00:00:00.000Z",
+    validUntil,
+    graceUntil,
+  };
+  const token = signer.sign(payload);
+
+  it("pairs the signature check with the window, so a caller cannot forget one", async () => {
+    // the gap this closes: verify() alone says nothing about expiry
+    expect(verifier.verify(token)).not.toBeNull();
+    const authorised = await authoriseToken({ token, verifier, now: new Date(validUntil) });
+    expect(authorised).toMatchObject({ status: "active", access: { level: "full" } });
+  });
+
+  it("still allows writes during grace", async () => {
+    const authorised = await authoriseToken({
+      token,
+      verifier,
+      now: new Date("2026-09-14T00:00:00.000Z"),
+    });
+    expect(authorised).toMatchObject({ status: "active", access: { level: "grace" } });
+  });
+
+  it("degrades to read-only past grace, not to invalid", async () => {
+    // a lapsed household still gets its recipes; there is no locked status to return
+    const authorised = await authoriseToken({
+      token,
+      verifier,
+      now: new Date(ms(graceUntil, 1)),
+    });
+    expect(authorised.status).toBe("read-only");
+    if (authorised.status === "invalid") throw new Error("unreachable");
+    expect(authorised.access).toMatchObject({ canRead: true, canWrite: false });
+    expect(authorised.payload.familyId).toBe("fam-1");
+  });
+
+  it("reports invalid for a signature that does not check out", async () => {
+    const forged = createEd25519Signer({
+      keyId: "k1",
+      privateKeyPem: other.privateKeyPem,
+    }).sign(payload);
+    expect(await authoriseToken({ token: forged, verifier })).toEqual({ status: "invalid" });
+    expect(await authoriseToken({ token: "nonsense", verifier })).toEqual({ status: "invalid" });
+  });
+
+  it("does not let an expired token through by way of a valid signature", async () => {
+    // the failure mode in one line: the signature is good and the window is not
+    const authorised = await authoriseToken({
+      token,
+      verifier,
+      now: new Date("2030-01-01T00:00:00.000Z"),
+    });
+    expect(authorised.status).not.toBe("active");
+  });
+
+  it("never returns a status that denies reading", async () => {
+    for (const now of [validUntil, ms(graceUntil, 1), "2099-01-01T00:00:00.000Z"]) {
+      const authorised = await authoriseToken({ token, verifier, now: new Date(now) });
+      if (authorised.status === "invalid") throw new Error(`unexpected invalid at ${now}`);
+      expect(authorised.access.canRead, now).toBe(true);
+    }
   });
 });
