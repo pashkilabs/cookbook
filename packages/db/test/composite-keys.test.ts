@@ -84,9 +84,13 @@ describe.skipIf(instance === null)("composite foreign keys", () => {
 
   /**
    * Each case names a child row that points at one of alpha's parents while claiming
-   * beta's household — the shape of a cross-household leak.
+   * whichever household is passed in — the shape of a cross-household leak.
+   *
+   * The household is a parameter because `photos` has its own constraint tying
+   * `storage_path` to `family_id`; a path built from the wrong household would fail
+   * that instead of the foreign key, and the test would pass for the wrong reason.
    */
-  const cases = () => [
+  const cases = (familyId: string) => [
     {
       table: "recipe_ingredients",
       row: { recipe_id: alphaRecipeId, position: 0, item_text: "1 cup cream" },
@@ -101,7 +105,7 @@ describe.skipIf(instance === null)("composite foreign keys", () => {
     },
     {
       table: "photos",
-      row: { recipe_id: alphaRecipeId, storage_path: "x/y.jpg", source: "camera" },
+      row: { recipe_id: alphaRecipeId, storage_path: `${familyId}/y.jpg`, source: "camera" },
     },
     {
       table: "shortlist_entries",
@@ -118,7 +122,7 @@ describe.skipIf(instance === null)("composite foreign keys", () => {
   ];
 
   it("refuses a child row that claims a household its parent does not belong to", async () => {
-    for (const { table, row } of cases()) {
+    for (const { table, row } of cases(beta.familyId)) {
       const { error } = await admin.from(table).insert({ ...row, family_id: beta.familyId });
       // a foreign key violation, not a policy refusal: the service role bypasses RLS
       expect(error?.code, `${table} accepted a cross-household row`).toBe("23503");
@@ -127,7 +131,7 @@ describe.skipIf(instance === null)("composite foreign keys", () => {
 
   it("accepts the same row when the household matches", async () => {
     // the converse, so the test above cannot pass because the insert was simply wrong
-    for (const { table, row } of cases()) {
+    for (const { table, row } of cases(alpha.familyId)) {
       const { error } = await admin.from(table).insert({ ...row, family_id: alpha.familyId });
       expect(error, `${table} rejected a valid row`).toBeNull();
     }

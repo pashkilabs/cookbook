@@ -304,11 +304,13 @@ eight cascading composite keys become soft-delete propagation. This is a
 schema change we may owe the sync engine, and knowing which is better after the
 engine is chosen is the right order.
 
-**`photos.storage_path` assumes the object already exists.** A camera photo taken
-offline has a row and local bytes and no object. Either `storage_path` becomes
-nullable with a local path alongside it, or a path is reserved at capture and the
-object arrives later. Both are migrations; neither should be discovered while
-writing the camera screen.
+**`photos.storage_path` assumed the object already exists.** Fixed rather than
+deferred, because it was a migration and it was small: `upload_state` is
+`pending | stored`, the path is reserved at capture, and NOT NULL survives. Checking
+what a pending path did to the storage read policies turned up a worse bug than the
+one being fixed — the policies trust the `photos` row, clients write `photos` rows,
+and nothing tied a row's path to its own household, so a household could name
+another household's object and read it. Two constraints close it; decisions §25.
 
 ---
 
@@ -321,7 +323,8 @@ Phase 3 work, listed so the roadmap can absorb it:
 - The local write path and outbox — one choke point, with the entitlement gate in
   it.
 - The post-sync integrity assertion, with its three outcomes.
-- A storage write policy for camera photos, and the `storage_path` decision above.
+- A storage write policy for camera photos, and the uploader that drains
+  `upload_state = 'pending'`.
 - A scheduler for `import_jobs`, still unbuilt and unrelated to this document except
   that a device polling its own imports needs the drain to actually run.
 

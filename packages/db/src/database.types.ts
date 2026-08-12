@@ -464,6 +464,7 @@ export type Database = {
           source: string
           storage_path: string
           updated_at: string
+          upload_state: string
           width: number | null
         }
         Insert: {
@@ -476,6 +477,7 @@ export type Database = {
           source: string
           storage_path: string
           updated_at?: string
+          upload_state?: string
           width?: number | null
         }
         Update: {
@@ -488,6 +490,7 @@ export type Database = {
           source?: string
           storage_path?: string
           updated_at?: string
+          upload_state?: string
           width?: number | null
         }
         Relationships: [
@@ -590,11 +593,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "ratings_family_member_id_fkey"
-            columns: ["family_member_id"]
+            foreignKeyName: "ratings_family_member"
+            columns: ["family_member_id", "family_id"]
             isOneToOne: false
             referencedRelation: "family_members"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "family_id"]
           },
           {
             foreignKeyName: "ratings_recipe"
@@ -763,11 +766,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "recipes_created_by_fkey"
-            columns: ["created_by"]
+            foreignKeyName: "recipes_created_by"
+            columns: ["created_by", "family_id"]
             isOneToOne: false
             referencedRelation: "family_members"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "family_id"]
           },
           {
             foreignKeyName: "recipes_family_id_fkey"

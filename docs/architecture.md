@@ -207,8 +207,8 @@ shortlist_entries   id, family_id, week_start, recipe_id,
                     created_at, updated_at, deleted_at
 pantry_items        id, family_id, ingredient_id?, name, amount, unit,
                     created_at, updated_at, deleted_at
-photos              id, family_id, recipe_id, storage_path, source, width, height,
-                    created_at, updated_at, deleted_at
+photos              id, family_id, recipe_id, storage_path, upload_state, source,
+                    width, height, created_at, updated_at, deleted_at
                     -- source in (import|camera|upload)
                     -- storage_path names an object in the private `recipe-photos`
                     -- bucket. Storage read policies resolve through this column, so
@@ -216,6 +216,13 @@ photos              id, family_id, recipe_id, storage_path, source, width, heigh
                     -- role — which is the correct state for an import awaiting
                     -- review. anon sees a photo only when the recipe is published
                     -- and source = 'camera'.
+                    -- Because those policies trust this row and clients write rows:
+                    -- CHECK (storage_path like family_id || '/%') and UNIQUE
+                    -- (storage_path). Without them a household could name another
+                    -- household's object and read it (decisions §25).
+                    -- upload_state pending|stored: a photo taken offline reserves
+                    -- its path at capture and uploads later. Never consulted by a
+                    -- policy — the path authorises, the state is for the uploader.
 import_jobs         id, family_id, kind, input_ref, status, result_json, error,
                     attempts, claimed_at, worker, quota_consumed_at, finished_at,
                     created_at, updated_at, deleted_at

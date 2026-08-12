@@ -665,7 +665,7 @@ describe.skipIf(instance === null)("row-level security", () => {
             {
               family_id: beta.familyId,
               recipe_id: beta.publicRecipeId,
-              storage_path: "beta/camera.jpg",
+              storage_path: `${beta.familyId}/camera.jpg`,
               source: "camera",
               width: 100,
               height: 100,
@@ -673,7 +673,7 @@ describe.skipIf(instance === null)("row-level security", () => {
             {
               family_id: beta.familyId,
               recipe_id: beta.publicRecipeId,
-              storage_path: "beta/import.jpg",
+              storage_path: `${beta.familyId}/import.jpg`,
               source: "import",
               width: 100,
               height: 100,

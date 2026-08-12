@@ -624,6 +624,60 @@ during a migration is what this list exists to prevent.
 
 ---
 
+## 25. A photo names its path before its bytes exist, and cannot name another household's
+
+`photos.storage_path` stays NOT NULL. `upload_state` is `pending | stored`, defaulting
+to `stored`.
+
+A photograph taken with no signal has a row and local bytes and no object. The
+alternative was a nullable path, and it was rejected: the path is derivable at capture
+from `family_id` and a locally minted uuid, so nothing waits on the server to assign
+it, and a null would be describing a *state* through a missing fact. It would also
+drop NOT NULL for every row — including imports, where the invariant genuinely holds —
+to express a condition affecting some. A final path from the moment of capture means a
+second device knows where the bytes will be before they arrive, and the object becomes
+readable the instant it lands with no row update in between.
+
+The state deliberately does **not** appear in the storage read policies. Between an
+upload completing and the row being updated, a policy checking `upload_state` would
+deny an object that exists. The path authorises; the state is for the uploader. A
+migration self-check asserts no storage policy references it.
+
+### The bug found while checking this
+
+The storage read policies resolve access by finding a `photos` row whose
+`storage_path` equals the object name — a deliberate choice in 090700, so that a
+renamed path convention cannot leave a policy matching the old shape. The cost of it
+is that **the row is authoritative about which object it names, and clients write
+rows.** Nothing tied a row's path to its own household.
+
+So a household could insert a `photos` row naming another household's object and
+inherit read access to it. Verified end to end: denied, claim accepted, then read.
+With `source = 'camera'` on a published recipe it also made another household's
+private photograph world-readable to `anon`.
+
+Two constraints close it, and they go on the row rather than in the policy:
+
+- `check (storage_path like family_id::text || '/%')` — a row can only name a path
+  inside its own household's folder.
+- `unique (storage_path)` — one object, one row. Otherwise deleting one row leaves the
+  object authorised by another, and a row claiming an import's path with
+  `source = 'camera'` would publish the blogger's photograph.
+
+**Why a constraint and not a policy.** Parsing the path inside a policy is exactly
+what 090700 rejected, and rightly: a convention encoded in a policy is a second source
+of truth that keeps matching the old shape after the convention moves. A CHECK is
+enforced on write, so if the convention changes, the next insert fails loudly instead
+of a policy quietly authorising the wrong object. The policy still consults the row —
+the row is now worth consulting.
+
+*Would change if:* paths stop being derivable at capture — a storage provider that
+assigns its own object keys would force the nullable-path shape, and the check
+constraint with it. Or if the path convention needs to change, which is now a
+migration rather than a rename, and that is the intended cost.
+
+---
+
 ## Unresolved
 
 | Question | Why it blocks | Who can answer |
