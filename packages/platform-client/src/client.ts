@@ -5,6 +5,7 @@ import type {
   PlatformClient,
   PlatformClientOptions,
   QuotaOutcome,
+  PlatformStore,
   Session,
   SignedToken,
   TokenPayload,
@@ -123,4 +124,58 @@ export function createPlatformClient(options: PlatformClientOptions): PlatformCl
   }
 
   return { getSession, getEntitlement, consumeQuota, registerDevice };
+}
+
+/**
+ * Quota for a household, with nobody signed in.
+ *
+ * A background worker draining import jobs is family-scoped: it acts for a household
+ * rather than as one of its adults, so `PlatformClient` — which resolves everything
+ * from an `accountId` — is the wrong shape. This is the narrow widening of the seam
+ * that background work needs, and it is still the only route to the entitlement.
+ *
+ * The alternative was letting the worker count locally, which would put a second
+ * opinion about the balance beside the one the database enforces.
+ */
+export interface FamilyQuotaMeter {
+  consume(familyId: string, amount: number): Promise<FamilyQuotaVerdict>;
+}
+
+export type FamilyQuotaVerdict =
+  | { allowed: true }
+  | { allowed: false; reason: "exceeded" | "no-entitlement"; detail?: string };
+
+export function createQuotaMeter(options: {
+  store: PlatformStore;
+  appKey: string;
+  /** counter name; defaults to the one the recipe app spends */
+  quota?: string;
+}): FamilyQuotaMeter {
+  const quota = options.quota ?? DEFAULT_QUOTA;
+
+  return {
+    async consume(familyId: string, amount: number): Promise<FamilyQuotaVerdict> {
+      if (!Number.isInteger(amount) || amount <= 0) {
+        throw new Error(`consume needs a positive whole amount, got ${amount}`);
+      }
+
+      const entitlement = await options.store.findEntitlement(familyId, options.appKey);
+      if (!entitlement) return { allowed: false, reason: "no-entitlement" };
+
+      const spent = await options.store.spendQuota({
+        familyId,
+        appKey: options.appKey,
+        quota,
+        amount,
+      });
+      if (spent) return { allowed: true };
+
+      const counter = entitlement.quota[quota];
+      return {
+        allowed: false,
+        reason: "exceeded",
+        ...(counter ? { detail: `${counter.used} of ${counter.limit} used` } : {}),
+      };
+    },
+  };
 }

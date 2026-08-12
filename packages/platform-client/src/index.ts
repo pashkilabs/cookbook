@@ -13,7 +13,13 @@
  *   @pashki/platform-client/supabase   the Supabase PlatformStore — server only
  */
 export * from "./types.js";
-export { createPlatformClient, DEFAULT_QUOTA } from "./client.js";
+export {
+  createPlatformClient,
+  createQuotaMeter,
+  DEFAULT_QUOTA,
+  type FamilyQuotaMeter,
+  type FamilyQuotaVerdict,
+} from "./client.js";
 export { DEFAULT_GRACE_DAYS, evaluateAccess, graceUntilFor, systemClock } from "./access.js";
 export {
   TOKEN_PREFIX,
