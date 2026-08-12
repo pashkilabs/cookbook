@@ -22,6 +22,17 @@ export {
 } from "./client.js";
 export { DEFAULT_GRACE_DAYS, evaluateAccess, graceUntilFor, systemClock } from "./access.js";
 export {
+  createPlatformRouter,
+  toFetchHandler,
+  type FetchAdapterOptions,
+  type PlatformErrorCode,
+  type PlatformHttpRequest,
+  type PlatformHttpResponse,
+  type PlatformRouter,
+  type PlatformRouterOptions,
+  type TokenAuthenticator,
+} from "./http.js";
+export {
   TOKEN_PREFIX,
   assembleToken,
   base64UrlDecode,
