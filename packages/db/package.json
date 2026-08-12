@@ -12,6 +12,10 @@
     "./test-support": {
       "types": "./test/support/index.ts",
       "default": "./test/support/index.ts"
+    },
+    "./test-support/global-setup": {
+      "types": "./test/global-setup.ts",
+      "default": "./test/global-setup.ts"
     }
   },
   "scripts": {

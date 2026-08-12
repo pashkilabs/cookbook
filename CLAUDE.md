@@ -145,6 +145,12 @@ models be good enough. Do not add a silent-save path.
   being orphaned, so cleanup goes through the Storage API — `.remove()` for objects,
   the bucket endpoint for buckets. Found when a probe bucket would not go away and
   the migration could not tidy up after itself.
+- **`turbo run test` must not be cached, and is not.** Most suites here assert against
+  a real Postgres, and the database is an input turbo cannot hash — so a cache hit
+  replays a pass that was measured against a different schema. Three attempts to
+  reproduce the post-reset flake reported clean because they were replays of an earlier
+  run. If `pnpm check` ever gets fast enough to be suspicious, check `cache: false` is
+  still on the `test` task.
 - **Row-level security says nothing about columns.** A policy decides which *rows* a
   caller may write; a table-wide `INSERT`/`UPDATE` grant then lets it write every
   column of those rows. Correct policies therefore coexisted with a client able to set

@@ -9,5 +9,8 @@ export default defineConfig({
     testTimeout: 30_000,
     hookTimeout: 60_000,
     fileParallelism: false,
+    // waits for the stack once, so a suite started straight after `db reset` cannot
+    // skip its integration tests and report green
+    globalSetup: ["./test/global-setup.ts"],
   },
 });

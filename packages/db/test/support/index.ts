@@ -1,7 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@supabase/supabase-js";
 
-export { readLocalInstance, type LocalInstance } from "../local-instance.js";
+export {
+  discoverLocalStack,
+  readLocalInstance,
+  type LocalInstance,
+  type LocalStack,
+} from "../local-instance.js";
 
 /**
  * Test support that other packages may use.
