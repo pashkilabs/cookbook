@@ -24,13 +24,24 @@ export function formatReport(report: EvalReport): string {
     ].join(" · "),
   );
 
+  const warnings: string[] = [];
   if (report.placeholders > 0) {
-    out.push("");
-    out.push(
+    warnings.push(
       report.placeholders === report.fixtures
         ? `!! every fixture is a placeholder. These numbers demonstrate the harness;\n   they measure nothing. Real fixtures go in eval/fixtures/.`
         : `!! ${report.placeholders} of ${report.fixtures} fixtures are placeholders, so the totals are diluted.`,
     );
+  }
+  // one line for a field nobody ever attempted, rather than N failures that each
+  // look like a wrong answer
+  for (const field of report.neverEmitted) {
+    warnings.push(
+      `!! ${labelFor(field)} was never emitted across ${report.scored} ${plural(report.scored, "fixture")}`,
+    );
+  }
+  if (warnings.length > 0) {
+    out.push("");
+    out.push(...warnings);
   }
 
   out.push("");
@@ -82,9 +93,7 @@ export function formatReport(report: EvalReport): string {
   out.push(
     "overall counts every check once: three recipe fields per fixture, three\n" +
       "per expected ingredient, and one per spurious line. A missing ingredient\n" +
-      "fails all three of its checks. Skipped fixtures are excluded entirely.\n" +
-      `${MISSING} means the extractor never mentioned the field; "none" means it\n` +
-      "said there is none. Those are different answers and score differently.",
+      "fails all three of its checks. Skipped fixtures are excluded entirely.",
   );
 
   return out.join("\n");

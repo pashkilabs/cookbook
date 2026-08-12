@@ -43,7 +43,7 @@ Open the repo root in VS Code and run Claude Code from there so it picks up
 
 ## Status
 
-**Phase 0, over half done.** `packages/core` is built and tested — 89 tests,
+**Phase 0, over half done.** `packages/core` is built and tested — 90 tests,
 typecheck clean, no DOM or network dependencies, so it runs identically in
 Next.js, Expo and the import worker.
 

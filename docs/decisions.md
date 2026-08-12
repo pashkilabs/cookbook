@@ -189,6 +189,37 @@ rather than frozen at whatever was typed once.
 
 ---
 
+## 14. Eval scoring treats an absent field as `null`
+
+**Reversed from the opposite rule**, which shipped with the harness and lasted
+about an hour.
+
+The original rule: a field missing from an extractor's output scored wrong even
+where the hand-checked answer was `null`. Only an explicit `null` counted as an
+answer. The reasoning was that "I looked, there is none" is worth more than
+silence, because silence can't be told apart from a crash — and an extractor that
+never emits a field would otherwise score full marks on every recipe that happens
+to lack one.
+
+That reasoning was about the wrong layer. Schema-constrained model output
+routinely omits nulls, and once model extractors exist the adapter around the
+model decides field presence, not the model. The harness would have been grading
+our own wrapper code and calling it extraction quality. `undefined` is now
+normalised to `null` at the adapter boundary before anything is compared.
+
+The signal the old rule protected was real, so it moved to the aggregate: a field
+never emitted anywhere in the fixture set produces one warning line in the report
+header (`!! time was never emitted across 20 fixtures`) instead of N failures that
+each look like a wrong answer. One line, not a diluted percentage.
+
+*Would change if:* the product ever needs to distinguish "the source states no
+time" from "extraction failed to read the time" — a review screen that flags the
+second differently, say. That distinction can't be expressed in a two-state
+field, so it would mean a third state in the extractor contract rather than a
+return to grading presence. Absent that, this stays.
+
+---
+
 ## Unresolved
 
 | Question | Why it blocks | Who can answer |

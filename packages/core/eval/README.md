@@ -113,12 +113,16 @@ checks, so an extractor can't score well on amounts by finding only the easy
 ingredients. Spurious lines cost something, so emitting fifty junk lines is not
 free.
 
-**Silence is not an answer.** Omitting `totalMinutes` scores wrong even where the
-expected value is `null`. An extractor that says "I looked, there is none" is
-worth more than one that says nothing, because silence can't be told apart from a
-crash — and an extractor that never emits a field would otherwise score full
-marks on every recipe that happens to lack it. Emit `null` explicitly. The report
-prints `—` for silence and `none` for an asserted absence.
+**Absence is the same answer as `null`.** Omitting `totalMinutes` and asserting it
+`null` score identically — `undefined` is normalised to `null` before anything is
+compared. Schema-constrained model output routinely omits nulls, and the wrapper
+around a model controls field presence rather than the model itself, so grading
+presence would grade our own adapter code instead of extraction quality.
+
+The signal that costs us is an extractor that never attempts a field at all,
+which would otherwise hide inside a low per-field percentage. The report carries
+that as one header line — `!! time was never emitted across 20 fixtures` — rather
+than as N failures that each look like a wrong answer.
 
 ## Reading the report
 

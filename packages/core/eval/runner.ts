@@ -5,8 +5,8 @@ import type {
   Fixture,
   FixtureSet,
 } from "./types.js";
-import type { FixtureScore, ScoreOptions } from "./score.js";
-import { DEFAULT_SCORE_OPTIONS, scoreRecipe } from "./score.js";
+import type { FixtureScore, RecipeFieldName, ScoreOptions } from "./score.js";
+import { DEFAULT_SCORE_OPTIONS, RECIPE_FIELDS, scoreRecipe } from "./score.js";
 
 export interface RunOptions {
   /** names the extractor in the report; defaults to the function's own name */
@@ -52,6 +52,12 @@ export interface EvalReport {
     found: number;
     spurious: number;
   };
+  /**
+   * Fields the extractor never emitted on any scored fixture. Absence scores the
+   * same as an asserted null, so a field nobody ever attempts would otherwise
+   * vanish into a low per-field percentage — this surfaces it once.
+   */
+  neverEmitted: RecipeFieldName[];
   overall: Tally;
   cost: {
     /** false when no extractor reported usage — a deterministic run, or one that didn't say */
@@ -121,6 +127,8 @@ function summarise(label: string, outcomes: FixtureOutcome[]): EvalReport {
   const ingredients = { expected: 0, found: 0, spurious: 0 };
   const overall = emptyTally();
   const cost = { reported: false, usd: 0, inputTokens: 0, outputTokens: 0, models: [] as string[] };
+  const emitted: Record<RecipeFieldName, number> = { title: 0, servings: 0, totalMinutes: 0 };
+  let scored = 0;
 
   for (const outcome of outcomes) {
     const { usage } = outcome;
@@ -134,6 +142,13 @@ function summarise(label: string, outcomes: FixtureOutcome[]): EvalReport {
 
     const { score } = outcome;
     if (!score) continue;
+
+    // only what the extractor actually returned counts as an attempt; a fixture
+    // that threw emitted nothing for reasons that aren't about the field
+    if (outcome.status === "scored") {
+      scored += 1;
+      for (const field of RECIPE_FIELDS) if (score.emitted[field]) emitted[field] += 1;
+    }
 
     for (const field of score.fields) add(byField[field.field], field.correct);
     for (const result of score.ingredients) {
@@ -157,6 +172,7 @@ function summarise(label: string, outcomes: FixtureOutcome[]): EvalReport {
     placeholders: outcomes.filter((o) => o.fixture.placeholder).length,
     byField,
     ingredients,
+    neverEmitted: scored === 0 ? [] : RECIPE_FIELDS.filter((field) => emitted[field] === 0),
     overall,
     cost,
     outcomes,

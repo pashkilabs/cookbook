@@ -35,6 +35,11 @@ rebuild, and everything else depends on it.*
 - [ ] `packages/db` — schema and migrations. Platform tables and app tables per
       `docs/architecture.md` §5. Row-level security on every app table keyed on
       `family_id`.
+      *Written but NOT applied. Docker on this machine cannot pull images, so no
+      local Supabase instance could be started. All 91 statements parse under the
+      PostgreSQL 17 grammar; nothing has been executed. Outstanding: `db:reset`
+      against a real instance, `gen:types`, and the RLS isolation suite (21 tests,
+      currently skipping for want of a database). See `packages/db/README.md`.*
 - [ ] Seed `ingredients` and `grocery_packages` from `SEED_CATALOG`. After this,
       nothing outside seeding imports that constant.
 - [ ] `packages/platform-client` — `getSession`, `getEntitlement`,

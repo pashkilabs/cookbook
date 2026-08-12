@@ -85,15 +85,15 @@ describe("scoring one recipe", () => {
     expect(score.ingredients[0]?.itemCorrect).toBe(false);
   });
 
-  it("counts a field the extractor never mentioned as wrong, not as absent", () => {
+  it("counts an omitted field as wrong when the source does state one", () => {
     const score = scoreRecipe(fixture().expected, { ingredients: [] });
     expect(score.fields.every((f) => !f.correct)).toBe(true);
     expect(score.correct).toBe(0);
   });
 
-  it("credits asserting there is no time, but not staying silent about it", () => {
-    // otherwise an extractor that never emits the field scores full marks on
-    // every recipe that happens not to state one
+  it("reads an omitted field as null, so serialisation convention is not graded", () => {
+    // schema-constrained model output routinely omits nulls, and the wrapper
+    // controls field presence — grading it would grade our own adapter
     const expected = fixture({
       expected: {
         title: "x",
@@ -105,8 +105,9 @@ describe("scoring one recipe", () => {
     const timeOf = (actual: Parameters<typeof scoreRecipe>[1]): boolean | undefined =>
       scoreRecipe(expected, actual).fields.find((f) => f.field === "totalMinutes")?.correct;
 
-    expect(timeOf({ ingredients: [] })).toBe(false);
+    expect(timeOf({ ingredients: [] })).toBe(true);
     expect(timeOf({ totalMinutes: null, ingredients: [] })).toBe(true);
+    expect(timeOf({ totalMinutes: 30, ingredients: [] })).toBe(false);
   });
 
   it("fails all three checks for an ingredient it never found", () => {
@@ -257,10 +258,27 @@ describe("the report", () => {
     expect(text).toContain(`"for the sauce"`);
   });
 
-  it("distinguishes a field the extractor omitted from one it answered null", async () => {
-    const silent: Extractor = () => ({ ingredients: [] });
-    const text = formatReport(await runEval([fixture()], silent));
-    expect(text).toContain("got —");
+  it("warns once for a field nobody ever attempted, instead of N quiet failures", async () => {
+    const noTime: Extractor = () => ({
+      title: "Cream Thing",
+      servings: 2,
+      ingredients: [{ amount: 1, unit: "cup", item: "heavy cream" }],
+    });
+    const report = await runEval([fixture({ id: "a" }), fixture({ id: "b" })], noTime);
+    expect(report.neverEmitted).toEqual(["totalMinutes"]);
+    expect(formatReport(report)).toContain("!! time was never emitted across 2 fixtures");
+  });
+
+  it("does not warn about a field the extractor answers, even when the answer is null", async () => {
+    const asserts: Extractor = () => ({
+      title: "Cream Thing",
+      servings: 2,
+      totalMinutes: null,
+      ingredients: [{ amount: 1, unit: "cup", item: "heavy cream" }],
+    });
+    const report = await runEval([fixture()], asserts);
+    expect(report.neverEmitted).toEqual([]);
+    expect(formatReport(report)).not.toContain("never emitted");
   });
 
   it("says so loudly while the fixture set is still placeholders", async () => {

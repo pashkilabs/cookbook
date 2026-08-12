@@ -17,11 +17,13 @@ export const DEFAULT_SCORE_OPTIONS: ScoreOptions = {
   matchThreshold: 0.5,
 };
 
-/** Shown wherever an extractor said nothing at all, as distinct from saying "none". */
+/** Shown where there is no value to show. */
 export const MISSING = "—";
 
 export type RecipeFieldName = "title" | "servings" | "totalMinutes";
 export type IngredientFieldName = "amount" | "unit" | "item";
+
+export const RECIPE_FIELDS: readonly RecipeFieldName[] = ["title", "servings", "totalMinutes"];
 
 export interface FieldResult {
   field: RecipeFieldName;
@@ -47,6 +49,36 @@ export interface FixtureScore {
   spurious: EvalIngredient[];
   correct: number;
   total: number;
+  /**
+   * Which fields the extractor actually put in its output. Absence does not
+   * affect the score — but an extractor that never emits a field on any fixture
+   * is worth one warning, which the runner aggregates from this.
+   */
+  emitted: Record<RecipeFieldName, boolean>;
+}
+
+/**
+ * What the scorer compares: absence collapsed into null.
+ *
+ * A field omitted from the output and a field asserted as null are the same
+ * answer. Grading them differently would grade the serialisation convention of
+ * whatever wrapper produced the output — schema-constrained model output
+ * routinely omits nulls, and the wrapper controls presence, not the model.
+ */
+interface NormalisedRecipe {
+  title: string | null;
+  servings: number | null;
+  totalMinutes: number | null;
+  ingredients: readonly EvalIngredient[];
+}
+
+function normaliseExtracted(actual: ExtractedRecipe): NormalisedRecipe {
+  return {
+    title: actual.title ?? null,
+    servings: actual.servings ?? null,
+    totalMinutes: actual.totalMinutes ?? null,
+    ingredients: actual.ingredients ?? [],
+  };
 }
 
 /**
@@ -151,31 +183,29 @@ export function scoreRecipe(
   actual: ExtractedRecipe,
   options: ScoreOptions = DEFAULT_SCORE_OPTIONS,
 ): FixtureScore {
+  const got = normaliseExtracted(actual);
   const fields: FieldResult[] = [
     {
       field: "title",
-      correct:
-        actual.title != null && normaliseTitle(expected.title) === normaliseTitle(actual.title),
+      correct: got.title !== null && normaliseTitle(expected.title) === normaliseTitle(got.title),
       expected: expected.title,
-      actual: actual.title ?? MISSING,
+      actual: got.title ?? MISSING,
     },
     {
       field: "servings",
-      correct: hasKey(actual, "servings") && amountsMatch(expected.servings, actual.servings, options),
+      correct: amountsMatch(expected.servings, got.servings, options),
       expected: numberDisplay(expected.servings),
-      actual: hasKey(actual, "servings") ? numberDisplay(actual.servings) : MISSING,
+      actual: numberDisplay(got.servings),
     },
     {
       field: "totalMinutes",
-      correct:
-        hasKey(actual, "totalMinutes") &&
-        amountsMatch(expected.totalMinutes, actual.totalMinutes, options),
+      correct: amountsMatch(expected.totalMinutes, got.totalMinutes, options),
       expected: minutesDisplay(expected.totalMinutes),
-      actual: hasKey(actual, "totalMinutes") ? minutesDisplay(actual.totalMinutes) : MISSING,
+      actual: minutesDisplay(got.totalMinutes),
     },
   ];
 
-  const produced = actual.ingredients ?? [];
+  const produced = got.ingredients;
   const { pairs, spurious } = pairIngredients(
     expected.ingredients,
     produced,
@@ -217,16 +247,12 @@ export function scoreRecipe(
     spurious: spurious.map((a) => produced[a]).filter((x): x is EvalIngredient => x !== undefined),
     correct,
     total,
+    emitted: {
+      title: actual.title !== undefined,
+      servings: actual.servings !== undefined,
+      totalMinutes: actual.totalMinutes !== undefined,
+    },
   };
-}
-
-/**
- * Distinguishes "the extractor said null" from "the extractor never mentioned
- * this field". Both are wrong when a value was expected, but only the first is
- * a claim, and the diff should not blur them.
- */
-function hasKey<K extends string>(value: object, key: K): boolean {
-  return key in value && (value as Record<K, unknown>)[key] !== undefined;
 }
 
 function numberDisplay(value: number | null | undefined): string {

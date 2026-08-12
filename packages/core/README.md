@@ -52,7 +52,7 @@ formats on the way out. Never do arithmetic on written units.
 ## Tests
 
 ```bash
-npm test          # 89 tests
+npm test          # 90 tests
 npm run typecheck
 npm run eval      # extractor accuracy against the fixture set
 ```

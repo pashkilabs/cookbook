@@ -67,7 +67,11 @@ export interface ExtractorUsage {
   costUsd?: number;
 }
 
-/** What an extractor produced. Fields may be absent — that scores as a miss, not a crash. */
+/**
+ * What an extractor produced. Absent fields are read as null when scoring, so
+ * omitting a field and asserting it null are the same answer — an extractor is
+ * measured on what it extracted, not on how its wrapper serialises nothing.
+ */
 export interface ExtractedRecipe {
   title?: string | null;
   servings?: number | null;
