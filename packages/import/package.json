@@ -9,6 +9,10 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./photo-storage": {
+      "types": "./src/photo-storage.ts",
+      "default": "./src/photo-storage.ts"
+    },
     "./sharp": {
       "types": "./src/sharp-preparer.ts",
       "default": "./src/sharp-preparer.ts"

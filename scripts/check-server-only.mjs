@@ -28,6 +28,7 @@ const SERVER_ONLY = [
   // the subpaths matter on their own: /crypto holds the signing key handling
   "@pashki/import/supabase",
   "@pashki/import/sharp",
+  "@pashki/import/photo-storage",
   "@pashki/platform-client/crypto",
   "@pashki/platform-client/supabase",
 ];
