@@ -100,6 +100,19 @@ models be good enough. Do not add a silent-save path.
   units. There is a regression test for this.
 - **Use inline confirmation, not `confirm()`.** Better on mobile, and it can't
   be suppressed by an embedding context.
+- **Postgres checks table privileges before row-level security.** A new table
+  needs an explicit grant to `authenticated`, and to `service_role` — which
+  bypasses RLS but still needs privileges; those are not the same thing. Without
+  the grant everything fails closed while the schema looks correct. Current
+  Supabase images deliberately narrow the default ACL so user tables aren't
+  auto-exposed, so don't expect one to arrive on its own.
+- **To test an RLS policy, make it permissive — don't remove it.** RLS denies by
+  default, so a dropped policy makes the table *more* restrictive and the
+  isolation test passes for the wrong reason. See `packages/db` `test:mutate`.
+- **Postgres checks the new row of an `UPDATE` against `SELECT` policies.** An
+  UPDATE policy can therefore sit redundant behind a restrictive SELECT policy
+  and look tested when nothing is exercising it. Loosening a SELECT policy — for
+  public recipe pages, say — promotes that UPDATE policy to the only guard.
 
 ## Style
 

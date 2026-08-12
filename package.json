@@ -9,7 +9,7 @@
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
     "build": "turbo run build",
-    "check": "pnpm typecheck && pnpm test"
+    "check": "node scripts/check-seed-catalog-usage.mjs && pnpm typecheck && pnpm test"
   },
   "devDependencies": {
     "turbo": "^2.3.3",

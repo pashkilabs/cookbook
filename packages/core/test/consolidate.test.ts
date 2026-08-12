@@ -4,6 +4,7 @@ import { SEED_CATALOG } from "../src/seed-catalog.js";
 import { parseIngredientList } from "../src/parse.js";
 import { consolidate, recipesUsingLeftovers, significantLeftovers } from "../src/consolidate.js";
 import type { ConsolidationEntry } from "../src/types.js";
+import { AISLE_PROBES, MATCH_PROBES } from "./fixtures/catalog.js";
 
 const catalog = createCatalog(SEED_CATALOG);
 
@@ -20,30 +21,18 @@ const lineFor = (lines: ReturnType<typeof consolidate>, key: string) => {
 };
 
 describe("catalog matching", () => {
-  it("finds items through preparation words", () => {
-    expect(catalog.find("finely chopped onion")?.key).toBe("onion");
-    expect(catalog.find("boneless skinless chicken breasts")?.key).toBe("chicken-breast");
-    expect(catalog.find("freshly grated parmesan cheese")?.key).toBe("parmesan");
-  });
-
-  it("keeps tinned tomatoes apart from fresh ones", () => {
-    // regression: stripping "diced" merged a tin into the produce aisle
-    expect(catalog.find("diced tomatoes")?.key).toBe("canned-tomatoes");
-    expect(catalog.find("tomatoes")?.key).toBe("tomatoes");
-    expect(catalog.find("cherry tomatoes")?.key).toBe("tomatoes");
-  });
-
-  it("prefers the longest matching name", () => {
-    expect(catalog.find("buttermilk")?.key).toBe("buttermilk");
-    expect(catalog.find("sun dried tomatoes")?.key).toBe("sun-dried-tomatoes");
-    expect(catalog.find("heavy whipping cream")?.key).toBe("heavy-cream");
+  // the probes live in test/fixtures/catalog.ts because the database round-trip
+  // test in @pashki/db asserts against the same ones
+  it("resolves every probe to the expected key", () => {
+    for (const [name, key] of MATCH_PROBES) {
+      expect(catalog.find(name)?.key ?? null, name).toBe(key);
+    }
   });
 
   it("falls back to keywords for items it does not carry", () => {
-    expect(catalog.find("smoked paprika")).toBeNull();
-    expect(catalog.aisleFor("smoked paprika")).toBe("Spices");
-    expect(catalog.aisleFor("courgette")).toBe("Produce");
-    expect(catalog.aisleFor("something unheard of")).toBe("Other");
+    for (const [name, aisle] of AISLE_PROBES) {
+      expect(catalog.aisleFor(name), name).toBe(aisle);
+    }
   });
 });
 

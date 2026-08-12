@@ -38,8 +38,13 @@ rebuild, and everything else depends on it.*
       coverage. 21 isolation tests, mutation-tested via
       `pnpm --filter @pashki/db test:mutate` so a weakened policy fails a test.
       Generated types committed.
-- [ ] Seed `ingredients` and `grocery_packages` from `SEED_CATALOG`. After this,
-      nothing outside seeding imports that constant.
+- [x] Seed `ingredients` and `grocery_packages` from `SEED_CATALOG`. 55
+      ingredients, 97 package sizes, in a `seed.sql` generated from the constant
+      rather than hand-copied. Idempotent. A round-trip test rebuilds the catalog
+      from the database and asserts it consolidates a known week identically to
+      `createCatalog(SEED_CATALOG)`, and
+      `scripts/check-seed-catalog-usage.mjs` (wired into `pnpm check`) fails if
+      anything outside seeding and tests references the constant.
 - [ ] `packages/platform-client` — `getSession`, `getEntitlement`,
       `consumeQuota`, `registerDevice`. The seam. Design the interface as though
       three more apps will use it.
