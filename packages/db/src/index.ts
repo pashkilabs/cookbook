@@ -1,21 +1,25 @@
 /**
  * The package's type surface.
  *
- * Concrete row types come from `src/database.types.ts`, which is generated from a
- * running database (`pnpm --filter @pashki/db gen:types`) and is therefore not
- * committed yet — see README, "Known gaps". Generating it is a one-command step;
- * fabricating it by hand would produce a file that claims to be generated and
- * drifts from the schema silently.
+ * `database.types.ts` is generated from a running database — never edited by hand.
+ * Regenerate after any migration:
  *
- * Once generated, add:
- *
- *   import type { Database } from "./database.types.js";
- *   export type { Database, Json } from "./database.types.js";
- *   type Tables = Database["public"]["Tables"];
- *   export type Row<T extends TableName> = Tables[T]["Row"];
- *   export type Insert<T extends TableName> = Tables[T]["Insert"];
- *   export type Update<T extends TableName> = Tables[T]["Update"];
+ *   pnpm --filter @pashki/db db:reset && pnpm --filter @pashki/db gen:types
  */
+import type { Database } from "./database.types.js";
+
+export type { Database, Json } from "./database.types.js";
+
+type Tables = Database["public"]["Tables"];
+
+/** A row as it comes back from a select: `Row<"recipes">`. */
+export type Row<T extends keyof Tables> = Tables[T]["Row"];
+
+/** What an insert accepts — defaults and generated columns optional. */
+export type Insert<T extends keyof Tables> = Tables[T]["Insert"];
+
+/** What an update accepts — every column optional. */
+export type Update<T extends keyof Tables> = Tables[T]["Update"];
 
 /**
  * Tables the recipe app owns and may query directly.
@@ -58,6 +62,12 @@ export const PLATFORM_TABLES = [
 export type PlatformTable = (typeof PLATFORM_TABLES)[number];
 
 export type TableName = AppTable | PlatformTable;
+
+// the two lists together must account for every table in the schema; if a
+// migration adds one and neither list mentions it, this stops compiling
+type UnlistedTable = Exclude<keyof Tables, TableName>;
+type NoUnlistedTables = [UnlistedTable] extends [never] ? true : UnlistedTable;
+export const EVERY_TABLE_IS_CLASSIFIED: NoUnlistedTables = true;
 
 /** Household-scoped tables: every one carries family_id and has four RLS policies. */
 export const HOUSEHOLD_TABLES = [

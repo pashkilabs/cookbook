@@ -16,6 +16,7 @@ const RLS_VIOLATION = "42501";
 
 interface Household {
   familyId: string;
+  accountId: string;
   memberId: string;
   recipeId: string;
   tombstonedRecipeId: string;
@@ -101,6 +102,7 @@ describe.skipIf(instance === null)("row-level security", () => {
 
       return {
         familyId,
+        accountId,
         memberId: member.data.id as string,
         recipeId: recipe.data.id as string,
         tombstonedRecipeId: tombstoned.data.id as string,
@@ -228,6 +230,24 @@ describe.skipIf(instance === null)("row-level security", () => {
       expect(error?.code).toBe(RLS_VIOLATION);
     });
 
+    it("cannot join another household by adding itself as a member", async () => {
+      // the attack that would defeat everything else: family_members is what
+      // private.current_family_ids() reads, so a client able to write it could
+      // grant itself any household. It is deliberately read-only to clients.
+      const { error } = await alpha.client.from("family_members").insert({
+        family_id: beta.familyId,
+        account_id: alpha.accountId,
+        display_name: "intruder",
+      });
+      expect(error?.code).toBe(RLS_VIOLATION);
+
+      const { count } = await admin
+        .from("family_members")
+        .select("id", { count: "exact", head: true })
+        .eq("family_id", beta.familyId);
+      expect(count).toBe(1);
+    });
+
     it("cannot attach a child row to another household's recipe", async () => {
       const { error } = await alpha.client.from("recipe_ingredients").insert({
         family_id: alpha.familyId,
@@ -291,12 +311,19 @@ describe.skipIf(instance === null)("row-level security", () => {
   });
 
   describe("import_cache", () => {
-    it("is invisible to a signed-in client despite having no household", async () => {
+    it("is unreachable by a signed-in client despite having no household", async () => {
       // shared across the whole user base, so it is served only through the
-      // import service running as the service role
+      // import service running as the service role.
+      //
+      // Refused outright rather than filtered to zero rows: authenticated holds no
+      // grant on this table, and Postgres checks privileges before RLS. Two
+      // independent gates are shut — the missing grant, and RLS enabled with no
+      // policy. The migration asserts the second one, because a future `grant
+      // select` would open the first without anyone noticing.
       const { data, error } = await alpha.client.from("import_cache").select("url_hash");
-      expect(error).toBeNull();
-      expect(data).toEqual([]);
+      expect(error?.code).toBe(RLS_VIOLATION);
+      expect(error?.message).toContain("permission denied");
+      expect(data).toBeNull();
     });
 
     it("is invisible to anonymous callers", async () => {

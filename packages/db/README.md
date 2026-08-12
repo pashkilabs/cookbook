@@ -82,6 +82,37 @@ different predicate. The migration then asserts its own coverage: any table
 carrying `family_id` without RLS, or with RLS and no policies, aborts
 `db reset` rather than shipping a hole.
 
+### Proving the tests prove something
+
+```bash
+pnpm --filter @pashki/db test:mutate
+```
+
+A passing isolation test is worthless if it would also pass against a table with
+RLS switched off. `scripts/mutate-rls.sh` weakens one policy at a time and
+requires the test meant to catch it to fail. Nine mutations, each with a stated
+expectation.
+
+Two findings from building it, both counter-intuitive enough to be worth keeping:
+
+**Dropping a policy makes a table more restrictive, not less.** RLS denies by
+default, so removing the SELECT policy means *nothing* is readable — and a test
+asserting "cannot read another household" still passes. The mutation that proves a
+negative test has teeth is making the policy **permissive**, not removing it.
+
+**Postgres checks the new row of an UPDATE against SELECT policies.** Not just the
+UPDATE policy's `WITH CHECK`. So while the SELECT policy is restrictive it masks
+the UPDATE policy completely: weakening UPDATE alone changes no observable
+behaviour, and both UPDATE tests keep passing. The harness records those two as
+`masked`, then runs the layered mutation — SELECT *and* UPDATE permissive together
+— which is caught.
+
+That masking is a live risk rather than a curiosity. **Phase 2 adds public,
+indexable recipe pages.** If that work loosens the SELECT policy on `recipes`, the
+UPDATE policy stops being redundant and becomes the only thing standing between a
+household and another household's rows. Re-run `test:mutate` after any change to a
+SELECT policy, and expect the two `masked` rows to flip to `catch`.
+
 ### Three tables are deliberately not household-scoped
 
 `ingredients` and `grocery_packages` are the catalog — global reference data.
@@ -110,18 +141,8 @@ within a household.
 
 ## Known gaps, deliberately left
 
-**`src/database.types.ts` is not committed, so there are no concrete row types
-yet.** Generating it needs a running database, and this machine could not start
-one — Docker cannot pull images (see the report accompanying this work). Run
-`pnpm --filter @pashki/db db:start && pnpm --filter @pashki/db gen:types` on a
-machine where Docker works, then add the six lines quoted at the top of
-`src/index.ts`. A hand-written stand-in was deliberately not committed: it would
-claim to be generated and drift from the schema without anyone noticing.
-
-**The migrations have not been executed.** They parse cleanly under the real
-PostgreSQL 17 grammar — all 91 statements, checked with `libpg-query` — but
-parsing is not executing. Foreign keys, the RLS self-check block, and policy
-behaviour are unverified. Run `db:reset` first on any machine with Docker.
+**`src/database.types.ts` is generated, never hand-edited.** Regenerate after any
+migration; `gen:types` immediately after a `db:reset` should produce no diff.
 
 
 **Nothing creates an `accounts` row on signup.** No trigger on `auth.users`.

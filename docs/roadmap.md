@@ -32,14 +32,12 @@ rebuild, and everything else depends on it.*
 
 ## Phase 1 — Foundations
 
-- [ ] `packages/db` — schema and migrations. Platform tables and app tables per
-      `docs/architecture.md` §5. Row-level security on every app table keyed on
-      `family_id`.
-      *Written but NOT applied. Docker on this machine cannot pull images, so no
-      local Supabase instance could be started. All 91 statements parse under the
-      PostgreSQL 17 grammar; nothing has been executed. Outstanding: `db:reset`
-      against a real instance, `gen:types`, and the RLS isolation suite (21 tests,
-      currently skipping for want of a database). See `packages/db/README.md`.*
+- [x] `packages/db` — schema and migrations. 18 tables per
+      `docs/architecture.md` §5, applied from clean. Row-level security on every
+      household table keyed on `family_id`, with the migration asserting its own
+      coverage. 21 isolation tests, mutation-tested via
+      `pnpm --filter @pashki/db test:mutate` so a weakened policy fails a test.
+      Generated types committed.
 - [ ] Seed `ingredients` and `grocery_packages` from `SEED_CATALOG`. After this,
       nothing outside seeding imports that constant.
 - [ ] `packages/platform-client` — `getSession`, `getEntitlement`,

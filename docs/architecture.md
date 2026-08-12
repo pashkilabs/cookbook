@@ -89,39 +89,116 @@ The two starred packages are the ones worth being precious about.
 
 ## 5. Data model
 
+*Built in `packages/db`. This section tracks the migrations — if the two disagree,
+the migrations are right and this is stale.*
+
+Conventions that apply to every table, so they are not repeated below:
+
+- **UUID primary keys** (`id`), so a device can mint one offline.
+- **`created_at` and `updated_at`** on every row, `updated_at` maintained by
+  trigger rather than application code — a sync engine writing straight to
+  Postgres never runs our code.
+- **`deleted_at`** on anything a device can delete. Tombstones stay *readable*: a
+  deleted row a peer cannot see is indistinguishable from one that never synced.
+
+The sync engine is still unresolved (§14), so the schema stops there — no
+publications, no replication slots, no engine-specific extensions.
+
 ### Platform tables (Pashki-owned)
 
+Read-only to clients. Every mutation goes through `platform-client` on the service
+role.
+
 ```
-accounts            id, email, created_at, deleted_at
-families            id, name, owner_account_id, created_at
-family_members      id, family_id, account_id?, display_name, colour, is_child
+accounts            id, email, created_at, updated_at, deleted_at
+                    -- id IS auth.users.id, so auth.uid() compares directly and no
+                    -- policy needs an extra hop
+families            id, name, owner_account_id, created_at, updated_at, deleted_at
+                    -- owner FK is ON DELETE RESTRICT: deleting an owning account
+                    -- fails by design; teardown is a flow, not a cascade
+family_members      id, family_id, account_id?, display_name, colour, is_child,
+                    created_at, updated_at, deleted_at
                     -- account_id NULL for children who are rated but don't sign in
-devices             id, account_id, platform, last_seen_at, revoked_at
-subscriptions       id, family_id, provider, external_id, status, renews_at
-entitlements        id, family_id, app_key, tier, quota_json, valid_until
+                    -- CHECK (not (is_child and account_id is not null))
+                    -- the root of trust: private.current_family_ids() reads this
+devices             id, account_id, platform, last_seen_at, revoked_at,
+                    created_at, updated_at
+                    -- revoked_at is the tombstone; platform in (ios|android|web)
+subscriptions       id, family_id, provider, external_id, status, renews_at,
+                    created_at, updated_at
+                    -- provider in (stripe|app_store|play); UNIQUE (provider,
+                    -- external_id) makes a replayed webhook an upsert
+entitlements        id, family_id, app_key, tier, quota_json, valid_until,
+                    created_at, updated_at
+                    -- UNIQUE (family_id, app_key). No grace column: grace is an
+                    -- issuance policy carried in the token, per decisions §9
 ```
 
 **The critical split: `family_members` are not `accounts`.** Adults have logins. Children get rated but never sign in. The prototype stumbled onto this with its separate "eaters" list; here it's formalised. Every app in the portfolio inherits this family definition rather than asking users to rebuild it.
 
 ### App tables (recipe-owned)
 
+Every household table carries `family_id` and has four RLS policies — select,
+insert, update, delete — on the same predicate. Child tables reference
+`(parent_id, family_id)` as a **composite foreign key**, so a row cannot claim a
+household its parent does not belong to.
+
 ```
 recipes             id, family_id, title, source_url, source_name, servings,
-                    time_minutes, status, make_again, times_made, created_by
-recipe_ingredients  id, recipe_id, position, amount, unit, item_text,
-                    ingredient_id?, note, is_estimated
-ingredients         id, canonical_name, aliases[], aisle, dimension
-                    -- the catalog, promoted out of source code
-grocery_packages    id, ingredient_id, label, base_amount, sort_order
-                    -- "pint (16 oz)" = 473ml
-ratings             recipe_id, family_member_id, score, rated_at
-meal_plans          id, family_id, week_start
-plan_entries        id, meal_plan_id, date, recipe_id, scale, cooked_at
-shortlist_entries   id, family_id, week_start, recipe_id
-pantry_items        id, family_id, ingredient_id?, name, amount, unit
-photos              id, recipe_id, storage_path, source, width, height
-import_jobs         id, family_id, kind, input_ref, status, result_json, error
-import_cache        url_hash, extracted_json, photo_path, fetched_at
+                    time_minutes, status, make_again, times_made, created_by,
+                    created_at, updated_at, deleted_at
+                    -- created_by -> family_members, so the UI can name a person
+                    -- who may not have a login. UNIQUE (id, family_id) is the
+                    -- target for every child table's composite FK.
+recipe_ingredients  id, family_id, recipe_id, position, amount, unit, item_text,
+                    ingredient_id?, note, is_estimated,
+                    created_at, updated_at, deleted_at
+                    -- amount/unit AS WRITTEN; base-unit conversion is core's job
+ratings             id, family_id, recipe_id, family_member_id, score, rated_at,
+                    created_at, updated_at, deleted_at
+                    -- score 1-5, matching the product's five-point scale, which
+                    -- the "whole family likes it" filter needs
+                    -- one live rating per member per recipe (partial unique index)
+meal_plans          id, family_id, week_start, created_at, updated_at, deleted_at
+plan_entries        id, family_id, meal_plan_id, date, recipe_id, scale, cooked_at,
+                    created_at, updated_at, deleted_at
+                    -- recipe_id NOT NULL: an entry is a planned recipe. Free-text
+                    -- entries would need it nullable and nobody has asked yet.
+shortlist_entries   id, family_id, week_start, recipe_id,
+                    created_at, updated_at, deleted_at
+pantry_items        id, family_id, ingredient_id?, name, amount, unit,
+                    created_at, updated_at, deleted_at
+photos              id, family_id, recipe_id, storage_path, source, width, height,
+                    created_at, updated_at, deleted_at
+                    -- source in (import|camera|upload)
+import_jobs         id, family_id, kind, input_ref, status, result_json, error,
+                    created_at, updated_at, deleted_at
+                    -- kind in (url|text|screenshot|video)
+                    -- status includes 'review': no import saves unseen
+```
+
+**The catalog** — global reference data, no `family_id`. Readable by any signed-in
+user, writable only by the service role that seeds it.
+
+```
+ingredients         id, canonical_name, aliases[], aisle, dimension,
+                    grams_per_cup?, can_size?, created_at, updated_at
+                    -- dimension mirrors the Dimension union in packages/core
+                    -- grams_per_cup and can_size are what let a volume measure
+                    -- merge into a weight-sold item, and "1 can" become a weight
+grocery_packages    id, ingredient_id, label, base_amount, sort_order,
+                    created_at, updated_at
+                    -- base_amount in base units: "pint (16 oz)" = 473.176
+```
+
+**The cache** — belongs to nobody.
+
+```
+import_cache        url_hash PK, extracted_json, photo_path, fetched_at,
+                    created_at, updated_at
+                    -- no family_id, no policies, no client grant. url_hash is the
+                    -- primary key rather than a UUID because this table is never
+                    -- synced to a device and the hash is what makes it a cache.
 ```
 
 ### Three decisions worth calling out
@@ -131,6 +208,12 @@ import_cache        url_hash, extracted_json, photo_path, fetched_at
 **The grocery catalog becomes data.** In the prototype, "cream comes in half-pints, pints and quarts" is hardcoded. As a table it can be corrected, extended and eventually improved by aggregate usage. This is what makes the shopping list get smarter over time instead of frozen.
 
 **`import_cache` is keyed by URL, not by family.** A recipe that goes round Facebook gets fetched and parsed once for your entire user base. At subscription scale this matters more than model choice.
+
+### Two things learned applying this
+
+**Grants are a separate gate from RLS, and Supabase no longer opens it for you.** Postgres checks table privileges *before* row-level security. On the current Supabase image the default privileges for the `postgres` role — which is what migrations run as — grant client roles only `TRUNCATE/REFERENCES/TRIGGER/MAINTAIN` and **no DML at all**. Tables come out unreadable by `authenticated`, which fails closed: the schema looks secure and the application is simply dead. Every grant is therefore explicit in the RLS migration.
+
+**Postgres checks the new row of an `UPDATE` against `SELECT` policies.** Not only the UPDATE policy's `WITH CHECK`. While the SELECT policy stays restrictive it masks the UPDATE policy entirely — weakening UPDATE alone changes no observable behaviour. That redundancy disappears the moment public recipe pages loosen a SELECT policy, at which point the UPDATE policy becomes the only guard. `packages/db/scripts/mutate-rls.sh` pins both behaviours.
 
 ---
 

@@ -17,6 +17,7 @@
     "db:status": "supabase status",
     "gen:types": "supabase gen types typescript --local --schema public > src/database.types.ts",
     "test": "vitest run",
+    "test:mutate": "bash scripts/mutate-rls.sh",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit"
   },

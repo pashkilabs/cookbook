@@ -16,6 +16,66 @@
 -- Hiding tombstones is the application's job at query time, not RLS's.
 
 -- ---------------------------------------------------------------------------
+-- Grants: the gate outside RLS.
+--
+-- Postgres checks table privileges BEFORE it evaluates row-level security. The two
+-- are independent and neither implies the other: a table with perfect policies and
+-- no grant is unreachable, and a table with grants and no policies is wide open.
+--
+-- These are explicit because Supabase's default privileges do not cover them. On
+-- the current image, the default ACL for role `postgres` in schema public grants
+-- client roles only Dxtm — TRUNCATE, REFERENCES, TRIGGER, MAINTAIN — and no DML at
+-- all, while `supabase_admin` gets the full set:
+--
+--   postgres | public | r | {postgres=arwdDxtm/postgres, anon=Dxtm/postgres,
+--                            authenticated=Dxtm/postgres, service_role=Dxtm/postgres}
+--
+-- Migrations run as `postgres`, so every table here came out with no SELECT for
+-- anyone. That fails closed — the schema looks secure and the application is
+-- simply dead — which is exactly the kind of thing that reads as an app bug for a
+-- day before anyone suspects grants.
+--
+-- Deliberately not using `alter default privileges` to paper over it: a new table
+-- should require a stated decision about who may touch it.
+-- ---------------------------------------------------------------------------
+
+-- The service role runs imports, webhooks and seeding. It bypasses RLS but still
+-- needs table privileges like any other role — bypassing row security is not the
+-- same as being granted access to the table.
+grant select, insert, update, delete on all tables in schema public to service_role;
+
+-- Household tables: full CRUD, with RLS deciding which rows.
+grant select, insert, update, delete on
+  public.recipes,
+  public.recipe_ingredients,
+  public.ratings,
+  public.meal_plans,
+  public.plan_entries,
+  public.shortlist_entries,
+  public.pantry_items,
+  public.photos,
+  public.import_jobs
+to authenticated;
+
+-- Platform tables and the catalog: read-only to clients. Every platform mutation
+-- goes through packages/platform-client on the service role.
+grant select on
+  public.accounts,
+  public.families,
+  public.family_members,
+  public.devices,
+  public.subscriptions,
+  public.entitlements,
+  public.ingredients,
+  public.grocery_packages
+to authenticated;
+
+-- anon is granted nothing at all. There is no household data it should reach, and
+-- public recipe pages are server-rendered through the service role rather than
+-- with an anon key. import_cache likewise stays service-role-only: it is shared
+-- across the entire user base, so no client may read it.
+
+-- ---------------------------------------------------------------------------
 -- The lookup every policy below depends on.
 --
 -- Created here rather than with the other helpers because it is LANGUAGE sql:
@@ -91,7 +151,14 @@ begin
 
     -- both clauses matter: `using` stops a caller reaching another household's
     -- row, `with check` stops them moving one of their own rows into a household
-    -- they don't belong to by writing a different family_id
+    -- they don't belong to by writing a different family_id.
+    --
+    -- Worth knowing before anyone tunes this: Postgres also checks the NEW row of
+    -- an UPDATE against the SELECT policy, so while SELECT stays restrictive it
+    -- masks this policy entirely — weakening it changes no observable behaviour,
+    -- which is verified in scripts/mutate-rls.sh. If public recipe pages ever
+    -- loosen the SELECT policy, this policy stops being redundant and becomes the
+    -- only guard. Re-run the mutation harness then.
     execute format($p$
       create policy %I on public.%I
         for update to authenticated
@@ -248,6 +315,23 @@ begin
     raise exception
       'tables carry family_id but have no policies, so they deny everything: %',
       array_to_string(unpolicied, ', ');
+  end if;
+
+  -- import_cache is the one table that SHOULD have no policies, and that has to
+  -- be asserted positively. Two independent gates keep it shut: no grant to any
+  -- client role, and RLS enabled with nothing to satisfy. A later `grant select`
+  -- would quietly open the first, so the second is what has to hold.
+  if not (select relrowsecurity from pg_class where oid = 'public.import_cache'::regclass) then
+    raise exception 'import_cache has row-level security disabled; it would be readable by any client holding a grant';
+  end if;
+
+  if exists (select 1 from pg_policy where polrelid = 'public.import_cache'::regclass) then
+    raise exception 'import_cache has a policy; it is shared across the whole user base and must not be reachable by clients';
+  end if;
+
+  if has_table_privilege('authenticated', 'public.import_cache', 'select')
+     or has_table_privilege('anon', 'public.import_cache', 'select') then
+    raise exception 'import_cache is granted to a client role; it must be service-role only';
   end if;
 end;
 $do$;
