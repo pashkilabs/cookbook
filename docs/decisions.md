@@ -455,11 +455,180 @@ act rather than a default.
 
 ---
 
+## 20. One household per device, and the file is the boundary
+
+A device holds exactly one household's data at a time. Switching households wipes
+the local database and re-syncs.
+
+SQLite has no row-level security and never will, so a device holding two households
+would need `where family_id = ?` applied by application code on every read, forever,
+with nothing checking it — the "logic you have to remember everywhere" that §5
+rejected for this exact problem on the server. One household needs no predicate,
+because there is no other row to leak. **Absence is the only enforcement that
+cannot be forgotten.**
+
+The cost is real and falls on real people: a caregiver, a second family, an adult in
+two households re-syncs on every switch. It is bounded by one household's data,
+which is small, and it is a cost to a few against a leak risk carried by everyone.
+
+`family_id` still travels on every synced row even though the file makes it
+redundant, because it turns "does this file contain a foreign row" into one query
+per table — the on-device analogue of `assert_rls_invariants()`, and the only thing
+that can catch a sync engine's bug rather than trusting it. See `docs/on-device.md`.
+
+*Would change if:* real users hit the switching cost often enough to matter. The
+upgrade is one database file per household with the *file* still the boundary —
+never two households in one file, which is the version that cannot be made safe
+later.
+
+---
+
+## 21. A device holds household rows; reference data and the roster arrive out of band
+
+Nine tables sync — `recipes`, `recipe_ingredients`, `recipe_steps`, `ratings`,
+`meal_plans`, `plan_entries`, `shortlist_entries`, `pantry_items`, `photos`. Both
+`family_id` and `deleted_at` are necessary to be syncable at all: no `family_id`
+means foreign rows cannot be detected, no `deleted_at` means a deletion cannot reach
+a device in a form it can see.
+
+Three things a device needs are deliberately **not** in the sync stream:
+
+- **The grocery catalog** is a versioned snapshot over HTTP, cached locally, with a
+  copy bundled as a floor. It is identical for every household, changes on deploy
+  rather than on user action, and has no `family_id` — syncing it would make every
+  household pay per-row replication for the same 152 rows and would break the
+  invariant that every synced row carries a household.
+- **The family roster** arrives inside the entitlement token, which already carries
+  `members` with display names and `isChild` only. This is why no platform table is
+  replicated to a device at all: the two things a device needs from them — who is in
+  the household, and what it may do — both travel in the token.
+- **Photo bytes** come from the CDN into a per-household cache directory mirroring
+  `storage_path`. Blobs in the sync stream cost every device bandwidth for images
+  most will never open.
+
+`import_cache` must never reach a device: it belongs to nobody, holds other
+households' scraped pages, has no `family_id` and is unbounded. `import_jobs` stays
+server-side and is polled, because it holds raw import payloads that a device has no
+use for once the review screen is done.
+
+*Would change if:* the catalog grows large enough that a snapshot is a bad download,
+which argues for delta fetching rather than for syncing it. Or if the roster needs
+to change without a token refresh — for instance if members become editable offline,
+which would make it household data rather than platform data, and a bigger decision
+than this one.
+
+---
+
+## 22. The on-device entitlement check is UX; the server is the enforcement
+
+The token lives in the OS keystore, refreshes on foreground and whenever
+`shouldRenew` is set, and is re-fetched **before** access is re-evaluated on
+reconnect so a stale token never causes a refusal a fetch would have avoided.
+
+The token is not a credential. It cannot write to the server — server writes carry
+the user's Supabase JWT through RLS, where `private.household_can_write()` re-checks
+`entitlements`. A rooted device can therefore grant itself local writes and the
+server will still refuse them, which means **the local check exists to keep the UI
+honest, not to keep anyone out.** Do not build attestation for a check whose failure
+mode is an optimistic screen.
+
+What that buys is permission to make the offline behaviour generous:
+
+- **Grace is the connectivity budget, not a billing courtesy.** A failed card is
+  fixed in hours; seven days is a holiday with bad signal. That is what the window
+  is sized for.
+- **Read-only never touches reading, cook mode, or shopping mode** — including
+  ticking items off, which is ephemeral device state rather than household data and
+  is not gated at all. Shopping mode works with no signal and no valid token.
+- **Refusal happens at one local write path**, not at each call site. That choke
+  point is where the predicate we cannot express as a policy lives.
+- **Queued writes are never discarded.** An outbox entry made while the token was
+  valid syncs on reconnect; if the household really has lapsed the server answers
+  `42501` and the app says so then. Destroying someone's work to guess at a billing
+  state we cannot observe offline is worse than syncing it and being told no.
+- **Unverifiable is read-only, not invalid.** An unknown key id — a rotation the
+  device slept through — degrades and triggers a key refresh. §9's floor covers our
+  own failures too, not only expiry.
+
+*Would change if:* a token ever gates something the server does not re-check. Then
+the local check becomes enforcement, and the keystore, the threat model in §23 and
+this whole decision need revisiting together.
+
+---
+
+## 23. Verifying keys are published and refreshed, never only bundled
+
+`GET /keys` on the seam: unauthenticated, cacheable, every currently-valid public
+key with its id. A snapshot ships with the app as a floor; the fetched set is
+persisted and wins.
+
+A key that cannot be replaced cannot be rotated, which would make the key ids in
+§15 decorative. Unauthenticated because public keys are public, and because a device
+that cannot verify its token is one we want fetching keys rather than blocked behind
+the thing it is trying to check.
+
+**Publish before signing.** A new key appears in `/keys` at least
+`token lifetime + grace + key staleness` — about 45 days — before it signs anything,
+and a retired key stays published until every token it signed is past grace.
+Rotation that skips the overlap turns every offline device read-only. This is the
+operational rule with teeth.
+
+**The threat model, stated so this is not over-built:** the list is served over TLS
+from our own domain and is not itself signed. Forging it would let someone mint a
+token their own device accepts, granting local writes the server refuses. So key
+distribution needs integrity against *accidents* — a stale bundle, a botched
+rotation, a CDN holding a retired key — not against an adversary with nothing to
+win.
+
+*Would change if:* §22 changes, or a platform consumer verifies tokens somewhere the
+server does not re-check the entitlement. Then the key list needs its own signature
+and a root key to sign it with.
+
+---
+
+## 24. Sync engine: six hard criteria, four ordered concessions
+
+§11 said constraint handling belongs on the evaluation checklist. This is that
+checklist, and the split between what is negotiable and what is not is the decision.
+
+**Disqualifying, not weighed:**
+
+1. `family_id` reaches the device on every synced row.
+2. `updated_at` is applied verbatim from the server, never rewritten locally — a
+   local trigger firing on replicated rows makes last-write-wins a function of
+   device clocks, which is the assumption §11 rests on.
+3. Deletions replicate as something a device can observe: our tombstones, or hard
+   deletes the engine reports.
+4. Sync can be scoped to one household.
+5. Sync authenticates as the user, with server-side rules. No shared key, no
+   client-declared scope.
+6. A local write is durable before it is acknowledged.
+
+**Conceded, in this order:** local foreign keys first (the server holds the
+invariant and the on-device assertion catches the pathological case); then local
+partial unique indexes (an undelete arriving before its delete is worse than briefly
+allowing two "one per week" plans — the UI picks by highest `updated_at`, then lowest
+`id`); then `ON DELETE CASCADE`, which is server behaviour; and last, reluctantly,
+local `CHECK` constraints, whose loss means the local store is not a schema we own.
+
+**One consequence that is not free.** Cascades hard-delete children with no
+`deleted_at`, so a device holding `recipe_ingredients` for a deleted recipe learns
+nothing unless the engine observes hard deletes. Criterion 3 therefore has a second
+half: either the engine replicates hard deletes, or the eight cascading composite
+keys become soft-delete propagation. Which is better depends on the engine, so the
+order — choose, then migrate — is deliberate.
+
+*Would change if:* an engine fails one criterion but is otherwise so far ahead that
+the criterion is worth re-examining. Re-examining is allowed; conceding quietly
+during a migration is what this list exists to prevent.
+
+---
+
 ## Unresolved
 
 | Question | Why it blocks | Who can answer |
 |---|---|---|
 | Apple's outside-purchase rules | Could dictate the whole billing architecture | Apple's live guidelines + someone who ships subscription apps |
-| Sync engine | Highest-risk dependency | Evaluation against current options |
+| Sync engine | Highest-risk dependency | Evaluation against current options, using §24's criteria |
 | Copyright posture on imported photos and prose | Changes what you store and display | Someone who does this professionally |
 | Free tier / trial / paid-only | Affects quota design and cost exposure | You |

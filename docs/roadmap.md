@@ -147,8 +147,18 @@ rebuild, and everything else depends on it.*
 
 ## Phase 3 — Native
 
+- [x] **On-device data model design.** `docs/on-device.md` — which nine tables sync
+      and which must never reach a phone, one household per device with the file as
+      the boundary, the token's life on a device, key distribution, and which of the
+      schema's constraints SQLite can hold. Decisions §20–§24. Design only; it
+      chooses no engine.
 - [ ] `apps/mobile` — Expo shell, EAS build config.
-- [ ] Local SQLite + sync engine. Tombstones for deletes.
+- [ ] Local SQLite + sync engine, evaluated against **decisions §24** — six
+      disqualifying criteria and four ordered concessions. Tombstones for deletes.
+- [ ] `GET /keys` on the seam, and a versioned catalog snapshot endpoint. Both are
+      prerequisites for a device working offline (§21, §23), and both are small.
+- [ ] The local write path and outbox — one choke point with the entitlement gate in
+      it — plus the post-sync integrity assertion, three outcomes not two.
 - [ ] Share target — receive links, text and images from other apps.
 - [ ] Camera: photograph the finished plate.
 - [ ] Cook mode: step through the method with ingredients pinned; rate at the
@@ -169,19 +179,18 @@ no refresh schedule, and nowhere on the device for a token to live. Offline
 entitlement is the point of signing them, and the last mile does not exist. This
 blocks the shopping mode's no-signal requirement, not just billing.
 
-**Local SQLite has no row-level security.** Every isolation guarantee that has been
-built is a server-side predicate — `private.current_family_ids()` and the policy
-loop. A local database has none of it, so on-device household isolation is
-enforced by nothing that exists. It matters less on a personal device and more
-than nothing: a shared iPad, or a sync bug that pulls a row down, has no floor
-under it. Decide deliberately whether the local store is per-household or
-per-device, before the sync engine decides for you.
+**Local SQLite has no row-level security.** ~~Decide deliberately whether the local
+store is per-household or per-device, before the sync engine decides for you.~~
+Answered: `docs/on-device.md` and decisions §20. One household per device, the file
+is the boundary, and `family_id` still travels on every row so a foreign row is one
+query away from being caught. What remains is building it.
 
 **Camera has no write path.** The photo bucket deliberately has no client write
 policy — imports are fetched and stored server-side. Photographing the plate needs
 a storage write policy written from scratch, plus a decision about whether the
-device uploads directly or posts to a route. This is the only Phase 3 task that
-needs new SQL.
+device uploads directly or posts to a route. And `photos.storage_path` assumes the
+object already exists, which a photo taken offline does not — so this is the only
+Phase 3 task needing both new SQL and a migration (`docs/on-device.md` §5).
 
 **The share target receives a link for exactly the platforms that never resolve.**
 Instagram and TikTok hand over a URL, and decisions §12 says reject those up
