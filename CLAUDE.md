@@ -145,6 +145,19 @@ models be good enough. Do not add a silent-save path.
   being orphaned, so cleanup goes through the Storage API — `.remove()` for objects,
   the bucket endpoint for buckets. Found when a probe bucket would not go away and
   the migration could not tidy up after itself.
+- **Row-level security says nothing about columns.** A policy decides which *rows* a
+  caller may write; a table-wide `INSERT`/`UPDATE` grant then lets it write every
+  column of those rows. Correct policies therefore coexisted with a client able to set
+  its own quota accounting, rewind the import queue, relabel a photograph's provenance
+  and stamp its own `updated_at`. Ask what a row can *assert*, not just which rows are
+  reachable — and grant columns, not tables (decisions §26).
+- **The Supabase CLI takes its project id from the working directory.** Run
+  `supabase db reset` from the repo root and it looks for a container named after the
+  root, reports `supabase start is not running`, and changes nothing. The instance is
+  fine; the CLI is looking at the wrong name. Run it from `packages/db`. This cost a
+  debugging detour because the error was filtered out by a `grep -E "ERROR"` — the CLI
+  writes `"Error"` — which is the "silence reads as success" trap arriving through my
+  own pipeline rather than through the tool.
 - **`git status` cannot tell you what has been committed.** It describes the working
   tree and nothing else, so a dirty tree at the end of a session says nothing about
   whether previous sessions landed. Run `git log` before any claim about repository

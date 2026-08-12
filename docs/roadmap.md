@@ -5,7 +5,7 @@ itself, and Phase 3 is next.**
 
 Built: `packages/core`, `packages/db` (19 tables, RLS, photo bucket, job queue),
 `packages/platform-client` (the seam, entitlement token, HTTP surface),
-`packages/import` (tiers 0–3, shared cache, photo storage, job runner). 451 tests
+`packages/import` (tiers 0–3, shared cache, photo storage, job runner). 498 tests
 across four packages.
 
 One Phase 1 item remains open, deliberately: **Stripe → entitlement issuance** is
@@ -258,18 +258,29 @@ Reviewed at the Phase 2/3 checkpoint. Two closed there; the rest carry forward.
 5. **`platform_spend_quota` being service-role-only was verified by hand.** If a
    grant slips, quota stops being server-authoritative and the failure is a
    number that is merely wrong.
+6. **A public hostname can still resolve to a private address.** `normaliseUrl`
+   refuses a client-supplied URL that *names* an internal host, which closes the
+   direct cases. It cannot see DNS: `rebind.example.com → 127.0.0.1` passes. The
+   check that would catch it inspects the address the socket actually connected to,
+   which belongs in the `Fetcher` adapter — a custom lookup or agent, and the only
+   remaining half of decisions §26's request-forgery finding.
+7. **`accounts` has an `accounts_update_self` policy and no matching grant.** It
+   decides nothing today. It would become live the moment somebody grants
+   `UPDATE` on `accounts` to a client, which is the sort of line that arrives in a
+   migration about something else. Dormant policies are how a grant becomes a
+   feature nobody reviewed.
 
 ### Fails loudly when it fails
 
-6. **`registerDevice`'s revoked-device path.** Untested.
-7. **The `child_has_no_login` constraint.** Untested. Violating it raises.
-8. **Seed idempotency** was verified by hand — but the catalog round-trip test
-   would fail loudly if a second seed duplicated rows. Downgraded from where it
-   sat before.
+8. **`registerDevice`'s revoked-device path.** Untested.
+9. **The `child_has_no_login` constraint.** Untested. Violating it raises.
+10. **Seed idempotency** was verified by hand — but the catalog round-trip test
+    would fail loudly if a second seed duplicated rows. Downgraded from where it
+    sat before.
 
 ### Known and accepted
 
-9. **Quota double-charge window.** A crash between the spend and recording the
+11. **Quota double-charge window.** A crash between the spend and recording the
    job charges an import that never ran. One statement cannot span both. The
    household loses one import from an allowance of fifty; a reservation protocol
    costs more than the failure does.

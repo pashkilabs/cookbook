@@ -677,6 +677,48 @@ migration rather than a rename, and that is the intended cost.
 
 ---
 
+## 26. A client writes columns, not tables
+
+Client roles hold **column-level** INSERT and UPDATE on household tables, never
+table-wide, and no DELETE at all.
+
+This came out of an audit of what a client can assert that RLS does not check, prompted
+by the `photos.storage_path` hole having survived several sessions. The audit's premise
+turned out to be the finding: **RLS decides which rows a caller may write and says
+nothing about which columns.** Table-wide grants meant every column of a writable row
+was client-assertable, and four different things were reachable that way — quota
+accounting, queue control, photo provenance, and the timestamps sync resolves conflicts
+with. None of them were policy failures. Every policy was correct.
+
+So the rule is now: a client may write the columns that represent a user's decisions.
+Everything the server decides — state machines, counters, provenance, accounting,
+identity, timestamps — is granted to the service role only.
+
+Why grants rather than triggers, which could also express this: column privileges are
+checked *before* row-level security, are visible in `information_schema`, and cannot be
+bypassed by a code path that forgot to consult something. A trigger inspecting
+`auth.role()` would work and would be one more thing to be correct. The narrower guard
+that needs no logic wins.
+
+Two invariants in `private.assert_rls_invariants()` keep it true for tables that do not
+exist yet: no client role may write `created_at` or `updated_at` on a table carrying
+`family_id`, and no client role may hold DELETE on a table carrying `deleted_at`.
+
+**Deletion is a tombstone.** That follows from architecture §5 rather than from security:
+a hard-deleted row is precisely the row a peer cannot distinguish from one that never
+synced. It has a happy side effect — decisions §9 recorded that a lapsed household's
+DELETE was refused *quietly*, zero rows, because DELETE has no `with check` clause.
+Routed through an UPDATE to `deleted_at`, the entitlement predicate applies and the
+refusal is loud like every other write. The wart is retired rather than documented.
+
+*Would change if:* a table appears whose whole content is server-assigned, where the
+right answer is no client write grant at all rather than a narrower one. Or if the column
+lists start drifting from what the app needs — the failure mode of this decision is a
+grant that quietly widens during a migration, which is why both halves are asserted
+rather than merely written down here.
+
+---
+
 ## Open: cascade deletions and tombstones
 
 **Not resolved. This waits on the sync engine choice, and exists so the evaluation
