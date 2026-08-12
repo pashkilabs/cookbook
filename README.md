@@ -40,17 +40,23 @@ Open the repo root in VS Code and run Claude Code from there so it picks up
 | `docs/decisions.md` | What was chosen, why, and what would reverse it |
 | `docs/roadmap.md` | Phases as tasks, and current position |
 | `packages/core` | The domain logic. The part worth being precious about. |
+| `packages/db` | Schema, migrations, RLS, generated types |
+| `packages/platform-client` | The seam. Nothing else may touch platform tables |
 
 ## Status
 
-**Phase 0, over half done.** `packages/core` is built and tested — 90 tests,
-typecheck clean, no DOM or network dependencies, so it runs identically in
-Next.js, Expo and the import worker.
+**End of Phase 1.** 176 tests across three packages, typecheck clean.
 
-The eval harness is in (`pnpm --filter @pashki/core eval`), which turns model
-selection into a measurement rather than an argument. It runs against three
-placeholder fixtures today.
+| | |
+|---|---|
+| `packages/core` | Parser, units, catalog matching, package maths, consolidation. No DOM, no network, so it runs identically in Next.js, Expo and the worker. Plus the eval harness. |
+| `packages/db` | 18 tables, row-level security on every household table, generated types, seeded grocery catalog. |
+| `packages/platform-client` | The seam: session, entitlements, quota, devices. Ed25519 entitlement token that degrades to read-only rather than locking. |
 
-Next up: real fixtures. 50+ recipes from actual sources — URLs, pasted captions,
-reel screenshots — each with hand-checked expected output. See
-`packages/core/eval/README.md` for the format.
+Phase 2 is the web app. Two things to settle before or during it: **Stripe is
+blocked** on Apple's outside-purchase rules, and **read-only degradation is not yet
+enforced server-side** — see `docs/roadmap.md`, "Known gaps in the foundations".
+
+Still outstanding from Phase 0: **real eval fixtures.** The harness runs against
+three placeholders, which measure nothing, and the import tiers in Phase 2 cannot
+be judged without them. See `packages/core/eval/README.md` for the format.

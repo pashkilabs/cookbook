@@ -126,6 +126,13 @@ it.
 *Non-negotiable on timing:* adding a quota later is nearly impossible without
 upsetting people.
 
+*Revisited after building it.* The metering is real and atomic — a conditional
+`UPDATE` that refuses rather than exceeding, verified under concurrent spends. Two
+things are not done: **nothing resets a counter** (`resetsAt` is stored, displayed,
+and acted on by nobody, so a monthly allowance is currently a lifetime one), and
+the numbers themselves are unset because they depend on the free-tier question
+below. The mechanism does not depend on that answer; the numbers do.
+
 ---
 
 ## 9. Entitlements as a signed token, degrading to read-only
@@ -134,6 +141,19 @@ You cannot call a licence server from a supermarket basement. Entitlements
 travel on the device as a signed token with a validity window and a grace
 period. After grace, the app degrades to **read-only, not locked** — a family
 should never lose access to their own recipes because a card expired mid-shop.
+
+*Revisited after building it.* The decision stands, but it is **only half
+implemented, and the missing half is the enforcing one.** `evaluateAccess` decides
+the level and the client is expected to honour it. Nothing on the server does:
+row-level security proves which household a row belongs to and never asks whether
+that household is paid up, so a lapsed family can still write through the API.
+Read-only is currently a UI convention.
+
+Worth being precise about what that does and does not cost. The token being
+offline-readable is right, and a device deciding its own level from a signed token
+is right. What is missing is the server refusing writes once grace has passed, and
+that has no hook in the schema today. It is the largest gap in Phase 1 and it is
+tracked as a Phase 2 task rather than left implicit here.
 
 ---
 
@@ -159,6 +179,25 @@ recipe in the same minute. Resist conflict-resolution theatre.
 
 **Highest-risk dependency in the project.** Check maintenance health and funding
 before committing — migrating sync engines mid-project is brutal.
+
+*Revisited after building the schema.* The sync-readiness conventions held up:
+UUID keys, `updated_at` by trigger, and readable tombstones are what every
+candidate needs. But three things in `packages/db` may fight an engine, and they
+were added for good reasons that a sync engine will not care about:
+
+- **Composite foreign keys.** Child rows reference `(parent_id, family_id)`
+  together, which is what keeps the denormalised tenant key honest. Row-by-row
+  replication arriving out of order will violate them transiently, so the engine
+  needs deferred constraints or a load path that disables them.
+- **`ON DELETE CASCADE`.** A cascade on the server produces deletions the engine
+  did not replicate and may not observe.
+- **Partial unique indexes** (`where deleted_at is null`). An undelete arriving
+  before its delete violates them transiently.
+
+None of this changes the decision — hand-rolling replication is still worse. It
+does mean **constraint handling belongs on the evaluation checklist** alongside
+maintenance health, and that the schema may have to give something up. Better to
+know which three things are negotiable than to discover it mid-migration.
 
 ---
 
@@ -217,6 +256,48 @@ time" from "extraction failed to read the time" — a review screen that flags t
 second differently, say. That distinction can't be expressed in a two-state
 field, so it would mean a third state in the extractor contract rather than a
 return to grading presence. Absent that, this stays.
+
+---
+
+## 15. Entitlement tokens are Ed25519, and name no algorithm
+
+Signed with Ed25519, addressed by key id, format
+`pashki1.<keyId>.<payload>.<signature>`. Not a JWT.
+
+Asymmetric so app #2's server can verify a platform-issued token holding only a
+public key; a shared HMAC secret would mean everything that can verify can also
+mint, and a leak would compromise every tenant. Key ids exist so a rotation can
+actually complete — a verifier holds several public keys while tokens from the
+retired one are still inside grace.
+
+**No algorithm field, deliberately.** A token that names its own algorithm is how
+JWT libraries end up accepting `alg: none` or checking an RSA signature with an
+HMAC key. The verifier knows what it is.
+
+*Would change if:* signing moves to a KMS or HSM that only offers other
+algorithms, or a platform consumer cannot get an Ed25519 implementation. The
+`TokenSigner` port already tolerates async for exactly that case.
+
+---
+
+## 16. Platform tables are read-only to clients; the seam needs the service role
+
+Clients get `SELECT` on platform tables and no write path at all. Creating a
+household, adding a member, registering a device and issuing an entitlement all go
+through `packages/platform-client` on the service role, and quota spending is a
+service-role-only database function.
+
+This is the cheap half of enforcing decision §10 — the app cannot reach into
+platform tables because it has no grant to. The other half is
+`scripts/check-platform-tables.mjs`, which fails the build on a direct query.
+
+**The cost, which is real:** the seam cannot run in a browser or an app bundle.
+Web can call it server-side, but native needs HTTP routes in front of it, and
+that work now sits in Phase 2 rather than appearing as a surprise in Phase 3.
+
+*Would change if:* a client genuinely needs to write a platform table offline. The
+answer then is probably a narrow RPC with its own policy rather than opening the
+tables — the seam is the thing worth keeping, not the grant matrix.
 
 ---
 

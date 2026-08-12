@@ -18,13 +18,25 @@ work with no signal.
 
 ```bash
 pnpm install
-pnpm check                      # typecheck + test, everything
+pnpm check                      # boundaries + typecheck + test, everything
+pnpm check:boundaries           # the two import guards on their own
 pnpm test                       # all packages
 pnpm --filter @pashki/core test # one package
-pnpm --filter @pashki/core test:watch
+pnpm --filter @pashki/core eval # extractor accuracy against the fixture set
+
+pnpm --filter @pashki/db db:start      # local Supabase (needs Docker)
+pnpm --filter @pashki/db db:reset      # re-apply every migration, then seed
+pnpm --filter @pashki/db gen:types     # regenerate database.types.ts
+pnpm --filter @pashki/db gen:seed      # regenerate seed.sql from SEED_CATALOG
+pnpm --filter @pashki/db test:mutate   # prove the RLS tests would catch a hole
 ```
 
-Run `pnpm check` before saying a task is done.
+Run `pnpm check` before saying a task is done. Database tests skip themselves when
+no local Supabase is running, so a green `pnpm check` without Docker has covered
+less than it looks — run `db:start` first when touching schema or the seam.
+
+After any migration: `db:reset` then `gen:types`, and commit the regenerated
+types. They drift silently otherwise.
 
 ## Layout
 
@@ -43,7 +55,14 @@ docs/decisions.md      what was chosen and what would reverse it
 docs/roadmap.md        phases and current position
 ```
 
-Only `packages/core` exists so far. See `docs/roadmap.md` for what's next.
+`packages/core`, `packages/db` and `packages/platform-client` exist. Everything
+else in that tree is still a plan. See `docs/roadmap.md` for what's next.
+
+Two boundaries are enforced by `pnpm check`, not by good intentions:
+`scripts/check-platform-tables.mjs` fails if anything outside
+`packages/platform-client` (or `packages/db`, which owns the schema) queries a
+platform table, and `scripts/check-seed-catalog-usage.mjs` fails if anything
+outside seeding and tests references `SEED_CATALOG`.
 
 ## Rules that matter
 
@@ -109,6 +128,11 @@ models be good enough. Do not add a silent-save path.
 - **To test an RLS policy, make it permissive — don't remove it.** RLS denies by
   default, so a dropped policy makes the table *more* restrictive and the
   isolation test passes for the wrong reason. See `packages/db` `test:mutate`.
+- **A PostgREST bulk insert ignores column defaults.** It sends the union of the
+  keys across every row in the batch and passes NULL for whatever a row omits, so
+  a row that leaves out a column with a default gets NULL rather than the default
+  — and a NOT NULL column fails outright. Spell out every column on every row of a
+  batch.
 - **Postgres checks the new row of an `UPDATE` against `SELECT` policies.** An
   UPDATE policy can therefore sit redundant behind a restrictive SELECT policy
   and look tested when nothing is exercising it. Loosening a SELECT policy — for

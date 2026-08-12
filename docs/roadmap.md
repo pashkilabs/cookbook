@@ -1,6 +1,21 @@
 # Roadmap
 
-**Current position: Phase 0, roughly half done.**
+**Current position: end of Phase 1. Phase 2 is next.**
+
+Built: `packages/core` (88 tests), `packages/db` (18 tables, RLS, seeded catalog),
+`packages/platform-client` (the seam, entitlement token). 176 tests across three
+packages.
+
+Two Phase 1 items remain open, both deliberately:
+
+- **Stripe → entitlement issuance** is blocked on Apple's outside-purchase rules
+  (`docs/decisions.md`, Unresolved). Everything it will write to is built:
+  `subscriptions` is `provider` + `external_id`, and `entitlements` is what the
+  token is minted from.
+- **Read-only degradation is not enforced server-side.** The token and
+  `evaluateAccess` decide it, and the client honours it, but nothing stops a
+  lapsed household writing through the API. See "Known gaps" below — this is the
+  largest hole in the foundations and it belongs to Phase 2, not Phase 3.
 
 Tasks are written to be picked up one at a time. Each should end with
 `pnpm check` passing.
@@ -13,7 +28,7 @@ Tasks are written to be picked up one at a time. Each should end with
 rebuild, and everything else depends on it.*
 
 - [x] `packages/core` — parser, units, catalog matching, package maths,
-      consolidation. 60 tests, typecheck clean.
+      consolidation. 88 tests, typecheck clean.
 - [ ] **Eval set.** `packages/core/eval/fixtures/` — 50+ real recipes across
       URLs, pasted captions and reel screenshots, each with hand-checked
       expected output. Needs real sources; ask before inventing fixtures.
@@ -55,22 +70,43 @@ rebuild, and everything else depends on it.*
       grace boundaries, degradation to read-only and never locked. 59 tests
       covering tampering, forged signatures, unknown key ids, malformed input and
       both window boundaries to the millisecond.
-- [ ] Stripe subscription + webhook → entitlement issuance.
+- [ ] Stripe subscription + webhook → entitlement issuance. **Blocked** on Apple's
+      outside-purchase rules — verify those before designing the flow.
+- [ ] **Enforce read-only server-side.** RLS proves which household a row belongs
+      to; nothing currently proves the household is still paid up. Every mutating
+      path has to consult the entitlement, and the schema has no hook for it yet.
 
 ---
 
 ## Phase 2 — Web app
 
 - [ ] `apps/web` — Next.js shell, auth flow, household setup.
+- [ ] **An HTTP surface for the seam.** `platform-client` needs the service role,
+      so it cannot run in a browser or an app bundle. Web can call it server-side,
+      but Phase 3's Expo app cannot — it needs routes in front of it. Cheaper to
+      draw now than to retrofit when the native app is waiting on it.
 - [ ] `packages/import` — tier 0 (structured recipe data), tier 1 (microdata and
       plugin markup), tier 2 (LLM cascade), tier 3 (vision). One provider
       interface; model as config.
-- [ ] `import_cache` keyed by URL hash, not by family.
-- [ ] Photo pipeline: fetch server-side, resize, store, CDN.
+      *Tiers 2 and 3 cannot be judged until the eval set has real fixtures — the
+      harness is built but three placeholders measure nothing. That Phase 0 item is
+      a real dependency of this one.*
+- [x] `import_cache` keyed by URL hash, not by family. Built in `packages/db`:
+      no `family_id`, no policies, service-role only. Needs a reader and writer.
+- [ ] Photo pipeline: fetch server-side, resize, store, CDN. *No Storage bucket or
+      its policies exist yet; `photos.storage_path` is a column pointing at
+      nothing.*
 - [ ] Port the prototype's screens: recipe list, detail with per-member ratings,
       week planner, shopping list with the split display, pantry.
-- [ ] Public recipe pages, server-rendered, indexable.
-- [ ] Batch import with a job queue.
+      *`plan_entries.recipe_id` is NOT NULL, so a free-text planner entry
+      ("leftovers") needs a migration.*
+- [ ] Public recipe pages, server-rendered, indexable. **Needs schema work first:**
+      recipes have no notion of being public, and `anon` holds no grant on any
+      table. Decide how a recipe becomes public and whether the page is served by
+      the service role or by a genuine anon-readable path — and note that loosening
+      a SELECT policy promotes the UPDATE policy to load-bearing (see
+      `packages/db/README.md`).
+- [ ] Batch import with a job queue. *`import_jobs` exists; nothing drains it.*
 
 **Ship this. Use it as a family for a month before writing native code.**
 
@@ -106,6 +142,41 @@ rebuild, and everything else depends on it.*
 ## Phase 5 — Platform extraction
 
 Generalise what app #2 actually needs. Not before.
+
+---
+
+## Known gaps in the foundations
+
+Found by reviewing Phase 1 against itself. None of these are Phase 2 features;
+they are load-bearing behaviour that nothing currently proves.
+
+**Read-only degradation is advisory.** `evaluateAccess` says `canWrite: false`
+after grace and the client is expected to obey. The database does not care: RLS
+checks which household a row belongs to, never whether that household is paid up.
+A lapsed family — or anyone replaying their own valid session — can still write.
+This is the biggest hole in Phase 1.
+
+**`verify()` does not check expiry.** It checks the signature and nothing else;
+the window is evaluated separately by `evaluateAccess`. Defensible — verification
+is not authorisation — but it means every caller has to remember to do both, and
+nothing enforces the pairing.
+
+**Quota never resets.** `resetsAt` is stored and displayed and no job acts on it.
+A monthly allowance is currently a lifetime one.
+
+**Untested paths that carry weight:**
+
+- `findFamilyForAccount`'s invited-member branch. The integration test's account
+  owns its household, so the embedded-resource join — the part with a hand-written
+  cast — never executes.
+- The `updated_at` trigger is asserted on `recipes` only. A table missing it would
+  silently break last-write-wins sync, and nothing checks all 18.
+- Composite foreign keys are tested on `recipe_ingredients` only, not on `ratings`,
+  `photos`, `plan_entries` or `shortlist_entries`.
+- Seed idempotency was verified by hand, not by a test.
+- `platform_spend_quota` being service-role-only was verified by hand.
+- `registerDevice`'s revoked-device path.
+- The `child_has_no_login` constraint.
 
 ---
 

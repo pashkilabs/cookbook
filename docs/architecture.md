@@ -85,6 +85,11 @@ pashki/
 
 The two starred packages are the ones worth being precious about.
 
+**Built so far:** `packages/core`, `packages/db`, `packages/platform-client`.
+Everything else above is still a plan. Note that `platform-client` requires the
+service role, so it runs on a server — apps reach it through HTTP routes rather
+than importing it into a client bundle.
+
 ---
 
 ## 5. Data model
