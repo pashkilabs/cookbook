@@ -128,6 +128,11 @@ models be good enough. Do not add a silent-save path.
 - **To test an RLS policy, make it permissive — don't remove it.** RLS denies by
   default, so a dropped policy makes the table *more* restrictive and the
   isolation test passes for the wrong reason. See `packages/db` `test:mutate`.
+- **`git status` cannot tell you what has been committed.** It describes the working
+  tree and nothing else, so a dirty tree at the end of a session says nothing about
+  whether previous sessions landed. Run `git log` before any claim about repository
+  state. The failure this prevents: reporting an escalating count of uncommitted
+  sessions across ten sessions that had each been committed at the time.
 - **As `anon`, `select *` on a public recipe fails.** Public reads are limited by
   **column** grants as well as row policies, and asking for a column you cannot
   read is a permission error rather than a filtered subset. Public reads need an
