@@ -10,8 +10,8 @@
       "default": "./src/index.ts"
     },
     "./test-support": {
-      "types": "./test/local-instance.ts",
-      "default": "./test/local-instance.ts"
+      "types": "./test/support/index.ts",
+      "default": "./test/support/index.ts"
     }
   },
   "scripts": {
