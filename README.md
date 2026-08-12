@@ -45,16 +45,18 @@ Open the repo root in VS Code and run Claude Code from there so it picks up
 
 ## Status
 
-**End of Phase 1.** 197 tests across three packages, typecheck clean.
+**End of Phase 2's backend work.** 437 tests across four packages, typecheck clean.
 
 | | |
 |---|---|
 | `packages/core` | Parser, units, catalog matching, package maths, consolidation. No DOM, no network, so it runs identically in Next.js, Expo and the worker. Plus the eval harness. |
-| `packages/db` | 18 tables, row-level security on every household table, generated types, seeded grocery catalog. |
-| `packages/platform-client` | The seam: session, entitlements, quota, devices. Ed25519 entitlement token, with read-only degradation enforced by RLS rather than by convention. |
+| `packages/db` | 19 tables, row-level security on every household table, a private photo bucket, an atomic job queue, generated types, seeded grocery catalog. |
+| `packages/platform-client` | The seam: session, entitlements, quota, devices, and the HTTP surface every client reaches it through. Ed25519 entitlement token, with read-only degradation enforced by RLS rather than by convention. |
+| `packages/import` | Recipe import: deterministic tiers 0–1, a schema-constrained model at tier 2, vision at tier 3, a shared URL cache, photo storage and the job queue. |
 
-Phase 2 is the web app. **Stripe remains blocked** on Apple's outside-purchase
-rules; everything it will write to exists. See `docs/roadmap.md` for the remaining
+Phase 2's backend is done; what remains of it is **the Next.js app and the screens**,
+plus choosing the tier-2 and tier-3 models. **Stripe remains blocked** on Apple's
+outside-purchase rules; everything it will write to exists. See `docs/roadmap.md` for
 "Known gaps in the foundations".
 
 Still outstanding from Phase 0: **real eval fixtures.** The harness runs against

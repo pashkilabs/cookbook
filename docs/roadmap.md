@@ -1,10 +1,12 @@
 # Roadmap
 
-**Current position: end of Phase 1. Phase 2 is next.**
+**Current position: Phase 2's backend is done. What remains of Phase 2 is the app
+itself, and Phase 3 is next.**
 
-Built: `packages/core`, `packages/db` (19 tables, RLS, seeded catalog),
-`packages/platform-client` (the seam, entitlement token), `packages/import`
-(deterministic tiers 0 and 1). 293 tests across four packages.
+Built: `packages/core`, `packages/db` (19 tables, RLS, photo bucket, job queue),
+`packages/platform-client` (the seam, entitlement token, HTTP surface),
+`packages/import` (tiers 0–3, shared cache, photo storage, job runner). 437 tests
+across four packages.
 
 One Phase 1 item remains open, deliberately: **Stripe → entitlement issuance** is
 blocked on Apple's outside-purchase rules (`docs/decisions.md`, Unresolved).

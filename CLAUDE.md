@@ -19,7 +19,7 @@ work with no signal.
 ```bash
 pnpm install
 pnpm check                      # boundaries + typecheck + test, everything
-pnpm check:boundaries           # the two import guards on their own
+pnpm check:boundaries           # the three boundary guards on their own
 pnpm test                       # all packages
 pnpm --filter @pashki/core test # one package
 pnpm --filter @pashki/core eval # extractor accuracy against the fixture set
@@ -55,14 +55,17 @@ docs/decisions.md      what was chosen and what would reverse it
 docs/roadmap.md        phases and current position
 ```
 
-`packages/core`, `packages/db` and `packages/platform-client` exist. Everything
-else in that tree is still a plan. See `docs/roadmap.md` for what's next.
+`packages/core`, `packages/db`, `packages/platform-client` and `packages/import`
+exist. Nothing under `apps/` does yet. See `docs/roadmap.md` for what's next.
 
-Two boundaries are enforced by `pnpm check`, not by good intentions:
-`scripts/check-platform-tables.mjs` fails if anything outside
-`packages/platform-client` (or `packages/db`, which owns the schema) queries a
-platform table, and `scripts/check-seed-catalog-usage.mjs` fails if anything
-outside seeding and tests references `SEED_CATALOG`.
+Three boundaries are enforced by `pnpm check:boundaries`, not by good intentions:
+
+- `check-platform-tables.mjs` — nothing outside `packages/platform-client` (or
+  `packages/db`, which owns the schema) may query a platform table.
+- `check-seed-catalog-usage.mjs` — nothing outside seeding and tests may reference
+  `SEED_CATALOG`.
+- `check-server-only.mjs` — no `"use client"` file or `apps/mobile` file may import
+  the seam, the import package or an inference credential.
 
 ## Rules that matter
 
@@ -79,9 +82,10 @@ surface small — don't erode it for convenience.
 
 **US-hosted inference only.** See `docs/decisions.md` for the routing table.
 
-**The app never touches platform tables directly.** No queries against
-`accounts`, `families`, `subscriptions` or `entitlements` from app code — go
-through `packages/platform-client`. This boundary is what makes extracting a
+**The app never touches platform tables directly.** No queries against `accounts`,
+`families`, `family_members`, `devices`, `subscriptions` or `entitlements` from app
+code — go through `packages/platform-client`, over HTTP if the caller cannot hold the
+service role. This boundary is what makes extracting a
 real platform for app #2 mechanical rather than surgical.
 
 **`family_members` are not `accounts`.** Adults have logins; children are rated

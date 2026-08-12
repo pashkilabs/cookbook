@@ -85,10 +85,12 @@ pashki/
 
 The two starred packages are the ones worth being precious about.
 
-**Built so far:** `packages/core`, `packages/db`, `packages/platform-client`.
-Everything else above is still a plan. Note that `platform-client` requires the
-service role, so it runs on a server — apps reach it through HTTP routes rather
-than importing it into a client bundle.
+**Built so far:** `packages/core`, `packages/db`, `packages/platform-client`,
+`packages/import`. Nothing under `apps/` exists yet, and `packages/ui` is still a plan.
+
+`platform-client` and `import` both require the service role, so they run on a server.
+Apps reach the seam through the HTTP routes in `platform-client` (§6) rather than
+importing it into a client bundle, and `scripts/check-server-only.mjs` enforces that.
 
 ---
 
