@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { readLocalInstance } from "./local-instance.js";
 
 /**
@@ -117,6 +117,7 @@ describe.skipIf(instance === null)("row-level security", () => {
     const ingredient = await admin
       .from("ingredients")
       .insert({
+        key: `test-cream-${stamp}`,
         canonical_name: `test cream ${stamp}`,
         aisle: "dairy",
         dimension: "volume",
@@ -130,6 +131,17 @@ describe.skipIf(instance === null)("row-level security", () => {
       .from("import_cache")
       .insert({ url_hash: cacheKey, extracted_json: { title: "cached" } });
     if (cached.error) throw cached.error;
+  });
+
+  afterAll(async () => {
+    if (!instance) return;
+    // Rows in the shared tables have to go: the catalog and the cache belong to
+    // nobody, so anything left here is visible to every other test. The catalog
+    // round-trip test counts ingredients, and a stray row from this file would
+    // fail it. Household rows are left alone — they are namespaced by family_id
+    // and cannot be seen by anything else.
+    await admin.from("ingredients").delete().eq("id", ingredientId);
+    await admin.from("import_cache").delete().eq("url_hash", cacheKey);
   });
 
   describe("reading another household", () => {
@@ -305,7 +317,8 @@ describe.skipIf(instance === null)("row-level security", () => {
     it("is not writable by a client", async () => {
       const { error } = await alpha.client
         .from("ingredients")
-        .insert({ canonical_name: "smuggled", aisle: "x", dimension: "weight" });
+        // a complete row, so a rejection can only be the missing privilege
+        .insert({ key: "smuggled", canonical_name: "smuggled", aisle: "x", dimension: "weight" });
       expect(error?.code).toBe(RLS_VIOLATION);
     });
   });

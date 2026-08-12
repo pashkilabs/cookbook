@@ -1,35 +1,11 @@
-# dependencies
 node_modules/
-.pnpm-store/
-
-# build output
 dist/
-build/
-out/
 .next/
-*.tsbuildinfo
-
-# turbo
 .turbo/
-
-# expo
 .expo/
-web-build/
-
-# env — .env.example stays tracked
+coverage/
+*.tsbuildinfo
 .env
 .env.local
 .env.*.local
-
-# logs
-*.log
-npm-debug.log*
-pnpm-debug.log*
-
-# coverage
-coverage/
-
-# editor and OS
 .DS_Store
-.idea/
-*.swp

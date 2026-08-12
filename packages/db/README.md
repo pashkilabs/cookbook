@@ -18,6 +18,42 @@ pnpm --filter @pashki/db db:stop
 not faked when they do run — RLS is enforced by Postgres against a real JWT, and
 a mocked version would only prove that the mock filters rows.
 
+## The seeded catalog
+
+```bash
+pnpm --filter @pashki/db gen:seed    # SEED_CATALOG -> supabase/seed.sql
+```
+
+`supabase/seed.sql` is **generated** — 55 ingredients, 97 package sizes — and
+never hand-edited. `db reset` applies it after the migrations. A hand-copy would
+drift the first time someone corrected a grams-per-cup figure in one place and not
+the other, and a drifted seed is worse than none: the round-trip test would be
+comparing the database against itself.
+
+Re-running the seed upserts rather than duplicating, on `ingredients.key` and
+`(ingredient_id, label)`. A package size removed from `SEED_CATALOG` is deleted
+here too, or the catalog would keep offering a size that no longer exists.
+
+`test/catalog-roundtrip.test.ts` rebuilds `CatalogItem[]` from the two tables and
+asserts it *behaves* identically to `createCatalog(SEED_CATALOG)` — same matches,
+same aisles, same package order, and a byte-identical shopping list over a week
+that touches every dimension the catalog carries. Behaviour rather than rows,
+because two catalogs with identical rows in a different order still pick different
+packages, and rows are what a hand-written seed gets right while behaviour drifts.
+
+This is what `grams_per_cup` and `can_size` exist for. Nulling either one in the
+database fails the week's consolidation, not just a field comparison — verified by
+mutating them deliberately.
+
+**`ingredients.key` is the domain's stable identifier**, surfacing as
+`ShoppingLine.key`. It is not a slug of the display name: key `butter` carries
+canonical_name `unsalted butter`, so a round-trip through `canonical_name` alone
+would silently renumber every shopping line.
+
+After this task, `scripts/check-seed-catalog-usage.mjs` (wired into `pnpm check`)
+fails the build if anything outside the definition, seeding and tests references
+`SEED_CATALOG`. The catalog is data.
+
 ## Versioned migrations, not declarative schemas
 
 Supabase supports a declarative workflow (`supabase/schemas/` plus

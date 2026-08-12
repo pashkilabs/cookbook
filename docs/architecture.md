@@ -181,15 +181,28 @@ import_jobs         id, family_id, kind, input_ref, status, result_json, error,
 user, writable only by the service role that seeds it.
 
 ```
-ingredients         id, canonical_name, aliases[], aisle, dimension,
+ingredients         id, key, canonical_name, aliases[], aisle, dimension,
                     grams_per_cup?, can_size?, created_at, updated_at
+                    -- key is the domain's stable identifier ('heavy-cream') and
+                    -- surfaces as ShoppingLine.key, so it must outlive a
+                    -- canonical_name correction. Not a slug of the display name:
+                    -- key 'butter' carries canonical_name 'unsalted butter'.
                     -- dimension mirrors the Dimension union in packages/core
                     -- grams_per_cup and can_size are what let a volume measure
                     -- merge into a weight-sold item, and "1 can" become a weight
 grocery_packages    id, ingredient_id, label, base_amount, sort_order,
                     created_at, updated_at
                     -- base_amount in base units: "pint (16 oz)" = 473.176
+                    -- UNIQUE (ingredient_id, label) makes re-seeding an upsert
 ```
+
+Seeded from `SEED_CATALOG` by `packages/db/supabase/seed.sql`, which is
+**generated** by `scripts/generate-seed.ts` and never hand-edited — 55 ingredients,
+97 package sizes. `db reset` applies it, and re-running it upserts rather than
+duplicating. A round-trip test rebuilds the catalog from these two tables and
+asserts it consolidates a known week byte-identically to `createCatalog(SEED_CATALOG)`;
+`scripts/check-seed-catalog-usage.mjs` fails the build if anything outside seeding
+and tests references the constant.
 
 **The cache** — belongs to nobody.
 

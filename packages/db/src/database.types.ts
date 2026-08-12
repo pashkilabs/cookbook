@@ -320,6 +320,7 @@ export type Database = {
           dimension: string
           grams_per_cup: number | null
           id: string
+          key: string
           updated_at: string
         }
         Insert: {
@@ -331,6 +332,7 @@ export type Database = {
           dimension: string
           grams_per_cup?: number | null
           id?: string
+          key: string
           updated_at?: string
         }
         Update: {
@@ -342,6 +344,7 @@ export type Database = {
           dimension?: string
           grams_per_cup?: number | null
           id?: string
+          key?: string
           updated_at?: string
         }
         Relationships: []

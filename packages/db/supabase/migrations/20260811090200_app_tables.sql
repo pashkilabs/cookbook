@@ -22,6 +22,12 @@
 -- migration.
 create table public.ingredients (
   id uuid primary key default gen_random_uuid(),
+  -- The domain's stable identifier, e.g. 'heavy-cream'. It surfaces as
+  -- ShoppingLine.key, so it has to survive a canonical_name being corrected —
+  -- which is why it is a separate column and not a slug of the display name.
+  -- Several are deliberately unlike their canonical name: key 'butter' carries
+  -- canonical_name 'unsalted butter'.
+  key text not null,
   canonical_name text not null,
   aliases text[] not null default '{}',
   aisle text not null,
@@ -36,7 +42,8 @@ create table public.ingredients (
   can_size numeric check (can_size > 0),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint ingredients_canonical_name_unique unique (canonical_name)
+  constraint ingredients_canonical_name_unique unique (canonical_name),
+  constraint ingredients_key_unique unique (key)
 );
 
 -- How an ingredient is actually sold. base_amount is in the dimension's base
@@ -49,7 +56,10 @@ create table public.grocery_packages (
   base_amount numeric not null check (base_amount > 0),
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  -- an ingredient cannot be sold in two different "pint (16 oz)". Also what makes
+  -- re-seeding an upsert rather than a duplicate.
+  constraint grocery_packages_label_unique unique (ingredient_id, label)
 );
 
 -- ---------------------------------------------------------------------------
