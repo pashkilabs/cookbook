@@ -146,9 +146,19 @@ describe.skipIf(instance === null)("platform HTTP surface, real tokens", () => {
     });
 
     it("is refused when the signature is wrong", async () => {
-      // a real JWT shape with the payload tampered: the auth server checks it, we do not
-      const [header, payload, signature] = alphaToken.split(".");
-      const forged = `${header}.${payload}.${(signature ?? "").replace(/.$/, "A")}`;
+      // a real JWT shape with the signature tampered: the auth server checks it, we do not
+      const [header, payload, signature = ""] = alphaToken.split(".");
+      // regression: this used to flip the signature's **last** character, which is not
+      // reliably tampering. A 32-byte HS256 signature is 43 base64url characters and the
+      // last one contributes only 4 significant bits, so "A", "B", "C" and "D" all decode
+      // to the same bytes — a 4-in-64 chance the forgery was the original token, which
+      // read as a post-reset flake for three sessions. The first character carries six
+      // bits that all survive, so changing it always changes the signature.
+      const forged = `${header}.${payload}.${signature[0] === "A" ? "B" : "A"}${signature.slice(1)}`;
+      expect(
+        Buffer.from(forged.split(".")[2] ?? "", "base64url"),
+        "the forged signature must decode to different bytes, not merely spell differently",
+      ).not.toEqual(Buffer.from(signature, "base64url"));
       expect((await call(forged)).status).toBe(401);
     });
 
