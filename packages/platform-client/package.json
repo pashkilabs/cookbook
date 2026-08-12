@@ -13,6 +13,10 @@
       "types": "./src/crypto.ts",
       "default": "./src/crypto.ts"
     },
+    "./auth": {
+      "types": "./src/supabase-auth.ts",
+      "default": "./src/supabase-auth.ts"
+    },
     "./supabase": {
       "types": "./src/supabase-store.ts",
       "default": "./src/supabase-store.ts"
