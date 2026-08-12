@@ -19,6 +19,7 @@ interface Household {
   accountId: string;
   memberId: string;
   recipeId: string;
+  publicRecipeId: string;
   tombstonedRecipeId: string;
   email: string;
   client: SupabaseClient;
@@ -95,6 +96,24 @@ describe.skipIf(instance === null)("row-level security", () => {
         .single();
       if (recipe.error) throw recipe.error;
 
+      const published = await admin
+        .from("recipes")
+        .insert({
+          family_id: familyId,
+          title: `${label} published pie`,
+          servings: 4,
+          time_minutes: 45,
+          source_url: "https://example.com/pie",
+          source_name: "Example Blog",
+          visibility: "public",
+          // household signals that must never reach a public reader
+          make_again: true,
+          times_made: 7,
+        })
+        .select("id")
+        .single();
+      if (published.error) throw published.error;
+
       const tombstoned = await admin
         .from("recipes")
         .insert({
@@ -117,6 +136,7 @@ describe.skipIf(instance === null)("row-level security", () => {
         accountId,
         memberId: member.data.id as string,
         recipeId: recipe.data.id as string,
+        publicRecipeId: published.data.id as string,
         tombstonedRecipeId: tombstoned.data.id as string,
         email,
         client,
@@ -147,14 +167,21 @@ describe.skipIf(instance === null)("row-level security", () => {
 
   afterAll(async () => {
     if (!instance) return;
-    // Rows in the shared tables have to go: the catalog and the cache belong to
-    // nobody, so anything left here is visible to every other test. The catalog
-    // round-trip test counts ingredients, and a stray row from this file would
-    // fail it. Household rows are left alone — they are namespaced by family_id
-    // and cannot be seen by anything else.
-    await admin.from("entitlements").delete().in("family_id", [alpha.familyId, beta.familyId]);
+    // Shared tables first: the catalog and the cache belong to nobody, so anything
+    // left is visible to every other test.
     await admin.from("ingredients").delete().eq("id", ingredientId);
     await admin.from("import_cache").delete().eq("url_hash", cacheKey);
+
+    // Households now need clearing too, which they did not before. Publishing makes
+    // a recipe visible across households, so a leftover public row from an earlier
+    // run shows up in the next run's "what can I see" assertions. Deleting the
+    // family cascades its recipes, members and entitlement; the account has to
+    // follow separately because families deliberately RESTRICT deleting an owner.
+    for (const household of [alpha, beta]) {
+      await admin.from("families").delete().eq("id", household.familyId);
+      await admin.from("accounts").delete().eq("id", household.accountId);
+      await admin.auth.admin.deleteUser(household.accountId);
+    }
   });
 
   describe("reading another household", () => {
@@ -177,11 +204,39 @@ describe.skipIf(instance === null)("row-level security", () => {
       expect(data).toEqual([]);
     });
 
-    it("sees only its own household when listing everything", async () => {
-      const { data, error } = await alpha.client.from("recipes").select("family_id");
+    it("sees its own household plus other households' published recipes, and nothing else", async () => {
+      // this used to assert "only its own household". Publishing changed what is
+      // true, not just what is tested: a signed-in person following a friend's link
+      // has to be able to read it.
+      const { data, error } = await alpha.client.from("recipes").select("id, family_id");
       expect(error).toBeNull();
-      expect(data?.length).toBeGreaterThan(0);
-      expect(new Set(data?.map((row) => row.family_id))).toEqual(new Set([alpha.familyId]));
+
+      const foreignIds = data!
+        .filter((row) => row.family_id !== alpha.familyId)
+        .map((row) => row.id);
+      // published: visible. Unpublished: not. Asserted as membership rather than an
+      // exact set, because published rows are visible across households and a
+      // shared database may hold other households' pages.
+      expect(foreignIds).toContain(beta.publicRecipeId);
+      expect(foreignIds).not.toContain(beta.recipeId);
+      expect(foreignIds).not.toContain(beta.tombstonedRecipeId);
+    });
+
+    it("cannot read another household's unpublished recipe", async () => {
+      const { data } = await alpha.client
+        .from("recipes")
+        .select("id")
+        .eq("id", beta.recipeId);
+      expect(data).toEqual([]);
+    });
+
+    it("can read another household's published recipe", async () => {
+      const { data, error } = await alpha.client
+        .from("recipes")
+        .select("id, title")
+        .eq("id", beta.publicRecipeId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(1);
     });
 
     it("cannot read another household's members", async () => {
@@ -443,6 +498,289 @@ describe.skipIf(instance === null)("row-level security", () => {
         });
         if (error) throw error;
       }
+    });
+  });
+
+  describe("what a public recipe page exposes", () => {
+    const PUBLIC_COLUMNS = "id, title, servings, time_minutes, source_url, source_name";
+
+    it("lets anon read a published recipe", async () => {
+      const { data, error } = await anon
+        .from("recipes")
+        .select(PUBLIC_COLUMNS)
+        .eq("id", beta.publicRecipeId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(1);
+      expect(data?.[0]).toMatchObject({ title: "beta published pie", servings: 4 });
+    });
+
+    it("gives anon the attribution, because linking back is required", async () => {
+      const { data } = await anon
+        .from("recipes")
+        .select("source_url, source_name")
+        .eq("id", beta.publicRecipeId);
+      expect(data?.[0]).toMatchObject({
+        source_url: "https://example.com/pie",
+        source_name: "Example Blog",
+      });
+    });
+
+    it("lets anon read the ingredient list", async () => {
+      const { error: seeded } = await admin.from("recipe_ingredients").insert({
+        family_id: beta.familyId,
+        recipe_id: beta.publicRecipeId,
+        position: 0,
+        item_text: "2 cups flour",
+        amount: 2,
+        unit: "cup",
+        note: "",
+        is_estimated: false,
+      });
+      if (seeded) throw seeded;
+
+      const { data, error } = await anon
+        .from("recipe_ingredients")
+        .select("item_text, amount, unit, is_estimated")
+        .eq("recipe_id", beta.publicRecipeId);
+      expect(error).toBeNull();
+      expect(data?.[0]).toMatchObject({ item_text: "2 cups flour", amount: 2, unit: "cup" });
+    });
+
+    describe("and what it must not", () => {
+      it("refuses select * rather than quietly returning a subset", async () => {
+        // column grants make this a permission error, which is the safe direction:
+        // a caller has to name what it wants
+        const { error } = await anon.from("recipes").select("*");
+        expect(error?.code).toBe(RLS_VIOLATION);
+      });
+
+      it("cannot read the household behind the page", async () => {
+        for (const column of ["family_id", "created_by", "make_again", "times_made", "status"]) {
+          const { error } = await anon.from("recipes").select(column);
+          expect(error?.code, column).toBe(RLS_VIOLATION);
+        }
+      });
+
+      it("cannot see an unpublished recipe", async () => {
+        const { data, error } = await anon
+          .from("recipes")
+          .select(PUBLIC_COLUMNS)
+          .eq("id", beta.recipeId);
+        expect(error).toBeNull();
+        expect(data).toEqual([]);
+      });
+
+      it("cannot see a published recipe that was deleted", async () => {
+        const { error: published } = await admin
+          .from("recipes")
+          .update({ visibility: "public" })
+          .eq("id", beta.tombstonedRecipeId);
+        if (published) throw published;
+        try {
+          const { data } = await anon
+            .from("recipes")
+            .select(PUBLIC_COLUMNS)
+            .eq("id", beta.tombstonedRecipeId);
+          expect(data).toEqual([]);
+        } finally {
+          await admin
+            .from("recipes")
+            .update({ visibility: "private" })
+            .eq("id", beta.tombstonedRecipeId);
+        }
+      });
+
+      it("cannot read the ingredients of an unpublished recipe", async () => {
+        const { data } = await anon
+          .from("recipe_ingredients")
+          .select("item_text")
+          .eq("recipe_id", beta.recipeId);
+        expect(data).toEqual([]);
+      });
+
+      it("cannot reach the household, its members, ratings, plans or pantry at all", async () => {
+        const forbidden = [
+          "families",
+          "family_members",
+          "accounts",
+          "devices",
+          "subscriptions",
+          "entitlements",
+          "ratings",
+          "meal_plans",
+          "plan_entries",
+          "shortlist_entries",
+          "pantry_items",
+          "import_jobs",
+          "import_cache",
+        ];
+        for (const table of forbidden) {
+          const { data, error } = await anon.from(table).select("*");
+          // denied outright by the missing grant, not merely filtered to nothing
+          expect(error?.code, table).toBe(RLS_VIOLATION);
+          expect(data, table).toBeNull();
+        }
+      });
+
+      it("cannot reach the grocery catalog either", async () => {
+        for (const table of ["ingredients", "grocery_packages"]) {
+          const { error } = await anon.from(table).select("*");
+          expect(error?.code, table).toBe(RLS_VIOLATION);
+        }
+      });
+
+      it("cannot write anything", async () => {
+        const insert = await anon
+          .from("recipes")
+          .insert({ family_id: beta.familyId, title: "planted by a stranger" });
+        expect(insert.error).not.toBeNull();
+
+        const update = await anon
+          .from("recipes")
+          .update({ title: "defaced" })
+          .eq("id", beta.publicRecipeId);
+        expect(update.error).not.toBeNull();
+
+        const remove = await anon.from("recipes").delete().eq("id", beta.publicRecipeId);
+        expect(remove.error).not.toBeNull();
+
+        const { data: intact } = await admin
+          .from("recipes")
+          .select("title")
+          .eq("id", beta.publicRecipeId)
+          .single();
+        expect(intact?.title).toBe("beta published pie");
+      });
+    });
+
+    describe("photos", () => {
+      let cameraPhotoId: string;
+      let importPhotoId: string;
+
+      beforeAll(async () => {
+        if (!instance) return;
+        const rows = await admin
+          .from("photos")
+          .insert([
+            {
+              family_id: beta.familyId,
+              recipe_id: beta.publicRecipeId,
+              storage_path: "beta/camera.jpg",
+              source: "camera",
+              width: 100,
+              height: 100,
+            },
+            {
+              family_id: beta.familyId,
+              recipe_id: beta.publicRecipeId,
+              storage_path: "beta/import.jpg",
+              source: "import",
+              width: 100,
+              height: 100,
+            },
+          ])
+          .select("id, source");
+        if (rows.error) throw rows.error;
+        cameraPhotoId = rows.data.find((r) => r.source === "camera")!.id;
+        importPhotoId = rows.data.find((r) => r.source === "import")!.id;
+      });
+
+      it("lets anon see the household's own photograph", async () => {
+        const { data, error } = await anon
+          .from("photos")
+          .select("id, storage_path")
+          .eq("id", cameraPhotoId);
+        expect(error).toBeNull();
+        expect(data).toHaveLength(1);
+      });
+
+      it("does not let anon see an imported photograph", async () => {
+        // the blogger's picture, not the household's. Republishing it is what the
+        // unresolved copyright question governs, so the default is no.
+        const { data, error } = await anon
+          .from("photos")
+          .select("id, storage_path")
+          .eq("id", importPhotoId);
+        expect(error).toBeNull();
+        expect(data).toEqual([]);
+      });
+    });
+
+    it("keeps a lapsed household's page up", async () => {
+      // publication is a read, and read-only is the floor
+      const { error: lapsed } = await admin
+        .from("entitlements")
+        .update({
+          valid_until: new Date(Date.now() - 8 * 86400000).toISOString(),
+          grace_until: new Date(Date.now() - 1).toISOString(),
+        })
+        .eq("family_id", beta.familyId);
+      if (lapsed) throw lapsed;
+      try {
+        const { data, error } = await anon
+          .from("recipes")
+          .select(PUBLIC_COLUMNS)
+          .eq("id", beta.publicRecipeId);
+        expect(error).toBeNull();
+        expect(data).toHaveLength(1);
+      } finally {
+        await admin
+          .from("entitlements")
+          .update({
+            valid_until: new Date(Date.now() + 30 * 86400000).toISOString(),
+            grace_until: new Date(Date.now() + 37 * 86400000).toISOString(),
+          })
+          .eq("family_id", beta.familyId);
+      }
+    });
+  });
+
+  describe("a published recipe is not a writable one", () => {
+    it("cannot update another household's public recipe", async () => {
+      // Before publishing existed, the SELECT policy hid beta's rows and masked this
+      // entirely. Now the row is visible and the UPDATE policy is the only guard.
+      const { data, error } = await alpha.client
+        .from("recipes")
+        .update({ title: "defaced" })
+        .eq("id", beta.publicRecipeId)
+        .select("id");
+      expect(error).toBeNull();
+      expect(data).toEqual([]);
+
+      const { data: intact } = await admin
+        .from("recipes")
+        .select("title")
+        .eq("id", beta.publicRecipeId)
+        .single();
+      expect(intact?.title).toBe("beta published pie");
+    });
+
+    it("cannot move its own public recipe into another household", async () => {
+      const { error } = await alpha.client
+        .from("recipes")
+        .update({ family_id: beta.familyId })
+        .eq("id", alpha.publicRecipeId);
+      expect(error?.code).toBe(RLS_VIOLATION);
+    });
+
+    it("cannot delete another household's public recipe", async () => {
+      const { data, error } = await alpha.client
+        .from("recipes")
+        .delete()
+        .eq("id", beta.publicRecipeId)
+        .select("id");
+      expect(error).toBeNull();
+      expect(data).toEqual([]);
+    });
+
+    it("cannot add an ingredient to another household's public recipe", async () => {
+      const { error } = await alpha.client.from("recipe_ingredients").insert({
+        family_id: alpha.familyId,
+        recipe_id: beta.publicRecipeId,
+        position: 99,
+        item_text: "1 cup mischief",
+      });
+      expect(error).not.toBeNull();
     });
   });
 

@@ -11,10 +11,16 @@
 #     negative test has teeth is making the policy PERMISSIVE.
 #
 #  2. Postgres checks the NEW row of an UPDATE against SELECT policies, not just
-#     the UPDATE policy's WITH CHECK. So while the SELECT policy is restrictive it
+#     the UPDATE policy's WITH CHECK. So while the SELECT policy is household-only it
 #     masks the UPDATE policy entirely — weakening UPDATE alone changes nothing.
-#     Those mutations are marked `masked`, and the layered mutation below proves
-#     the UPDATE policy does work once SELECT is loosened.
+#     That was recorded here as `masked`, with a note that public recipe pages would
+#     promote the UPDATE policy to load-bearing.
+#
+#     **That has now happened.** A signed-in person can read any household's
+#     published recipe, so the UPDATE policy is the only thing stopping a stranger
+#     editing one. The two mutations below run against published recipes and are
+#     expected to be `caught`. If either reports `masked` again, the UPDATE policy is
+#     not guarding and a public recipe is writable by strangers.
 
 cd "$(dirname "$0")/.." || exit 1
 
@@ -77,24 +83,24 @@ mutate "SELECT permissive" catch \
    create policy recipes_select_in_household on public.recipes for select to authenticated using (true);" \
   "$SEL_OK" "even asking for it by id"
 
-mutate "UPDATE using permissive (SELECT intact)" masked \
+mutate "UPDATE using permissive, on a published recipe" catch \
   "drop policy recipes_update_in_household on public.recipes;
    create policy recipes_update_in_household on public.recipes for update to authenticated using (true) with check ($WPRED);" \
-  "$UPD_OK" "cannot update another household"
+  "$UPD_OK" "cannot update another household's public recipe"
 
-mutate "UPDATE with-check permissive (SELECT intact)" masked \
+mutate "UPDATE with-check permissive, on a published recipe" catch \
   "drop policy recipes_update_in_household on public.recipes;
    create policy recipes_update_in_household on public.recipes for update to authenticated using ($PRED) with check (true);" \
-  "$UPD_OK" "cannot hand its own recipe"
+  "$UPD_OK" "cannot move its own public recipe into another household"
 
-mutate "SELECT + UPDATE using both permissive" catch \
+mutate "SELECT + UPDATE using both permissive (unpublished)" catch \
   "drop policy recipes_select_in_household on public.recipes;
    create policy recipes_select_in_household on public.recipes for select to authenticated using (true);
    drop policy recipes_update_in_household on public.recipes;
    create policy recipes_update_in_household on public.recipes for update to authenticated using (true) with check ($WPRED);" \
-  "$SEL_OK $UPD_OK" "cannot update another household"
+  "$SEL_OK $UPD_OK" "cannot update another household's recipe"
 
-mutate "SELECT + UPDATE with-check both permissive" catch \
+mutate "SELECT + UPDATE with-check both permissive (unpublished)" catch \
   "drop policy recipes_select_in_household on public.recipes;
    create policy recipes_select_in_household on public.recipes for select to authenticated using (true);
    drop policy recipes_update_in_household on public.recipes;
@@ -128,6 +134,18 @@ mutate "entitlement check dropped from INSERT policy" catch \
   "drop policy recipes_insert_in_household on public.recipes;
    create policy recipes_insert_in_household on public.recipes for insert to authenticated with check ($PRED);" \
   "$INS_OK" "read-only after grace cannot insert"
+
+mutate "anon SELECT policy made permissive" catch \
+  "drop policy recipes_select_public on public.recipes;
+   create policy recipes_select_public on public.recipes for select to anon using (true);" \
+  "drop policy recipes_select_public on public.recipes;
+   create policy recipes_select_public on public.recipes for select to anon using (visibility = 'public' and deleted_at is null);" \
+  "cannot see an unpublished recipe"
+
+mutate "anon granted the household column" catch \
+  "grant select (family_id) on public.recipes to anon;" \
+  "revoke select (family_id) on public.recipes from anon;" \
+  "cannot read the household behind the page"
 
 printf -- '-%.0s' {1..100}; echo
 if [ "$wrong" -eq 0 ]; then

@@ -353,6 +353,77 @@ tables — the seam is the thing worth keeping, not the grant matrix.
 
 ---
 
+## 17. A visibility flag, not a share token
+
+`recipes.visibility` is `private` (default) or `public`. Public means
+**world-readable and indexable by `anon`**. There is no share token.
+
+The two are different products, not two implementations of one:
+
+| | Public flag | Share token |
+|---|---|---|
+| Who can read | anyone | whoever holds the link |
+| Search engines | indexed — that is the point | must carry `noindex` |
+| Discoverable | yes | no |
+| Revocation | flip the flag | rotate the token, and the old link dies |
+
+§2 rejected React Native Web specifically to keep server-rendered, **indexable**
+public recipe pages, because that is the growth loop: someone texts a friend "you
+have to make this", the link opens for a person with no account, and Google can
+find it. That is the flag. A share token would satisfy the text-a-friend half and
+none of the indexing half.
+
+An unlisted share link is a reasonable future feature, and it was deliberately not
+built now: it would mean designing rotation, revocation and leak semantics with no
+consumer, and `visibility` is text rather than a boolean so `unlisted` can join it
+without a type change.
+
+**Enforced by RLS plus column grants together.** RLS decides which rows anon may
+read (`visibility = 'public' and deleted_at is null`); column privileges decide
+which columns. Both are needed, because a publishable row still carries household
+data — `family_id` identifies the household, and `make_again` / `times_made` /
+`created_by` are private signals about how it cooks. The consequence is that
+`select *` as anon fails rather than silently returning a subset, which is the safe
+direction.
+
+Deleted recipes are excluded from public view even though tombstones stay readable
+inside the household. That rule exists so a sync peer can observe a deletion; anon
+is not syncing.
+
+**Only the household's own photograph is public.** `photos.source = 'camera'` is
+the family's picture of the finished plate, theirs to publish. An `'import'` photo
+is the original blogger's, and republishing it world-readable is precisely what the
+unresolved copyright question governs — so the default is the conservative subset
+that does not need that question answered. Widening it is one migration once it is.
+
+*Would change if:* the copyright posture lands somewhere that makes world-readable
+publication of imported content untenable. Then `public` becomes reachable only for
+recipes a household authored, and an unlisted token becomes the sharing mechanism
+for everything else. The flag survives either way; what changes is who may set it.
+
+---
+
+## 18. Publishing promotes the UPDATE policy from redundant to load-bearing
+
+Recorded because it was predicted, then confirmed, and it will matter again.
+
+While the `recipes` SELECT policy was household-only, it masked the UPDATE policy
+completely: Postgres checks the new row of an `UPDATE` against SELECT policies, so
+weakening UPDATE alone changed no observable behaviour. `scripts/mutate-rls.sh`
+reported those two mutations as `masked` with a note that public pages would change
+it.
+
+Publishing loosened the SELECT policy — a signed-in person may read any household's
+published recipe — and both mutations now report `caught`. The UPDATE policy is now
+the only thing stopping a stranger editing a published recipe.
+
+*The rule this leaves behind:* **any change that loosens a SELECT policy must be
+followed by `test:mutate`, and any mutation that flips from `caught` to `masked` is
+a regression, not a curiosity.** A masked mutation means some other policy is doing
+the work and the one under test is unverified.
+
+---
+
 ## Unresolved
 
 | Question | Why it blocks | Who can answer |

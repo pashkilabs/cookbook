@@ -138,8 +138,10 @@ pnpm --filter @pashki/db test:mutate
 
 A passing isolation test is worthless if it would also pass against a table with
 RLS switched off. `scripts/mutate-rls.sh` weakens one policy at a time and
-requires the test meant to catch it to fail. Ten mutations, each with a stated
-expectation, including one that drops the entitlement check from a write policy.
+requires the test meant to catch it to fail. Twelve mutations, each with a stated
+expectation — including one that drops the entitlement check from a write policy,
+one that makes the anon policy permissive, and one that grants anon the household
+column.
 
 The harness also asserts that each filter selected **exactly one** test before it
 believes an outcome. `vitest -t` joins describe blocks with a space, not `" > "`,
@@ -154,17 +156,43 @@ asserting "cannot read another household" still passes. The mutation that proves
 negative test has teeth is making the policy **permissive**, not removing it.
 
 **Postgres checks the new row of an UPDATE against SELECT policies.** Not just the
-UPDATE policy's `WITH CHECK`. So while the SELECT policy is restrictive it masks
-the UPDATE policy completely: weakening UPDATE alone changes no observable
-behaviour, and both UPDATE tests keep passing. The harness records those two as
-`masked`, then runs the layered mutation — SELECT *and* UPDATE permissive together
-— which is caught.
+UPDATE policy's `WITH CHECK`. While the SELECT policy was household-only it masked
+the UPDATE policy completely: weakening UPDATE alone changed no observable
+behaviour, and both UPDATE tests kept passing. The harness recorded those two as
+`masked`, with a note that public recipe pages would change it.
 
-That masking is a live risk rather than a curiosity. **Phase 2 adds public,
-indexable recipe pages.** If that work loosens the SELECT policy on `recipes`, the
-UPDATE policy stops being redundant and becomes the only thing standing between a
-household and another household's rows. Re-run `test:mutate` after any change to a
-SELECT policy, and expect the two `masked` rows to flip to `catch`.
+**They have flipped.** Publishing loosened the SELECT policy — a signed-in person
+may read any household's published recipe — so the UPDATE policy is now the only
+thing stopping a stranger editing one. Both mutations run against published recipes
+and report `caught`. No mutation reports `masked` any more.
+
+The rule that leaves behind: **any change that loosens a SELECT policy must be
+followed by `test:mutate`, and a mutation flipping from `caught` back to `masked` is
+a regression.** Masked means some other policy is doing the work and the one under
+test is unverified.
+
+### Public recipe pages
+
+`recipes.visibility` is `private` or `public`; public means readable by `anon` and
+indexable. Decisions §17 covers why that rather than a share token.
+
+Two mechanisms, both needed:
+
+- **RLS** picks the rows: `visibility = 'public' and deleted_at is null`.
+- **Column grants** pick the columns. `anon` can read title, servings, time,
+  attribution and dates — and cannot read `family_id`, `created_by`, `make_again`,
+  `times_made` or `status`. A publishable row still carries household data.
+
+`select *` as `anon` therefore **fails** with a permission error rather than
+returning a subset. That is deliberate: a caller has to name what it wants.
+
+Anon can also read a published recipe's ingredients, and its photos only where
+`source = 'camera'` — the household's own photograph. An imported photo is the
+blogger's, which is what the open copyright question governs.
+
+The migration asserts the whole surface at apply time: anon has no privilege of any
+kind on the fifteen other tables, no write privilege on the three it can read, no
+access to the forbidden columns, and enough access to actually render a page.
 
 ### Three tables are deliberately not household-scoped
 

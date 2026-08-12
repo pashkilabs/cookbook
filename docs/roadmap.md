@@ -100,12 +100,11 @@ rebuild, and everything else depends on it.*
       week planner, shopping list with the split display, pantry.
       *`plan_entries.recipe_id` is NOT NULL, so a free-text planner entry
       ("leftovers") needs a migration.*
-- [ ] Public recipe pages, server-rendered, indexable. **Needs schema work first:**
-      recipes have no notion of being public, and `anon` holds no grant on any
-      table. Decide how a recipe becomes public and whether the page is served by
-      the service role or by a genuine anon-readable path — and note that loosening
-      a SELECT policy promotes the UPDATE policy to load-bearing (see
-      `packages/db/README.md`).
+- [x] **Schema and policies for public recipe pages.** `recipes.visibility`, anon
+      RLS policies plus column grants, and a migration self-check over the whole
+      anon surface. Decisions §17 records flag-not-token; §18 records that the two
+      previously-`masked` mutations now report `caught`, which was the acceptance
+      criterion. Rendering the pages is still to do, and needs no further schema.
 - [ ] Batch import with a job queue. *`import_jobs` exists; nothing drains it.*
 
 **Ship this. Use it as a family for a month before writing native code.**

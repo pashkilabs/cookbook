@@ -150,11 +150,16 @@ household its parent does not belong to.
 
 ```
 recipes             id, family_id, title, source_url, source_name, servings,
-                    time_minutes, status, make_again, times_made, created_by,
-                    created_at, updated_at, deleted_at
+                    time_minutes, status, visibility, make_again, times_made,
+                    created_by, created_at, updated_at, deleted_at
                     -- created_by -> family_members, so the UI can name a person
                     -- who may not have a login. UNIQUE (id, family_id) is the
                     -- target for every child table's composite FK.
+                    -- visibility: 'private' (default) or 'public'. Public is
+                    -- world-readable and indexable by anon, not an unlisted link
+                    -- (decisions §17). anon reads it through column grants, so
+                    -- family_id / make_again / times_made / created_by / status
+                    -- are not selectable by anon at all.
 recipe_ingredients  id, family_id, recipe_id, position, amount, unit, item_text,
                     ingredient_id?, note, is_estimated,
                     created_at, updated_at, deleted_at
