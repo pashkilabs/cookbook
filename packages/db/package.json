@@ -16,6 +16,10 @@
     "./test-support/global-setup": {
       "types": "./test/global-setup.ts",
       "default": "./test/global-setup.ts"
+    },
+    "./catalog": {
+      "types": "./src/catalog.ts",
+      "default": "./src/catalog.ts"
     }
   },
   "scripts": {
@@ -41,5 +45,8 @@
     "tsx": "^4.19.2",
     "typescript": "^5.6.3",
     "vitest": "^2.1.8"
+  },
+  "dependencies": {
+    "@pashki/core": "workspace:*"
   }
 }

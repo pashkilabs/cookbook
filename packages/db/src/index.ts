@@ -39,6 +39,8 @@ export const APP_TABLES = [
   "plan_entries",
   "shortlist_entries",
   "pantry_items",
+  "shopping_ticks",
+  "shopping_ticks",
   "photos",
   "import_jobs",
   "import_cache",
@@ -80,6 +82,7 @@ export const HOUSEHOLD_TABLES = [
   "plan_entries",
   "shortlist_entries",
   "pantry_items",
+  "shopping_ticks",
   "photos",
   "import_jobs",
 ] as const satisfies readonly AppTable[];

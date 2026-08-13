@@ -1,4 +1,9 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import {
+  catalogItemsFromRows,
+  GROCERY_PACKAGE_COLUMNS,
+  INGREDIENT_COLUMNS,
+} from "../src/catalog.js";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
   consolidate,
@@ -30,39 +35,16 @@ const instance = readLocalInstance();
 async function loadCatalogFromDatabase(admin: SupabaseClient): Promise<CatalogItem[]> {
   const ingredients = await admin
     .from("ingredients")
-    .select("id, key, canonical_name, aliases, aisle, dimension, grams_per_cup, can_size");
+    .select(INGREDIENT_COLUMNS);
   if (ingredients.error) throw ingredients.error;
 
-  const packages = await admin
-    .from("grocery_packages")
-    .select("ingredient_id, label, base_amount, sort_order");
+  const packages = await admin.from("grocery_packages").select(GROCERY_PACKAGE_COLUMNS);
   if (packages.error) throw packages.error;
 
-  const byIngredient = new Map<string, Array<{ label: string; amount: number; sort: number }>>();
-  for (const row of packages.data) {
-    const list = byIngredient.get(row.ingredient_id) ?? [];
-    list.push({
-      label: row.label,
-      amount: Number(row.base_amount),
-      sort: row.sort_order,
-    });
-    byIngredient.set(row.ingredient_id, list);
-  }
-
-  return ingredients.data.map((row) => ({
-    key: row.key,
-    // canonical name first, then aliases — the order createCatalog matches on
-    names: [row.canonical_name, ...row.aliases],
-    aisle: row.aisle,
-    dimension: row.dimension as CatalogItem["dimension"],
-    packages: byIngredient
-      .get(row.id)
-      ?.sort((a, b) => a.sort - b.sort)
-      .map(({ label, amount }) => ({ label, amount })) ?? [],
-    ...(row.grams_per_cup === null ? {} : { gramsPerCup: Number(row.grams_per_cup) }),
-    ...(row.can_size === null ? {} : { canSize: Number(row.can_size) }),
-  }));
+  // the same mapping the app uses, so this test proves the app's catalog and not a copy of it
+  return catalogItemsFromRows(ingredients.data, packages.data);
 }
+
 
 const week = (): ConsolidationEntry[] =>
   KNOWN_WEEK.map((entry) => ({

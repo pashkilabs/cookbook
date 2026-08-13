@@ -68,10 +68,11 @@ importers:
         version: 2.1.9(@types/node@26.2.0)
 
   packages/db:
-    devDependencies:
+    dependencies:
       '@pashki/core':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../core
+    devDependencies:
       '@supabase/supabase-js':
         specifier: ^2.112.3
         version: 2.112.3
