@@ -128,3 +128,5 @@ textarea {
 .parsed li { padding: 0.15rem 0; }
 
 .confirm { display: inline-flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+
+.matched { margin: 0.35rem 0 0; font-size: 0.8rem; color: var(--accent); }

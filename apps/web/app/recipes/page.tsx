@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
+import { keepWholeFamilyLikes, searchRecipes } from "@/lib/recipe-search";
 import { Filters, FILTERS, type FilterKey } from "./filters";
 import { SignOutButton } from "./sign-out";
 
@@ -50,49 +51,12 @@ export default async function RecipesPage({
     );
   }
 
-  let query = supabase
-    .from("recipes")
-    .select("id, title, source_name, servings, time_minutes, times_made, make_again, visibility")
-    .eq("family_id", family.id)
-    .is("deleted_at", null)
-    .eq("status", "active");
-
-  if (q) {
-    // titles only. Searching ingredients means a join and a decision about ranking, and
-    // neither belongs in the same change as the filters.
-    query = query.ilike("title", `%${escapeForLike(q)}%`);
-  }
-  if (filter === "make-again") query = query.eq("make_again", true);
-  if (filter === "untried") query = query.eq("times_made", 0);
-
-  const { data: found, error } = await query.order("created_at", { ascending: false });
-  let recipes = found ?? [];
-
-  if (filter === "family-likes" && recipes.length > 0) {
-    // Computed here rather than in the query. "Everybody who rated gave 4 or 5" is a condition
-    // over a *group* of rows, and expressing it through PostgREST means a view or an RPC — both
-    // of which are schema changes, and this filter is not worth one yet. A household's ratings
-    // are a small set, so one extra read decides it.
-    const { data: ratings } = await supabase
-      .from("ratings")
-      .select("recipe_id, score")
-      .eq("family_id", family.id)
-      .in("recipe_id", recipes.map((recipe) => recipe.id))
-      .is("deleted_at", null);
-
-    const byRecipe = new Map<string, number[]>();
-    for (const rating of ratings ?? []) {
-      const scores = byRecipe.get(rating.recipe_id) ?? [];
-      scores.push(rating.score);
-      byRecipe.set(rating.recipe_id, scores);
-    }
-    // an unrated recipe is not "liked by the whole family" — it is unknown, which is what
-    // "Untried" is for
-    recipes = recipes.filter((recipe) => {
-      const scores = byRecipe.get(recipe.id);
-      return !!scores && scores.length > 0 && scores.every((score) => score >= 4);
-    });
-  }
+  const found = await searchRecipes({ supabase, familyId: family.id, query: q, filter });
+  const hits =
+    filter === "family-likes"
+      ? await keepWholeFamilyLikes(supabase, family.id, found.hits)
+      : found.hits;
+  const error = found.error;
 
   return (
     <main>
@@ -111,9 +75,9 @@ export default async function RecipesPage({
 
       <Filters q={q} filter={filter} />
 
-      {error && <p className="error">Could not read recipes: {error.message}</p>}
+      {error && <p className="error">Could not read recipes: {error}</p>}
 
-      {!error && recipes.length === 0 && (
+      {!error && hits.length === 0 && (
         <div className="empty">
           {q || filter ? (
             <>
@@ -133,7 +97,7 @@ export default async function RecipesPage({
         </div>
       )}
 
-      {recipes.map((recipe) => (
+      {hits.map(({ recipe, matchedIngredient }) => (
         <Link className="card" key={recipe.id} href={`/recipes/${recipe.id}`}>
           <h2>{recipe.title}</h2>
           <p className="meta" style={{ margin: 0 }}>
@@ -148,16 +112,12 @@ export default async function RecipesPage({
               .filter(Boolean)
               .join(" · ")}
           </p>
+          {/* why this one is here, when the title says nothing about the search */}
+          {matchedIngredient && (
+            <p className="matched">contains {matchedIngredient}</p>
+          )}
         </Link>
       ))}
     </main>
   );
-}
-
-/**
- * `%` and `_` are wildcards in `LIKE`, so a search for "50%" would otherwise match everything
- * containing "50". Backslash-escaped, which is what Postgres expects by default.
- */
-function escapeForLike(input: string): string {
-  return input.replace(/[\\%_]/g, (character) => `\\${character}`);
 }

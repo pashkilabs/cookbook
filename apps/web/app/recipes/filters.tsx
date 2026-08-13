@@ -24,8 +24,8 @@ export function Filters({ q, filter }: { q: string; filter: FilterKey | null }) 
           type="search"
           name="q"
           defaultValue={q}
-          placeholder="Search titles…"
-          aria-label="Search recipes by title"
+          placeholder="Search titles and ingredients…"
+          aria-label="Search recipes by title or ingredient"
         />
         <button type="submit">Search</button>
       </form>
