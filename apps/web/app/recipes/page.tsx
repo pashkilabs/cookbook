@@ -81,6 +81,9 @@ export default async function RecipesPage({
           <Link className="button" href="/planner">
             Planner
           </Link>
+          <Link className="button" href="/recipes/import">
+            Import
+          </Link>
           <Link className="button" href="/recipes/new">
             Add a recipe
           </Link>
@@ -105,7 +108,7 @@ export default async function RecipesPage({
             <>
               <p style={{ marginTop: 0 }}>No recipes yet.</p>
               <p style={{ marginBottom: 0 }}>
-                <Link href="/recipes/new">Type one in</Link> — importing has no screen yet.
+                <Link href="/recipes/import">Import one from a link</Link> or <Link href="/recipes/new">type one in</Link>.
               </p>
             </>
           )}

@@ -11,7 +11,7 @@
  */
 /** @type {import('next').NextConfig} */
 export default {
-  transpilePackages: ["@pashki/platform-client", "@pashki/core", "@pashki/db"],
+  transpilePackages: ["@pashki/platform-client", "@pashki/core", "@pashki/db", "@pashki/import"],
   webpack: (config) => {
     config.resolve.extensionAlias = {
       ...config.resolve.extensionAlias,

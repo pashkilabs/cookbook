@@ -7,6 +7,7 @@ one into.
 |---|---|
 | `/recipes` | the household's recipes, with search and the three filters — make-again, untried, whole-family-likes |
 | `/recipes/new` | type one in |
+| `/recipes/import` | paste a link, review what came back, save |
 | `/recipes/[id]` | ingredients through `@pashki/core`, the method, the photo, per-member ratings |
 | `/recipes/[id]/edit` | change it |
 | `/planner` | a week, seven days, and whatever is shortlisted waiting for one |
@@ -55,6 +56,48 @@ the write lands — a shop is no place to wait for a round trip — rolling back
 The pantry marks what you already have; an entry created from a shopping line carries no
 quantity, which `consolidate()` treats as "flag it, deduct nothing". That is the honest reading
 of somebody glancing in a cupboard.
+
+## Importing
+
+**Tiers 0 and 1 only.** `ImportOptions.llm` is omitted and the pipeline calls no model unless a
+cascade is passed in, so this cannot reach tier 2 by accident. Tiers 2 and 3 wait on the eval
+fixtures, which is what should choose a model rather than a guess.
+
+**Nothing saves without the person seeing it.** `POST /api/import` returns a draft and creates no
+rows; the review screen makes every field editable and saving goes through the *same* route as
+typing a recipe in, so the parser runs once and there is no second write path to drift.
+
+**The photo is uploaded during the preview and unreachable until save.** Storage read policies
+resolve through a `photos` row, so an object with no row is readable by nobody but the service
+role — which is the state 090700 describes for an import awaiting review, and is verified: the
+household is refused the object before saving and served it after. An abandoned review leaves an
+orphan, which is the known gap in `docs/roadmap.md`, not something this introduced.
+
+**Quota is spent on the fetch, not the save**, because fetching a page and decoding its photo is
+the cost and somebody who abandons a review has still spent it. A cache hit spends nothing: a
+recipe already extracted for another household costs nothing to hand over.
+
+**Refusals are honest.** A Facebook, Instagram or TikTok link is rejected before any request, in
+about 300ms, naming the route that would work instead. A page with no machine-readable recipe says
+tiers 0 and 1 found nothing and that reading the page text is not built — it does not imply a
+model tried.
+
+### The measured hit rate
+
+**23 of 23 real recipe pages** — 22 by tier 0 (structured data), 1 by tier 1 (microdata).
+
+The sample is single-recipe pages from listing pages on sites that answer us, filtered by hand to
+exclude roundups, category indexes and editorial pages. That filtering matters: a first pass of
+remembered URLs scored 45%, and every miss turned out to be a URL that did not exist or a site
+answering `402` to a real browser too. Neither is something a model would fix.
+
+What that number says about model spend: on pages that publish recipe data, tier 2 would have
+bought nothing here. The constraint is *reaching* pages — three large sites (all Dotdash Meredith)
+refuse automated requests outright — and that is a fetching problem, not an extraction one.
+
+The one caveat worth keeping: a hit is not always a good hit. The single microdata hit returned
+three ingredients and no steps for a hummus recipe. Quality across a real fixture set is what the
+eval harness is for.
 
 ## The planner
 

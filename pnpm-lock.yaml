@@ -23,6 +23,9 @@ importers:
       '@pashki/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@pashki/import':
+        specifier: workspace:*
+        version: link:../../packages/import
       '@pashki/platform-client':
         specifier: workspace:*
         version: link:../../packages/platform-client

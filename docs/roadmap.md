@@ -123,7 +123,7 @@ rebuild, and everything else depends on it.*
       migration asserts the bucket is private and that every anon read path checks
       recipe visibility. Display sizes come from the transformation CDN rather than
       stored variants. 18 tests, mostly negative.
-- [ ] Port the prototype's screens: recipe list, detail with per-member ratings,
+- [x] Port the prototype's screens: recipe list, detail with per-member ratings,
       week planner, shopping list with the split display, pantry.
       *`plan_entries.recipe_id` is NOT NULL, so a free-text planner entry
       ("leftovers") needs a migration. The method now has somewhere to live:
