@@ -138,7 +138,10 @@ export async function buildShoppingWeek(
     ...(row.unit === null ? {} : { unit: row.unit as string }),
   }));
 
-  const lines = consolidate(entries, catalog, { pantry, deductPantry: true });
+  // the same preference decides both halves: which sizes are on the shelf, and how the amounts
+  // are written. Passing it to one and not the other is what produced "2.5 kg bag" above
+  // "3 lb spare" (decisions §28).
+  const lines = consolidate(entries, catalog, { pantry, deductPantry: true, system });
   const leftovers = significantLeftovers(lines);
 
   // Candidates are the household's other recipes — the ones not already planned this week.

@@ -1,9 +1,28 @@
-import type { Dimension } from "./types.js";
+import type { Dimension, MeasurementSystem } from "./types.js";
 import { formatQuantity } from "./text.js";
 import { UNITS } from "./units.js";
 
-/** Millilitres in the unit a cook would say out loud. */
-export function formatVolume(ml: number): string {
+/**
+ * Millilitres and grams in the units the household reads (decisions §28).
+ *
+ * **Thresholds are a judgement, not a conversion.** A cook writes "500 g", never "0.5 kg", and
+ * "250 ml", never "0.25 l" — so metric switches to the larger unit only at 1000, and stays whole
+ * below it. The US side keeps its own boundaries: cups from 115 ml because half a cup is still
+ * cups, and ounces from 25 g because anything less is a spoonful of spice.
+ *
+ * Metric shows a decimal where US shows a fraction: "1.5 kg" is how it is written down, while
+ * "1½ cup" is how a cup is spoken. Below a litre or a kilo, metric rounds to whole units —
+ * nobody buys 247 ml.
+ *
+ * Very small metric volumes stay in millilitres rather than becoming teaspoons. On a shopping
+ * list these are totals, not instructions, and "15 ml" is unambiguous where "1 tbsp" invites the
+ * question of whose tablespoon.
+ */
+export function formatVolume(ml: number, system: MeasurementSystem = "us"): string {
+  if (system === "metric") {
+    if (ml >= 1000) return `${decimal(ml / 1000)} l`;
+    return `${Math.round(ml)} ml`;
+  }
   if (ml >= UNITS.gallon!.toBase * 0.9) return `${formatQuantity(ml / UNITS.gallon!.toBase)} gal`;
   if (ml >= UNITS.quart!.toBase * 0.9) return `${formatQuantity(ml / UNITS.quart!.toBase)} qt`;
   if (ml >= 115) return `${formatQuantity(ml / UNITS.cup!.toBase)} cup`;
@@ -11,10 +30,19 @@ export function formatVolume(ml: number): string {
   return `${formatQuantity(ml / UNITS.tsp!.toBase)} tsp`;
 }
 
-export function formatWeight(g: number): string {
+export function formatWeight(g: number, system: MeasurementSystem = "us"): string {
+  if (system === "metric") {
+    if (g >= 1000) return `${decimal(g / 1000)} kg`;
+    return `${Math.round(g)} g`;
+  }
   if (g >= UNITS.lb!.toBase * 0.9) return `${formatQuantity(g / UNITS.lb!.toBase)} lb`;
   if (g >= 25) return `${Math.round(g / UNITS.oz!.toBase)} oz`;
   return `${Math.round(g)} g`;
+}
+
+/** One decimal place at most, and no trailing zero: 1.5, 2, 1.2. */
+function decimal(value: number): string {
+  return String(Math.round(value * 10) / 10);
 }
 
 const COUNTABLE: Partial<Record<Dimension, [string, string]>> = {
@@ -23,9 +51,13 @@ const COUNTABLE: Partial<Record<Dimension, [string, string]>> = {
   bunch: ["bunch", "bunches"],
 };
 
-export function formatMeasure(amount: number, dimension: Dimension): string {
-  if (dimension === "volume") return formatVolume(amount);
-  if (dimension === "weight") return formatWeight(amount);
+export function formatMeasure(
+  amount: number,
+  dimension: Dimension,
+  system: MeasurementSystem = "us",
+): string {
+  if (dimension === "volume") return formatVolume(amount, system);
+  if (dimension === "weight") return formatWeight(amount, system);
   const words = COUNTABLE[dimension];
   if (words) {
     const rounded = Math.round(amount * 100) / 100;

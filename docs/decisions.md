@@ -794,16 +794,29 @@ will offer a pint and a 500 ml carton for the same purchase.
 packages is one a household cannot be told how to buy. Guessing at the remaining twelve would put
 invented numbers into the one part of the system that has to be right.
 
-### What is done and what is not
+### The thresholds are a judgement, not a conversion
 
-**Done:** the column, the check constraint, the per-market package rows, the seed, the seam
-exposing `Family.measurementSystem`, and the shopping list choosing package sizes by it. A metric
-household is now offered "600 ml pot" where a US one gets "pint (16 oz)".
+`formatWeight`, `formatVolume` and `formatMeasure` take the system, and `consolidate` threads it
+through every display it produces. Where the two systems change unit is chosen, not derived:
 
-**Not done:** `formatWeight` and `formatVolume` still emit US units regardless of the preference,
-so a metric household sees metric *packages* and imperial *quantities* — "600 ml pot" above "takes
-11 oz". That is a change to `packages/core`'s formatters with 100-odd tests resting on their
-current output, and it is a separate piece of work rather than a rider on this one.
+| | metric | US |
+|---|---|---|
+| weight | grams below 1000, kilograms above — "500 g", never "0.5 kg" | ounces from 25 g, pounds from ~408 g |
+| volume | millilitres below 1000, litres above — "250 ml", never "0.25 l" | tsp, tbsp, cups from 115 ml, quarts, gallons |
+| above the threshold | a decimal: "1.5 kg" | a fraction: "1½ qt" |
+| below it | rounded whole: "247 g", "237 ml" | as the US boundaries fall |
+
+A cook writes 500 g and 250 ml, so metric changes unit only at 1000 rather than wherever the
+number divides tidily. Metric shows a decimal because that is how it is written down, while a
+fraction is how a cup is spoken. Small metric volumes stay in millilitres rather than becoming
+teaspoons: on a shopping list these are totals, not instructions, and "15 ml" is unambiguous where
+"1 tbsp" invites the question of whose tablespoon.
+
+Counts are untouched in both — three onions are three onions anywhere.
+
+**A US household's output is unchanged**, asserted directly rather than inferred from the older
+tests passing: every formatter renders identically whether the system is omitted or stated as
+`us`, and `consolidate` produces a deep-equal result either way.
 
 *Would change if:* a household needs two systems at once — one adult cooking in cups while the
 other shops in grams. The setting would move from the household to the member, which is a bigger

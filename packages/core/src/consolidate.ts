@@ -30,7 +30,7 @@ export function consolidate(
   catalog: Catalog,
   options: ConsolidateOptions = {},
 ): ShoppingLine[] {
-  const { pantry = [], excludeStaples = true, deductPantry = false } = options;
+  const { pantry = [], excludeStaples = true, deductPantry = false, system = "us" } = options;
   const buckets = new Map<string, Bucket>();
 
   for (const entry of entries) {
@@ -103,12 +103,12 @@ export function consolidate(
       aisle: bucket.aisle,
       dimension: primary,
       needed,
-      neededDisplay: formatMeasure(needed, primary),
+      neededDisplay: formatMeasure(needed, primary, system),
       packages,
       packagesDisplay: packages ? formatPackages(packages) : null,
       capacity,
       leftover,
-      leftoverDisplay: leftover > 0 ? formatMeasure(leftover, primary) : null,
+      leftoverDisplay: leftover > 0 ? formatMeasure(leftover, primary, system) : null,
       uses: bucket.uses,
       inPantry: Boolean(onHand),
       otherDimensions: present
@@ -116,7 +116,7 @@ export function consolidate(
         .map((d) => ({
           dimension: d,
           amount: bucket.totals[d] ?? 0,
-          display: formatMeasure(bucket.totals[d] ?? 0, d),
+          display: formatMeasure(bucket.totals[d] ?? 0, d, system),
         })),
     };
   });

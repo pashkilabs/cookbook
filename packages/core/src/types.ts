@@ -114,6 +114,11 @@ export interface PantryEntry {
 
 export interface ConsolidateOptions {
   pantry?: PantryEntry[];
+  /**
+   * Which units the household reads (decisions §28). Defaults to `us`, which is what every list
+   * predating the preference was — so an omitted system changes nothing.
+   */
+  system?: MeasurementSystem;
   /** drop salt, pepper, water and friends from the list */
   excludeStaples?: boolean;
   /** subtract pantry quantities where they are known */
