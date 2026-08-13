@@ -250,7 +250,6 @@ export type Database = {
           created_at: string
           extracted_json: Json | null
           fetched_at: string
-          photo_path: string | null
           updated_at: string
           url_hash: string
         }
@@ -258,7 +257,6 @@ export type Database = {
           created_at?: string
           extracted_json?: Json | null
           fetched_at?: string
-          photo_path?: string | null
           updated_at?: string
           url_hash: string
         }
@@ -266,7 +264,6 @@ export type Database = {
           created_at?: string
           extracted_json?: Json | null
           fetched_at?: string
-          photo_path?: string | null
           updated_at?: string
           url_hash?: string
         }
@@ -935,9 +932,17 @@ export type Database = {
           isSetofReturn: true
         }
       }
-      import_mark_quota_consumed: {
-        Args: { p_job_id: string }
-        Returns: string
+      import_finish_job: {
+        Args: {
+          p_app_key: string
+          p_charge: boolean
+          p_error: string
+          p_job_id: string
+          p_quota: string
+          p_result: Json
+          p_status: string
+        }
+        Returns: Json
       }
       platform_spend_quota: {
         Args: {

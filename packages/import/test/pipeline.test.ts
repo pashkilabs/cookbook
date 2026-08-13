@@ -100,6 +100,61 @@ describe("the shared cache", () => {
     if (hit.ok) expect(hit.recipe.title).toBe("Apple Pie");
   });
 
+  it("gives a hit the same photograph a miss would", async () => {
+    /*
+     * The gap this closes gets worse as the product succeeds: the better the shared cache works,
+     * the more households would have received recipes with no picture. See decisions §33.
+     */
+    const cache = createFakeCache();
+    const first = createFakeFetcher({ [PIE]: { html: PAGE_WITH_IMAGE_REFERENCE } }, { [IMAGE]: { bytes: jpegBytes() } });
+    const miss = await importRecipe(PIE, { fetcher: first, cache });
+    expect(miss.ok && miss.photo?.width).toBeGreaterThan(0);
+
+    // a different household, the same link: the page is not fetched, the image is
+    const second = createFakeFetcher({}, { [IMAGE]: { bytes: jpegBytes() } });
+    const hit = await importRecipe(PIE, { fetcher: second, cache });
+
+    expect(hit.ok && hit.fromCache).toBe(true);
+    expect(second.pageCalls, "the page is what the cache saves").toEqual([]);
+    expect(second.byteCalls, "the photograph is re-fetched from its source").toEqual([IMAGE]);
+    expect(hit.ok && hit.photo?.bytes.length).toBe(miss.ok ? miss.photo?.bytes.length : -1);
+  });
+
+  it("carries the source image URL, never a storage path", async () => {
+    // `import_cache` is one row for the whole user base and a storage path is
+    // `<family_id>/<uuid>.jpg`. Nothing household-identifying may go in (architecture §11).
+    const cache = createFakeCache();
+    const fetcher = createFakeFetcher({ [PIE]: { html: PAGE_WITH_IMAGE_REFERENCE } }, { [IMAGE]: { bytes: jpegBytes() } });
+    await importRecipe(PIE, { fetcher, cache });
+
+    const entry = [...cache.store.values()][0]!;
+    expect(entry.recipe.imageUrl, "a public address on somebody else's site").toBe(IMAGE);
+    expect(JSON.stringify(entry)).not.toMatch(/storagePath|storage_path/);
+  });
+
+  it("still returns the recipe when the cached image has since gone", async () => {
+    const cache = createFakeCache();
+    const first = createFakeFetcher({ [PIE]: { html: PAGE_WITH_IMAGE_REFERENCE } }, { [IMAGE]: { bytes: jpegBytes() } });
+    await importRecipe(PIE, { fetcher: first, cache });
+
+    // the site took the picture down; a missing image is not a failed import
+    const hit = await importRecipe(PIE, { fetcher: createFakeFetcher({}), cache });
+    expect(hit.ok).toBe(true);
+    expect(hit.ok && hit.photo).toBeNull();
+    expect(hit.ok && hit.recipe.title).toBe("Apple Pie");
+  });
+
+  it("skips the cached photo too when the caller asked for no photo", async () => {
+    const cache = createFakeCache();
+    const first = createFakeFetcher({ [PIE]: { html: PAGE_WITH_IMAGE_REFERENCE } }, { [IMAGE]: { bytes: jpegBytes() } });
+    await importRecipe(PIE, { fetcher: first, cache });
+
+    const second = createFakeFetcher({}, { [IMAGE]: { bytes: jpegBytes() } });
+    const hit = await importRecipe(PIE, { fetcher: second, cache, skipPhoto: true });
+    expect(hit.ok && hit.photo).toBeNull();
+    expect(second.byteCalls).toEqual([]);
+  });
+
   it("is keyed by URL hash, not by family — the same page shared four ways is one entry", async () => {
     const cache = createFakeCache();
     const fetcher = createFakeFetcher(

@@ -55,6 +55,20 @@ export async function importRecipe(url: string, options: ImportOptions): Promise
   if (options.cache && !options.refresh) {
     const cached = await options.cache.get(urlHash);
     if (cached) {
+      /*
+       * A hit produces the same recipe a miss would, photograph included.
+       *
+       * The cache carries the **source image URL** — a public address on somebody else's
+       * website, already part of the extracted recipe — and a hit re-fetches it into the
+       * requesting household's own storage. It cannot carry a storage path: `import_cache` is
+       * one row for the entire user base, and a storage path is `<family_id>/<uuid>.jpg`. See
+       * decisions §33.
+       *
+       * Returning no photo was the alternative, and it got worse as the product succeeded: the
+       * better the shared cache works, the more households would receive recipes with no
+       * picture. One image request is a small price for that not being true.
+       */
+      const photo = options.skipPhoto ? null : await fetchPhoto(cached.recipe.imageUrl, options);
       return {
         ok: true,
         recipe: cached.recipe,
@@ -62,9 +76,7 @@ export async function importRecipe(url: string, options: ImportOptions): Promise
         // tier 0 would quietly corrupt the hit rate that decides model spend
         tier: cached.tier,
         attempts: [{ tier: cached.tier, outcome: "hit", detail: "from cache" }],
-        // the image is not cached: storing it is the photo pipeline's job, and the
-        // recipe carries the URL so a caller can fetch it if it wants to
-        photo: null,
+        photo,
         fromCache: true,
         urlHash,
       };
