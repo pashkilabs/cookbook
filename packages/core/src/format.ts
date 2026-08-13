@@ -66,11 +66,27 @@ export function formatMeasure(
   return formatQuantity(amount);
 }
 
-/** How a recipe wrote it, e.g. `1½ cup` or `3`. */
+/**
+ * The amount as the recipe stated it, e.g. `1½ cups` or `3`.
+ *
+ * **"As written" means the parse, not the source text** (decisions §29). It cannot mean the
+ * source text, because nothing stores it: `recipe_ingredients` keeps the amount, the unit and the
+ * item, and the original keystrokes are gone by the time anything is displayed. So this renders
+ * the parse the way a recipe would have written it, which is the honest reading — and the split
+ * display is where somebody checks which meal takes what, so it has to read like their recipe.
+ *
+ * Word units inflect (`2 cloves`, `1½ cups`); symbols never do (`250 g`, `2 tbsp`). Every plural
+ * emitted here is one `canonicalUnit` accepts, because the recipe editor rebuilds its lines from
+ * these strings and re-parses them — a plural this produced but the parser could not read would
+ * quietly lose a unit on the next save.
+ */
+const PLURALISABLE_UNITS = new Set(["cup", "pint", "quart", "gallon", "stick", "clove", "can", "bunch"]);
+
 export function formatAsWritten(amount: number | null, unit: string | null): string {
   const qty = formatQuantity(amount);
   if (!unit || unit === "count") return qty;
-  return qty ? `${qty} ${unit}` : unit;
+  const word = amount !== null && amount !== 1 && PLURALISABLE_UNITS.has(unit) ? pluralise(unit) : unit;
+  return qty ? `${qty} ${word}` : word;
 }
 
 export function formatPackages(

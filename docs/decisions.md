@@ -825,6 +825,35 @@ having one answer.
 
 ---
 
+## 29. "As written" means the parse, and the parse is rendered as a recipe would write it
+
+The split display — *"Tuesday takes 1 cup, Friday takes ½ cup"* — said **"takes 2 clove"**, because
+`formatAsWritten` printed the canonical unit verbatim.
+
+Two readings of "as written" were available, and one of them is not:
+
+- *The source text.* **Not available.** `recipe_ingredients` stores the amount, the unit, the item
+  and the note; the original keystrokes are gone by the time anything renders. `ParsedIngredient`
+  carries a `raw` field, but in the product that field holds a line the app *rebuilt* from the
+  stored columns — so displaying it would show a reconstruction while claiming fidelity.
+- **The parse, rendered the way a recipe would write it.** Chosen. Word units inflect (`2 cloves`,
+  `1½ cups`), symbols never do (`250 g`, `2 tbsp`).
+
+The absence of stored text made the decision, and it is worth being explicit that it did: had the
+source been kept, showing it would have been the better answer, because the split display exists
+to let somebody check a number against the recipe in front of them.
+
+**Every plural emitted is one the parser accepts.** The recipe editor rebuilds its lines from these
+strings and re-parses them on save, so a plural we produced but `canonicalUnit` could not read
+would quietly drop a unit — a cup becoming a bare number. There is a round-trip test for it.
+
+*Would change if:* the original line gets stored. That is a column on `recipe_ingredients` and it
+has an independent reason to exist — the import review screen wants to show what the model was
+given alongside what it made of it, and an eval fixture wants the same. If it lands, "as written"
+should become the text, and this decision reverses.
+
+---
+
 ## Open: cascade deletions and tombstones
 
 **Not resolved. This waits on the sync engine choice, and exists so the evaluation
