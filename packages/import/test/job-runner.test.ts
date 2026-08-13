@@ -102,12 +102,16 @@ describe("running a job", () => {
       options({
         storePhoto: async (input) => {
           stored.push({ photoId: input.photoId });
-          return `fam-1/${input.photoId}.jpg`;
+          return { storagePath: `fam-1/${input.photoId}.jpg`, width: 800, height: 600 };
         },
       }),
     );
     expect(stored).toEqual([{ photoId: "job-1" }]);
-    expect(outcome.status === "review" && outcome.result.photoPath).toBe("fam-1/job-1.jpg");
+    expect(outcome.status === "review" && outcome.result.photo).toEqual({
+      storagePath: "fam-1/job-1.jpg",
+      width: 800,
+      height: 600,
+    });
   });
 
   it("drains pasted text through tier 2", async () => {

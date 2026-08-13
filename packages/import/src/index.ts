@@ -77,6 +77,7 @@ export {
   type JobRunnerOptions,
   type QuotaMeter,
   type QuotaVerdict,
+  type StoredPhotoRef,
 } from "./job-runner.js";
 export {
   DEFAULT_IMAGE_LIMITS,

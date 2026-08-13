@@ -45,7 +45,7 @@ export type JobResult =
       tier: Tier;
       fromCache: boolean;
       /** where the photo was stored, if there was one */
-      photoPath: string | null;
+      photo: StoredPhotoRef | null;
     }
   | { ok: false; failure: ImportFailure };
 
@@ -80,6 +80,13 @@ export type QuotaVerdict =
   | { allowed: true }
   | { allowed: false; reason: "exceeded" | "no-entitlement"; detail?: string };
 
+/** Where a job's photo ended up. Mirrors the columns on `photos`. */
+export interface StoredPhotoRef {
+  storagePath: string;
+  width: number | null;
+  height: number | null;
+}
+
 export interface JobRunnerOptions {
   queue: JobQueue;
   quota: QuotaMeter;
@@ -88,17 +95,21 @@ export interface JobRunnerOptions {
   /** fetcher, cache and optionally the llm cascade */
   imports: ImportOptions;
   /**
-   * Stores the photo and returns its path.
+   * Stores the photo and says where it went.
    *
    * Injected so the runner does not pull in sharp or the Storage client. The `photoId`
    * it is given is the job id, so a retry overwrites the previous attempt instead of
    * leaving an orphan object nobody can reach.
+   *
+   * Dimensions come back with the path because nothing downstream can recover them: the bytes
+   * are gone by the time a person reviews the job, and `photos.width`/`height` exist so a card
+   * can reserve space before the image loads.
    */
   storePhoto?: (input: {
     familyId: string;
     bytes: Uint8Array;
     photoId: string;
-  }) => Promise<string | null>;
+  }) => Promise<StoredPhotoRef | null>;
 }
 
 export type JobOutcome =
@@ -166,7 +177,7 @@ export async function runNextJob(options: JobRunnerOptions): Promise<JobOutcome>
     const outcome = await importRecipe(job.inputRef, options.imports);
     if (!outcome.ok) return fail(outcome.failure, outcome.failure.kind);
 
-    const photoPath =
+    const photo =
       outcome.photo && options.storePhoto
         ? await options.storePhoto({
             familyId: job.familyId,
@@ -181,7 +192,7 @@ export async function runNextJob(options: JobRunnerOptions): Promise<JobOutcome>
       recipe: outcome.recipe,
       tier: outcome.tier,
       fromCache: outcome.fromCache,
-      photoPath,
+      photo,
     };
     await options.queue.finish({
       jobId: job.id,
@@ -220,7 +231,7 @@ export async function runNextJob(options: JobRunnerOptions): Promise<JobOutcome>
     recipe: llm.recipe,
     tier: "llm" as Tier,
     fromCache: false,
-    photoPath: null,
+    photo: null,
   };
   await options.queue.finish({
     jobId: job.id,
