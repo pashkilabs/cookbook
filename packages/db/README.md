@@ -20,12 +20,26 @@ a mocked version would only prove that the mock filters rows.
 
 ## Pushing to a hosted project
 
+**After every push, run `pnpm check:parity`.** It asks both environments a
+byte-identical set of questions — table and policy counts, storage policies, private
+functions, catalog counts, bucket visibility, composite keys, client grants on the shared
+tables, anon write grants, and `assert_rls_invariants()` in each — and reports where they
+disagree. It reports; it does not fix, because a difference is a decision and the decision
+belongs in a migration.
+
+Three outcomes with distinct exit codes: `0` parity, `1` a difference or a broken
+invariant, `2` could not reach one of them. The third matters as much as the others — a
+comparison that did not happen is not a comparison that found nothing. Hosted credentials
+come from `SUPABASE_DB_URL`, or `SUPABASE_DB_PASSWORD` plus the linked project ref, and are
+never printed.
+
 ```bash
 cd packages/db                 # not the repo root — see below
 npx supabase login             # once, interactive
 npx supabase link --project-ref <ref>
 pnpm db:push:dry               # read the migration list before applying it
 pnpm db:push                   # migrations + seed
+pnpm check:parity              # and confirm the two environments now agree
 ```
 
 Four things that are easy to get wrong.

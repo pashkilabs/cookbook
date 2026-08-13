@@ -24,6 +24,7 @@
     "db:reset": "supabase db reset",
     "db:status": "supabase status",
     "gen:types": "supabase gen types typescript --local --schema public > src/database.types.ts",
+    "check:parity": "node scripts/check-parity.mjs",
     "db:push:dry": "supabase db push --include-seed --dry-run",
     "db:push": "supabase db push --include-seed",
     "gen:seed": "tsx scripts/generate-seed.ts",
