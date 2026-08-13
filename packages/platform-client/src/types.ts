@@ -216,6 +216,42 @@ export interface PlatformStore {
    */
   spendQuota(input: SpendQuotaInput): Promise<QuotaCounter | null>;
   registerDevice(input: RegisterDeviceInput): Promise<Device>;
+  /**
+   * Give a newly signed-up person an account, a household and a place in it.
+   *
+   * The first thing outside test fixtures to write platform tables. It lives on the
+   * port rather than in the web app for the reason the whole seam exists: these are
+   * the three tables app code may not touch, and `check-platform-tables.mjs` fails
+   * the build on a direct query.
+   *
+   * **Idempotent**, because sign-up is a place people double-click and refresh. An
+   * account that already has a household gets that household back, untouched, with
+   * `created: false` — never a second one.
+   *
+   * Issues **no entitlement**, deliberately. A household with none cannot write
+   * (decisions §9: absence is not an unmetered allowance), so a freshly provisioned
+   * household can read and not write until entitlement issuance exists. Inventing a
+   * trial here would be deciding the free-tier question that `docs/decisions.md`
+   * lists as open.
+   */
+  provisionHousehold(input: ProvisionHouseholdInput): Promise<ProvisionedHousehold>;
+}
+
+export interface ProvisionHouseholdInput {
+  /** the authenticated account; the same uuid as `auth.users.id` */
+  accountId: string;
+  email: string;
+  householdName: string;
+  /** what the adult is called inside the household, not their login */
+  displayName: string;
+}
+
+export interface ProvisionedHousehold {
+  account: Account;
+  family: Family;
+  member: FamilyMember;
+  /** false when the account already had a household and nothing was created */
+  created: boolean;
 }
 
 export interface SpendQuotaInput {

@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { readLocalInstance } from "@pashki/db/test-support";
-import { createPlatformClient, type PlatformClient } from "../src/index.js";
+import { createPlatformClient, type PlatformClient, type PlatformStore } from "../src/index.js";
 import { createSupabasePlatformStore } from "../src/supabase-store.js";
 import { createEd25519Signer, createEd25519Verifier, generateEd25519KeyPair } from "../src/crypto.js";
 
@@ -345,5 +345,133 @@ describe.skipIf(instance === null)("supabase platform store", () => {
 describe.skipIf(instance !== null)("supabase platform store (skipped)", () => {
   it("needs a local Supabase instance — run pnpm --filter @pashki/db db:start", () => {
     expect(instance).toBeNull();
+  });
+});
+describe.skipIf(instance === null)("provisioning a household", () => {
+  let admin: SupabaseClient;
+  let store: PlatformStore;
+  const accounts: string[] = [];
+  const families: string[] = [];
+
+  beforeAll(() => {
+    if (!instance) return;
+    admin = createClient(instance.url, instance.serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    store = createSupabasePlatformStore(admin);
+  });
+
+  afterAll(async () => {
+    if (!instance) return;
+    for (const familyId of families) await admin.from("families").delete().eq("id", familyId);
+    for (const accountId of accounts) {
+      await admin.from("accounts").delete().eq("id", accountId);
+      await admin.auth.admin.deleteUser(accountId);
+    }
+  });
+
+  /** A real auth user, because accounts.id references auth.users(id). */
+  const newSignUp = async (label: string) => {
+    const email = `${label}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@pashki.test`;
+    const user = await admin.auth.admin.createUser({
+      email,
+      password: `pw-${label}-${Date.now()}`,
+      email_confirm: true,
+    });
+    if (user.error) throw user.error;
+    accounts.push(user.data.user!.id);
+    return { accountId: user.data.user!.id, email };
+  };
+
+  it("gives a new sign-up an account, a household and a place in it", async () => {
+    const { accountId, email } = await newSignUp("provision");
+    const result = await store.provisionHousehold({
+      accountId,
+      email,
+      householdName: "The Test Household",
+      displayName: "Adult",
+    });
+    families.push(result.family.id);
+
+    expect(result.created).toBe(true);
+    expect(result.account).toEqual({ id: accountId, email });
+    expect(result.family).toMatchObject({ name: "The Test Household", ownerAccountId: accountId });
+    expect(result.member).toMatchObject({
+      familyId: result.family.id,
+      accountId,
+      displayName: "Adult",
+      isChild: false,
+    });
+  });
+
+  it("returns the same household on a second attempt instead of a second household", async () => {
+    // sign-up is a place people double-click and refresh
+    const { accountId, email } = await newSignUp("twice");
+    const input = {
+      accountId,
+      email,
+      householdName: "First Household",
+      displayName: "Adult",
+    };
+    const first = await store.provisionHousehold(input);
+    families.push(first.family.id);
+
+    const second = await store.provisionHousehold({ ...input, householdName: "Second Household" });
+    expect(second.created).toBe(false);
+    expect(second.family.id).toBe(first.family.id);
+    expect(second.family.name).toBe("First Household");
+    expect(second.member.id).toBe(first.member.id);
+
+    const { count } = await admin
+      .from("families")
+      .select("id", { count: "exact", head: true })
+      .eq("owner_account_id", accountId);
+    expect(count).toBe(1);
+  });
+
+  it("completes a household that has no members yet, rather than duplicating it", async () => {
+    // the crash window: accounts upserted and families inserted, family_members not.
+    // The accounts row has to exist first — families.owner_account_id references it.
+    const { accountId, email } = await newSignUp("half");
+    const seeded = await admin.from("accounts").insert({ id: accountId, email });
+    if (seeded.error) throw seeded.error;
+
+    const orphan = await admin
+      .from("families")
+      .insert({ name: "Half Built", owner_account_id: accountId })
+      .select("id")
+      .single();
+    if (orphan.error) throw orphan.error;
+    families.push(orphan.data.id);
+
+    const result = await store.provisionHousehold({
+      accountId,
+      email,
+      householdName: "Ignored",
+      displayName: "Adult",
+    });
+    expect(result.family.id).toBe(orphan.data.id);
+    expect(result.member.accountId).toBe(accountId);
+
+    const { count } = await admin
+      .from("families")
+      .select("id", { count: "exact", head: true })
+      .eq("owner_account_id", accountId);
+    expect(count).toBe(1);
+  });
+
+  it("issues no entitlement, so a new household reads and cannot write", async () => {
+    // decisions §9: absence is not an unmetered allowance, and inventing a trial here
+    // would settle the free-tier question that is still open
+    const { accountId, email } = await newSignUp("entitle");
+    const result = await store.provisionHousehold({
+      accountId,
+      email,
+      householdName: "Unentitled",
+      displayName: "Adult",
+    });
+    families.push(result.family.id);
+
+    expect(await store.findEntitlement(result.family.id, "recipes")).toBeNull();
   });
 });

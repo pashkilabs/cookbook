@@ -122,6 +122,46 @@ export function createInMemoryStore(seed: Seed = {}, clock: Clock = () => new Da
       devices.push(device);
       return { ...device };
     },
+
+    async provisionHousehold(input) {
+      const account = accounts.find((a) => a.id === input.accountId) ?? {
+        id: input.accountId,
+        email: input.email,
+      };
+      if (!accounts.includes(account)) accounts.push(account);
+
+      const existing =
+        families.find((f) => f.ownerAccountId === input.accountId) ??
+        families.find((f) => members.some((m) => m.familyId === f.id && m.accountId === input.accountId));
+
+      const family =
+        existing ??
+        (() => {
+          const created = {
+            id: `family-${families.length + 1}`,
+            name: input.householdName,
+            ownerAccountId: input.accountId,
+          };
+          families.push(created);
+          return created;
+        })();
+
+      const mine = members.find(
+        (m) => m.familyId === family.id && m.accountId === input.accountId,
+      );
+      if (mine) return { account, family, member: mine, created: false };
+
+      const member = {
+        id: `member-${members.length + 1}`,
+        familyId: family.id,
+        accountId: input.accountId,
+        displayName: input.displayName,
+        colour: null,
+        isChild: false,
+      };
+      members.push(member);
+      return { account, family, member, created: existing === undefined };
+    },
   };
 }
 

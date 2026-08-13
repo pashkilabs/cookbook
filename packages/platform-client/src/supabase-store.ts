@@ -6,6 +6,8 @@ import type {
   FamilyMember,
   Platform,
   PlatformStore,
+  ProvisionedHousehold,
+  ProvisionHouseholdInput,
   Quota,
   QuotaCounter,
   RegisterDeviceInput,
@@ -161,6 +163,69 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
         .single();
       if (error) throw error;
       return { id: data.id, platform: data.platform as Platform };
+    },
+
+    /**
+     * Account, household, membership — in that order, because each references the last.
+     *
+     * Not one transaction: PostgREST has no multi-statement call, and wrapping this in a
+     * database function would put household naming policy in SQL. Idempotence is what
+     * covers the gap instead. A crash between the family insert and the member insert
+     * leaves a household with no members, which the next attempt finds and completes
+     * rather than duplicating — the check is for a family, and then for a member in it.
+     */
+    async provisionHousehold(input: ProvisionHouseholdInput): Promise<ProvisionedHousehold> {
+      const account = await supabase
+        .from("accounts")
+        // the row is keyed by auth.users.id, so a repeat sign-up is the same account
+        .upsert({ id: input.accountId, email: input.email }, { onConflict: "id" })
+        .select("id, email")
+        .single();
+      if (account.error) throw account.error;
+
+      const existing = await this.findFamilyForAccount(input.accountId);
+      const family =
+        existing ??
+        (await (async (): Promise<Family> => {
+          const created = await supabase
+            .from("families")
+            .insert({ name: input.householdName, owner_account_id: input.accountId })
+            .select("id, name, owner_account_id")
+            .single();
+          if (created.error) throw created.error;
+          return toFamily(created.data);
+        })());
+
+      const members = await this.listMembers(family.id);
+      const mine = members.find((member) => member.accountId === input.accountId);
+      if (mine) return { account: account.data, family, member: mine, created: false };
+
+      const member = await supabase
+        .from("family_members")
+        .insert({
+          family_id: family.id,
+          account_id: input.accountId,
+          display_name: input.displayName,
+          colour: null,
+          is_child: false,
+        })
+        .select("id, family_id, account_id, display_name, colour, is_child")
+        .single();
+      if (member.error) throw member.error;
+
+      return {
+        account: account.data,
+        family,
+        member: {
+          id: member.data.id,
+          familyId: member.data.family_id,
+          accountId: member.data.account_id,
+          displayName: member.data.display_name,
+          colour: member.data.colour,
+          isChild: member.data.is_child,
+        },
+        created: existing === null,
+      };
     },
   };
 }
