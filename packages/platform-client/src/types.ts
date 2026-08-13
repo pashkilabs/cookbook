@@ -22,7 +22,19 @@ export interface Family {
   id: string;
   name: string;
   ownerAccountId: string;
+  /**
+   * Which units this household reads.
+   *
+   * A household setting, not a per-recipe or per-catalog one: somebody who types metric on Monday
+   * and imperial on Thursday should still read one consistent list (decisions §28). It lives on
+   * the platform side because `families` does, so app code reads it through the seam and cannot
+   * write it — changing a household's settings is a platform operation.
+   */
+  measurementSystem: MeasurementSystem;
 }
+
+/** Kept in step with `packages/core`'s own union rather than imported, so the seam stays free of it. */
+export type MeasurementSystem = "us" | "metric";
 
 /**
  * A person in the household. Adults have `accountId`; children are rated but

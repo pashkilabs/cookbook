@@ -12,7 +12,7 @@
  * tests. `scripts/check-seed-catalog-usage.mjs` enforces that.
  */
 import { writeFileSync } from "node:fs";
-import { SEED_CATALOG } from "@pashki/core";
+import { METRIC_PACKAGES, SEED_CATALOG } from "@pashki/core";
 
 /** Single-quoted SQL literal. */
 const lit = (value: string): string => `'${value.replace(/'/g, "''")}'`;
@@ -36,10 +36,20 @@ for (const item of SEED_CATALOG) {
   );
 
   // sort_order preserves the order the catalog lists packages in, which is the
-  // order a shopping list offers them
+  // order a shopping list offers them.
+  //
+  // Both markets are emitted. Sizes differ by market rather than only in their wording, so these
+  // are separate rows and a list must never mix them (decisions §28). Metric coverage is partial
+  // and the uncovered items simply have no metric rows — `catalogItemsFromRows` falls back to the
+  // US ones explicitly rather than leaving an item unbuyable.
   item.packages.forEach((size, index) => {
     packageRows.push(
-      `  (${lit(item.key)}, ${lit(size.label)}, ${size.amount}, ${index})`,
+      `  (${lit(item.key)}, ${lit("us")}, ${lit(size.label)}, ${size.amount}, ${index})`,
+    );
+  });
+  (METRIC_PACKAGES[item.key] ?? []).forEach((size, index) => {
+    packageRows.push(
+      `  (${lit(item.key)}, ${lit("metric")}, ${lit(size.label)}, ${size.amount}, ${index})`,
     );
   });
 }
@@ -53,7 +63,7 @@ const sql = `-- GENERATED FILE — do not edit.
 --
 -- Idempotent: \`supabase db reset\` runs this after the migrations, and running it
 -- again upserts rather than duplicating. Both tables have the unique constraints
--- that makes that possible — ingredients.key and (ingredient_id, label).
+-- that makes that possible — ingredients.key and (ingredient_id, system, label).
 --
 -- base_amount and can_size are in the dimension's base unit, millilitres or
 -- grams. grams_per_cup is what lets a volume measure merge into an item sold by
@@ -76,13 +86,13 @@ on conflict (key) do update set
 
 -- Packages are keyed to their ingredient by catalog key rather than by a uuid, so
 -- this file carries no generated ids and stays stable between runs.
-insert into public.grocery_packages (ingredient_id, label, base_amount, sort_order)
-select i.id, seed.label, seed.base_amount, seed.sort_order
+insert into public.grocery_packages (ingredient_id, system, label, base_amount, sort_order)
+select i.id, seed.system, seed.label, seed.base_amount, seed.sort_order
 from (values
 ${packageRows.join(",\n")}
-) as seed(ingredient_key, label, base_amount, sort_order)
+) as seed(ingredient_key, system, label, base_amount, sort_order)
 join public.ingredients i on i.key = seed.ingredient_key
-on conflict (ingredient_id, label) do update set
+on conflict (ingredient_id, system, label) do update set
   base_amount = excluded.base_amount,
   sort_order  = excluded.sort_order,
   updated_at  = now();
@@ -93,11 +103,11 @@ on conflict (ingredient_id, label) do update set
 delete from public.grocery_packages gp
 using public.ingredients i
 where gp.ingredient_id = i.id
-  and (i.key, gp.label) not in (
-    select seed.ingredient_key, seed.label
+  and (i.key, gp.system, gp.label) not in (
+    select seed.ingredient_key, seed.system, seed.label
     from (values
 ${packageRows.join(",\n")}
-    ) as seed(ingredient_key, label, base_amount, sort_order)
+    ) as seed(ingredient_key, system, label, base_amount, sort_order)
   );
 
 commit;

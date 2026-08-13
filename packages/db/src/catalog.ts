@@ -1,4 +1,4 @@
-import type { CatalogItem } from "@pashki/core";
+import type { CatalogItem, MeasurementSystem } from "@pashki/core";
 
 /**
  * Catalog rows, as `packages/core` wants them.
@@ -28,6 +28,7 @@ export interface IngredientRow {
 
 export interface GroceryPackageRow {
   ingredient_id: string;
+  system: string;
   label: string;
   base_amount: number | string;
   sort_order: number;
@@ -36,17 +37,33 @@ export interface GroceryPackageRow {
 /** What to select, so a caller cannot ask for a column this mapper does not expect. */
 export const INGREDIENT_COLUMNS =
   "id, key, canonical_name, aliases, aisle, dimension, grams_per_cup, can_size";
-export const GROCERY_PACKAGE_COLUMNS = "ingredient_id, label, base_amount, sort_order";
+export const GROCERY_PACKAGE_COLUMNS = "ingredient_id, system, label, base_amount, sort_order";
 
+/**
+ * @param system which market's package sizes to use. Sizes differ by market rather than only in
+ * their wording — a pint is 473 ml, a metric carton 500 — so a list must never mix them
+ * (decisions §28). **Falls back to the US rows** for any item with no rows in the requested
+ * system, because metric coverage is partial and an item with no packages is one a household
+ * cannot be told how to buy.
+ */
 export function catalogItemsFromRows(
   ingredients: IngredientRow[],
   packages: GroceryPackageRow[],
+  system: MeasurementSystem = "us",
 ): CatalogItem[] {
   const byIngredient = new Map<string, GroceryPackageRow[]>();
+  const usByIngredient = new Map<string, GroceryPackageRow[]>();
   for (const row of packages) {
-    const list = byIngredient.get(row.ingredient_id) ?? [];
-    list.push(row);
-    byIngredient.set(row.ingredient_id, list);
+    if (row.system === system) {
+      const list = byIngredient.get(row.ingredient_id) ?? [];
+      list.push(row);
+      byIngredient.set(row.ingredient_id, list);
+    }
+    if (row.system === "us") {
+      const list = usByIngredient.get(row.ingredient_id) ?? [];
+      list.push(row);
+      usByIngredient.set(row.ingredient_id, list);
+    }
   }
 
   return ingredients.map((row) => ({
@@ -56,8 +73,7 @@ export function catalogItemsFromRows(
     aisle: row.aisle,
     dimension: row.dimension as CatalogItem["dimension"],
     packages:
-      byIngredient
-        .get(row.id)
+      (byIngredient.get(row.id) ?? usByIngredient.get(row.id))
         ?.slice()
         // sort_order is the shop's order — smallest first — and choosePackages relies on it
         .sort((a, b) => a.sort_order - b.sort_order)

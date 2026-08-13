@@ -13,6 +13,7 @@ import {
   GROCERY_PACKAGE_COLUMNS,
   INGREDIENT_COLUMNS,
 } from "@pashki/db/catalog";
+import type { MeasurementSystem } from "@pashki/core";
 import type { IsoDate } from "./week";
 
 /**
@@ -41,6 +42,12 @@ export async function buildShoppingWeek(
   familyId: string,
   weekStart: IsoDate,
   days: IsoDate[],
+  /**
+   * Which market's package sizes to offer. Comes from `families.measurement_system` through the
+   * seam — display follows the household, not the recipe it typed or the catalog it shops from
+   * (decisions §28).
+   */
+  system: MeasurementSystem = "us",
 ): Promise<{ week: ShoppingWeek | null; error: string | null }> {
   const [plan, ingredientRows, packageRows, pantryRows, tickRows] = await Promise.all([
     supabase
@@ -77,7 +84,9 @@ export async function buildShoppingWeek(
     recipe: entry.recipes as unknown as { id: string; title: string },
   }));
 
-  const catalog = createCatalog(catalogItemsFromRows(ingredientRows.data ?? [], packageRows.data ?? []));
+  const catalog = createCatalog(
+    catalogItemsFromRows(ingredientRows.data ?? [], packageRows.data ?? [], system),
+  );
 
   if (planned.length === 0) {
     return {

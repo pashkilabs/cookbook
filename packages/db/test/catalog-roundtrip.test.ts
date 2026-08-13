@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { metricPackageCoverage } from "@pashki/core";
 import {
   catalogItemsFromRows,
   GROCERY_PACKAGE_COLUMNS,
@@ -138,5 +139,47 @@ describe.skipIf(instance === null)("seeded catalog round-trip", () => {
 describe.skipIf(instance !== null)("seeded catalog round-trip (skipped)", () => {
   it("needs a local Supabase instance — run pnpm --filter @pashki/db db:start", () => {
     expect(instance).toBeNull();
+  });
+});
+
+describe.skipIf(instance === null)("package sizes per market", () => {
+  it("gives a metric household sizes it can buy, and falls back where it cannot", async () => {
+    if (!instance) return;
+    const admin = createClient(instance.url, instance.serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const ingredients = await admin.from("ingredients").select(INGREDIENT_COLUMNS);
+    const packages = await admin.from("grocery_packages").select(GROCERY_PACKAGE_COLUMNS);
+    if (ingredients.error) throw ingredients.error;
+    if (packages.error) throw packages.error;
+
+    const us = catalogItemsFromRows(ingredients.data, packages.data, "us");
+    const metric = catalogItemsFromRows(ingredients.data, packages.data, "metric");
+
+    const usCream = us.find((item) => item.key === "heavy-cream")!;
+    const metricCream = metric.find((item) => item.key === "heavy-cream")!;
+    expect(usCream.packages.map((size) => size.label)).toContain("pint (16 oz)");
+    expect(metricCream.packages.map((size) => size.label)).toEqual(["300 ml pot", "600 ml pot"]);
+
+    // coverage is partial on purpose; an uncovered item keeps the US sizes rather than having none
+    const covered = metricPackageCoverage();
+    const uncovered = metric.find((item) => item.key === covered.missing[0]);
+    const sameInUs = us.find((item) => item.key === covered.missing[0]);
+    expect(uncovered?.packages).toEqual(sameInUs?.packages);
+    expect(metric.every((item) => item.packages.length > 0)).toBe(true);
+  });
+
+  it("keeps every canonical name singular, because the display pluralises", async () => {
+    if (!instance) return;
+    const admin = createClient(instance.url, instance.serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data } = await admin.from("ingredients").select("key, canonical_name, dimension");
+    // regression: the catalog held some plural and some singular, which read as "1½ lemons"
+    // beside "3 yellow onion" on one list
+    const plural = (data ?? []).filter(
+      (row) => row.dimension === "count" && /(?<!s)s$/.test(row.canonical_name),
+    );
+    expect(plural.map((row) => row.canonical_name)).toEqual([]);
   });
 });

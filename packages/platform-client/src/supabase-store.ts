@@ -59,7 +59,7 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
     async findFamilyForAccount(accountId: string): Promise<Family | null> {
       const owned = await supabase
         .from("families")
-        .select("id, name, owner_account_id")
+        .select("id, name, owner_account_id, measurement_system")
         .eq("owner_account_id", accountId)
         .is("deleted_at", null)
         .order("created_at", { ascending: true })
@@ -70,7 +70,7 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
 
       const member = await supabase
         .from("family_members")
-        .select("family_id, families!inner(id, name, owner_account_id, deleted_at)")
+        .select("family_id, families!inner(id, name, owner_account_id, measurement_system, deleted_at)")
         .eq("account_id", accountId)
         .is("deleted_at", null)
         .order("created_at", { ascending: true })
@@ -79,7 +79,13 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
       if (member.error) throw member.error;
 
       const family = member.data?.families as
-        | { id: string; name: string; owner_account_id: string; deleted_at: string | null }
+        | {
+            id: string;
+            name: string;
+            owner_account_id: string;
+            measurement_system: string | null;
+            deleted_at: string | null;
+          }
         | undefined;
       if (!family || family.deleted_at !== null) return null;
       return toFamily(family);
@@ -191,7 +197,7 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
           const created = await supabase
             .from("families")
             .insert({ name: input.householdName, owner_account_id: input.accountId })
-            .select("id, name, owner_account_id")
+            .select("id, name, owner_account_id, measurement_system")
             .single();
           if (created.error) throw created.error;
           return toFamily(created.data);
@@ -265,8 +271,20 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
   };
 }
 
-function toFamily(row: { id: string; name: string; owner_account_id: string }): Family {
-  return { id: row.id, name: row.name, ownerAccountId: row.owner_account_id };
+function toFamily(row: {
+  id: string;
+  name: string;
+  owner_account_id: string;
+  measurement_system?: string | null;
+}): Family {
+  return {
+    id: row.id,
+    name: row.name,
+    ownerAccountId: row.owner_account_id,
+    // defaulted rather than asserted: the column defaults to 'us', and a row read before that
+    // migration is a household that has never expressed a preference
+    measurementSystem: row.measurement_system === "metric" ? "metric" : "us",
+  };
 }
 
 /**

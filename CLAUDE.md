@@ -104,6 +104,11 @@ handle count nouns with an irregulars list, because storing "lemons" fixes "3 le
 breaks "1 lemon". Plurals live in `names` as aliases, since that is what recipes are written
 in.
 
+**Package sizes are per market.** A pint is 473 ml and a metric carton is 500, so
+`grocery_packages.system` splits them and nothing may mix two markets in one purchase
+(decisions §28). Display follows `families.measurement_system`, not the recipe's units and
+not the catalog's.
+
 **Base units are millilitres and grams.** Convert on the way in, format on the
 way out. Never do arithmetic on written units.
 

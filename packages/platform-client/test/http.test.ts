@@ -41,7 +41,7 @@ function twoHouseholdStore() {
     accounts: [...(seed.accounts ?? []), { id: OTHER_ACCOUNT, email: "other@example.test" }],
     families: [
       ...(seed.families ?? []),
-      { id: OTHER_FAMILY, name: "Other household", ownerAccountId: OTHER_ACCOUNT },
+      { id: OTHER_FAMILY, name: "Other household", ownerAccountId: OTHER_ACCOUNT, measurementSystem: "us" },
     ],
     members: [
       ...(seed.members ?? []),

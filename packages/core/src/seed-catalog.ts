@@ -1,4 +1,4 @@
-import type { CatalogItem } from "./types.js";
+import type { CatalogItem, MeasurementSystem, PackageSize } from "./types.js";
 
 /**
  * Starter grocery catalog: how things are actually sold.
@@ -162,3 +162,80 @@ export const SEED_CATALOG: CatalogItem[] = [
     packages: [{ label: "10 oz bag", amount: 283 }, { label: "16 oz bag", amount: 454 }] },
 ];
 
+/**
+ * Metric package sizes, where a real market size is knowable rather than invented.
+ *
+ * Kept separate from the items above rather than mixed into their `packages`, for two reasons:
+ * the diff stays readable, and `choosePackages` must never see two markets' sizes at once — it
+ * would happily suggest a pint and a 500 ml carton for the same purchase.
+ *
+ * **Coverage is partial and deliberately so.** These are sizes a British or European shop
+ * actually stocks; the rest fall back to the US rows, which `catalogItemsFromRows` does
+ * explicitly rather than silently. Guessing at the other twenty-seven would put invented numbers
+ * into the one part of the system that has to be right — the package maths.
+ */
+export const METRIC_PACKAGES: Record<string, PackageSize[]> = {
+  "heavy-cream": [{ label: "300 ml pot", amount: 300 }, { label: "600 ml pot", amount: 600 }],
+  "half-and-half": [{ label: "300 ml pot", amount: 300 }],
+  buttermilk: [{ label: "284 ml pot", amount: 284 }],
+  milk: [{ label: "500 ml", amount: 500 }, { label: "1 l", amount: 1000 }, { label: "2 l", amount: 2000 }],
+  butter: [{ label: "250 g block", amount: 250 }],
+  flour: [{ label: "500 g bag", amount: 500 }, { label: "1.5 kg bag", amount: 1500 }],
+  sugar: [{ label: "500 g bag", amount: 500 }, { label: "1 kg bag", amount: 1000 }],
+  "brown-sugar": [{ label: "500 g bag", amount: 500 }],
+  rice: [{ label: "500 g bag", amount: 500 }, { label: "1 kg bag", amount: 1000 }],
+  pasta: [{ label: "500 g pack", amount: 500 }],
+  potatoes: [{ label: "1 kg bag", amount: 1000 }, { label: "2.5 kg bag", amount: 2500 }],
+  carrots: [{ label: "500 g bag", amount: 500 }, { label: "1 kg bag", amount: 1000 }],
+  mushrooms: [{ label: "250 g punnet", amount: 250 }, { label: "500 g punnet", amount: 500 }],
+  spinach: [{ label: "250 g bag", amount: 250 }],
+  "frozen-peas": [{ label: "900 g bag", amount: 900 }],
+  broth: [{ label: "500 ml carton", amount: 500 }, { label: "1 l carton", amount: 1000 }],
+  "olive-oil": [{ label: "500 ml bottle", amount: 500 }, { label: "1 l bottle", amount: 1000 }],
+  "soy-sauce": [{ label: "150 ml bottle", amount: 150 }, { label: "500 ml bottle", amount: 500 }],
+  "maple-syrup": [{ label: "250 ml bottle", amount: 250 }],
+  "coconut-milk": [{ label: "400 ml tin", amount: 400 }],
+  "canned-tomatoes": [{ label: "400 g tin", amount: 400 }],
+  beans: [{ label: "400 g tin", amount: 400 }],
+  "tomato-paste": [{ label: "200 g tube", amount: 200 }],
+  parmesan: [{ label: "100 g piece", amount: 100 }, { label: "200 g piece", amount: 200 }],
+  feta: [{ label: "200 g block", amount: 200 }],
+  "shredded-cheese": [{ label: "200 g bag", amount: 200 }],
+  "cream-cheese": [{ label: "180 g tub", amount: 180 }, { label: "280 g tub", amount: 280 }],
+  "sour-cream": [{ label: "300 g pot", amount: 300 }],
+  yogurt: [{ label: "500 g pot", amount: 500 }, { label: "1 kg pot", amount: 1000 }],
+  eggs: [{ label: "box of 6", amount: 6 }, { label: "box of 12", amount: 12 }],
+  onion: [{ label: "loose", amount: 1 }, { label: "1 kg net (~7)", amount: 7 }],
+  lemon: [{ label: "loose", amount: 1 }, { label: "pack of 4", amount: 4 }],
+  lime: [{ label: "loose", amount: 1 }, { label: "pack of 5", amount: 5 }],
+  avocado: [{ label: "loose", amount: 1 }, { label: "pack of 4", amount: 4 }],
+  tomatoes: [{ label: "loose", amount: 1 }, { label: "6-pack", amount: 6 }],
+  // garlic is sold by the bulb here, not the head
+  garlic: [{ label: "1 bulb (~10 cloves)", amount: 10 }, { label: "3-pack bulbs", amount: 30 }],
+  "chicken-thighs": [{ label: "500 g pack", amount: 500 }, { label: "1 kg pack", amount: 1000 }],
+  "chicken-breast": [{ label: "300 g pack", amount: 300 }, { label: "600 g pack", amount: 600 }],
+  "ground-beef": [{ label: "500 g pack", amount: 500 }],
+  "ground-turkey": [{ label: "500 g pack", amount: 500 }],
+  salmon: [{ label: "240 g (2 fillets)", amount: 240 }],
+  bread: [{ label: "1 loaf", amount: 1 }],
+};
+
+/**
+ * The catalog as one market sells it.
+ *
+ * Falls back to the US sizes for anything `METRIC_PACKAGES` does not cover, so a metric household
+ * gets a working list with some American wording rather than an item it cannot buy.
+ */
+export function seedCatalogFor(system: MeasurementSystem): CatalogItem[] {
+  if (system === "us") return SEED_CATALOG;
+  return SEED_CATALOG.map((item) => {
+    const metric = METRIC_PACKAGES[item.key];
+    return metric ? { ...item, packages: metric } : item;
+  });
+}
+
+/** Which keys have metric sizes, so coverage is measurable rather than assumed. */
+export function metricPackageCoverage(): { covered: number; total: number; missing: string[] } {
+  const missing = SEED_CATALOG.filter((item) => !METRIC_PACKAGES[item.key]).map((item) => item.key);
+  return { covered: SEED_CATALOG.length - missing.length, total: SEED_CATALOG.length, missing };
+}

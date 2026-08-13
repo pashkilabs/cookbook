@@ -5,4 +5,9 @@ export * from "./parse.js";
 export * from "./catalog.js";
 export * from "./format.js";
 export * from "./consolidate.js";
-export { SEED_CATALOG } from "./seed-catalog.js";
+export {
+  METRIC_PACKAGES,
+  SEED_CATALOG,
+  metricPackageCoverage,
+  seedCatalogFor,
+} from "./seed-catalog.js";

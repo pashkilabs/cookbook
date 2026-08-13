@@ -760,6 +760,58 @@ rather than merely written down here.
 
 ---
 
+## 28. Display follows the household, not the recipe and not the catalog
+
+A household has a measurement system — `families.measurement_system`, `us` or `metric`,
+defaulting to `us` — and every number it reads is in that system.
+
+Found by running the shopping list against a real week: a recipe typed as `300 g tagliatelle`
+came back as **11 oz**, and `1 litre chicken stock` left `1⅝ cup` spare. `formatWeight` is
+imperial above 25 g, `formatVolume` never emits millilitres, and the catalog is American —
+cremini, russet, sticks of butter, 5 lb bags. Internally consistent, and wrong for the household
+that typed it.
+
+Three candidates for the authority, and two of them fail on the same case:
+
+- *The recipe's own units.* Rejected. A household types "300 g pasta" from one source and "2 cups
+  rice" from another, and a list that mixes them is harder to shop from than either. The same
+  argument kills per-ingredient units.
+- *The catalog's units.* Rejected for the same reason once the catalog is more than one market's:
+  the household would read whatever the shop it is not standing in happens to sell.
+- **The household.** One setting, one consistent list, whatever the recipes said.
+
+### Package sizes are per market, not per label
+
+This is the part that reaches into the catalog, which is why it is being done now rather than
+after Phase 3. A pint is 473 ml and a metric carton is 500 — the sizes *differ*, they are not one
+size with two names. So `grocery_packages` carries a `system`, uniqueness became
+`(ingredient_id, system, label)`, and `choosePackages` must never see two markets at once or it
+will offer a pint and a 500 ml carton for the same purchase.
+
+**Metric coverage is partial and stated rather than implied.** `METRIC_PACKAGES` covers 43 of the
+55 catalog items with sizes a British or European shop actually stocks;
+`catalogItemsFromRows` falls back to the US rows for the rest, explicitly, because an item with no
+packages is one a household cannot be told how to buy. Guessing at the remaining twelve would put
+invented numbers into the one part of the system that has to be right.
+
+### What is done and what is not
+
+**Done:** the column, the check constraint, the per-market package rows, the seed, the seam
+exposing `Family.measurementSystem`, and the shopping list choosing package sizes by it. A metric
+household is now offered "600 ml pot" where a US one gets "pint (16 oz)".
+
+**Not done:** `formatWeight` and `formatVolume` still emit US units regardless of the preference,
+so a metric household sees metric *packages* and imperial *quantities* — "600 ml pot" above "takes
+11 oz". That is a change to `packages/core`'s formatters with 100-odd tests resting on their
+current output, and it is a separate piece of work rather than a rider on this one.
+
+*Would change if:* a household needs two systems at once — one adult cooking in cups while the
+other shops in grams. The setting would move from the household to the member, which is a bigger
+change than it sounds: `family_members` has no login for children, so "whose preference" stops
+having one answer.
+
+---
+
 ## Open: cascade deletions and tombstones
 
 **Not resolved. This waits on the sync engine choice, and exists so the evaluation

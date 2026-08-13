@@ -31,10 +31,20 @@ export interface ParsedIngredient {
   raw: string;
 }
 
+export type MeasurementSystem = "us" | "metric";
+
 export interface PackageSize {
   label: string;
   /** size in the dimension's base unit */
   amount: number;
+  /**
+   * Which market sells it in this size. Absent means US, which is what every size predating the
+   * preference was.
+   *
+   * Sizes differ by market, not just their wording: a pint is 473 ml and a metric carton is 500,
+   * so these are separate rows rather than one row with two labels (decisions §28).
+   */
+  system?: MeasurementSystem;
 }
 
 /**

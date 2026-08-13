@@ -12,8 +12,12 @@
 import { isTestFile, lineOf, sourceFiles, stripComments } from "./lib/source-files.mjs";
 
 const root = new URL("..", import.meta.url).pathname;
-const NEEDLE = "SEED_CATALOG";
-const PATTERN = /SEED_CATALOG/;
+/**
+ * `seedCatalogFor` and `METRIC_PACKAGES` are the same seed data reached by other names, so they
+ * are guarded the same way. Adding an export was not going to be the loophole.
+ */
+const NEEDLES = ["SEED_CATALOG", "METRIC_PACKAGES", "seedCatalogFor", "metricPackageCoverage"];
+const PATTERN = /SEED_CATALOG|METRIC_PACKAGES|seedCatalogFor|metricPackageCoverage/;
 
 /**
  * Where the constant may legitimately be referenced. Tests are allowed because the
@@ -33,13 +37,14 @@ const offenders = [];
 
 for (const { path, source } of sourceFiles(root)) {
   if (ALLOWED.includes(path) || isTestFile(path)) continue;
-  if (!source.includes(NEEDLE)) continue;
-  if (!stripComments(source).includes(NEEDLE)) continue;
+  if (!NEEDLES.some((needle) => source.includes(needle))) continue;
+  const stripped = stripComments(source);
+  if (!NEEDLES.some((needle) => stripped.includes(needle))) continue;
   offenders.push(`${path}:${lineOf(source, PATTERN)}`);
 }
 
 if (offenders.length > 0) {
-  console.error(`${NEEDLE} is referenced outside seeding and tests:\n`);
+  console.error(`${NEEDLES.join(", ")} — seed data referenced outside seeding and tests:\n`);
   for (const offender of offenders) console.error(`  ${offender}`);
   console.error(
     "\nThe catalog is data. Load it with createCatalog() from the ingredients and" +
@@ -48,4 +53,4 @@ if (offenders.length > 0) {
   process.exit(1);
 }
 
-console.log(`${NEEDLE} is referenced only by its definition, seeding and tests.`);
+console.log(`Seed data (${NEEDLES.join(", ")}) is referenced only by its definition, seeding and tests.`);

@@ -32,6 +32,7 @@ export default async function ShoppingPage({
     family.id,
     weekStart,
     weekDays(weekStart),
+    family.measurementSystem,
   );
 
   return (

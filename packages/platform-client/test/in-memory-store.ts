@@ -141,6 +141,8 @@ export function createInMemoryStore(seed: Seed = {}, clock: Clock = () => new Da
             id: `family-${families.length + 1}`,
             name: input.householdName,
             ownerAccountId: input.accountId,
+            // what the column defaults to for a household that has never chosen
+            measurementSystem: "us" as const,
           };
           families.push(created);
           return created;
@@ -190,7 +192,7 @@ export function standardSeed(
 ): Seed {
   return {
     accounts: [{ id: ACCOUNT_ID, email: "adult@example.test" }],
-    families: [{ id: FAMILY_ID, name: "Household", ownerAccountId: ACCOUNT_ID }],
+    families: [{ id: FAMILY_ID, name: "Household", ownerAccountId: ACCOUNT_ID, measurementSystem: "us" }],
     members: [
       {
         id: "mem-1",

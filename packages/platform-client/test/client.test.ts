@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createPlatformClient, decodeUnverified, type Clock } from "../src/index.js";
+import {
+  createPlatformClient,
+  decodeUnverified,
+  type Clock,
+  type Family,
+} from "../src/index.js";
 import { createEd25519Signer, createEd25519Verifier, generateEd25519KeyPair } from "../src/crypto.js";
 import {
   ACCOUNT_ID,
@@ -54,7 +59,7 @@ describe("getSession", () => {
 
   it("prefers the household the account owns over one it was invited to", async () => {
     const seed = standardSeed();
-    const invited = { id: "fam-2", name: "In-laws", ownerAccountId: "other" };
+    const invited: Family = { id: "fam-2", name: "In-laws", ownerAccountId: "other", measurementSystem: "us" };
     const store = createInMemoryStore({
       ...seed,
       families: [invited, ...(seed.families ?? [])],

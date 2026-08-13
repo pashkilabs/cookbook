@@ -120,6 +120,7 @@ export type Database = {
           created_at: string
           deleted_at: string | null
           id: string
+          measurement_system: string
           name: string
           owner_account_id: string
           updated_at: string
@@ -128,6 +129,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           id?: string
+          measurement_system?: string
           name: string
           owner_account_id: string
           updated_at?: string
@@ -136,6 +138,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           id?: string
+          measurement_system?: string
           name?: string
           owner_account_id?: string
           updated_at?: string
@@ -209,6 +212,7 @@ export type Database = {
           ingredient_id: string
           label: string
           sort_order: number
+          system: string
           updated_at: string
         }
         Insert: {
@@ -218,6 +222,7 @@ export type Database = {
           ingredient_id: string
           label: string
           sort_order?: number
+          system?: string
           updated_at?: string
         }
         Update: {
@@ -227,6 +232,7 @@ export type Database = {
           ingredient_id?: string
           label?: string
           sort_order?: number
+          system?: string
           updated_at?: string
         }
         Relationships: [
