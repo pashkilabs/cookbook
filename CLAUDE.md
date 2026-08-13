@@ -193,6 +193,13 @@ models be good enough. Do not add a silent-save path.
   two environments and is the only thing that can catch the difference. Found when the
   first hosted push refused itself: `import_cache`, one shared row set for the whole
   user base, was readable by `anon`, with only RLS between a stranger and the catalog.
+- **`ON DELETE CASCADE` does not fire on a soft delete.** Every deletion here is an `UPDATE`
+  setting `deleted_at`, because clients hold no `DELETE`, so a cascade declared on a foreign key
+  never runs — a tombstoned recipe kept its plan entries and went on buying ingredients.
+  Propagation is a trigger (`private.propagate_soft_delete`, decisions §30) rather than route
+  code, because Phase 3's sync writes `deleted_at` straight into Postgres from a device and never
+  calls a route. Children take the parent's *exact* timestamp, which is what makes an undelete
+  distinguishable from a child deleted on its own.
 - **Row-level security says nothing about columns.** A policy decides which *rows* a
   caller may write; a table-wide `INSERT`/`UPDATE` grant then lets it write every
   column of those rows. Correct policies therefore coexisted with a client able to set

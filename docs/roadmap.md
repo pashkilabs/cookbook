@@ -241,14 +241,6 @@ Reviewed at the Phase 2/3 checkpoint. Two closed there; the rest carry forward.
 review screen needs it anyway — showing what a model was given beside what it made of it — and an
 eval fixture wants the same.
 
-**Deleting a recipe leaves its plan entries live.** Found while verifying the shopping list: a
-tombstoned recipe kept appearing on the planner and contributing to the list, because
-`DELETE /api/recipes/[id]` tombstones the recipe and nothing else. `ON DELETE CASCADE` does not
-fire on a soft delete, which is the concrete face of the open cascade/tombstone question in
-`docs/decisions.md` — and unlike that question, this half does not wait on the sync engine. It is
-a small fix in the delete route plus a decision about whether soft-delete propagation belongs in
-the app or in a trigger.
-
 ### Fails silently, wrong answer looks right
 
 1. ~~**`verify()` does not check expiry.**~~ Closed: `authoriseToken` pairs the

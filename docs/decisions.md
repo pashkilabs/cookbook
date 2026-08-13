@@ -854,6 +854,71 @@ should become the text, and this decision reverses.
 
 ---
 
+## 30. Soft-delete propagation lives in a database trigger
+
+Deleting a recipe tombstones its ingredients, steps, ratings, photos, shortlist entries and plan
+entries — in `private.propagate_soft_delete`, fired by a trigger, not in the delete route.
+
+This closed a live bug. Clients hold no `DELETE` privilege (§26), so every deletion in the product
+is an `UPDATE` setting `deleted_at`, and **`ON DELETE CASCADE` does not fire on an UPDATE**. A
+tombstoned recipe kept its plan entries: still on the planner, still buying ingredients on the
+shopping list.
+
+### Why not the route
+
+The route is where somebody would look for it, and a trigger is invisible from there. That cost is
+real and it is paid on purpose, because of what Phase 3 does:
+
+**A sync engine writes to Postgres directly.** A device deleting a recipe offline replicates
+`deleted_at` into `recipes` without going near a route handler, so propagation written there would
+simply not happen — and the household would meet the same bug again from a phone. No amount of
+care in the application layer covers a writer that does not call it.
+
+Two smaller reasons agree. A trigger cannot be forgotten by a future caller — the import service,
+an admin script, a repair query are all doors the route is not. And it runs inside the same
+statement as the parent update, so a peer observes one consistent set of tombstones rather than a
+parent that arrived ahead of its children.
+
+The invisibility is paid down where it bites: `assert_rls_invariants` fails if a new child table
+has no propagation, and the delete route carries a comment pointing here.
+
+### What a device sees
+
+Children get `deleted_at` set to **the parent's exact timestamp**, and `set_updated_at` bumps
+`updated_at` as usual. So a peer sees ordinary row updates it already knows how to replicate — it
+is *told* the children went rather than expected to infer it (architecture §5).
+
+### Two modes, mirroring the foreign keys
+
+`tombstone` for everything that cascades on a hard delete. `nullify` for `recipes.created_by`,
+which is `ON DELETE SET NULL`: a person leaving takes their ratings with them — a score attributed
+to nobody is worse than no score — but not the recipes they wrote, which are still dinner.
+
+`families` and `accounts` are exempt, both because deleting one is teardown rather than editing. A
+household going away is a device wipe (§20) and a hard delete that cascades, not a million
+tombstones for a household that no longer exists.
+
+### The reverse
+
+**Nothing in the product restores a soft-deleted row.** No screen offers it, no route sets
+`deleted_at` back to null; the only undelete today is a hand-written statement. This is recorded
+because an undelete arriving later would need the question settled anyway, and settling it now
+costs nothing.
+
+A restore trigger returns exactly the children whose `deleted_at` equals the parent's — the ones
+that went *because* it went. A rating deleted on its own three weeks earlier stays deleted, which
+is what somebody restoring a recipe wants. That is the whole reason children take the parent's
+timestamp rather than their own `now()`.
+
+`nullify` has no reverse: the old `created_by` is gone, so a restored member does not regain
+authorship. Stated rather than left half-working.
+
+*Would change if:* propagation becomes expensive enough to matter — a household with thousands of
+rows under one parent — at which point the answer is a background job and a different set of
+trade-offs, not moving it back into the route.
+
+---
+
 ## Open: cascade deletions and tombstones
 
 **Not resolved. This waits on the sync engine choice, and exists so the evaluation

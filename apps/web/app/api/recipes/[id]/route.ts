@@ -83,8 +83,13 @@ export async function DELETE(_request: Request, context: { params: Promise<{ id:
   const { supabase, familyId } = scope;
 
   // A tombstone, not a delete. Clients hold no DELETE privilege (091300) because a hard-deleted
-  // row is the one thing a peer cannot tell from a row that never synced. The recipe's children
-  // keep their rows — the recipe is the tombstone, and its absence hides them everywhere.
+  // row is the one thing a peer cannot tell from a row that never synced.
+  //
+  // **The children are tombstoned by a database trigger, not here** (decisions §30). That is
+  // deliberate and it is invisible from this file, so: `private.propagate_soft_delete` fires on
+  // this UPDATE and carries the same timestamp down to plan_entries, shortlist_entries, ratings,
+  // photos, recipe_ingredients and recipe_steps. It lives in the database because Phase 3's sync
+  // will write `deleted_at` straight into Postgres from a device, without passing through here.
   const { data, error } = await supabase
     .from("recipes")
     .update({ deleted_at: new Date().toISOString() })
