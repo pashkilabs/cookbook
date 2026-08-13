@@ -1056,6 +1056,50 @@ shared object with the copyright question settled first, not a household path in
 
 ---
 
+## 34. Hosted auth sends through Resend, from a domain we own
+
+**Decided.** Confirmation and recovery mail goes out through Resend on `smtp.resend.com:465`,
+from `noreply@pashki.com`, at 100 emails an hour. Configured by
+`pnpm --filter @pashki/db set:smtp` rather than by clicking, for the same reason `check:parity`
+exists: configuration nobody can review is configuration nobody notices drifting.
+
+### What the default was
+
+Supabase's built-in sender is **two emails per hour for the entire project** — not per user, not
+per address. That is enough to test a signup once and nothing else. The failure is quiet in the
+worst way: the account is created, the send is refused afterwards, and the person sits looking at
+an inbox with no error anywhere to explain it. Public signup could not open on that, and the fact
+that development never noticed is exactly the point — one developer testing one flow never
+reaches the second email.
+
+### Why Resend
+
+3,000 a month free covers every user this product will have before it has revenue, SMTP is a
+hostname and an API key rather than a service integration, and domain verification is three DNS
+records. Postmark has the better transactional reputation and the confirmation email is the one
+that must not land in spam — worth revisiting if delivery disappoints, and cheap to revisit,
+because the seam is six settings behind one script. SES is cheapest at scale and its sandbox
+would have to be escaped by a support ticket before the first stranger could register.
+
+### Why 100 an hour and not more
+
+A rate limit is also the blast radius of a signup loop. 100/hour is far above any honest early
+usage and low enough that a runaway costs an apology rather than a provider suspension. Raising
+it later is one number; explaining an account suspension is not.
+
+### What this does not fix
+
+`site_url` on the hosted project is still `http://localhost:3000`, and GoTrue builds the link in
+the email from it. So mail now **sends and is delivered** — proved end to end, Resend reporting
+`delivered` for a real signup — and a stranger receiving it would click through to their own
+machine. Public signup needs the web app deployed and `site_url` plus `uri_allow_list` pointed at
+that domain. Sending was the blocker that could be removed today; it was not the only one.
+
+*Would change if:* deliverability disappoints, or volume outgrows the free tier. Both are a
+different value of `PASHKI_SMTP_HOST` and one script run.
+
+---
+
 ## Open: cascade deletions and tombstones
 
 **Not resolved. This waits on the sync engine choice, and exists so the evaluation
