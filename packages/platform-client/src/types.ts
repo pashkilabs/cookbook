@@ -235,6 +235,28 @@ export interface PlatformStore {
    * lists as open.
    */
   provisionHousehold(input: ProvisionHouseholdInput): Promise<ProvisionedHousehold>;
+  /**
+   * Write a household's entitlement.
+   *
+   * The capability, not a policy. **Nothing here decides who gets one, what tier, or what
+   * the numbers are** — a caller states all of it. That separation is the point: real
+   * issuance is a billing webhook, and it is blocked on Apple's outside-purchase rules
+   * (`docs/decisions.md`, Unresolved), so the only thing that should exist before that
+   * decision is the mechanism.
+   *
+   * Idempotent by `(family_id, app_key)`, which the schema already makes unique — a
+   * replayed webhook is an update, not a duplicate.
+   */
+  issueEntitlement(input: IssueEntitlementInput): Promise<Entitlement>;
+}
+
+export interface IssueEntitlementInput {
+  familyId: string;
+  appKey: string;
+  tier: Tier;
+  quota: Quota;
+  validUntil: string;
+  graceUntil: string;
 }
 
 export interface ProvisionHouseholdInput {

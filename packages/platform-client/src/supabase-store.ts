@@ -6,6 +6,7 @@ import type {
   FamilyMember,
   Platform,
   PlatformStore,
+  IssueEntitlementInput,
   ProvisionedHousehold,
   ProvisionHouseholdInput,
   Quota,
@@ -225,6 +226,40 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
           isChild: member.data.is_child,
         },
         created: existing === null,
+      };
+    },
+
+    /**
+     * Upsert on `(family_id, app_key)`, the unique the schema already carries, so a
+     * replayed billing webhook updates the window rather than failing or duplicating it.
+     *
+     * Decides nothing about who deserves one — every value arrives from the caller.
+     */
+    async issueEntitlement(input: IssueEntitlementInput): Promise<Entitlement> {
+      const { data, error } = await supabase
+        .from("entitlements")
+        .upsert(
+          {
+            family_id: input.familyId,
+            app_key: input.appKey,
+            tier: input.tier,
+            quota_json: input.quota,
+            valid_until: input.validUntil,
+            grace_until: input.graceUntil,
+          },
+          { onConflict: "family_id,app_key" },
+        )
+        .select("family_id, app_key, tier, quota_json, valid_until, grace_until")
+        .single();
+      if (error) throw error;
+
+      return {
+        familyId: data.family_id,
+        appKey: data.app_key,
+        tier: data.tier as Tier,
+        quota: toQuota(data.quota_json),
+        validUntil: data.valid_until,
+        graceUntil: data.grace_until,
       };
     },
   };

@@ -1,6 +1,11 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { readLocalInstance } from "@pashki/db/test-support";
+import {
+  createTestHousehold,
+  deleteTestHousehold,
+  readLocalInstance,
+  type TestHousehold,
+} from "@pashki/db/test-support";
 import { createPlatformClient, type PlatformClient, type PlatformStore } from "../src/index.js";
 import { createSupabasePlatformStore } from "../src/supabase-store.js";
 import { createEd25519Signer, createEd25519Verifier, generateEd25519KeyPair } from "../src/crypto.js";
@@ -473,5 +478,103 @@ describe.skipIf(instance === null)("provisioning a household", () => {
     families.push(result.family.id);
 
     expect(await store.findEntitlement(result.family.id, "recipes")).toBeNull();
+  });
+});
+
+describe.skipIf(instance === null)("issuing an entitlement", () => {
+  let admin: SupabaseClient;
+  let store: PlatformStore;
+  let household: TestHousehold;
+
+  beforeAll(async () => {
+    if (!instance) return;
+    admin = createClient(instance.url, instance.serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    store = createSupabasePlatformStore(admin);
+    // entitled: false — this suite is about what issuing one changes
+    household = await createTestHousehold({
+      admin,
+      url: instance.url,
+      anonKey: instance.anonKey,
+      label: "issue",
+      entitled: false,
+    });
+  });
+
+  afterAll(async () => {
+    if (!instance) return;
+    if (household) await deleteTestHousehold(admin, household);
+  });
+
+  const window = () => ({
+    validUntil: new Date(Date.now() + 30 * 86400000).toISOString(),
+    graceUntil: new Date(Date.now() + 37 * 86400000).toISOString(),
+  });
+
+  it("turns a household that cannot write into one that can", async () => {
+    // the whole point: household_can_write reads this row, so before and after are
+    // different answers to "may I save a recipe"
+    const before = await household.client
+      .from("recipes")
+      .insert({ family_id: household.familyId, title: "Refused" });
+    expect(before.error?.code).toBe("42501");
+
+    await store.issueEntitlement({
+      familyId: household.familyId,
+      appKey: "recipes",
+      tier: "full",
+      quota: { imports: { limit: 25, used: 0, resetsAt: null } },
+      ...window(),
+    });
+
+    const after = await household.client
+      .from("recipes")
+      .insert({ family_id: household.familyId, title: "Accepted" });
+    expect(after.error).toBeNull();
+  });
+
+  it("updates the window on a second issue rather than duplicating the row", async () => {
+    // a replayed billing webhook must not create a second entitlement
+    const first = await store.issueEntitlement({
+      familyId: household.familyId,
+      appKey: "recipes",
+      tier: "full",
+      quota: { imports: { limit: 25, used: 4, resetsAt: null } },
+      ...window(),
+    });
+    const extended = new Date(Date.now() + 60 * 86400000).toISOString();
+    const second = await store.issueEntitlement({
+      familyId: household.familyId,
+      appKey: "recipes",
+      tier: "full",
+      quota: { imports: { limit: 50, used: 0, resetsAt: null } },
+      validUntil: extended,
+      graceUntil: new Date(Date.now() + 67 * 86400000).toISOString(),
+    });
+
+    // compared as instants: Postgres returns `+00:00` where the input said `Z`, and every
+    // consumer parses rather than string-matches (`evaluateAccess` uses Date.parse)
+    expect(Date.parse(first.validUntil)).not.toBe(Date.parse(second.validUntil));
+    expect(Date.parse(second.validUntil)).toBe(Date.parse(extended));
+    expect(second.quota.imports?.limit).toBe(50);
+
+    const { count } = await admin
+      .from("entitlements")
+      .select("id", { count: "exact", head: true })
+      .eq("family_id", household.familyId);
+    expect(count).toBe(1);
+  });
+
+  it("reads back through findEntitlement exactly as written", async () => {
+    const issued = await store.issueEntitlement({
+      familyId: household.familyId,
+      appKey: "recipes",
+      tier: "full",
+      quota: { imports: { limit: 12, used: 3, resetsAt: null, periodDays: 30 } },
+      ...window(),
+    });
+    const read = await store.findEntitlement(household.familyId, "recipes");
+    expect(read).toEqual(issued);
   });
 });

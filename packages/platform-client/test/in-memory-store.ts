@@ -162,6 +162,23 @@ export function createInMemoryStore(seed: Seed = {}, clock: Clock = () => new Da
       members.push(member);
       return { account, family, member, created: existing === undefined };
     },
+
+    async issueEntitlement(input) {
+      const existing = entitlements.find(
+        (e) => e.familyId === input.familyId && e.appKey === input.appKey,
+      );
+      const issued = {
+        familyId: input.familyId,
+        appKey: input.appKey,
+        tier: input.tier,
+        quota: structuredClone(input.quota),
+        validUntil: input.validUntil,
+        graceUntil: input.graceUntil,
+      };
+      if (existing) Object.assign(existing, issued);
+      else entitlements.push(issued);
+      return { ...issued };
+    },
   };
 }
 
