@@ -238,7 +238,9 @@ secure_password_change = false
 # 1s locally so the confirmation flow is testable; hosted uses its own default.
 max_frequency = "1s"
 # Number of characters used in the email OTP.
-otp_length = 6
+# 8, to match hosted. `check:parity` reported the difference and it is settled here rather
+# than tolerated — a tolerated difference is one nobody looks at twice.
+otp_length = 8
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
