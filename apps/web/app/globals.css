@@ -1,0 +1,66 @@
+/*
+ * Deliberately plain. `packages/ui` — tokens and shared primitives — does not exist yet,
+ * and inventing a design system inside one screen is how it ends up living here instead of
+ * there. Enough to read comfortably, nothing worth keeping.
+ */
+:root {
+  --ink: #1c1a17;
+  --muted: #6b635a;
+  --line: #e4ded6;
+  --paper: #fbf9f6;
+  --accent: #7a4419;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font: 16px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--ink);
+  background: var(--paper);
+}
+
+main { max-width: 46rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+
+h1 { font-size: 1.75rem; margin: 0 0 0.25rem; letter-spacing: -0.01em; }
+h2 { font-size: 1.05rem; margin: 0 0 0.35rem; }
+
+a { color: var(--accent); }
+
+.subtitle { color: var(--muted); margin: 0 0 2rem; }
+
+.bar {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 1rem; margin-bottom: 2rem; padding-bottom: 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.notice {
+  border: 1px solid var(--line); border-left: 3px solid var(--accent);
+  background: #fff; padding: 0.85rem 1rem; margin-bottom: 1.75rem;
+  font-size: 0.9rem; color: var(--muted);
+}
+
+.card {
+  border: 1px solid var(--line); background: #fff;
+  padding: 1rem 1.1rem; margin-bottom: 0.75rem;
+}
+.card .meta { color: var(--muted); font-size: 0.85rem; }
+
+.empty { border: 1px dashed var(--line); padding: 2rem 1.25rem; text-align: center; color: var(--muted); }
+
+form.stack { display: flex; flex-direction: column; gap: 0.85rem; max-width: 22rem; }
+label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.25rem; }
+input {
+  width: 100%; padding: 0.55rem 0.65rem; font-size: 1rem;
+  border: 1px solid var(--line); background: #fff; color: var(--ink);
+}
+button {
+  padding: 0.55rem 1rem; font-size: 0.95rem; cursor: pointer;
+  border: 1px solid var(--ink); background: var(--ink); color: var(--paper);
+}
+button.quiet { background: none; color: var(--muted); border-color: var(--line); }
+button[disabled] { opacity: 0.55; cursor: progress; }
+
+.error { color: #8c2f14; font-size: 0.9rem; }
+.tabs { display: flex; gap: 0.5rem; margin-bottom: 1.25rem; }
