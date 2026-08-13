@@ -151,6 +151,13 @@ models be good enough. Do not add a silent-save path.
   reproduce the post-reset flake reported clean because they were replays of an earlier
   run. If `pnpm check` ever gets fast enough to be suspicious, check `cache: false` is
   still on the `test` task.
+- **RLS decides what may leave the database; a screen decides whose kitchen it shows.**
+  Those are different questions and only the first is a policy's job. Published recipes are
+  world-readable by design (decisions §17), so a household-scoped view **must filter by
+  `family_id` itself** — relying on RLS for presentation means the view shows everything the
+  person is *permitted* to see, which is not the same as everything that is theirs. Found
+  when the recipe list rendered another household's published roast chicken, with every
+  policy behaving exactly as intended.
 - **Hosted Supabase and the local image disagree about what "default" means.** Hosted
   runs `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon,
   authenticated`, so a new table is born with full DML for anonymous clients. The local
