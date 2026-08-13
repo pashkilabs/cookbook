@@ -623,6 +623,47 @@ during a migration is what this list exists to prevent.
 
 ---
 
+## 27. Provisioning happens at first confirmed sign-in
+
+An unconfirmed account gets nothing. No `accounts` row, no household, no membership — sign-up
+asks GoTrue for an unconfirmed user and returns.
+
+The alternative was to leave provisioning at sign-up and gate it, and that collapses on
+inspection: at sign-up nothing is confirmed yet, by definition, so "gated at sign-up" means
+"never runs at sign-up". The only real question was where it moves to.
+
+**Why it has to move.** An unconfirmed account is a *claim* on an address, not ownership of
+one. Provisioning at sign-up let anybody spend somebody else's address on a household they own
+— `families.owner_account_id` is a real relationship, and `accounts.email` would fill with
+addresses nobody had verified. The household is the first durable thing in this system; it
+should not exist on an unproven claim.
+
+**What makes it cheap** is that `provisionHousehold` was already idempotent (§16's descendant).
+Every confirmed sign-in can call it and only the first does work, so there is no
+"have-I-provisioned" flag to keep and no coordination between the confirmation path and the
+sign-in path. Both call the same function; the second is a read.
+
+The household name and display name are collected at sign-up and carried on the auth user's
+`user_metadata` until they are needed. Metadata is user-writable, which is acceptable for
+exactly this: the worst somebody can do is choose a different name for their own household.
+
+Two consequences worth stating:
+
+- **A confirmed account with no household is a legitimate, recoverable state.** If provisioning
+  fails after confirmation, signing in completes it. The UI says so rather than pretending it
+  cannot happen.
+- **The gate is checked even where it should be unreachable.** GoTrue will not issue a session
+  for an unconfirmed account, so `lib/provisioning.ts` refusing one should never fire — which
+  is why it is tested with a hand-signed token that the auth server accepts. A guard nothing
+  exercises is a guard nobody knows works.
+
+*Would change if:* a flow appears where somebody is legitimately known before they confirm —
+an invitation to an existing household, say, where the household already exists and the new
+member is being added to it. That is additive rather than a reversal: the household is not
+being created on an unproven claim.
+
+---
+
 ## 25. A photo names its path before its bytes exist, and cannot name another household's
 
 `photos.storage_path` stays NOT NULL. `upload_state` is `pending | stored`, defaulting
