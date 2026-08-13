@@ -171,3 +171,39 @@ describe("a URL naming a host only the worker can reach", () => {
     expect("kind" in rebinding).toBe(false);
   });
 });
+
+describe("what gets fetched versus what gets hashed", () => {
+  it("requests the URL as given and hashes the deduplicated one", () => {
+    // regression: eleven of twenty real recipe pages "failed" with HTTP 402/403/404 because the
+    // pipeline fetched the cache key — www.allrecipes.com requested as allrecipes.com, and a
+    // path fetched without its trailing slash
+    const url = normaliseUrl("https://www.allrecipes.com/recipe/213742/cheesy-casserole/");
+    if ("kind" in url) throw new Error("expected a URL");
+    expect(url.fetchUrl).toBe("https://www.allrecipes.com/recipe/213742/cheesy-casserole/");
+    expect(url.href).toBe("https://allrecipes.com/recipe/213742/cheesy-casserole");
+  });
+
+  it("still deduplicates the same recipe shared four ways", () => {
+    const shared = [
+      "https://www.example.com/pie?utm_source=twitter",
+      "https://example.com/pie/",
+      "https://www.example.com/pie",
+      "https://example.com/pie?fbclid=abc",
+    ].map((raw) => {
+      const parsed = normaliseUrl(raw);
+      if ("kind" in parsed) throw new Error(raw);
+      return parsed.href;
+    });
+    expect(new Set(shared).size, "all four should be one cache entry").toBe(1);
+  });
+
+  it("keeps the safety normalisations on both", () => {
+    // the fetch URL is not the raw input: a fragment is dropped and http is upgraded
+    const url = normaliseUrl("http://www.Example.com/pie#method");
+    if ("kind" in url) throw new Error("expected a URL");
+    expect(url.fetchUrl).toBe("https://www.example.com/pie");
+    // and the refusals still fire before either is produced
+    expect(normaliseUrl("http://127.0.0.1/x")).toMatchObject({ kind: "private-address" });
+    expect(normaliseUrl("https://user:pw@example.com/x")).toMatchObject({ kind: "invalid-url" });
+  });
+});

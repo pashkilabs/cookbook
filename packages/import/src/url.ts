@@ -21,9 +21,24 @@ const BLOCKED: Array<{ pattern: RegExp; platform: string; useInstead: "screensho
 const TRACKING = /^(utm_|fbclid$|gclid$|mc_(c|e)id$|igshid$|ref$|ref_src$|si$|epik$)/i;
 
 export interface NormalisedUrl {
-  /** what to fetch and what to hash */
+  /**
+   * The cache key's URL: `www.` stripped, tracking parameters dropped, parameters sorted, a
+   * trailing slash removed. Deduplicates the same recipe shared four ways.
+   *
+   * **Not what to fetch.** Those normalisations exist to make two URLs compare equal, and several
+   * of them change which page a server will serve.
+   */
   href: string;
   host: string;
+  /**
+   * What to actually request: the URL as given, minus a fragment, lowercased and forced to https.
+   *
+   * Separated after measuring the deterministic tiers against real sites and finding eleven of
+   * twenty "failures" were `HTTP 402/403/404` on a URL nobody had linked to — `www.allrecipes.com`
+   * fetched as `allrecipes.com`, `/homemade_pizza_dough/` fetched without its slash. The tiers
+   * were never the problem; the request was.
+   */
+  fetchUrl: string;
 }
 
 /**
@@ -125,8 +140,13 @@ export function normaliseUrl(
   }
 
   url.hash = "";
-  url.hostname = url.hostname.toLowerCase().replace(/^www\./, "");
+  url.hostname = url.hostname.toLowerCase();
   url.protocol = "https:";
+
+  // what to request, decided before the deduplicating normalisations below rewrite it
+  const fetchUrl = url.toString();
+
+  url.hostname = url.hostname.replace(/^www\./, "");
   // default ports carry no information
   if (url.port === "443" || url.port === "80") url.port = "";
 
@@ -141,7 +161,7 @@ export function normaliseUrl(
     url.pathname = url.pathname.replace(/\/+$/, "");
   }
 
-  return { href: url.toString(), host: url.hostname };
+  return { href: url.toString(), host: url.hostname, fetchUrl };
 }
 
 export function blockedPlatform(

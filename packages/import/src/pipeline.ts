@@ -73,13 +73,14 @@ export async function importRecipe(url: string, options: ImportOptions): Promise
 
   let page;
   try {
-    page = await options.fetcher.page(normalised.href);
+    // the URL as given, not the cache key — see NormalisedUrl.fetchUrl
+    page = await options.fetcher.page(normalised.fetchUrl);
   } catch (thrown) {
     return {
       ok: false,
       failure: {
         kind: "fetch-failed",
-        url: normalised.href,
+        url: normalised.fetchUrl,
         detail: thrown instanceof Error ? thrown.message : String(thrown),
       },
       attempts,
@@ -94,7 +95,7 @@ export async function importRecipe(url: string, options: ImportOptions): Promise
       ok: false,
       failure: {
         kind: "not-html",
-        url: normalised.href,
+        url: normalised.fetchUrl,
         detail: `content type ${page.contentType}`,
       },
       attempts,
@@ -128,7 +129,7 @@ export async function importRecipe(url: string, options: ImportOptions): Promise
   if (!recipe && options.llm) {
     const llm = await extractWithLlm({
       content: pageToText(page.html),
-      sourceUrl: normalised.href,
+      sourceUrl: normalised.fetchUrl,
       sourceName: siteName,
       cascade: options.llm,
     });
@@ -149,7 +150,7 @@ export async function importRecipe(url: string, options: ImportOptions): Promise
         ok: false,
         failure: {
           kind: "recipe-incomplete",
-          url: normalised.href,
+          url: normalised.fetchUrl,
           tier: incomplete.tier,
           missing: (incomplete.detail ?? "").split(", ").filter(Boolean),
         },
@@ -160,7 +161,7 @@ export async function importRecipe(url: string, options: ImportOptions): Promise
       ok: false,
       failure: {
         kind: "no-recipe-found",
-        url: normalised.href,
+        url: normalised.fetchUrl,
         triedTiers: [...new Set(attempts.map((attempt) => attempt.tier))],
       },
       attempts,
