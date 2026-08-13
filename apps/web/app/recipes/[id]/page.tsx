@@ -3,6 +3,7 @@ import Link from "next/link";
 import { formatAsWritten } from "@pashki/core";
 import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
+import { RemoveRecipe } from "./remove";
 import { Verdicts } from "./verdicts";
 
 /**
@@ -100,6 +101,12 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
               .filter(Boolean)
               .join(" · ") || "no details yet"}
           </p>
+        </div>
+        <div className="tabs" style={{ margin: 0 }}>
+          <Link className="button" href={`/recipes/${recipe.id}/edit`}>
+            Edit
+          </Link>
+          <RemoveRecipe recipeId={recipe.id} title={recipe.title} />
         </div>
       </div>
 

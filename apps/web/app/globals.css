@@ -126,3 +126,5 @@ textarea {
 .danger { border-color: #8c2f14; background: none; color: #8c2f14; }
 .parsed { margin: 0.5rem 0 0; padding: 0; list-style: none; font-size: 0.85rem; color: var(--muted); }
 .parsed li { padding: 0.15rem 0; }
+
+.confirm { display: inline-flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }

@@ -1,10 +1,38 @@
 # @pashki/web
 
-The web app. Two screens: the recipe list, and one recipe.
+The web app. A list you can search and filter, a recipe you can read, and a form you can type
+one into.
 
-`/recipes` lists the household's recipes; a card links to `/recipes/[id]`, which shows
-ingredients formatted by `@pashki/core`, the method from `recipe_steps`, the photo, and
-per-member ratings on the five-point scale. Rating and make-again are the only writes.
+| | |
+|---|---|
+| `/recipes` | the household's recipes, with search and the three filters — make-again, untried, whole-family-likes |
+| `/recipes/new` | type one in |
+| `/recipes/[id]` | ingredients through `@pashki/core`, the method, the photo, per-member ratings |
+| `/recipes/[id]/edit` | change it |
+
+**Ingredient lines go through core's parser, not a form with separate amount/unit/item
+fields.** That is deliberate: it is the same path an import will take, so every recipe typed by
+hand exercises the parser against real typing before a model is involved. The preview under the
+textarea is the same parse the server will do — run in the browser, because `packages/core` is
+pure and bundles anywhere — so somebody can see that `1 (14 oz) can chopped tomatoes` was
+understood before saving.
+
+**Filters live in the URL** as a plain GET form with no client component, so a filtered list is
+a link somebody can send to the other adult in the household. `whole-family-likes` is computed
+in app code rather than in the query: "everybody who rated gave 4 or 5" is a condition over a
+group of rows, and expressing it through PostgREST needs a view or an RPC — a schema change it
+has not earned. An unrated recipe is not liked by the whole family; it is unknown, which is what
+`untried` is for.
+
+**Editing replaces the child rows rather than diffing them.** Position is the only identity an
+ingredient line has, so "line 3 changed" and "a line was inserted above it" are
+indistinguishable from the text alone. The old rows are tombstoned, which is also what a syncing
+peer needs.
+
+**Removal is a tombstone too.** Clients hold no `DELETE` privilege (091300) because a
+hard-deleted row cannot be told from one that never synced. Confirmation is inline, never
+`confirm()` — a native dialog is poor on mobile and an embedding context can suppress it, which
+would turn "are you sure" into "deleted".
 
 ```bash
 cp .env.local.example .env.local   # then fill it in — see below
