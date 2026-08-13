@@ -75,8 +75,7 @@ export {
   type JobQueue,
   type JobResult,
   type JobRunnerOptions,
-  type QuotaMeter,
-  type QuotaVerdict,
+  type FinishOutcome,
   type StoredPhotoRef,
 } from "./job-runner.js";
 export {

@@ -55,30 +55,41 @@ export interface FinishJobInput {
   result: JobResult;
   /** one line for logs and admin; the typed failure is in `result` */
   errorSummary: string | null;
+  /**
+   * Whether this outcome costs the household an import.
+   *
+   * False for every failure and for every cache hit. A recipe already extracted for somebody
+   * else is handed over free, which is the point of a cache shared across the whole user base.
+   */
+  charge: boolean;
 }
+
+/**
+ * What the queue did with the outcome.
+ *
+ * `recorded` is not always what was asked for: a successful extraction the household cannot pay
+ * for is recorded as failed rather than handed over free, and the queue is what decides that,
+ * because deciding it anywhere else means asking about the allowance in one statement and
+ * spending it in another.
+ */
+export type FinishOutcome = {
+  recorded: "review" | "failed";
+  charged: boolean;
+  /** set when a success was refused for want of allowance */
+  quota?: "exceeded" | "no-entitlement" | null;
+};
 
 /** The queue, behind a port so the runner can be tested without a database. */
 export interface JobQueue {
   claim(worker: string): Promise<ImportJob | null>;
-  finish(input: FinishJobInput): Promise<void>;
-  markQuotaConsumed(jobId: string): Promise<void>;
+  /**
+   * Record the outcome and, for a chargeable success, spend one import **in the same
+   * statement**. Splitting the two leaves a window where a crash bills for a job that still
+   * looks unfinished, and closing that window with a refund adds a write that can fail on its
+   * own. See migration 092000.
+   */
+  finish(input: FinishJobInput): Promise<FinishOutcome>;
 }
-
-/**
- * Quota, spent through the seam.
- *
- * A port because a worker is family-scoped and `PlatformClient` is account-scoped —
- * nobody is signed in. `createQuotaMeter` in `@pashki/platform-client` is the
- * implementation; counting locally would put a second opinion about the balance next
- * to the one the database enforces.
- */
-export interface QuotaMeter {
-  consume(familyId: string, amount: number): Promise<QuotaVerdict>;
-}
-
-export type QuotaVerdict =
-  | { allowed: true }
-  | { allowed: false; reason: "exceeded" | "no-entitlement"; detail?: string };
 
 /** Where a job's photo ended up. Mirrors the columns on `photos`. */
 export interface StoredPhotoRef {
@@ -89,7 +100,6 @@ export interface StoredPhotoRef {
 
 export interface JobRunnerOptions {
   queue: JobQueue;
-  quota: QuotaMeter;
   /** identifies this process in `import_jobs.worker` */
   worker: string;
   /** fetcher, cache and optionally the llm cascade */
@@ -129,13 +139,45 @@ export async function runNextJob(options: JobRunnerOptions): Promise<JobOutcome>
   if (!job) return { status: "idle" };
 
   const fail = async (failure: ImportFailure, summary: string): Promise<JobOutcome> => {
+    // charge: false. A fetch that never reached a page cost almost nothing, and a household
+    // that pasted twenty saved links should not pay for the ten whose sites refused us.
     await options.queue.finish({
       jobId: job.id,
       status: "failed",
       result: { ok: false, failure },
       errorSummary: summary,
+      charge: false,
     });
     return { status: "failed", job, failure };
+  };
+
+  /**
+   * Record a success and pay for it in one statement.
+   *
+   * The queue may answer that it recorded a failure instead — an extraction the household has no
+   * allowance for is not handed over free. What comes back is what happened, not what was asked
+   * for, and the outcome returned to the caller follows it.
+   */
+  const succeed = async (
+    result: Extract<JobResult, { ok: true }>,
+  ): Promise<JobOutcome> => {
+    const finished = await options.queue.finish({
+      jobId: job.id,
+      status: "review",
+      result,
+      errorSummary: null,
+      // a cache hit costs no fetch and no parse, so it costs no allowance
+      charge: !result.fromCache,
+    });
+
+    if (finished.recorded === "failed") {
+      const failure: ImportFailure = {
+        kind: "quota-exceeded",
+        reason: finished.quota ?? "exceeded",
+      };
+      return { status: "failed", job, failure };
+    }
+    return { status: "review", job, result };
   };
 
   if (job.kind === "screenshot" || job.kind === "video") {
@@ -145,32 +187,6 @@ export async function runNextJob(options: JobRunnerOptions): Promise<JobOutcome>
       { kind: "unsupported-job-kind", jobKind: job.kind },
       `${job.kind} jobs are not drained yet`,
     );
-  }
-
-  // Does this cost anything? A cached URL costs no model call, so it costs no quota.
-  // Peeking the cache before charging is one cheap read; charging first and refunding
-  // is the version that goes wrong.
-  let cached = false;
-  if (job.kind === "url" && options.imports.cache && !options.imports.refresh) {
-    const normalised = normaliseUrl(job.inputRef);
-    if (!("kind" in normalised)) {
-      cached = (await options.imports.cache.get(hashUrl(normalised.href))) !== null;
-    }
-  }
-
-  if (!cached && job.quotaConsumedAt === null) {
-    const verdict = await options.quota.consume(job.familyId, 1);
-    if (!verdict.allowed) {
-      return fail(
-        { kind: "quota-exceeded", reason: verdict.reason, detail: verdict.detail },
-        `quota ${verdict.reason}`,
-      );
-    }
-    // Recorded immediately after spending. A crash in between charges the household
-    // once more on the retry — the alternative is a distributed transaction across the
-    // quota function and this row, which is not worth it for a ceiling only abuse
-    // reaches.
-    await options.queue.markQuotaConsumed(job.id);
   }
 
   if (job.kind === "url") {
@@ -194,13 +210,7 @@ export async function runNextJob(options: JobRunnerOptions): Promise<JobOutcome>
       fromCache: outcome.fromCache,
       photo,
     };
-    await options.queue.finish({
-      jobId: job.id,
-      status: "review",
-      result,
-      errorSummary: null,
-    });
-    return { status: "review", job, result };
+    return succeed(result);
   }
 
   // text: a pasted caption has no markup, so the deterministic tiers have nothing to
@@ -233,13 +243,7 @@ export async function runNextJob(options: JobRunnerOptions): Promise<JobOutcome>
     fromCache: false,
     photo: null,
   };
-  await options.queue.finish({
-    jobId: job.id,
-    status: "review",
-    result,
-    errorSummary: null,
-  });
-  return { status: "review", job, result };
+  return succeed(result);
 }
 
 /**

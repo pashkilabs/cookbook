@@ -7,8 +7,6 @@ import {
 import { createSupabaseImportCache } from "@pashki/import/supabase";
 import { createSupabaseJobQueue } from "@pashki/import/job-queue";
 import { storeImportedPhoto } from "@pashki/import/photo-storage";
-import { createQuotaMeter } from "@pashki/platform-client";
-import { createSupabasePlatformStore } from "@pashki/platform-client/supabase";
 
 /**
  * The import queue, reachable from the product for the first time.
@@ -44,9 +42,10 @@ export async function drainImportQueue(maxJobs = 25): Promise<JobOutcome[]> {
   const admin = serviceRole();
 
   return drainQueue({
-    queue: createSupabaseJobQueue(admin),
-    // through the seam: the spend is one conditional UPDATE in the database, never counted here
-    quota: createQuotaMeter({ store: createSupabasePlatformStore(admin), appKey: "recipes" }),
+    // Recording an outcome and paying for it are one statement inside `import_finish_job`, which
+    // is why there is no quota meter here: a household is charged when a result exists, never on
+    // submission, and never twice (decisions §32).
+    queue: createSupabaseJobQueue(admin, { appKey: "recipes" }),
     worker: `web-${process.pid}`,
     imports: {
       fetcher: createHttpFetcher(),

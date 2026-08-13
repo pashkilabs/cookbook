@@ -6,8 +6,6 @@ import {
   type ImportJob,
   type JobQueue,
   type JobRunnerOptions,
-  type QuotaMeter,
-  type QuotaVerdict,
 } from "../src/index.js";
 import {
   PAGE_WITH_IMAGE_REFERENCE,
@@ -21,33 +19,48 @@ const PIE = "https://example.com/pie";
 const IMAGE = "https://cdn.example.com/pie.jpg";
 const NOTHING = "https://example.com/about";
 
-/** An in-memory queue, so the runner's behaviour can be tested without a database. */
-function fakeQueue(jobs: ImportJob[]): JobQueue & { finished: FinishJobInput[]; marked: string[] } {
+/**
+ * An in-memory queue, so the runner's behaviour can be tested without a database.
+ *
+ * It models `import_finish_job` rather than merely recording calls, because charging now happens
+ * *inside* finish and a fake that ignored that would test nothing about the thing that changed.
+ * The allowance, the stamp that makes a second finish free, and the refusal that turns a success
+ * into a failure all behave as the SQL does.
+ */
+interface FakeQueue extends JobQueue {
+  finished: FinishJobInput[];
+  /** one entry per unit actually spent */
+  charges: string[];
+}
+
+function fakeQueue(
+  jobs: ImportJob[],
+  allowance: { limit?: number; entitled?: boolean } = {},
+): FakeQueue {
+  const limit = allowance.limit ?? Infinity;
+  const entitled = allowance.entitled ?? true;
   const pending = [...jobs];
   const finished: FinishJobInput[] = [];
-  const marked: string[] = [];
+  const charges: string[] = [];
+  // keyed by job id, as `import_jobs.quota_consumed_at` is
+  const consumed = new Map(jobs.filter((j) => j.quotaConsumedAt).map((j) => [j.id, true]));
+
   return {
     finished,
-    marked,
+    charges,
     async claim() {
       return pending.shift() ?? null;
     },
     async finish(input) {
       finished.push(input);
-    },
-    async markQuotaConsumed(jobId) {
-      marked.push(jobId);
-    },
-  };
-}
-
-function fakeQuota(verdict: QuotaVerdict = { allowed: true }): QuotaMeter & { calls: Array<[string, number]> } {
-  const calls: Array<[string, number]> = [];
-  return {
-    calls,
-    async consume(familyId, amount) {
-      calls.push([familyId, amount]);
-      return verdict;
+      if (input.status !== "review" || !input.charge || consumed.has(input.jobId)) {
+        return { recorded: input.status, charged: false, quota: null };
+      }
+      if (!entitled) return { recorded: "failed", charged: false, quota: "no-entitlement" };
+      if (charges.length >= limit) return { recorded: "failed", charged: false, quota: "exceeded" };
+      charges.push(input.jobId);
+      consumed.set(input.jobId, true);
+      return { recorded: "review", charged: true, quota: null };
     },
   };
 }
@@ -68,7 +81,6 @@ const fetcher = () =>
 function options(over: Partial<JobRunnerOptions> = {}): JobRunnerOptions {
   return {
     queue: fakeQueue([job()]),
-    quota: fakeQuota(),
     worker: "test-worker",
     imports: { fetcher: fetcher() },
     ...over,
@@ -201,76 +213,125 @@ describe("typed terminal states", () => {
 });
 
 describe("quota", () => {
-  it("spends one unit per job, through the meter", async () => {
-    const quota = fakeQuota();
-    await runNextJob(options({ quota }));
-    expect(quota.calls).toEqual([["fam-1", 1]]);
+  /**
+   * Charged when the result is recorded, not when the job is claimed.
+   *
+   * The reversal is measured rather than theoretical: on a batch of twenty-two pasted links,
+   * ten of the fifteen that reached the queue failed to fetch, so charging up front spent two
+   * thirds of the allowance on nothing. Decisions §32 keeps the old reasoning and why it lost.
+   */
+  it("charges nothing for a job that failed", async () => {
+    const queue = fakeQueue([job({ inputRef: NOTHING })]);
+    const outcome = await runNextJob(
+      options({ queue, imports: { fetcher: createFakeFetcher({ [NOTHING]: { html: PAGE_WITH_NO_RECIPE } }) } }),
+    );
+
+    expect(outcome.status).toBe("failed");
+    expect(queue.charges, "a page that published no recipe cost us almost nothing").toEqual([]);
+    expect(queue.finished[0]?.charge).toBe(false);
   });
 
-  it("records that it spent, so a retry does not charge twice", async () => {
-    const queue = fakeQueue([job()]);
-    await runNextJob(options({ queue }));
-    expect(queue.marked).toEqual(["job-1"]);
-  });
-
-  it("does not charge again for a job that already paid", async () => {
-    const quota = fakeQuota();
-    // a retry after a crash: the row still carries the timestamp
-    await runNextJob(
+  it("charges nothing when the site refuses the request", async () => {
+    // the common case, and the one that made this worth reversing: link rot and bot-blocking
+    const queue = fakeQueue([job({ inputRef: "https://example.com/gone" })]);
+    const outcome = await runNextJob(
       options({
-        queue: fakeQueue([job({ attempts: 2, quotaConsumedAt: "2026-08-12T00:00:00.000Z" })]),
-        quota,
+        queue,
+        // no fixture for that URL: the fake fetcher throws, as a 404 does
+        imports: { fetcher: createFakeFetcher({}) },
       }),
     );
-    expect(quota.calls).toEqual([]);
+
+    expect(outcome.status).toBe("failed");
+    expect(queue.charges).toEqual([]);
+    // the flag, not just the total: a failed status is never charged by the database either,
+    // so asserting only the total would pass without the runner deciding anything
+    expect(queue.finished[0]?.charge).toBe(false);
+  });
+
+  it("charges exactly one for a job that succeeded", async () => {
+    const queue = fakeQueue([job()]);
+    const outcome = await runNextJob(options({ queue }));
+
+    expect(outcome.status).toBe("review");
+    expect(queue.charges).toEqual(["job-1"]);
+    expect(queue.finished[0]?.charge).toBe(true);
+  });
+
+  it("charges once in total for a job that succeeds after failing", async () => {
+    // a transient refusal, then the same job re-claimed once its lease expired
+    const flaky = createFakeFetcher({});
+    const queue = fakeQueue([job(), job({ attempts: 2 })]);
+
+    const first = await runNextJob(options({ queue, imports: { fetcher: flaky } }));
+    const second = await runNextJob(options({ queue, imports: { fetcher: fetcher() } }));
+
+    expect(first.status).toBe("failed");
+    expect(second.status).toBe("review");
+    expect(queue.charges, "the failed attempt was free; the successful one paid once").toEqual([
+      "job-1",
+    ]);
+  });
+
+  it("does not charge again for a job already stamped as paid", async () => {
+    // a crash between spending and recording cannot happen — they are one statement — but a
+    // job re-claimed after its lease expired can be finished twice
+    const queue = fakeQueue([job({ attempts: 2, quotaConsumedAt: "2026-08-12T00:00:00.000Z" })]);
+    const outcome = await runNextJob(options({ queue }));
+
+    expect(outcome.status).toBe("review");
+    expect(queue.charges).toEqual([]);
   });
 
   it("costs nothing when the URL is already cached", async () => {
     const cache = createFakeCache();
-    const quota = fakeQuota();
     const shared = fetcher();
 
-    // first job pays and populates the cache
-    await runNextJob(options({ queue: fakeQueue([job()]), quota, imports: { fetcher: shared, cache } }));
-    expect(quota.calls).toHaveLength(1);
+    const first = fakeQueue([job()]);
+    await runNextJob(options({ queue: first, imports: { fetcher: shared, cache } }));
+    expect(first.charges).toHaveLength(1);
 
-    // a second household importing the same link costs no model call, so no quota
-    const second = fakeQuota();
+    // a second household importing the same link costs no fetch and no parse, so no allowance
+    const second = fakeQueue([job({ id: "job-2", familyId: "fam-2" })]);
     const outcome = await runNextJob(
-      options({
-        queue: fakeQueue([job({ id: "job-2", familyId: "fam-2" })]),
-        quota: second,
-        imports: { fetcher: createFakeFetcher({}), cache },
-      }),
+      options({ queue: second, imports: { fetcher: fetcher(), cache } }),
     );
-    expect(second.calls).toEqual([]);
+
+    expect(second.charges).toEqual([]);
+    expect(second.finished[0]?.charge).toBe(false);
     expect(outcome.status === "review" && outcome.result.fromCache).toBe(true);
   });
 
-  it("fails the job when the household is out of allowance", async () => {
-    const queue = fakeQueue([job()]);
-    const outcome = await runNextJob(
-      options({ queue, quota: fakeQuota({ allowed: false, reason: "exceeded", detail: "50 of 50 used" }) }),
-    );
+  it("fails a success the household cannot pay for, rather than giving it away", async () => {
+    // the meter is the only thing between an allowance and ignoring it
+    const queue = fakeQueue([job()], { limit: 0 });
+    const outcome = await runNextJob(options({ queue }));
+
     expect(outcome.status).toBe("failed");
-    const recorded = queue.finished[0]!.result;
-    if (recorded.ok) throw new Error("expected failure");
-    expect(recorded.failure).toEqual({
+    expect(outcome.status === "failed" && outcome.failure).toEqual({
       kind: "quota-exceeded",
       reason: "exceeded",
-      detail: "50 of 50 used",
     });
   });
 
-  it("does not fetch anything when quota is refused", async () => {
+  it("tells a household with no allowance apart from one that has used it up", async () => {
+    const queue = fakeQueue([job()], { entitled: false });
+    const outcome = await runNextJob(options({ queue }));
+
+    expect(outcome.status === "failed" && outcome.failure).toEqual({
+      kind: "quota-exceeded",
+      reason: "no-entitlement",
+    });
+  });
+
+  it("still fetches before it knows whether it can charge", async () => {
+    // stated rather than hidden: charging late means an out-of-allowance household causes a
+    // request before being refused. The trade accepted in §32.
     const spy = fetcher();
-    await runNextJob(
-      options({
-        quota: fakeQuota({ allowed: false, reason: "no-entitlement" }),
-        imports: { fetcher: spy },
-      }),
-    );
-    expect(spy.pageCalls).toEqual([]);
+    const queue = fakeQueue([job()], { limit: 0 });
+    await runNextJob(options({ queue, imports: { fetcher: spy } }));
+
+    expect(spy.pageCalls).toEqual([PIE]);
   });
 });
 

@@ -6,10 +6,9 @@ import {
   readLocalInstance,
   type TestHousehold,
 } from "@pashki/db/test-support";
-import { createQuotaMeter } from "@pashki/platform-client";
 import { createSupabasePlatformStore } from "@pashki/platform-client/supabase";
 import type { PlatformStore } from "@pashki/platform-client";
-import { drainQueue, runNextJob, type QuotaMeter } from "../src/index.js";
+import { drainQueue, runNextJob } from "../src/index.js";
 import { createSupabaseJobQueue } from "../src/supabase-job-queue.js";
 import { PAGE_WITH_IMAGE_REFERENCE, createFakeFetcher, jpegBytes } from "./fixtures.js";
 
@@ -26,7 +25,6 @@ const IMAGE = "https://cdn.example.com/pie.jpg";
 describe.skipIf(instance === null)("import job queue", () => {
   let admin: SupabaseClient;
   let household: TestHousehold;
-  let quota: QuotaMeter;
   let store: PlatformStore;
 
   /** Read the balance through the seam, not by querying the table. */
@@ -76,9 +74,8 @@ describe.skipIf(instance === null)("import job queue", () => {
       anonKey: instance.anonKey,
       label: "queue",
     });
-    // the real meter, wired the way a route would: quota goes through the seam
+    // the balance is read through the seam; spending it is `import_finish_job`'s job now
     store = createSupabasePlatformStore(admin);
-    quota = createQuotaMeter({ store, appKey: "recipes" });
   });
 
   afterAll(async () => {
@@ -91,7 +88,6 @@ describe.skipIf(instance === null)("import job queue", () => {
     const urls = await queueJobs(1, "single");
     const outcome = await runNextJob({
       queue: createSupabaseJobQueue(admin),
-      quota,
       worker: "w-single",
       imports: { fetcher: fetcherFor(urls) },
     });
@@ -116,7 +112,6 @@ describe.skipIf(instance === null)("import job queue", () => {
     const workers = Array.from({ length: 20 }, (_, i) =>
       drainQueue({
         queue: createSupabaseJobQueue(admin),
-        quota,
         worker: `w-${i}`,
         imports: { fetcher },
         maxJobs: 12,
@@ -151,7 +146,6 @@ describe.skipIf(instance === null)("import job queue", () => {
 
     const outcome = await runNextJob({
       queue: createSupabaseJobQueue(admin),
-      quota,
       worker: "w-none",
       imports: { fetcher: createFakeFetcher({}) },
     });
@@ -177,7 +171,6 @@ describe.skipIf(instance === null)("import job queue", () => {
 
     const outcome = await runNextJob({
       queue: createSupabaseJobQueue(admin),
-      quota,
       worker: "w-alive",
       imports: { fetcher: fetcherFor(urls) },
     });
@@ -198,11 +191,133 @@ describe.skipIf(instance === null)("import job queue", () => {
     expect(error).not.toBeNull();
   });
 
-  it("will not let a client mark quota as consumed", async () => {
-    const { error } = await household.client.rpc("import_mark_quota_consumed", {
+  it("will not let a client finish a job", async () => {
+    // it spends an allowance, so the same rule as claiming: service role only
+    const { error } = await household.client.rpc("import_finish_job", {
       p_job_id: "00000000-0000-0000-0000-000000000000",
+      p_status: "review",
+      p_result: { ok: true },
+      p_error: null,
+      p_app_key: "recipes",
+      p_quota: "imports",
+      p_charge: true,
     });
     expect(error).not.toBeNull();
+  });
+
+  describe("what a batch actually costs", () => {
+    /**
+     * Against real SQL, not the in-memory model.
+     *
+     * The reversal that these guard — charging when the result is recorded rather than when the
+     * job is claimed — was decided on a measurement: ten of fifteen queued links failed to fetch,
+     * so charging up front spent two thirds of a household's allowance on nothing (decisions §32).
+     */
+    it("charges nothing for a job that failed", async () => {
+      await queueJobs(1, "doomed");
+      const usedBefore = await quotaUsed();
+
+      const outcome = await runNextJob({
+        queue: createSupabaseJobQueue(admin),
+        worker: "w-fail",
+        // no fixture for that URL, so the fetch throws — a 404 by another name
+        imports: { fetcher: createFakeFetcher({}) },
+      });
+
+      expect(outcome.status).toBe("failed");
+      const rows = await jobRows();
+      expect(rows[0]).toMatchObject({ status: "failed" });
+      expect(rows[0]?.quota_consumed_at, "nothing was spent, so nothing is stamped").toBeNull();
+      expect(await quotaUsed()).toBe(usedBefore);
+
+      await admin.from("import_jobs").delete().eq("family_id", household.familyId);
+    });
+
+    it("refuses to charge a failed job even when asked to", async () => {
+      // the database is the backstop: the runner passes charge:false for a failure, and this
+      // proves that is belt as well as braces rather than the only thing standing in the way
+      await queueJobs(1, "asked");
+      const rows = await jobRows();
+      const usedBefore = await quotaUsed();
+
+      const { error } = await admin.rpc("import_finish_job", {
+        p_job_id: rows[0]!.id,
+        p_status: "failed",
+        p_result: { ok: false, failure: { kind: "fetch-failed" } },
+        p_error: "HTTP 404",
+        p_app_key: "recipes",
+        p_quota: "imports",
+        p_charge: true,
+      });
+
+      expect(error).toBeNull();
+      expect(await quotaUsed()).toBe(usedBefore);
+      const after = await jobRows();
+      expect(after[0]?.quota_consumed_at).toBeNull();
+
+      await admin.from("import_jobs").delete().eq("family_id", household.familyId);
+    });
+
+    it("charges once in total for a job that succeeds after failing", async () => {
+      const urls = await queueJobs(1, "retry");
+      const usedBefore = await quotaUsed();
+
+      const first = await runNextJob({
+        queue: createSupabaseJobQueue(admin),
+        worker: "w-try-1",
+        imports: { fetcher: createFakeFetcher({}) },
+      });
+      expect(first.status).toBe("failed");
+      expect(await quotaUsed()).toBe(usedBefore);
+
+      // the same job, re-queued the way an operator would after a transient refusal
+      await admin
+        .from("import_jobs")
+        .update({ status: "queued", finished_at: null })
+        .eq("family_id", household.familyId);
+
+      const second = await runNextJob({
+        queue: createSupabaseJobQueue(admin),
+        worker: "w-try-2",
+        imports: { fetcher: fetcherFor(urls) },
+      });
+
+      expect(second.status).toBe("review");
+      expect(await quotaUsed(), "the failure was free; the success paid once").toBe(usedBefore + 1);
+
+      await admin.from("import_jobs").delete().eq("family_id", household.familyId);
+    });
+
+    it("refuses a success the household cannot pay for, rather than giving it away", async () => {
+      const urls = await queueJobs(1, "broke");
+      const entitlement = await store.findEntitlement(household.familyId, "recipes");
+      const limit = entitlement?.quota.imports?.limit ?? 0;
+
+      // spend the allowance down to nothing without touching the counter by hand
+      await admin.rpc("platform_spend_quota", {
+        p_family_id: household.familyId,
+        p_app_key: "recipes",
+        p_quota: "imports",
+        p_amount: limit - (await quotaUsed()),
+      });
+
+      const outcome = await runNextJob({
+        queue: createSupabaseJobQueue(admin),
+        worker: "w-broke",
+        imports: { fetcher: fetcherFor(urls) },
+      });
+
+      expect(outcome.status).toBe("failed");
+      expect(outcome.status === "failed" && outcome.failure).toMatchObject({
+        kind: "quota-exceeded",
+        reason: "exceeded",
+      });
+      const rows = await jobRows();
+      expect(rows[0], "recorded as failed, not handed over free").toMatchObject({ status: "failed" });
+      expect(await quotaUsed(), "and the counter did not move").toBe(limit);
+
+      await admin.from("import_jobs").delete().eq("family_id", household.familyId);
+    });
   });
 });
 

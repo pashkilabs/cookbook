@@ -145,6 +145,17 @@ export type FamilyQuotaVerdict =
   | { allowed: true }
   | { allowed: false; reason: "exceeded" | "no-entitlement"; detail?: string };
 
+/**
+ * A family-scoped meter, for a caller with nobody signed in.
+ *
+ * **Not the way an import is charged.** Spending here and recording the outcome elsewhere is two
+ * statements, and the window between them is a household billed for a job that still looks
+ * unfinished. `import_finish_job` does both in one transaction (decisions §32), so anything
+ * draining the import queue should go through the queue, not through this.
+ *
+ * This remains the right shape for a spend that *is* the whole operation — where there is no
+ * second write to be atomic with.
+ */
 export function createQuotaMeter(options: {
   store: PlatformStore;
   appKey: string;
