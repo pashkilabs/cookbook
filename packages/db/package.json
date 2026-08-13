@@ -36,7 +36,8 @@
     "test:mutate": "bash scripts/mutate-rls.sh",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
-    "set:smtp": "node scripts/set-smtp.mjs"
+    "set:smtp": "node scripts/set-smtp.mjs",
+    "set:site-url": "node scripts/set-site-url.mjs"
   },
   "devDependencies": {
     "@pashki/core": "workspace:^",
