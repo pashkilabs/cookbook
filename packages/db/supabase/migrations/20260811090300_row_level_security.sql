@@ -35,9 +35,26 @@
 -- simply dead — which is exactly the kind of thing that reads as an app bug for a
 -- day before anyone suspects grants.
 --
--- Deliberately not using `alter default privileges` to paper over it: a new table
--- should require a stated decision about who may touch it.
+-- **Environments do not agree on what "default" means, so this starts from nothing.**
+-- The local image narrows the default ACL as above. Hosted Supabase does the opposite:
+--
+--   ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES
+--     TO anon, authenticated, service_role
+--
+-- so every table created here is born with SELECT, INSERT, UPDATE and DELETE for
+-- `anon`. Found by pushing to a hosted project: the self-check at the bottom of this
+-- file refused the migration because `import_cache` — shared across the entire user
+-- base — was readable by any client. Only RLS was standing between anon and the
+-- grocery catalog, and grants are supposed to be the gate *outside* RLS.
+--
+-- So: revoke everything from client roles, then grant back deliberately. And narrow
+-- the default, which is what actually enforces the principle that a new table
+-- requires a stated decision about who may touch it — under a permissive default,
+-- the decision gets made by nobody.
 -- ---------------------------------------------------------------------------
+
+revoke all on all tables in schema public from anon, authenticated;
+alter default privileges in schema public revoke all on tables from anon, authenticated;
 
 -- The service role runs imports, webhooks and seeding. It bypasses RLS but still
 -- needs table privileges like any other role — bypassing row security is not the
@@ -395,6 +412,31 @@ begin
      or has_table_privilege('anon', 'public.import_cache', 'select') then
     raise exception 'import_cache is granted to a client role; it must be service-role only';
   end if;
+
+  -- The rest of the matrix, asserted where it is established. A permissive default
+  -- privilege elsewhere would otherwise hand clients write access to the platform
+  -- tables and the grocery catalog, with only RLS between them and it.
+  declare
+    writable text[];
+  begin
+    select coalesce(array_agg(t.name || ' (' || r.role || ')' order by t.name, r.role), '{}')
+    into writable
+    from (values
+      ('public.accounts'), ('public.families'), ('public.family_members'),
+      ('public.devices'), ('public.subscriptions'), ('public.entitlements'),
+      ('public.ingredients'), ('public.grocery_packages')
+    ) as t(name)
+    cross join (values ('anon'), ('authenticated')) as r(role)
+    where has_table_privilege(r.role, t.name::regclass, 'insert')
+       or has_table_privilege(r.role, t.name::regclass, 'update')
+       or has_table_privilege(r.role, t.name::regclass, 'delete');
+
+    if array_length(writable, 1) > 0 then
+      raise exception
+        'platform tables and the catalog are read-only to clients, but a client role holds write privileges: %',
+        array_to_string(writable, ', ');
+    end if;
+  end;
 end;
 $do$;
 

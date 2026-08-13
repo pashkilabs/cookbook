@@ -200,6 +200,42 @@ begin
         array_to_string(dormant, ', ');
     end if;
   end;
+
+  -- And the same rule as a privilege, which is the half a permissive default privilege
+  -- breaks. Hosted Supabase grants ALL on new public tables to anon and authenticated;
+  -- 090300 revokes that and narrows the default, and this is what keeps it revoked.
+  declare
+    writable text[];
+  begin
+    select coalesce(array_agg(c.relname || ' (' || r.rolname || ')' order by c.relname, r.rolname), '{}')
+    into writable
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'
+    cross join (select rolname from pg_roles where rolname in ('anon', 'authenticated')) r
+    where c.relkind = 'r'
+      and c.relname in (
+        'accounts', 'families', 'family_members', 'devices', 'subscriptions',
+        'entitlements', 'ingredients', 'grocery_packages'
+      )
+      and (
+        has_table_privilege(r.rolname, c.oid, 'INSERT')
+        or has_table_privilege(r.rolname, c.oid, 'UPDATE')
+        or has_table_privilege(r.rolname, c.oid, 'DELETE')
+      );
+
+    if array_length(writable, 1) > 0 then
+      raise exception
+        'platform tables and the catalog are read-only to clients, but a client role holds write privileges: %',
+        array_to_string(writable, ', ');
+    end if;
+
+    -- import_cache belongs to nobody and must be reachable by no client at all
+    if has_table_privilege('anon', 'public.import_cache', 'SELECT')
+       or has_table_privilege('authenticated', 'public.import_cache', 'SELECT') then
+      raise exception
+        'import_cache is readable by a client role; it is shared across the whole user base';
+    end if;
+  end;
 end;
 $fn$;
 
