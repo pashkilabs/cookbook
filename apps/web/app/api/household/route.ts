@@ -1,83 +1,42 @@
-import { createClient } from "@supabase/supabase-js";
-import { platformStore } from "@/lib/platform";
-import { issueDevelopmentEntitlement } from "@/lib/dev-entitlement";
+import { provisionForConfirmedAccount } from "@/lib/provisioning";
 
 /**
- * Sign up: create the auth user, then the account, household and membership.
+ * Provision the household for whoever holds this bearer token.
  *
- * All of it server-side, because the last three are platform tables and clients have no
- * write path to them (decisions §16). This is the first caller of that path outside test
- * fixtures.
+ * Called by the sign-in form after a successful password sign-in, and mirrored by
+ * `/auth/confirm`, which does the same thing at the moment of confirmation. Both are safe to
+ * run repeatedly: `provisionHousehold` is idempotent, so the second and every subsequent call
+ * is a read.
  *
- * **The user is created already confirmed, which is a deliberate Phase 2 shortcut.** Real
- * public signup needs an email confirmation flow; without one, anybody can claim any
- * address. It is recorded here rather than in a backlog because the line that does it is
- * one line, and whoever opens signup to the public has to see it.
+ * It used to *create the account* — with `email_confirm: true`, which meant the app vouched
+ * for addresses it had never contacted. That is gone. This route now creates nothing unless
+ * the auth server confirms both that the token is live and that the address was proven.
  */
 export async function POST(request: Request) {
-  let body: { email?: string; password?: string; householdName?: string; displayName?: string };
-  try {
-    body = (await request.json()) as typeof body;
-  } catch {
-    return Response.json({ error: "expected a JSON body" }, { status: 400 });
+  const authorization = request.headers.get("authorization") ?? "";
+  const [scheme, token] = authorization.split(" ");
+  if (scheme?.toLowerCase() !== "bearer" || !token) {
+    return Response.json({ error: "a bearer token is required" }, { status: 401 });
   }
 
-  const email = body.email?.trim();
-  const password = body.password;
-  const householdName = body.householdName?.trim();
-  const displayName = body.displayName?.trim();
+  const outcome = await provisionForConfirmedAccount(token);
 
-  if (!email || !password || !householdName || !displayName) {
+  if (outcome.status === "unauthenticated") {
+    return Response.json({ error: "that session is not valid" }, { status: 401 });
+  }
+  if (outcome.status === "unconfirmed") {
+    // 403 rather than 401: the token is real, the address is not proven. Distinguishable on
+    // purpose — the caller already holds a session for this address, so there is nothing left
+    // to enumerate.
     return Response.json(
-      { error: "email, password, householdName and displayName are all required" },
-      { status: 400 },
+      { error: "confirm your email address before creating a household" },
+      { status: 403 },
     );
   }
-  if (password.length < 8) {
-    return Response.json({ error: "password must be at least 8 characters" }, { status: 400 });
-  }
 
-  const admin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  );
-
-  const user = await admin.auth.admin.createUser({
-    email,
-    password,
-    // Phase 2 shortcut — see above.
-    email_confirm: true,
+  return Response.json({
+    familyId: outcome.familyId,
+    created: outcome.created,
+    canWrite: outcome.canWrite,
   });
-  if (user.error || !user.data.user) {
-    // the message is the auth server's, which distinguishes "already registered" from a
-    // weak password. Not rewritten, because guessing at it would be worse.
-    return Response.json({ error: user.error?.message ?? "could not create the account" }, { status: 400 });
-  }
-
-  try {
-    const provisioned = await platformStore().provisionHousehold({
-      accountId: user.data.user.id,
-      email,
-      householdName,
-      displayName,
-    });
-    // Development only, behind PASHKI_DEV_ISSUE_ENTITLEMENT — a household with no
-    // entitlement can read and not write, which is correct and unusable. Reported in the
-    // response rather than assumed, so the caller knows which of the two it got.
-    const entitlement = await issueDevelopmentEntitlement(provisioned.family.id);
-
-    return Response.json({
-      familyId: provisioned.family.id,
-      created: provisioned.created,
-      canWrite: entitlement.issued,
-      ...(entitlement.reason ? { entitlementNote: entitlement.reason } : {}),
-    });
-  } catch (thrown) {
-    // The auth user exists and has no household. Provisioning is idempotent, so signing in
-    // and retrying completes it rather than duplicating — which is why this does not try to
-    // delete the user and unwind.
-    const detail = thrown instanceof Error ? thrown.message : String(thrown);
-    return Response.json({ error: `account created but household provisioning failed: ${detail}` }, { status: 500 });
-  }
 }
