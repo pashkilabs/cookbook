@@ -18,6 +18,41 @@ pnpm --filter @pashki/db db:stop
 not faked when they do run — RLS is enforced by Postgres against a real JWT, and
 a mocked version would only prove that the mock filters rows.
 
+## Pushing to a hosted project
+
+```bash
+cd packages/db                 # not the repo root — see below
+npx supabase login             # once, interactive
+npx supabase link --project-ref <ref>
+pnpm db:push:dry               # read the migration list before applying it
+pnpm db:push                   # migrations + seed
+```
+
+Four things that are easy to get wrong.
+
+**Run the CLI from here.** It derives its project id from the working directory, so from
+the repo root it looks for a project that does not exist and reports `supabase start is
+not running` — for a stack that is running fine.
+
+**`db push` does not seed.** Only `db reset` does. Without `--include-seed` you get
+nineteen empty tables, and the shopping-list maths has no catalog to consolidate
+against. Both scripts above pass it.
+
+**The migrations check themselves.** Every one ends in `DO` blocks asserting what it
+just did — bucket privacy, the RLS invariants, the grant matrix, the composite keys. A
+hosted environment that differs from local fails the migration rather than half-applying
+it. That is the intended behaviour; read the error rather than working around it.
+
+**Never point the test suite at a hosted project.** `db:reset` drops everything,
+`test:mutate` deliberately makes RLS policies permissive and restores them afterwards,
+and the fixtures create and delete auth users on every run. All of it assumes a
+disposable database. `test/local-instance.ts` only ever discovers a *local* stack — it
+asks `supabase status` and filters `docker ps` — so this cannot happen by accident.
+Keep it that way.
+
+`gen:types` stays pointed at `--local` on purpose: the hosted schema is the same schema,
+and generating from local keeps the committed types reproducible without network access.
+
 ## The seeded catalog
 
 ```bash
