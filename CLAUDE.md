@@ -151,6 +151,17 @@ models be good enough. Do not add a silent-save path.
   reproduce the post-reset flake reported clean because they were replays of an earlier
   run. If `pnpm check` ever gets fast enough to be suspicious, check `cache: false` is
   still on the `test` task.
+- **Hosted Supabase and the local image disagree about what "default" means.** Hosted
+  runs `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon,
+  authenticated`, so a new table is born with full DML for anonymous clients. The local
+  image narrows the same ACL to `Dxtm` and grants no DML at all. **Every migration is
+  therefore written and tested against a stricter environment than production**, and a
+  local-only green is not evidence that the grant matrix is right. Any migration adding
+  a table must revoke client privileges and re-grant explicitly, and assert the
+  resulting matrix in a `DO` block — `pnpm --filter @pashki/db check:parity` compares the
+  two environments and is the only thing that can catch the difference. Found when the
+  first hosted push refused itself: `import_cache`, one shared row set for the whole
+  user base, was readable by `anon`, with only RLS between a stranger and the catalog.
 - **Row-level security says nothing about columns.** A policy decides which *rows* a
   caller may write; a table-wide `INSERT`/`UPDATE` grant then lets it write every
   column of those rows. Correct policies therefore coexisted with a client able to set
