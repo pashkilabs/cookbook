@@ -158,6 +158,20 @@ models be good enough. Do not add a silent-save path.
   person is *permitted* to see, which is not the same as everything that is theirs. Found
   when the recipe list rendered another household's published roast chicken, with every
   policy behaving exactly as intended.
+- **The local stack and hosted also disagree about email confirmation, in the other
+  direction.** Hosted ships `mailer_autoconfirm: false` — confirmation required. The CLI ships
+  `enable_confirmations = false` — auto-confirm. So local is the *more permissive* of the two
+  here, and every negative test about unconfirmed accounts passes vacuously until
+  `supabase/config.toml` is fixed. Neither environment is reliably stricter than the other;
+  they simply differ, and `config.toml` has to be read against the hosted config rather than
+  trusted. `pnpm --filter @pashki/db check:parity` compares schema and privileges, **not auth
+  settings** — nothing automated catches this one yet.
+- **GoTrue matches `redirect_to` against its allow list, and a path under `site_url` is not
+  implied.** An unlisted redirect is not an error: it is silently replaced with `site_url`, so
+  the link in the email goes somewhere plausible and wrong. Add the path glob
+  (`http://host:port/**`) to `additional_redirect_urls` locally and `uri_allow_list` on hosted.
+  And build that URL from configuration, never from the request's `Host` header — a Host is
+  attacker-controlled, and an email built from one is a poisoned confirmation link.
 - **Hosted Supabase and the local image disagree about what "default" means.** Hosted
   runs `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon,
   authenticated`, so a new table is born with full DML for anonymous clients. The local
