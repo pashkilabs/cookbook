@@ -200,9 +200,12 @@ nothing implements yet. Tier 3 accepts images and Phase 4 owns video, so the sha
 target's real job is triage, not receiving. Build it as triage.
 
 **`import_jobs` has a drain but no scheduler.** The runner claims work atomically
-and is callable from a route; nothing calls it on a timer. A device that submits an
-import and closes waits forever. Cron, a queue trigger, or a Supabase scheduled
-function — the choice is small, its absence is not.
+and the batch screen now calls it — in slices, while somebody is on the page — so the
+queue is reachable from the product. Nothing calls it on a timer. A device that submits
+an import and closes waits until someone reopens the page. Cron, a queue trigger, or a
+Supabase scheduled function — the choice is small, its absence is not. Decisions §31
+lists what else a deployed worker brings: concurrency, cross-household fairness, and a
+reaper for the photo objects an abandoned review leaves behind.
 
 ---
 

@@ -919,6 +919,71 @@ trade-offs, not moving it back into the route.
 
 ---
 
+## 31. The batch runner is triggered by the app, and production needs a worker
+
+**Decided.** `POST /api/import/drain` claims and runs a few jobs per call, and the batch screen
+calls it in a loop while a person is on the page. That is what makes the queue reachable now; it
+is not what it should be.
+
+The queue itself was always the deployable half. `import_claim_next_job` is `FOR UPDATE SKIP
+LOCKED` with a 300-second lease, so concurrent workers never take the same row and a worker that
+dies mid-job returns its job to the pool. None of that assumes who calls it. What is missing is
+only the *caller*.
+
+Triggering from the app buys the whole feature at the cost of three properties:
+
+- **A request timeout bounds the batch.** Hence the slicing — three jobs per call, and the screen
+  loops — rather than one call that drains twenty and risks being cut off at the platform's limit.
+- **Closing the tab pauses the batch.** Nothing is lost: the rows are in the database and
+  reopening the page carries on. But a person who submits and leaves gets nothing until they come
+  back, which is precisely the case a share target from a phone will produce.
+- **Nothing reclaims a lease when no one is looking.** The reclaim is real, and it only fires when
+  something calls `claim`. A job whose worker died stays `running` until the next drain.
+
+**What production needs**, in the order it matters:
+
+1. **A scheduler.** Supabase's `pg_cron` calling an Edge Function, or a container on a timer, or
+   a queue trigger. Small choice; its absence is the entire gap.
+2. **Concurrency.** The drain is strictly serial: measured at ~0.9 s per job median and 2.8 s at
+   worst, so twenty links is roughly twenty seconds of wall clock for work that is almost entirely
+   waiting on other people's servers. Four workers is a four-fold improvement for no cleverness,
+   and `SKIP LOCKED` already permits it.
+3. **Fairness.** `import_claim_next_job` orders by `created_at` across every household, so one
+   household pasting fifty links delays everyone behind them. FIFO is right until it is not; the
+   fix is claiming round-robin by `family_id`, and it is not needed until there is a second
+   household with a batch.
+4. **A reaper for abandoned reviews.** A job left in `review` holds a stored photo object that no
+   `photos` row points at, so nothing can read it and nothing deletes it.
+
+*Would change if:* the drain moves to a deployed worker, at which point the route stays as the
+manual override — "run my batch now" — rather than being deleted.
+
+---
+
+## 32. A failed import still spends the household's allowance
+
+**Decided, and worth naming because it will feel wrong to somebody.** Quota is consumed before
+the fetch, not after a successful extraction. A page that 404s costs an import.
+
+Measured on a deliberately messy batch of twenty-two lines: fifteen reached the queue and ten of
+those failed to fetch, so two thirds of the allowance was spent producing nothing. That is the
+worst case and it is not hypothetical — link rot, bot-blocking CDNs and paywalls are the normal
+state of the recipe web.
+
+The reason it is charged anyway is that **the fetch is the cost**. The request went out, the
+bytes came back, and a failure is not free to produce — the alternative is a meter that charges
+only for successes and can therefore be driven indefinitely by anything that fails. Charging
+first and refunding on failure is the version with a race in it.
+
+Two things make it survivable rather than merely defensible. A cached URL is not charged at all,
+verified end to end: five links already in the shared cache drained in 1.5 s with `quota_consumed_at`
+null on every row. And `quota_consumed_at` means a retry of the same job never charges twice.
+
+*Would change if:* the allowance becomes tight enough that this dominates. The fix is a cheaper
+first pass — a `HEAD` request, or charging only once bytes arrive — not a refund path.
+
+---
+
 ## Open: cascade deletions and tombstones
 
 **Not resolved. This waits on the sync engine choice, and exists so the evaluation
