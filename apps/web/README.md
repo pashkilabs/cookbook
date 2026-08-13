@@ -55,10 +55,19 @@ people double-click.
 `app/api/household/route.ts`. Real public signup needs a confirmation flow — without one,
 anybody can claim any address. One line, and whoever opens signup has to see it.
 
-**A new household has no entitlement, so it can read and not write.** That is decisions §9
-working as intended (absence is not an unmetered allowance) and issuance is blocked on
-Apple's outside-purchase rules. The practical effect: a household created here shows an
-empty list and cannot add to it until entitlement issuance exists.
+**A new household has no entitlement, so it can read and not write** — decisions §9 working
+as intended, since absence is not an unmetered allowance. Real issuance is a billing webhook
+blocked on Apple's outside-purchase rules.
+
+For local work, `PASHKI_DEV_ISSUE_ENTITLEMENT=true` makes sign-up issue one so a created
+household can actually write. **It is not a trial and not a free tier** — both are open
+questions in `docs/decisions.md`, and the numbers in `lib/dev-entitlement.ts` are
+development values rather than policy. It is off unless set to exactly `"true"`, it logs a
+warning every time it fires, and it is named for what it is so that finding it set in a
+deployed environment reads as a mistake. It is deliberately not also gated on `NODE_ENV`:
+`next start` serves a production build, so that check cannot tell a laptop from a
+deployment and would only break the workflow the flag exists for. When there is a real
+deployment, gate it on that platform's own environment marker.
 
 **No design system.** `packages/ui` does not exist; `app/globals.css` is plain enough to
 read and not worth keeping. Building one inside one screen is how it ends up living here.

@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { platformStore } from "@/lib/platform";
+import { issueDevelopmentEntitlement } from "@/lib/dev-entitlement";
 
 /**
  * Sign up: create the auth user, then the account, household and membership.
@@ -61,9 +62,16 @@ export async function POST(request: Request) {
       householdName,
       displayName,
     });
+    // Development only, behind PASHKI_DEV_ISSUE_ENTITLEMENT — a household with no
+    // entitlement can read and not write, which is correct and unusable. Reported in the
+    // response rather than assumed, so the caller knows which of the two it got.
+    const entitlement = await issueDevelopmentEntitlement(provisioned.family.id);
+
     return Response.json({
       familyId: provisioned.family.id,
       created: provisioned.created,
+      canWrite: entitlement.issued,
+      ...(entitlement.reason ? { entitlementNote: entitlement.reason } : {}),
     });
   } catch (thrown) {
     // The auth user exists and has no household. Provisioning is idempotent, so signing in
