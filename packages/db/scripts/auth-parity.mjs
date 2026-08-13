@@ -60,15 +60,30 @@ const SETTINGS = {
   },
   rate_limit_email_sent: {
     local: "GOTRUE_RATE_LIMIT_EMAIL_SENT",
-    expectedToDiffer:
-      "local sends freely so the confirmation flow is testable; hosted's 2/hour is the real constraint and the blocker for public signup",
+    expectedToDiffer: (_local, hosted) =>
+      Number(hosted) <= 2
+        ? "local sends freely so the confirmation flow is testable; hosted's 2/hour is the ceiling imposed by having no SMTP provider, and the blocker for public signup"
+        : "local sends freely so the confirmation flow is testable; hosted's limit is what its provider and its appetite for a signup loop allow",
   },
   smtp_host: {
     local: "GOTRUE_SMTP_HOST",
-    expectedToDiffer: "local captures mail in Mailpit; hosted has none configured, which is the same blocker",
+    /*
+     * Two very different states wear the same "differs" badge here, so the reason is computed
+     * rather than written down once. Baking "hosted has none configured" into a string would
+     * have kept printing it after one was configured — a parity check quietly asserting a stale
+     * fact is worse than one that says nothing.
+     */
+    expectedToDiffer: (_local, hosted) =>
+      hosted === "(not set)"
+        ? "local captures mail in Mailpit; HOSTED HAS NO PROVIDER, so it sends 2 emails an hour through a shared address — run pnpm --filter @pashki/db set:smtp"
+        : "local captures mail in Mailpit; hosted sends through its own provider",
   },
   smtp_admin_email: {
     local: "GOTRUE_SMTP_ADMIN_EMAIL",
+    expectedToDiffer: "follows smtp_host",
+  },
+  smtp_sender_name: {
+    local: "GOTRUE_SMTP_SENDER_NAME",
     expectedToDiffer: "follows smtp_host",
   },
   smtp_max_frequency: {
@@ -97,7 +112,10 @@ export async function compareAuthSettings({ projectRef, accessToken }) {
       local: mine,
       hosted: theirs,
       differs: mine !== theirs,
-      expectedToDiffer: spec.expectedToDiffer,
+      expectedToDiffer:
+        typeof spec.expectedToDiffer === "function"
+          ? spec.expectedToDiffer(mine, theirs)
+          : spec.expectedToDiffer,
     });
   }
 
