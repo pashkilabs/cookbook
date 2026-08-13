@@ -3,6 +3,8 @@ import Link from "next/link";
 import { formatAsWritten } from "@pashki/core";
 import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
+import { startOfWeek, todayIso } from "@/lib/week";
+import { ShortlistButton } from "../shortlist-button";
 import { RemoveRecipe } from "./remove";
 import { Verdicts } from "./verdicts";
 
@@ -81,6 +83,16 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
 
   const scores = new Map(ratings.data?.map((r) => [r.family_member_id, r.score]) ?? []);
 
+  const weekStart = startOfWeek(todayIso());
+  const { data: shortlisted } = await supabase
+    .from("shortlist_entries")
+    .select("id")
+    .eq("family_id", family.id)
+    .eq("week_start", weekStart)
+    .eq("recipe_id", recipe.id)
+    .is("deleted_at", null)
+    .maybeSingle();
+
   return (
     <main>
       <p className="subtitle" style={{ marginBottom: "0.75rem" }}>
@@ -103,6 +115,11 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
           </p>
         </div>
         <div className="tabs" style={{ margin: 0 }}>
+          <ShortlistButton
+            recipeId={recipe.id}
+            weekStart={weekStart}
+            shortlisted={shortlisted !== null}
+          />
           <Link className="button" href={`/recipes/${recipe.id}/edit`}>
             Edit
           </Link>

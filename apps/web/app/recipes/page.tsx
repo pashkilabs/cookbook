@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
 import { keepWholeFamilyLikes, searchRecipes } from "@/lib/recipe-search";
+import { startOfWeek, todayIso } from "@/lib/week";
+import { ShortlistButton } from "./shortlist-button";
 import { Filters, FILTERS, type FilterKey } from "./filters";
 import { SignOutButton } from "./sign-out";
 
@@ -58,6 +60,16 @@ export default async function RecipesPage({
       : found.hits;
   const error = found.error;
 
+  // which of these are already wanted this week, so the button starts in the right state
+  const weekStart = startOfWeek(todayIso());
+  const { data: shortlisted } = await supabase
+    .from("shortlist_entries")
+    .select("recipe_id")
+    .eq("family_id", family.id)
+    .eq("week_start", weekStart)
+    .is("deleted_at", null);
+  const onThisWeek = new Set((shortlisted ?? []).map((row) => row.recipe_id));
+
   return (
     <main>
       <div className="bar">
@@ -66,6 +78,9 @@ export default async function RecipesPage({
           <p className="subtitle" style={{ margin: 0 }}>{auth.user.email}</p>
         </div>
         <div className="tabs" style={{ margin: 0 }}>
+          <Link className="button" href="/planner">
+            Planner
+          </Link>
           <Link className="button" href="/recipes/new">
             Add a recipe
           </Link>
@@ -116,6 +131,13 @@ export default async function RecipesPage({
           {matchedIngredient && (
             <p className="matched">contains {matchedIngredient}</p>
           )}
+          <div className="card-actions">
+            <ShortlistButton
+              recipeId={recipe.id}
+              weekStart={weekStart}
+              shortlisted={onThisWeek.has(recipe.id)}
+            />
+          </div>
         </Link>
       ))}
     </main>

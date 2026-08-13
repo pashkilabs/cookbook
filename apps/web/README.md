@@ -9,6 +9,7 @@ one into.
 | `/recipes/new` | type one in |
 | `/recipes/[id]` | ingredients through `@pashki/core`, the method, the photo, per-member ratings |
 | `/recipes/[id]/edit` | change it |
+| `/planner` | a week, seven days, and whatever is shortlisted waiting for one |
 
 **Ingredient lines go through core's parser, not a form with separate amount/unit/item
 fields.** That is deliberate: it is the same path an import will take, so every recipe typed by
@@ -28,6 +29,35 @@ has not earned. An unrated recipe is not liked by the whole family; it is unknow
 ingredient line has, so "line 3 changed" and "a line was inserted above it" are
 indistinguishable from the text alone. The old rows are tombstoned, which is also what a syncing
 peer needs.
+
+## The planner
+
+`meal_plans`, `plan_entries` and `shortlist_entries` had never been rendered. The flow is
+browse → shortlist → schedule, and the shortlist is what separates the two: a recipe can be
+wanted this week without yet having a day.
+
+**Week arithmetic is UTC, in `lib/week.ts`, and unit-tested.** `week_start` and `date` are
+Postgres `date` columns — a calendar day with no zone. Local `Date` maths would mean a household
+in Auckland planning Monday and the server storing Sunday, a bug that appears for some people at
+some times of year. Anchoring at UTC midnight and never formatting through a locale removes the
+class, daylight saving included. Writing the tests found a real one: `Date.UTC(2026, 1, 30)` does
+not fail, it rolls into March, so `?week=2026-02-30` would have silently opened a different week
+— `isIsoDate` now validates by round-tripping.
+
+**The week's `meal_plans` row is created on demand**, by the first placement, so a household that
+never opens the planner accumulates no empty weeks. Find-then-insert rather than upsert, because
+the unique index is partial (`where deleted_at is null`) and PostgREST cannot name one as an
+`ON CONFLICT` target; a lost race returns `23505`, which is read back rather than reported.
+
+**`week_start` is derived from the day being planned**, never taken from the caller alongside it.
+Nothing in the schema ties an entry's date to its plan's week — the composite key ties it to the
+*household* — so two sources could disagree.
+
+**Placing a recipe takes it off the shortlist**, because it is no longer waiting for a day. Both
+shortlist verbs are idempotent: the button behind them can be pressed twice on a slow connection,
+and the caller asked for a state rather than an event.
+
+Scales are 1×, 1.5× and 2× — the prototype's, and a free numeric field invites 0.3333.
 
 **Removal is a tombstone too.** Clients hold no `DELETE` privilege (091300) because a
 hard-deleted row cannot be told from one that never synced. Confirmation is inline, never
