@@ -96,8 +96,13 @@ but never sign in. Keep them separate, linked optionally.
 
 **The grocery catalog is data, not code.** `SEED_CATALOG` is seed data for the
 `ingredients` and `grocery_packages` tables. Build catalogs via
-`createCatalog(items)`. Nothing may import `SEED_CATALOG` outside seeding and
-tests.
+`createCatalog(items)`. Nothing may import `SEED_CATALOG` — or `METRIC_PACKAGES`,
+`seedCatalogFor`, `metricPackageCoverage` — outside seeding and tests.
+
+**Catalog names are singular; the display pluralises.** `formatCountable` and `pluralise`
+handle count nouns with an irregulars list, because storing "lemons" fixes "3 lemons" and
+breaks "1 lemon". Plurals live in `names` as aliases, since that is what recipes are written
+in.
 
 **Base units are millilitres and grams.** Convert on the way in, format on the
 way out. Never do arithmetic on written units.

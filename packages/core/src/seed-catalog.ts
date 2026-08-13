@@ -10,6 +10,17 @@ import type { CatalogItem } from "./types.js";
  *
  * `amount` values are in the dimension's base unit: millilitres or grams.
  */
+/**
+ * The grocery catalog, as data.
+ *
+ * **Canonical names — the first in each `names` array — are singular.** The display pluralises
+ * (`formatCountable`), because a list has to say "1 lemon" as often as "3 lemons" and storing
+ * one form breaks the other. Plurals stay in the array as aliases, since that is what recipes
+ * are written in: "3 lemons" has to find this item.
+ *
+ * `garlic` is named for the thing rather than the unit: its dimension is `clove`, so
+ * `formatMeasure` supplies "2 cloves" and the name supplies "garlic".
+ */
 export const SEED_CATALOG: CatalogItem[] = [
   // ---- Dairy ----
   { key: "heavy-cream", names: ["heavy cream", "heavy whipping cream", "whipping cream", "double cream"],
@@ -41,7 +52,7 @@ export const SEED_CATALOG: CatalogItem[] = [
     packages: [{ label: "5 oz wedge", amount: 142 }, { label: "8 oz wedge", amount: 227 }] },
   { key: "feta", names: ["feta"], aisle: "Dairy", dimension: "weight", gramsPerCup: 150,
     packages: [{ label: "6 oz", amount: 170 }, { label: "8 oz", amount: 227 }] },
-  { key: "eggs", names: ["large eggs", "eggs", "egg"], aisle: "Dairy", dimension: "count",
+  { key: "eggs", names: ["large egg", "large eggs", "eggs", "egg"], aisle: "Dairy", dimension: "count",
     packages: [{ label: "half dozen", amount: 6 }, { label: "dozen", amount: 12 }, { label: "18-count", amount: 18 }] },
 
   // ---- Meat & Seafood ----
@@ -69,11 +80,11 @@ export const SEED_CATALOG: CatalogItem[] = [
   { key: "onion", names: ["yellow onion", "white onion", "red onion", "onions", "onion"],
     aisle: "Produce", dimension: "count",
     packages: [{ label: "loose", amount: 1 }, { label: "3 lb bag (~6)", amount: 6 }] },
-  { key: "garlic", names: ["garlic cloves", "garlic"], aisle: "Produce", dimension: "clove",
+  { key: "garlic", names: ["garlic", "garlic cloves", "garlic clove"], aisle: "Produce", dimension: "clove",
     packages: [{ label: "1 head (~10 cloves)", amount: 10 }, { label: "3-pack heads", amount: 30 }] },
-  { key: "lemon", names: ["lemons", "lemon"], aisle: "Produce", dimension: "count",
+  { key: "lemon", names: ["lemon", "lemons"], aisle: "Produce", dimension: "count",
     packages: [{ label: "loose", amount: 1 }, { label: "bag of 5", amount: 5 }] },
-  { key: "lime", names: ["limes", "lime"], aisle: "Produce", dimension: "count",
+  { key: "lime", names: ["lime", "limes"], aisle: "Produce", dimension: "count",
     packages: [{ label: "loose", amount: 1 }, { label: "bag of 5", amount: 5 }] },
   { key: "potatoes", names: ["russet potatoes", "yukon gold potatoes", "baby potatoes", "potatoes", "potato"],
     aisle: "Produce", dimension: "weight",
@@ -87,7 +98,7 @@ export const SEED_CATALOG: CatalogItem[] = [
     packages: [{ label: "loose", amount: 1 }, { label: "3-pack", amount: 3 }] },
   { key: "spinach", names: ["baby spinach", "spinach"], aisle: "Produce", dimension: "weight",
     packages: [{ label: "5 oz box", amount: 142 }, { label: "10 oz box", amount: 283 }] },
-  { key: "tomatoes", names: ["roma tomatoes", "cherry tomatoes", "tomatoes", "tomato"],
+  { key: "tomatoes", names: ["roma tomato", "roma tomatoes", "cherry tomatoes", "cherry tomato", "tomatoes", "tomato"],
     aisle: "Produce", dimension: "count",
     packages: [{ label: "loose", amount: 1 }, { label: "pint container", amount: 12 }] },
   { key: "mushrooms", names: ["cremini mushrooms", "button mushrooms", "mushrooms"],
@@ -95,7 +106,7 @@ export const SEED_CATALOG: CatalogItem[] = [
     packages: [{ label: "8 oz pack", amount: 227 }, { label: "16 oz pack", amount: 454 }] },
   { key: "broccoli", names: ["broccoli"], aisle: "Produce", dimension: "count",
     packages: [{ label: "1 crown", amount: 1 }] },
-  { key: "avocado", names: ["avocados", "avocado"], aisle: "Produce", dimension: "count",
+  { key: "avocado", names: ["avocado", "avocados"], aisle: "Produce", dimension: "count",
     packages: [{ label: "loose", amount: 1 }, { label: "bag of 4", amount: 4 }] },
   { key: "cilantro", names: ["fresh cilantro", "cilantro", "coriander"], aisle: "Produce", dimension: "bunch",
     packages: [{ label: "1 bunch", amount: 1 }] },
@@ -143,10 +154,11 @@ export const SEED_CATALOG: CatalogItem[] = [
     packages: [{ label: "8 oz bottle", amount: 237 }, { label: "12 oz bottle", amount: 355 }] },
 
   // ---- Bakery & Frozen ----
-  { key: "tortillas", names: ["flour tortillas", "corn tortillas", "tortillas"], aisle: "Bakery", dimension: "count",
+  { key: "tortillas", names: ["flour tortilla", "flour tortillas", "corn tortillas", "corn tortilla", "tortillas", "tortilla"], aisle: "Bakery", dimension: "count",
     packages: [{ label: "pack of 8", amount: 8 }, { label: "pack of 12", amount: 12 }] },
   { key: "bread", names: ["sandwich bread", "baguette", "bread"], aisle: "Bakery", dimension: "count",
     packages: [{ label: "1 loaf", amount: 1 }] },
   { key: "frozen-peas", names: ["frozen peas", "frozen corn", "frozen vegetables"], aisle: "Frozen", dimension: "weight",
     packages: [{ label: "10 oz bag", amount: 283 }, { label: "16 oz bag", amount: 454 }] },
 ];
+

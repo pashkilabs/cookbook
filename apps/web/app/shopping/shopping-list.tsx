@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import type { ShoppingLine } from "@pashki/core";
+import { formatCountable, pluralise, type ShoppingLine } from "@pashki/core";
 
 /**
  * The list, and the two things you can do to it while standing in a shop.
@@ -112,11 +112,18 @@ export function ShoppingList(props: {
                 <div className="what">
                   <p className="buy">
                     {/* the package decision, said plainly */}
+                    {/*
+                      Catalog names are singular; core pluralises. "a bag of potatoes" is plural
+                      whatever the count, while a bare quantity agrees with its number — which is
+                      why the two branches ask for different forms rather than sharing one string.
+                    */}
                     {line.packagesDisplay ? (
                       <>
                         <strong>{line.packagesDisplay}</strong>{" "}
-                        <span className="meta">of {line.label}</span>
+                        <span className="meta">of {pluralise(line.label)}</span>
                       </>
+                    ) : line.dimension === "count" ? (
+                      <strong>{formatCountable(line.needed, line.label)}</strong>
                     ) : (
                       <>
                         <strong>{line.neededDisplay || line.label}</strong>{" "}
