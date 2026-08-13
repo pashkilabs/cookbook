@@ -10,6 +10,7 @@ one into.
 | `/recipes/[id]` | ingredients through `@pashki/core`, the method, the photo, per-member ratings |
 | `/recipes/[id]/edit` | change it |
 | `/planner` | a week, seven days, and whatever is shortlisted waiting for one |
+| `/shopping` | the week's list, merged through `consolidate()` |
 
 **Ingredient lines go through core's parser, not a form with separate amount/unit/item
 fields.** That is deliberate: it is the same path an import will take, so every recipe typed by
@@ -29,6 +30,31 @@ has not earned. An unrated recipe is not liked by the whole family; it is unknow
 ingredient line has, so "line 3 changed" and "a line was inserted above it" are
 indistinguishable from the text alone. The old rows are tombstoned, which is also what a syncing
 peer needs.
+
+## The shopping list
+
+Every number on that page comes from `consolidate()` in `packages/core` — the merging, the unit
+conversion, the package choice, the leftovers and the aisle order. **The app recomputes none of
+it.** `lib/shopping.ts` assembles inputs and `groupByAisle` only breaks an already-sorted list
+into runs; re-sorting would be the app deciding aisle order.
+
+**The catalog is read from `ingredients` and `grocery_packages`**, through
+`@pashki/db/catalog` — the first thing in the product to use catalog-as-data. `SEED_CATALOG`
+stays where it belongs, in seeding and tests, and `check-seed-catalog-usage.mjs` enforces that.
+
+**Stored ingredient rows are rebuilt into text and re-parsed** rather than hand-assembled into
+`ParsedIngredient` objects. The rows are already the parser's own output, so round-tripping
+through the one implementation avoids a second, subtly different one living in the app.
+
+**The package line is the loudest thing on a row**, because it is the product: *"pint (16 oz) of
+heavy cream — pasta takes 1 cup, soup takes ½ cup, ½ cup spare"*. One pint bought instead of two
+half-pints and waste.
+
+Ticks live in `shopping_ticks`, keyed by `(family, week, item_key)`, and move in the UI before
+the write lands — a shop is no place to wait for a round trip — rolling back if it is refused.
+The pantry marks what you already have; an entry created from a shopping line carries no
+quantity, which `consolidate()` treats as "flag it, deduct nothing". That is the honest reading
+of somebody glancing in a cupboard.
 
 ## The planner
 

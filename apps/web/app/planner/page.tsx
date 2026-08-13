@@ -89,6 +89,9 @@ export default async function PlannerPage({
           <Link className="chip" href={`/planner?week=${addWeeks(weekStart, 1)}`}>
             Next →
           </Link>
+          <Link className="button" href={`/shopping?week=${weekStart}`}>
+            Shopping
+          </Link>
           <Link className="button" href="/recipes">
             Recipes
           </Link>
@@ -109,9 +112,7 @@ export default async function PlannerPage({
         waiting={waiting}
       />
 
-      <p className="subtitle" style={{ marginTop: "2rem" }}>
-        The shopping list comes next — that is where a week of recipes becomes one trip.
-      </p>
+
     </main>
   );
 }
