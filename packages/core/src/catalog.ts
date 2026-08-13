@@ -22,7 +22,11 @@ const AISLE_HINTS: Record<string, string[]> = {
   Pantry: ["vinegar", "mustard", "ketchup", "mayo", "oats", "nuts", "raisin",
     "cornstarch", "cornflour", "baking soda", "baking powder", "yeast", "sesame",
     "sriracha", "salsa", "peanut butter", "quinoa", "couscous", "lentil", "panko",
-    "breadcrumb", "wine", "broth", "stock", "syrup", "sauce"],
+    "breadcrumb", "wine", "broth", "stock", "syrup", "sauce",
+    // dried carbohydrates: found missing when a real week put tagliatelle in "Other",
+    // which is the aisle for things nobody could classify rather than a shelf in a shop
+    "pasta", "spaghetti", "tagliatelle", "linguine", "penne", "macaroni", "fusilli",
+    "noodle", "orzo", "rice", "polenta", "flour"],
 };
 
 export interface Catalog {
@@ -64,14 +68,30 @@ export function createCatalog(items: CatalogItem[]): Catalog {
     return found;
   }
 
+  /**
+   * The longest matching hint wins, not the first aisle that matches.
+   *
+   * First-match-wins made the order of `AISLE_HINTS` load-bearing, and it lost: "egg noodles"
+   * found "egg" in Dairy before reaching "noodle" in Pantry. Longest-match is the same rule
+   * `find` already uses on catalog names, for the same reason — a longer hint is a more specific
+   * claim, whichever list it happens to sit in.
+   */
   function aisleFor(name: string): string {
     const item = find(name);
     if (item) return item.aisle;
     const n = normaliseName(name);
+
+    let bestAisle = "Other";
+    let bestLength = 0;
     for (const [aisle, words] of Object.entries(AISLE_HINTS)) {
-      if (words.some((w) => n.includes(w))) return aisle;
+      for (const word of words) {
+        if (word.length > bestLength && n.includes(word)) {
+          bestAisle = aisle;
+          bestLength = word.length;
+        }
+      }
     }
-    return "Other";
+    return bestAisle;
   }
 
   return { find, aisleFor, all: () => items };
