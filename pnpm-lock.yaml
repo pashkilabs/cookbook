@@ -17,6 +17,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@pashki/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@pashki/platform-client':
         specifier: workspace:*
         version: link:../../packages/platform-client

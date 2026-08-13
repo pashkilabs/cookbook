@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
@@ -84,7 +85,7 @@ export default async function RecipesPage() {
       )}
 
       {recipes?.map((recipe) => (
-        <article className="card" key={recipe.id}>
+        <Link className="card" key={recipe.id} href={`/recipes/${recipe.id}`}>
           <h2>{recipe.title}</h2>
           <p className="meta" style={{ margin: 0 }}>
             {[
@@ -97,7 +98,7 @@ export default async function RecipesPage() {
               .filter(Boolean)
               .join(" · ") || "no details yet"}
           </p>
-        </article>
+        </Link>
       ))}
     </main>
   );

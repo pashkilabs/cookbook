@@ -1,6 +1,10 @@
 # @pashki/web
 
-The web app. One screen so far: the recipe list.
+The web app. Two screens: the recipe list, and one recipe.
+
+`/recipes` lists the household's recipes; a card links to `/recipes/[id]`, which shows
+ingredients formatted by `@pashki/core`, the method from `recipe_steps`, the photo, and
+per-member ratings on the five-point scale. Rating and make-again are the only writes.
 
 ```bash
 cp .env.local.example .env.local   # then fill it in — see below
@@ -30,10 +34,24 @@ from the session cookie, so `recipes` is read as `authenticated` and row-level s
 decides which rows come back. Reading with the service role and filtering in application
 code would have worked until the day somebody forgot the filter.
 
-**The list also filters by `family_id`, which is not redundant.** Published recipes are
-world-readable (decisions §17), so RLS legitimately returns other households' public
-recipes. Isolation and presentation are different questions — without the filter, this
-screen showed a stranger's roast chicken, which the first render of it duly did.
+**Both screens filter by `family_id`, which is not redundant.** Published recipes are
+world-readable (decisions §17), so RLS legitimately returns other households' public recipes.
+Isolation and presentation are different questions — without the filter, the list showed a
+stranger's roast chicken, which the first render of it duly did. On the detail screen the same
+filter is what makes an id belonging to somebody else `notFound()`: a stranger's *published*
+recipe 404s on a URL guess rather than rendering, and an id that does not exist 404s
+identically, so neither answer confirms the recipe is real.
+
+**A rating is update-then-insert, not an upsert.** `ratings_one_per_member` is a partial unique
+index (`where deleted_at is null`) and PostgREST cannot name one as an `ON CONFLICT` target —
+it has no way to restate the predicate. Two devices rating the same person in the same instant
+can therefore both insert; the index refuses the second, which surfaces as a message rather
+than a duplicate.
+
+**The photo is a signed URL, signed as the viewer.** The bucket is private, so the storage
+policy — which resolves through the `photos` row — is what authorises it, the same reasoning as
+reading the rows. Verified end to end: the page renders a signed URL, it serves the image, and
+an unauthenticated caller is refused the same object.
 
 **The household id comes from the seam.** `family_members` is a platform table and
 `check-platform-tables.mjs` fails the build on a direct read, so the page asks

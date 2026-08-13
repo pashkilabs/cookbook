@@ -64,3 +64,34 @@ button[disabled] { opacity: 0.55; cursor: progress; }
 
 .error { color: #8c2f14; font-size: 0.9rem; }
 .tabs { display: flex; gap: 0.5rem; margin-bottom: 1.25rem; }
+
+/* The detail screen. Still deliberately plain — packages/ui does not exist yet. */
+a.card { display: block; text-decoration: none; color: inherit; }
+a.card:hover { border-color: var(--accent); }
+a.card h2 { color: var(--accent); }
+
+section { margin-bottom: 2rem; }
+
+.photo {
+  display: block; width: 100%; height: auto; max-height: 22rem;
+  object-fit: cover; border: 1px solid var(--line); margin-bottom: 2rem; background: #fff;
+}
+
+ul.ingredients { list-style: none; padding: 0; margin: 0; }
+ul.ingredients li { padding: 0.4rem 0; border-bottom: 1px solid var(--line); }
+.measure { display: inline-block; min-width: 6rem; color: var(--muted); }
+.estimated {
+  margin-left: 0.5rem; padding: 0.05rem 0.35rem; font-size: 0.72rem;
+  border: 1px solid var(--line); color: var(--muted); vertical-align: middle;
+}
+
+ol.steps { padding-left: 1.4rem; margin: 0; }
+ol.steps li { padding: 0.35rem 0; }
+
+ul.verdicts { list-style: none; padding: 0; margin: 0; }
+ul.verdicts li {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; padding: 0.5rem 0; border-bottom: 1px solid var(--line);
+}
+.scale { display: flex; gap: 0.3rem; }
+.scale button { min-width: 2.2rem; padding: 0.35rem 0; }
