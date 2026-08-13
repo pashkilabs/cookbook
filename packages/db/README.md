@@ -20,18 +20,34 @@ a mocked version would only prove that the mock filters rows.
 
 ## Pushing to a hosted project
 
-**After every push, run `pnpm check:parity`.** It asks both environments a
-byte-identical set of questions — table and policy counts, storage policies, private
-functions, catalog counts, bucket visibility, composite keys, client grants on the shared
-tables, anon write grants, and `assert_rls_invariants()` in each — and reports where they
-disagree. It reports; it does not fix, because a difference is a decision and the decision
-belongs in a migration.
+**After every push, run `pnpm check:parity`.** Two halves, because both have produced a bug.
 
-Three outcomes with distinct exit codes: `0` parity, `1` a difference or a broken
-invariant, `2` could not reach one of them. The third matters as much as the others — a
-comparison that did not happen is not a comparison that found nothing. Hosted credentials
-come from `SUPABASE_DB_URL`, or `SUPABASE_DB_PASSWORD` plus the linked project ref, and are
-never printed.
+The **database** half asks both environments a byte-identical set of questions — table and
+policy counts, storage policies, private functions, catalog counts, bucket visibility,
+composite keys, client grants on the shared tables, anon write grants, and
+`assert_rls_invariants()` in each.
+
+The **auth** half compares GoTrue settings: autoconfirm, redirect allow lists, every rate
+limit, SMTP configuration, password and captcha policy, token lifetimes. It exists because the
+second asymmetry to bite was not in the schema — local had email confirmation off while hosted
+requires it, so negative tests about unconfirmed accounts passed for the wrong reason. Local is
+read from the running GoTrue container's environment rather than from `config.toml`: the
+container holds what is in effect, the file holds what somebody wrote, and the CLI translates
+between them. Secrets are compared as configured-or-absent and never printed.
+
+Some auth settings are *meant* to differ — `site_url`, the email rate limit, SMTP. Those are
+marked `~~` with a stated reason and not counted, because a check that cries wolf on every run
+gets ignored, which fails the same way silence does. Anything else differing is marked `!!` and
+counted.
+
+It reports; it does not fix. A difference is a decision, and it belongs in a migration or in
+`config.toml`.
+
+Three outcomes with distinct exit codes: `0` parity, `1` a difference or a broken invariant,
+`2` could not reach one of them. The third matters as much as the others — a comparison that
+did not happen is not a comparison that found nothing, so a missing `SUPABASE_ACCESS_TOKEN`
+exits 2 rather than skipping the auth half. Credentials come from `SUPABASE_DB_URL` (or
+`SUPABASE_DB_PASSWORD` plus the linked ref) and `SUPABASE_ACCESS_TOKEN`.
 
 ```bash
 cd packages/db                 # not the repo root — see below

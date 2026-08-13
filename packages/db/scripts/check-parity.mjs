@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 /**
- * Does the hosted database match the local one?
+ * Does the hosted project match the local one?
+ *
+ * Two halves, because both have now produced a bug. The **database** half compares schema and
+ * privileges. The **auth** half compares GoTrue settings, and exists because the second
+ * asymmetry to bite was not in the schema: local had email confirmation off while hosted
+ * requires it, so every negative test about unconfirmed accounts passed for the wrong reason.
  *
  * Every migration is written and tested against the local image, which narrows the
  * default ACL for client roles. Hosted Supabase does the opposite — `ALTER DEFAULT
@@ -30,9 +35,13 @@
  * Hosted credentials come from the environment and are never printed:
  *   SUPABASE_DB_URL       a full connection string, already percent-encoded
  *   SUPABASE_DB_PASSWORD  raw password; the pooler URL is built from the linked ref
+ *   SUPABASE_ACCESS_TOKEN needed for the auth half — the management API is the only way to read
+ *                         hosted auth settings, and without it that half reports
+ *                         could-not-measure rather than quietly comparing nothing
  */
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
+import { compareAuthSettings } from "./auth-parity.mjs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -82,6 +91,12 @@ function ask(target) {
     : { ok: false, detail: "psql returned no rows — the question set did not run" };
 }
 
+function linkedProjectRef() {
+  const refFile = join(packageRoot, "supabase", ".temp", "project-ref");
+  if (!existsSync(refFile)) return null;
+  return readFileSync(refFile, "utf8").trim() || null;
+}
+
 /** Build the hosted connection string without ever printing it. */
 function hostedTarget() {
   if (process.env.SUPABASE_DB_URL) return { url: process.env.SUPABASE_DB_URL };
@@ -89,9 +104,7 @@ function hostedTarget() {
   const password = process.env.SUPABASE_DB_PASSWORD;
   if (!password) return null;
 
-  const refFile = join(packageRoot, "supabase", ".temp", "project-ref");
-  if (!existsSync(refFile)) return null;
-  const ref = readFileSync(refFile, "utf8").trim();
+  const ref = linkedProjectRef();
   if (!ref) return null;
 
   const region = process.env.SUPABASE_DB_REGION ?? "ca-central-1";
@@ -164,6 +177,7 @@ const differences = compared
   }))
   .filter((row) => row.local !== row.hosted);
 
+console.log("DATABASE");
 const width = Math.max(...keys.map((key) => key.length));
 for (const key of keys) {
   const mine = local.answers.get(key) ?? "(absent)";
@@ -173,27 +187,60 @@ for (const key of keys) {
 }
 
 console.log("-".repeat(width + 40));
+console.log("");
+
+console.log("AUTH SETTINGS");
+const auth = await compareAuthSettings({
+  projectRef: linkedProjectRef(),
+  accessToken: process.env.SUPABASE_ACCESS_TOKEN,
+});
+
+if (!auth.ok) {
+  console.error(`COULD NOT MEASURE: auth settings — ${auth.detail}`);
+  console.error("  The database half may have compared fine. This half did not run, which is");
+  console.error("  not the same as it having found nothing.");
+  process.exit(CANNOT_MEASURE);
+}
+
+const authWidth = Math.max(...auth.rows.map((row) => row.key.length));
+const unexpected = auth.rows.filter((row) => row.differs && !row.expectedToDiffer);
+for (const row of auth.rows) {
+  const mark = !row.differs ? "  " : row.expectedToDiffer ? "~~" : "!!";
+  console.log(`${mark} ${row.key.padEnd(authWidth)}  local=${row.local}  hosted=${row.hosted}`);
+}
+const expectedDiffs = auth.rows.filter((row) => row.differs && row.expectedToDiffer);
+if (expectedDiffs.length > 0) {
+  console.log("");
+  console.log("~~ differs on purpose:");
+  for (const row of expectedDiffs) console.log(`     ${row.key}: ${row.expectedToDiffer}`);
+}
+console.log("-".repeat(authWidth + 40));
 
 for (const [environment, reason] of broken) {
   console.log(`INVARIANT BROKEN (${environment}): ${reason}`);
 }
 
-if (differences.length === 0 && broken.length === 0) {
-  console.log(`PARITY: ${compared.length} checks, no differences, invariants hold in both.`);
+if (differences.length === 0 && broken.length === 0 && unexpected.length === 0) {
+  console.log(
+    `PARITY: ${compared.length} database checks and ${auth.rows.length} auth settings, ` +
+      `no unexpected differences, invariants hold in both.`,
+  );
   process.exit(PARITY);
 }
 
-if (differences.length === 0) {
-  console.log("");
-  console.log("No differences between the environments — they are broken identically.");
-  process.exit(DIFFERENCES);
+if (differences.length > 0) {
+  console.log(`DIFFERENCES (database): ${differences.length} of ${compared.length} checks disagree.`);
+  for (const row of differences) console.log(`  ${row.key}: local=${row.local} hosted=${row.hosted}`);
 }
-
-console.log(`DIFFERENCES: ${differences.length} of ${compared.length} checks disagree.`);
-for (const row of differences) {
-  console.log(`  ${row.key}: local=${row.local} hosted=${row.hosted}`);
+if (unexpected.length > 0) {
+  console.log(`DIFFERENCES (auth): ${unexpected.length} setting(s) differ with no stated reason.`);
+  for (const row of unexpected) console.log(`  ${row.key}: local=${row.local} hosted=${row.hosted}`);
+}
+if (differences.length === 0 && unexpected.length === 0) {
+  console.log("No differences between the environments — they are broken identically.");
 }
 console.log("");
-console.log("Not fixed on purpose. A difference is a decision, and it belongs in a");
-console.log("migration — then push, then run this again.");
+console.log("Not fixed on purpose. A difference is a decision — put it in a migration or in");
+console.log("supabase/config.toml, apply it, then run this again. If it is meant to differ, say");
+console.log("so in scripts/auth-parity.mjs with the reason.");
 process.exit(DIFFERENCES);
