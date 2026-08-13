@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { browserClient } from "@/lib/supabase-browser";
+import { refusal } from "@/lib/refusal";
 
 /**
  * The two things this screen writes: who liked it, and whether to make it again.
@@ -143,18 +144,4 @@ export function Verdicts(props: {
       {error && <p className="error">{error}</p>}
     </section>
   );
-}
-
-/**
- * `42501` is the entitlement predicate refusing a write, which is the read-only state after
- * grace — a household in it should be told why, not shown a database code.
- */
-function refusal(error: { code?: string; message: string }): string {
-  if (error.code === "42501") {
-    return "This household is read-only — its subscription window has passed. Everything here is still readable.";
-  }
-  if (error.code === "23505") {
-    return "Somebody else rated that at the same moment. Reload and try again.";
-  }
-  return error.message;
 }
