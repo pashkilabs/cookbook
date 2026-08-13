@@ -960,27 +960,99 @@ manual override — "run my batch now" — rather than being deleted.
 
 ---
 
-## 32. A failed import still spends the household's allowance
+## 32. Quota is charged when a result is recorded, not when a job is submitted
 
-**Decided, and worth naming because it will feel wrong to somebody.** Quota is consumed before
-the fetch, not after a successful extraction. A page that 404s costs an import.
+**Reversed.** This section first said the opposite, and the original argument is kept below
+because it was sound — it lost to a measurement, not to a better argument, and that is the part
+worth being able to find later.
 
-Measured on a deliberately messy batch of twenty-two lines: fifteen reached the queue and ten of
-those failed to fetch, so two thirds of the allowance was spent producing nothing. That is the
-worst case and it is not hypothetical — link rot, bot-blocking CDNs and paywalls are the normal
-state of the recipe web.
+### What it says now
 
-The reason it is charged anyway is that **the fetch is the cost**. The request went out, the
-bytes came back, and a failure is not free to produce — the alternative is a meter that charges
-only for successes and can therefore be driven indefinitely by anything that fails. Charging
-first and refunding on failure is the version with a race in it.
+A job is charged at the moment its outcome is recorded, in the same statement, by
+`import_finish_job` (migration 092000). A failure charges nothing. A cache hit charges nothing. A
+success charges exactly one, and `quota_consumed_at` means a job finished twice — reclaimed after
+its lease expired — pays once.
 
-Two things make it survivable rather than merely defensible. A cached URL is not charged at all,
-verified end to end: five links already in the shared cache drained in 1.5 s with `quota_consumed_at`
-null on every row. And `quota_consumed_at` means a retry of the same job never charges twice.
+There is no refund path and there is no race, because there is no window: spending the allowance
+and writing `status = 'review'` are one transaction. A refund would have been a second write that
+can fail on its own, and a refund racing a concurrent spend is precisely the read-then-write that
+`platform_spend_quota` exists to avoid.
 
-*Would change if:* the allowance becomes tight enough that this dominates. The fix is a cheaper
-first pass — a `HEAD` request, or charging only once bytes arrive — not a refund path.
+A success the household cannot pay for is recorded as **failed**, not handed over free. The meter
+is the only thing between an allowance and ignoring it.
+
+### What it said before, and why it lost
+
+The original reasoning: **the fetch is the cost**. The request goes out, the bytes come back, and
+a failure is not free to produce. A meter that charges only for successes can be driven
+indefinitely by anything that fails.
+
+That is still true. What defeated it is how often "anything that fails" happens. On a deliberately
+messy batch of twenty-two pasted links, fifteen reached the queue and **ten of those failed to
+fetch** — HTTP 402, 403 and 404 from bot-blocking CDNs, paywalls and link rot. Two thirds of the
+household's allowance bought nothing.
+
+That is not an adversary; it is Tuesday. Somebody who pastes twenty saved links, receives five
+recipes and is billed for fifteen does not conclude that the recipe web is hostile. They conclude
+the product is broken, and they are not wrong to. A fetch that never reached a page cost us
+almost nothing, and charging for it defends a boundary that abuse would reach long before an
+ordinary household did.
+
+### What it costs
+
+Charging late means the work happens before anyone asks whether it can be paid for: an
+out-of-allowance household still causes a page fetch, and is refused afterwards. That is a real
+cost and it is accepted deliberately — it is bounded by the allowance being finite, and the
+alternative is the pre-flight check this section just removed. There is a test asserting the fetch
+happens, so the cost is recorded rather than forgotten.
+
+*Would change if:* failed imports become a way to consume real money — a tier that calls a model
+before it knows the extraction succeeded, say. The fix then is charging at the point the expensive
+thing starts, not returning to charging on submission.
+
+---
+
+## 33. The shared cache carries the source image URL, never a storage path
+
+**Decided.** `import_cache` is keyed by URL hash and belongs to nobody: one row serves every
+household that ever imports that page. A cache hit now returns the same photograph a miss would,
+by carrying the **source** image URL — a public address on the original site, already part of the
+extracted recipe — and re-fetching it into the requesting household's own storage.
+
+### Why not the stored object
+
+The table had a `photo_path` column for exactly this, and it is dropped in migration 092000. A
+storage path here is `<family_id>/<uuid>.jpg`: one household's object, handed to whoever hits the
+cache next. Nothing ever wrote it, which is the only reason this is a dropped column rather than
+an incident.
+
+It would not have leaked bytes. Every read policy on `recipe-photos` resolves through a `photos`
+row, so a second household holding that path could not read it, and `photos_path_in_household`
+would refuse the insert that tried to claim it. But a cross-tenant reference that fails a
+constraint check is still a cross-tenant reference, and a shared table holding one household's
+identifiers is the thing architecture §11 exists to prevent. The cache holds extraction and
+nothing about who asked for it.
+
+### Why not a shared copy of the bytes
+
+A single canonical object in a shared bucket would save the re-fetch. It was rejected on two
+counts. It needs its own bucket, its own access rules and its own lifecycle — a second storage
+model beside the per-household one, for a saving of one image request. And the copyright posture
+on imported photographs is an open question: each household holding what it fetched from the
+publisher is a materially weaker claim than Pashki holding one copy and serving it to everybody.
+
+### Why this was worth fixing now
+
+The failure mode got worse as the product succeeded. The better the shared cache works — the more
+households importing the same link that went round a group chat — the more recipes would have
+arrived with no picture. A gap that widens with adoption does not wait.
+
+An image that has since been taken down simply yields no photo; a missing image was never a failed
+import. The cost is one image request per cache hit, measured at roughly 0.3 s.
+
+*Would change if:* re-fetching starts being refused at scale — a publisher rate-limiting us for
+requesting the same image on behalf of a thousand households — at which point the answer is a
+shared object with the copyright question settled first, not a household path in a shared row.
 
 ---
 
