@@ -107,7 +107,7 @@ export async function importRecipe(url: string, options: ImportOptions): Promise
   let usedTier: Tier | null = null;
 
   for (const tier of DETERMINISTIC_TIERS) {
-    const found = extractTier(tier, page.html, page.finalUrl, normalised.href, siteName);
+    const found = extractTier(tier, page.html, page.finalUrl, normalised.fetchUrl, siteName);
     if (!found) {
       attempts.push({ tier, outcome: "no-data" });
       continue;
@@ -138,7 +138,7 @@ export async function importRecipe(url: string, options: ImportOptions): Promise
       recipe = llm.recipe;
       usedTier = "llm";
       // the model is not asked for an image, so take whatever the markup offered
-      const fromMarkup = imageFromMarkup(page.html, page.finalUrl, normalised.href, siteName);
+      const fromMarkup = imageFromMarkup(page.html, page.finalUrl, normalised.fetchUrl, siteName);
       if (fromMarkup) recipe = { ...recipe, imageUrl: fromMarkup };
     }
   }

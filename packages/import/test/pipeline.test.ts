@@ -268,3 +268,28 @@ describe("a bad image is not a failed import", () => {
     expect(fetcher.byteCalls).toEqual([]);
   });
 });
+
+describe("the URL a recipe records", () => {
+  it("is one a person can open, not the cache key", async () => {
+    // regression: source_url came back as budgetbytes.com for a page linked as
+    // www.budgetbytes.com, so "Open the original" pointed at a 404
+    const page = {
+      finalUrl: "https://www.example.com/pie/",
+      contentType: "text/html",
+      html: `<html><head><script type="application/ld+json">${JSON.stringify({
+        "@type": "Recipe",
+        name: "Pie",
+        recipeIngredient: ["200 g flour", "100 g butter"],
+        recipeInstructions: ["Mix.", "Bake."],
+      })}</script></head><body></body></html>`,
+    };
+    const outcome = await importRecipe("https://www.example.com/pie/", {
+      fetcher: { page: async () => page, bytes: async () => { throw new Error("no image"); } },
+      skipPhoto: true,
+    });
+    if (!outcome.ok) throw new Error(`expected a recipe, got ${outcome.failure.kind}`);
+    expect(outcome.recipe.sourceUrl).toBe("https://www.example.com/pie/");
+    // and the cache key is still the deduplicated form
+    expect(outcome.urlHash).toBe(hashUrl("https://example.com/pie"));
+  });
+});
