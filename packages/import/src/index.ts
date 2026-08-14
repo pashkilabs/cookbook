@@ -47,6 +47,14 @@ export {
 } from "./jsonld.js";
 export { extractMicrodata, extractSiteName } from "./microdata.js";
 export {
+  CACHE_MAX_AGE_DAYS,
+  EXTRACTOR_VERSION,
+  cacheStaleness,
+  isCacheEntryFresh,
+  type CacheEntryAge,
+  type CacheStaleness,
+} from "./cache-policy.js";
+export {
   EXTRACTION_INSTRUCTIONS,
   PLACEHOLDER_CASCADE,
   PLACEHOLDER_VISION_CASCADE,

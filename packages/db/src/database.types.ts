@@ -249,6 +249,7 @@ export type Database = {
         Row: {
           created_at: string
           extracted_json: Json | null
+          extractor_version: number
           fetched_at: string
           updated_at: string
           url_hash: string
@@ -256,6 +257,7 @@ export type Database = {
         Insert: {
           created_at?: string
           extracted_json?: Json | null
+          extractor_version?: number
           fetched_at?: string
           updated_at?: string
           url_hash: string
@@ -263,6 +265,7 @@ export type Database = {
         Update: {
           created_at?: string
           extracted_json?: Json | null
+          extractor_version?: number
           fetched_at?: string
           updated_at?: string
           url_hash?: string

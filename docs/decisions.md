@@ -1247,6 +1247,67 @@ delete pg_net and the shared secret rather than changing what runs.
 
 ---
 
+## 36. The shared cache expires on a version stamp and an age, because they answer different failures
+
+**Decided.** `import_cache` entries carry `extractor_version` and are read against both it and
+`fetched_at`. An entry stamped with anything other than the current `EXTRACTOR_VERSION` is a
+miss; so is one older than thirty days. Neither policy subsumes the other, which is why there are
+two.
+
+Until now nothing expired at all. `fetched_at` was written and read by nothing, and `refresh`
+existed in `ImportOptions` with no caller — so a cached extraction was permanent, for one row
+serving the entire user base.
+
+### The version stamp: a parser fix must reach entries it did not write
+
+This is the failure worth designing against, and it has already happened twice. The tier-0
+extractor was corrected once for image references — a bare `{"@id": ...}` overwriting the real
+node it pointed at — and once for fetching the normalised cache key instead of the URL as
+written. Both times the fix reached new imports and nothing else. Every household that had
+already imported the page kept the wrong result, and nothing reported the difference.
+
+**Age cannot solve this.** A fix ships today and yesterday's entries stay wrong until the clock
+runs out; shortening the clock enough to matter throws away the cache's whole economic argument
+(architecture §11). A version stamp propagates correctness as fast as people ask for it, and
+costs one re-fetch per URL somebody actually wants.
+
+It is a hand-maintained integer rather than a hash of the extractor source, and the asymmetry is
+the reason: **bumping unnecessarily costs a re-fetch; forgetting to bump costs every household a
+wrong recipe indefinitely.** A source hash removes the discipline but invalidates the world on a
+comment change — which makes the cheap mistake expensive and inverts the asymmetry that makes
+this safe to get wrong. The rule is: when unsure, bump.
+
+Rows written before the column existed default to `0` and are therefore stale. That is
+deliberate — backfilling them to the current version would preserve exactly the entries this
+exists to invalidate.
+
+### The age: a page changing under us
+
+The stamp says nothing about this case, where the parser is right and the source moved. We fetch
+a page once, so nothing observes a correction, a reworked ingredient list, or a URL reused for
+something else.
+
+Thirty days, chosen to be generous rather than clever: it is a bound on how wrong we can be, not
+an attempt to detect change. Recipe pages drift slowly, and at tiers 0 and 1 a miss costs one
+HTTP request and no model call.
+
+### Shape
+
+The policy is a pure function (`packages/import/src/cache-policy.ts`) returning a *reason* rather
+than a boolean, so a caller can tell "the parser moved" from "the page might have" — a single
+`false` would make the stamp's effect unmeasurable. The Supabase adapter applies it, because that
+is where the two columns live and the pipeline should not learn the storage shape to ask a
+question about it.
+
+A stale entry is a **miss, not a delete**: the next successful extraction upserts over it, so the
+row is replaced by the thing that superseded it rather than by a second write. Rows for URLs
+nobody imports again are never collected; that is a reaper's job and is not this.
+
+*Would change if:* tier 2 is wired, at which point a miss costs a model call and thirty days may
+be the wrong trade in the other direction. The age is already a parameter for that reason.
+
+---
+
 ## Open: cascade deletions and tombstones
 
 **Not resolved. This waits on the sync engine choice, and exists so the evaluation
