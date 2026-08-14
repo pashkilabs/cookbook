@@ -419,12 +419,12 @@ try {
    */
   const invitedAddress = invitee;
   const invitedPassword = `Smoke-${stamp}-Bb2!`;
-  const created = await fetch(`${SUPABASE}/auth/v1/admin/users`, {
+  const inviteeAccount = await fetch(`${SUPABASE}/auth/v1/admin/users`, {
     method: "POST",
     headers: svc,
     body: JSON.stringify({ email: invitedAddress, password: invitedPassword, email_confirm: true }),
   }).then((r) => r.json());
-  invitedAccountId = created?.id ?? null;
+  invitedAccountId = inviteeAccount?.id ?? null;
 
   const claim = await rest(
     "POST",
