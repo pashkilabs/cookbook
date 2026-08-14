@@ -399,6 +399,23 @@ try {
       });
     }
     if (familyId) {
+      /*
+       * A drained job stores its photograph through the runner, so the path is in `result_json`
+       * and nowhere this script ever saw it. Deleting the rows without the objects left one
+       * unreachable file per run — found by the reaper's own census, which is a fair result for
+       * a test that exists to stop exactly this kind of silence.
+       */
+      const jobs = (await rest("GET", `/import_jobs?family_id=eq.${familyId}&select=result_json`)) ?? [];
+      const jobObjects = jobs
+        .map((job) => job.result_json?.photo?.storagePath)
+        .filter((path) => typeof path === "string");
+      if (jobObjects.length) {
+        await fetch(`${SUPABASE}/storage/v1/object/recipe-photos`, {
+          method: "DELETE",
+          headers: svc,
+          body: JSON.stringify({ prefixes: jobObjects }),
+        });
+      }
       await rest("PATCH", `/import_jobs?family_id=eq.${familyId}`, { status: "cancelled" });
       await rest("DELETE", `/import_jobs?family_id=eq.${familyId}`);
       for (const table of ["shopping_ticks", "shortlist_entries", "plan_entries", "photos", "recipe_ingredients", "recipe_steps", "ratings"]) {
@@ -413,7 +430,24 @@ try {
     if (accountId) {
       await fetch(`${SUPABASE}/auth/v1/admin/users/${accountId}`, { method: "DELETE", headers: svc });
     }
-    console.log("\ncleaned up: household, recipes, jobs, objects, account");
+    /*
+     * Verified, not announced. "cleaned up" was printed for three runs that each left an object
+     * behind, which is the same failure mode this whole file exists to catch: a message is not a
+     * measurement.
+     */
+    if (familyId) {
+      const left = await fetch(`${SUPABASE}/storage/v1/object/list/recipe-photos`, {
+        method: "POST",
+        headers: svc,
+        body: JSON.stringify({ prefix: familyId, limit: 100 }),
+      }).then((r) => r.json()).catch(() => []);
+      const stranded = Array.isArray(left) ? left.length : 0;
+      console.log(
+        stranded === 0
+          ? "\ncleaned up: household, recipes, jobs, objects, account"
+          : `\nCLEANUP INCOMPLETE: ${stranded} object(s) left under ${familyId} — the reaper will collect them`,
+      );
+    }
   } catch (error) {
     console.error(`\nWARNING: cleanup incomplete — ${String(error.message).slice(0, 120)}`);
   }

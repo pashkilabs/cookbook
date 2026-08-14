@@ -98,15 +98,23 @@ const escaped = (value) => `'${String(value).replace(/'/g, "''")}'`;
 
 let before;
 try {
-  before = run("select coalesce((select endpoint from private.import_drain_config limit 1), '(not set)')");
+  before = run("select coalesce((select drain_endpoint from private.scheduler_config limit 1), '(not set)')");
 } catch (error) {
   console.error("COULD NOT MEASURE: could not reach the database.");
   console.error(`  ${String(error.message).slice(0, 200)}`);
   process.exit(CANNOT_MEASURE);
 }
 
-console.log(`endpoint  ${before}`);
+/*
+ * The reaper's endpoint is derived rather than asked for. Both scheduled jobs call the same
+ * deployment with the same secret, and a second argument would be a second thing to get wrong —
+ * this session has already lost an afternoon to one secret configured twice.
+ */
+const reaperEndpoint = endpoint.replace(/\/api\/import\/drain$/, "/api/photos/reap");
+
+console.log(`drain     ${before}`);
 console.log(`          ->  ${endpoint}`);
+console.log(`reaper    ->  ${reaperEndpoint}`);
 console.log("secret    (set, not printed)");
 
 if (dryRun) {
@@ -116,9 +124,10 @@ if (dryRun) {
 
 try {
   run(
-    `insert into private.import_drain_config (id, endpoint, secret, updated_at)
-     values (true, ${escaped(endpoint)}, ${escaped(secret)}, now())
-     on conflict (id) do update set endpoint = excluded.endpoint, secret = excluded.secret, updated_at = now()`,
+    `insert into private.scheduler_config (id, drain_endpoint, reaper_endpoint, secret, updated_at)
+     values (true, ${escaped(endpoint)}, ${escaped(reaperEndpoint)}, ${escaped(secret)}, now())
+     on conflict (id) do update set drain_endpoint = excluded.drain_endpoint,
+       reaper_endpoint = excluded.reaper_endpoint, secret = excluded.secret, updated_at = now()`,
   );
 } catch (error) {
   console.error(`\nREFUSED: the write failed — ${String(error.message).slice(0, 200)}`);
@@ -127,8 +136,9 @@ try {
 
 // read back rather than trusting the insert; the secret is compared by length and match, never shown
 const check = run(
-  `select json_build_object('endpoint', endpoint, 'secret_matches', secret = ${escaped(secret)})::text
-   from private.import_drain_config limit 1`,
+  `select json_build_object('endpoint', drain_endpoint, 'reaper', reaper_endpoint,
+     'secret_matches', secret = ${escaped(secret)})::text
+   from private.scheduler_config limit 1`,
 );
 const parsed = JSON.parse(check);
 if (parsed.endpoint !== endpoint || parsed.secret_matches !== true) {

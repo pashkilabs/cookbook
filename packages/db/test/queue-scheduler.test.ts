@@ -212,9 +212,9 @@ describe.skipIf(instance === null)("the import queue scheduler", () => {
       await clearQueue();
       await queueJob();
       exec(
-        `insert into private.import_drain_config (id, endpoint, secret)
+        `insert into private.scheduler_config (id, drain_endpoint, secret)
          values (true, 'http://127.0.0.1:9/api/import/drain', 'test-secret')
-         on conflict (id) do update set endpoint = excluded.endpoint`,
+         on conflict (id) do update set drain_endpoint = excluded.drain_endpoint`,
       );
       try {
         const result = sql<{ dispatched: boolean; request_id: number }>(
@@ -223,7 +223,7 @@ describe.skipIf(instance === null)("the import queue scheduler", () => {
         expect(result.dispatched).toBe(true);
         expect(typeof result.request_id).toBe("number");
       } finally {
-        exec("delete from private.import_drain_config");
+        exec("delete from private.scheduler_config");
       }
     });
   });

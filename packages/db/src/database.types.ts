@@ -947,6 +947,14 @@ export type Database = {
         }
         Returns: Json
       }
+      list_orphaned_photo_objects: {
+        Args: { p_grace_hours?: number }
+        Returns: {
+          created_at: string
+          name: string
+          size_bytes: number
+        }[]
+      }
       platform_spend_quota: {
         Args: {
           p_amount: number

@@ -1,7 +1,7 @@
-import { timingSafeEqual } from "node:crypto";
 import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
 import { drainImportQueue } from "@/lib/queue";
+import { machineCaller } from "@/lib/machine-auth";
 
 /**
  * Turn the handle.
@@ -20,7 +20,7 @@ import { drainImportQueue } from "@/lib/queue";
  * claim takes one row.
  */
 export async function POST(request: Request) {
-  if (!(await authorised(request))) {
+  if (!(await machineCaller(request))) {
     return Response.json({ error: "sign in first" }, { status: 401 });
   }
 
@@ -47,29 +47,3 @@ export async function POST(request: Request) {
   });
 }
 
-/**
- * A signed-in household, or the scheduler.
- *
- * The secret is compared with `timingSafeEqual` on equal-length buffers. A `===` here leaks the
- * length and the matching prefix through timing, and this is the one door a machine knocks on
- * repeatedly — the ideal conditions for that to matter.
- */
-async function authorised(request: Request): Promise<boolean> {
-  const presented = request.headers.get("x-pashki-drain-secret");
-  const expected = process.env.PASHKI_DRAIN_SECRET;
-
-  if (presented && expected) {
-    const a = Buffer.from(presented);
-    const b = Buffer.from(expected);
-    // length must match before timingSafeEqual, which throws otherwise; compared first so a
-    // wrong-length guess is refused without revealing anything else
-    if (a.length === b.length && timingSafeEqual(a, b)) return true;
-  }
-
-  const supabase = await userClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) return false;
-
-  // a signed-in account with no household has nothing to drain for
-  return (await platformStore().findFamilyForAccount(auth.user.id)) !== null;
-}

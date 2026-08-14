@@ -1388,6 +1388,61 @@ function-packaging limits — not sharp back in the web app.
 
 ---
 
+## 38. Unreachable photographs are collected on a schedule, and a live review is never collected
+
+**Decided.** `pashki-photo-reaper` sweeps hourly for objects in `recipe-photos` that no `photos`
+row claims, no live import job owns, and that are older than **24 hours**.
+
+An import stores its photograph before anyone has agreed to save the recipe, because that is when
+the bytes exist, and every storage read policy resolves through a `photos` row. So an abandoned
+review leaves an object that is unreachable by every client *and* deleted by nothing — permanent,
+invisible, and counted against the bucket. §37 made each one larger, since photographs are now
+stored as fetched rather than resized.
+
+### Two rules, and only one of them is a guess
+
+**Not owned by a live job.** A job in `queued`, `running` or `review` owns its photograph. A batch
+review left open for a week is somebody\'s unfinished work, not litter, and this rule does not
+care how long they take.
+
+**Older than 24 hours.** The imprecise half, and unavoidable: the single-URL preview creates *no
+job row at all* — `/api/import` stores an object and hands back a draft — so time is the only
+thing protecting a review in progress there. Twenty-four hours is roughly two orders of magnitude
+more than a review takes and covers someone opening a review, going to bed, and saving in the
+morning. The asymmetry decides it: being generous costs a few megabytes for a day, being tight
+deletes a photograph out from under an open review, which a person experiences as the product
+losing their work. Err long.
+
+A **tombstoned** `photos` row also spares the object. A soft delete is reversible (§30) and
+releasing bytes is not, so only a row that was never created at all makes an object collectable.
+
+### Why it is a route and not SQL
+
+`storage.protect_delete()` refuses direct deletes from `storage.objects`, deliberately, so objects
+are never orphaned by a stray statement. The only door is the Storage API, which needs the service
+role — so the database decides *what* is collectable and an authenticated route carries it out, on
+§35\'s pattern: predicate, conditional dispatch, pg_net. An empty sweep never leaves the database.
+
+Hourly rather than by the minute, because nothing here waits on a person.
+
+### What it found
+
+Nothing, on the first census — and then the census was wrong. Enumerating objects *by household*
+missed three, because they belonged to smoke-test households that had already been deleted;
+asking `storage.objects` directly found six objects and three unclaimed. All three were one per
+smoke run, from the batch job\'s photograph: the runner stores it, the path lives in
+`import_jobs.result_json`, and the test deleted the rows without the objects. The test printed
+"cleaned up" every time.
+
+Two lessons, both already rules here in other clothes. Enumerate the thing you are auditing, not
+the thing you think owns it. And a cleanup that announces success without checking is the same
+failure as a check that cannot fail.
+
+*Would change if:* the grace window proves too long to matter for storage cost, which would mean
+the product has enough abandoned reviews to be worth asking why.
+
+---
+
 ## Open: cascade deletions and tombstones
 
 **Not resolved. This waits on the sync engine choice, and exists so the evaluation
