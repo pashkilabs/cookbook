@@ -1169,8 +1169,9 @@ different value of `PASHKI_SMTP_HOST` and one script run.
 
 ## 35. The queue is drained by pg_cron calling the app, not by a worker
 
-**Decided and not yet built.** Recorded now because the reasoning was worked out with a database
-in front of me and would otherwise have to be rediscovered.
+**Built** (migration `20260814092000`). Recorded as decided-and-unbuilt while the development
+machine had no working Docker; the reasoning below is unchanged, and the measurements at the foot
+are from the built thing.
 
 `import_jobs` is drained only while somebody has the batch screen open (§31). Close the tab and
 queued jobs sit there. The fix is a caller on a timer; the question was which caller.
@@ -1235,12 +1236,38 @@ Concurrency and per-household fairness (§31) both stay out. `SKIP LOCKED` alrea
 workers, so adding them later changes the schedule and not the claim — and at one household
 neither is measurable.
 
-### What blocked it
+### As built, and what it cost
 
-Docker on the development machine wedged with under a gigabyte of disk free, leaving no local
-Postgres — and no `psql` outside the container. Writing a migration that touches the queue's
-correctness without once running it is the trade this repo does not make. Both extensions are
-confirmed available on the hosted project.
+The idle path was measured rather than assumed. `explain (analyze, buffers)` on the predicate
+against an empty queue:
+
+```
+Limit  (actual time=0.007..0.008 rows=0 loops=1)
+  Buffers: shared hit=1
+  ->  Index Scan using import_jobs_queue on import_jobs
+Execution Time: 0.102 ms
+```
+
+One index scan, **one buffer hit, a tenth of a millisecond**. At a tick a minute that is about
+0.14 seconds of database time per day, no HTTP, and no serverless invocation. The unconditional
+version would have been ~43,800 requests a month to keep discovering nobody had imported anything.
+
+**The predicate is tested against the claim rather than beside it.** Seven queue states are run
+through both `import_queue_has_work` and `import_claim_next_job`, asserting they agree — because
+they are separate pieces of SQL that can drift apart silently, and the direction that drifts
+quietly is the queue going to sleep on work it could have taken. Removing the expired-lease arm
+from the predicate makes two of those tests fail, which is how the lease reclaim is known to be
+exercised by the normal path.
+
+`dispatch_import_drain` returns a reason rather than void, so `cron.job_run_details` distinguishes
+an idle queue from an unconfigured one. Without that, a scheduler that had never been given an
+endpoint would look exactly like a queue nobody was using.
+
+The endpoint and shared secret live in `private.import_drain_config`, populated by
+`pnpm --filter @pashki/db set:drain-endpoint` — a table rather than Supabase Vault, because
+Vault's surface differs between the local image and hosted and this repo has been caught twice
+trusting those to agree. `private` is not a schema PostgREST exposes, so no client can read it
+whatever the grants say.
 
 *Would change if:* the app moves to a host with a real scheduler, or Vercel moves off Hobby. Both
 delete pg_net and the shared secret rather than changing what runs.

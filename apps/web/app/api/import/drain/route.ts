@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
 import { drainImportQueue } from "@/lib/queue";
@@ -5,10 +6,13 @@ import { drainImportQueue } from "@/lib/queue";
 /**
  * Turn the handle.
  *
- * Triggered by the batch screen while somebody is watching, which is not what production wants —
- * see `lib/queue.ts` for what a deployed worker changes. It is authenticated so that draining is
- * something a household does rather than an open endpoint, even though the runner works on the
- * whole queue rather than on one household's jobs.
+ * Two callers, both authenticated, for different reasons.
+ *
+ * The **batch screen** calls it while somebody watches, so results appear as they land. The
+ * **scheduler** calls it on a timer with a shared secret, which is what makes a closed tab stop
+ * meaning a stranded queue (decisions §35). Neither is an open endpoint: draining costs fetches
+ * and spends other people's quota, so an unauthenticated caller could burn a household's
+ * allowance from outside.
  *
  * **The queue is global and the claim is atomic**, so this drains whatever is oldest, including
  * another household's jobs. That is the design — `import_claim_next_job` orders by `created_at`
@@ -16,12 +20,9 @@ import { drainImportQueue } from "@/lib/queue";
  * claim takes one row.
  */
 export async function POST(request: Request) {
-  const supabase = await userClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) return Response.json({ error: "sign in first" }, { status: 401 });
-
-  const family = await platformStore().findFamilyForAccount(auth.user.id);
-  if (!family) return Response.json({ error: "this account has no household" }, { status: 403 });
+  if (!(await authorised(request))) {
+    return Response.json({ error: "sign in first" }, { status: 401 });
+  }
 
   let maxJobs = 5;
   try {
@@ -44,4 +45,31 @@ export async function POST(request: Request) {
       ...(outcome.status !== "idle" ? { jobId: outcome.job.id } : {}),
     })),
   });
+}
+
+/**
+ * A signed-in household, or the scheduler.
+ *
+ * The secret is compared with `timingSafeEqual` on equal-length buffers. A `===` here leaks the
+ * length and the matching prefix through timing, and this is the one door a machine knocks on
+ * repeatedly — the ideal conditions for that to matter.
+ */
+async function authorised(request: Request): Promise<boolean> {
+  const presented = request.headers.get("x-pashki-drain-secret");
+  const expected = process.env.PASHKI_DRAIN_SECRET;
+
+  if (presented && expected) {
+    const a = Buffer.from(presented);
+    const b = Buffer.from(expected);
+    // length must match before timingSafeEqual, which throws otherwise; compared first so a
+    // wrong-length guess is refused without revealing anything else
+    if (a.length === b.length && timingSafeEqual(a, b)) return true;
+  }
+
+  const supabase = await userClient();
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return false;
+
+  // a signed-in account with no household has nothing to drain for
+  return (await platformStore().findFamilyForAccount(auth.user.id)) !== null;
 }

@@ -38,7 +38,8 @@
     "lint": "tsc --noEmit",
     "set:smtp": "node scripts/set-smtp.mjs",
     "set:site-url": "node scripts/set-site-url.mjs",
-    "issue:entitlement": "node scripts/issue-entitlement.mjs"
+    "issue:entitlement": "node scripts/issue-entitlement.mjs",
+    "set:drain-endpoint": "node scripts/set-drain-endpoint.mjs"
   },
   "devDependencies": {
     "@pashki/core": "workspace:^",
