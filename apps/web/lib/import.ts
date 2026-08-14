@@ -2,10 +2,8 @@ import { createClient } from "@supabase/supabase-js";
 import {
   createHttpFetcher,
   importRecipe,
-  type ExtractedRecipe,
   type ImportOutcome,
 } from "@pashki/import";
-import { formatAsWritten } from "@pashki/core";
 import { createSupabaseImportCache } from "@pashki/import/supabase";
 import { storeImportedPhoto } from "@pashki/import/photo-storage";
 import { createPlatformClient } from "@pashki/platform-client";
@@ -93,27 +91,3 @@ export async function spendImportQuota(accountId: string) {
   return platform.consumeQuota("recipes", 1);
 }
 
-/**
- * An extracted recipe as the review screen takes it.
- *
- * Shared by the single-URL route and the batch queue on purpose: a batch review that shaped its
- * draft differently would be a second parser reached by a second door, and the two would drift.
- * Ingredients are rendered back to text so that **saving runs `parseIngredientList` either way** —
- * what the person edits is what gets parsed.
- */
-export function draftFrom(recipe: ExtractedRecipe) {
-  return {
-    title: recipe.title,
-    servings: recipe.servings === null ? "" : String(recipe.servings),
-    timeMinutes: recipe.totalMinutes === null ? "" : String(recipe.totalMinutes),
-    sourceName: recipe.sourceName ?? "",
-    sourceUrl: recipe.sourceUrl,
-    ingredients: recipe.ingredients
-      .map((line) =>
-        [formatAsWritten(line.amount, line.unit), line.item].filter(Boolean).join(" ") +
-        (line.note ? `, ${line.note}` : ""),
-      )
-      .join("\n"),
-    steps: recipe.steps.join("\n"),
-  };
-}

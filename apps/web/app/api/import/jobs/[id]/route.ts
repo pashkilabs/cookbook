@@ -2,7 +2,7 @@ import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
 import { admin } from "@/lib/import-jobs";
 import { createRecipeFrom } from "@/lib/recipe-writes";
-import { RECIPE_PHOTO_BUCKET } from "@pashki/import/photo-storage";
+import { RECIPE_PHOTO_BUCKET } from "@pashki/import/photo-bucket";
 
 /**
  * Accept a reviewed import, or discard it.

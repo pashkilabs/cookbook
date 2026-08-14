@@ -24,6 +24,10 @@
     "./supabase": {
       "types": "./src/supabase-cache.ts",
       "default": "./src/supabase-cache.ts"
+    },
+    "./photo-bucket": {
+      "types": "./src/photo-bucket.ts",
+      "default": "./src/photo-bucket.ts"
     }
   },
   "scripts": {

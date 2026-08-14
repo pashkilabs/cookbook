@@ -1,7 +1,7 @@
 import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
 import { attemptImport, spendImportQuota } from "@/lib/import";
-import { formatAsWritten } from "@pashki/core";
+import { draftFrom } from "@/lib/draft";
 
 /**
  * Read a recipe off a page. Save nothing.
@@ -53,24 +53,10 @@ export async function POST(request: Request) {
     }
   }
 
-  const { recipe } = outcome;
   return Response.json({
-    draft: {
-      title: recipe.title,
-      servings: recipe.servings === null ? "" : String(recipe.servings),
-      timeMinutes: recipe.totalMinutes === null ? "" : String(recipe.totalMinutes),
-      sourceName: recipe.sourceName ?? "",
-      sourceUrl: recipe.sourceUrl,
-      // shown as core parsed them, one per line — the same text the manual form takes, so saving
-      // runs the identical parser rather than a second path
-      ingredients: recipe.ingredients
-        .map((line) =>
-          [formatAsWritten(line.amount, line.unit), line.item].filter(Boolean).join(" ") +
-          (line.note ? `, ${line.note}` : ""),
-        )
-        .join("\n"),
-      steps: recipe.steps.join("\n"),
-    },
+    // the same shape the batch queue hands back — one draft builder, so the review screen cannot
+    // be shown two different renderings of the same parse
+    draft: draftFrom(outcome.recipe),
     photo: storagePath ? { storagePath, ...photoDimensions } : null,
     tier: outcome.tier,
     fromCache: outcome.fromCache,

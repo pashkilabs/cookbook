@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import sharp from "sharp";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { RECIPE_PHOTO_BUCKET } from "./photo-bucket.js";
 
 /**
  * Fetch, resize, store — the server side of the photo pipeline.
@@ -18,7 +19,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * unreachable object rather than a visible one.
  */
 
-export const RECIPE_PHOTO_BUCKET = "recipe-photos";
+export { RECIPE_PHOTO_BUCKET } from "./photo-bucket.js";
 
 export interface PhotoStorageOptions {
   /** service role: the bucket has no client write policy */

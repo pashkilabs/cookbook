@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import type { JobResult } from "@pashki/import";
-import { draftFrom } from "@/lib/import";
+import { draftFrom } from "@/lib/draft";
 
 /**
  * Reading the queue's progress, and describing a failure in words.
