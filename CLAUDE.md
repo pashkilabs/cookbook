@@ -52,6 +52,7 @@ packages/ui/           design tokens, shared primitives
 packages/db/           schema, migrations, generated types
 docs/architecture.md   full design
 docs/decisions.md      what was chosen and what would reverse it
+docs/deployment.md     what is deployed where, and what is configured by hand
 docs/on-device.md      what a device holds and enforces, and what sync must give us
 docs/roadmap.md        phases and current position
 ```
