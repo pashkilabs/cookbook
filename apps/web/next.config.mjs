@@ -46,7 +46,20 @@ export default {
     //
     // The wildcard is deliberate: each platform installs only its own binary, so this matches
     // linux on the deployment and darwin on a laptop without naming either.
-    "/api/**": [
+    // **A tracing include is a size decision as much as a correctness one.** `/api/**` attached
+    // libvips — tens of megabytes — to all seventeen API routes, which broke the function grouping
+    // Vercel uses to fit this app inside the Hobby plan's twelve-function limit, and the deployment
+    // was refused outright.
+    //
+    // The key matches by prefix, not exactly, so `/api/import` also covers `/api/import/jobs` and
+    // `/api/import/batch`, which do not resize anything. Four heavy routes rather than seventeen is
+    // the best precision available without moving files around, and it is verified by reading the
+    // `.nft.json` manifests rather than assumed.
+    "/api/import": [
+      "../../node_modules/.pnpm/@img+sharp-*/node_modules/@img/**",
+      "../../node_modules/.pnpm/@img+sharp-libvips-*/node_modules/@img/**",
+    ],
+    "/api/import/drain": [
       "../../node_modules/.pnpm/@img+sharp-*/node_modules/@img/**",
       "../../node_modules/.pnpm/@img+sharp-libvips-*/node_modules/@img/**",
     ],
