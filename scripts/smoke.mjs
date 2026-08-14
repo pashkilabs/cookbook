@@ -194,6 +194,7 @@ try {
     ["POST", "/api/shopping-ticks", {}],
     ["POST", "/api/pantry", {}],
     ["POST", "/api/household", {}],
+    ["POST", "/api/members", {}],
     ["POST", "/api/signup", {}],
     ["POST", "/api/resend", {}],
     ["GET", "/api/platform/session"],
@@ -204,7 +205,7 @@ try {
   }
 
   console.log("\npages render");
-  for (const path of ["/", "/sign-in", "/recipes", "/planner", "/shopping", "/recipes/import"]) {
+  for (const path of ["/", "/sign-in", "/recipes", "/planner", "/shopping", "/recipes/import", "/household"]) {
     const result = await call("GET", path, { auth: false });
     record(`GET ${path}`, alive(result), `HTTP ${result.status}`);
   }
@@ -348,6 +349,43 @@ try {
     );
   } else {
     console.log("  --    scheduler secret not in the environment; that path was not checked");
+  }
+
+  console.log("\nhousehold members");
+  const added = await call("POST", "/api/members", { body: { displayName: "Smoke Child" } });
+  const memberId = added.body?.member?.id ?? null;
+  record("add a child", added.status === 200 && Boolean(memberId), `HTTP ${added.status}`);
+  record(
+    "the child has a colour and no account",
+    added.body?.member?.accountId === null && Boolean(added.body?.member?.colour),
+    added.body?.member?.colour ? `colour ${added.body.member.colour}` : "no colour",
+  );
+
+  if (memberId) {
+    const renamed = await call("PATCH", "/api/members", {
+      body: { id: memberId, displayName: "Smoke Child II", colour: "plum" },
+    });
+    record(
+      "rename and recolour",
+      renamed.status === 200 && renamed.body?.member?.colour === "plum",
+      `HTTP ${renamed.status}`,
+    );
+
+    const badColour = await call("PATCH", "/api/members", {
+      body: { id: memberId, colour: "#ff00ff" },
+    });
+    record("a colour outside the palette is refused", badColour.status === 400, `HTTP ${badColour.status}`);
+
+    // the rule that stops a household deleting its only adult and stranding itself
+    const members = await rest("GET", `/family_members?family_id=eq.${familyId}&account_id=eq.${accountId}&select=id`);
+    const mine = members?.[0]?.id;
+    if (mine) {
+      const self = await call("DELETE", "/api/members", { body: { id: mine } });
+      record("refuses to remove yourself", self.status === 400, `HTTP ${self.status}`);
+    }
+
+    const removed = await call("DELETE", "/api/members", { body: { id: memberId } });
+    record("remove a child", removed.status === 200, `HTTP ${removed.status}`);
   }
 
   console.log("\nplanner, shopping, storage");

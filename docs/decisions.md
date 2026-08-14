@@ -1443,6 +1443,73 @@ the product has enough abandoned reviews to be worth asking why.
 
 ---
 
+## 39. Children now, invited adults later — and the reason is the acceptance flow, not the table
+
+**Decided.** A household can add, rename, recolour and remove **children** — a name and a colour,
+no account, no invitation. Inviting an **adult** who will sign in is deferred.
+
+### Why the split is worth making
+
+They look like one feature and are two. A child is a row: `family_members` has held
+`account_id nullable` and `is_child` since Phase 1, and the `child_has_no_login` check already
+encodes the invariant. Nothing else is required — no email, no token, no second provisioning
+path.
+
+That row is also **most of the value**. The five-point scale, the per-member ratings on the
+detail screen and the "whole family likes" filter were all built for a household with several
+opinions, and until now a household had exactly one. Children are the members most likely to
+disagree about dinner.
+
+### What inviting an adult actually costs
+
+Not the table — an `invitations` row is trivial. The cost is everything around acceptance:
+
+1. A token that is single-use, expiring, and safe to put in an email.
+2. An acceptance route that **joins an existing household** rather than creating one. Today
+   `provisionForConfirmedAccount` creates a household at first confirmed sign-in, unconditionally.
+   Adding a branch there means editing the most-verified path in the application — the one the
+   smoke test exercises on every run and the one whose idempotency a double-clicked signup
+   depends on.
+3. A response that does not reveal whether an address already has an account, which the signup
+   route already takes care to avoid and an invitation flow can easily undo.
+4. A second email template, and the sending rate to go with it.
+
+### The reason it waits, rather than "it is more work"
+
+**Phase 3 needs the same acceptance flow through a deep link, and that has nowhere to land yet.**
+The roadmap already records it: a native signup needs `pashki://` or a universal link in GoTrue's
+redirect allow list, and GoTrue silently substitutes `site_url` for anything unlisted. An
+invitation built now would be built against the web-only redirect and rebuilt for the app — or
+worse, built once and quietly wrong on a phone.
+
+The honest summary is that acceptance is the hard half, it is shared with a Phase 3 dependency
+that is not resolved, and shipping the easy half first costs nothing later: adding an adult writes
+the same `family_members` row this already writes, with `account_id` set and `is_child` false.
+
+### Also decided here
+
+**Nobody can remove themselves.** Leaving a household is a different action with different
+consequences — who owns it afterwards, what becomes of the recipes — and allowing it through the
+roster would let somebody delete the only adult and strand a household behind an account that is
+a member of nothing.
+
+**Removal is a soft delete and the trigger does the rest** (§30): ratings tombstone, and
+`recipes.created_by` nullifies. Both rules were written before anything could create a second
+member, so they had never run against a household that had one; they do now, including the case
+that matters for the product — a detail screen showing a removed member's rating renders no score
+rather than a score with no name.
+
+**Colours are a vocabulary the seam owns.** `family_members.colour` stores `"clay"`, not a hex
+value, so restyling is a stylesheet change rather than a data migration, and a value outside the
+palette is refused rather than collected. Eight, because five distinguishable ones was the
+requirement and two of any eight are a hard pair under deuteranopia — which is why the interface
+never uses colour alone.
+
+*Would change if:* a household asks for a second adult before Phase 3 starts. The work is
+understood; it is sequenced, not blocked.
+
+---
+
 ## Open: cascade deletions and tombstones
 
 **Not resolved. This waits on the sync engine choice, and exists so the evaluation

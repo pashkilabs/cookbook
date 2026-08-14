@@ -112,6 +112,9 @@ export default async function RecipesPage({
           <Link className="button" href="/planner">
             Planner
           </Link>
+          <Link className="button quiet" href="/household">
+            Household
+          </Link>
           <Link className="button" href="/recipes/import">
             Import
           </Link>

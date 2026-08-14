@@ -28,6 +28,17 @@ function signer() {
   return createEd25519Signer({ keyId, privateKeyPem });
 }
 
+/**
+ * The seam for one signed-in account.
+ *
+ * Account-scoped rather than family-scoped on purpose: every method resolves the household from
+ * the account, so a route handler never holds a `familyId` it could be talked into substituting.
+ * No signer — nothing here mints a token.
+ */
+export function platformClient(accountId: string) {
+  return createPlatformClient({ store: platformStore(), accountId });
+}
+
 export function platformStore() {
   return createSupabasePlatformStore(serviceRole());
 }

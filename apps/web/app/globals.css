@@ -506,3 +506,45 @@ ul.facts li + li::before {
   color: var(--accent);
   margin: 0 0 var(--s5);
 }
+
+/* ---------------------------------------------------------------------------
+ * The household roster. Colour identifies nobody on its own — every dot sits
+ * beside a name, because two of these hues are a harder pair than they look
+ * under deuteranopia.
+ *
+ * The values mirror MEMBER_COLOURS in the seam, which stores the *key*. That is
+ * the point of storing a word: this block can change without a data migration.
+ * ------------------------------------------------------------------------- */
+
+.dot.clay, .swatch.clay { background: #b4531f; }
+.dot.olive, .swatch.olive { background: #6b7a3a; }
+.dot.teal, .swatch.teal { background: #2f7d78; }
+.dot.plum, .swatch.plum { background: #7d3f6a; }
+.dot.indigo, .swatch.indigo { background: #40518f; }
+.dot.mustard, .swatch.mustard { background: #a87a12; }
+.dot.rose, .swatch.rose { background: #b04a5f; }
+.dot.slate, .swatch.slate { background: #55606b; }
+
+ul.roster { list-style: none; padding: 0; margin: 0 0 var(--s6); }
+ul.roster li {
+  display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap;
+  padding: var(--s3) 0; border-bottom: 1px solid var(--line);
+}
+.dot {
+  width: 1.1rem; height: 1.1rem; border-radius: 99px; flex: 0 0 auto;
+  background: var(--line-strong);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+ul.roster .who { flex: 1; min-width: 8rem; display: flex; align-items: baseline; gap: var(--s2); flex-wrap: wrap; }
+ul.roster .who .meta { color: var(--muted); font-size: 0.8rem; }
+ul.roster .tabs, ul.roster .chips { margin: 0; flex-wrap: wrap; }
+ul.roster button { font-size: 0.82rem; min-height: 2.25rem; padding: 0.3rem 0.7rem; }
+
+/* a swatch is a colour, so it must be big enough to hit with a thumb */
+.swatch {
+  width: 2.25rem; height: 2.25rem; min-height: 0;
+  border-radius: 99px; border: 2px solid transparent; padding: 0; cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+.swatch.on { border-color: var(--ink); }
+
