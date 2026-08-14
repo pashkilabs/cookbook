@@ -39,9 +39,16 @@ export default {
    */
   outputFileTracingRoot: new URL("../../", import.meta.url).pathname,
   outputFileTracingIncludes: {
+    // Relative to *this app*, not to the tracing root — and pnpm's store is at the repository
+    // root, so `./node_modules` matched nothing at all and the build reported no error for it.
+    // Verified by reading `.next/server/app/api/**/*.nft.json`, which is the only thing that
+    // actually says what was traced.
+    //
+    // The wildcard is deliberate: each platform installs only its own binary, so this matches
+    // linux on the deployment and darwin on a laptop without naming either.
     "/api/**": [
-      "./node_modules/.pnpm/@img+sharp-linux-x64*/node_modules/@img/**",
-      "./node_modules/.pnpm/@img+sharp-libvips-linux-x64*/node_modules/@img/**",
+      "../../node_modules/.pnpm/@img+sharp-*/node_modules/@img/**",
+      "../../node_modules/.pnpm/@img+sharp-libvips-*/node_modules/@img/**",
     ],
   },
   transpilePackages: ["@pashki/platform-client", "@pashki/core", "@pashki/db", "@pashki/import"],
