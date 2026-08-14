@@ -3,7 +3,9 @@ import type {
   Account,
   Device,
   Family,
+  AcceptInvitationOutcome,
   FamilyMember,
+  Invitation,
   Platform,
   PlatformStore,
   IssueEntitlementInput,
@@ -52,6 +54,32 @@ function toMember(row: {
     displayName: row.display_name,
     colour: row.colour,
     isChild: row.is_child,
+  };
+}
+
+const INVITATION_COLUMNS =
+  "id, family_id, email, expires_at, accepted_at, revoked_at, superseded_at, created_at";
+
+/** Never carries the token hash: it is not selected, so it cannot be leaked by a caller. */
+function toInvitation(row: {
+  id: string;
+  family_id: string;
+  email: string;
+  expires_at: string;
+  accepted_at: string | null;
+  revoked_at: string | null;
+  superseded_at: string | null;
+  created_at: string;
+}): Invitation {
+  return {
+    id: row.id,
+    familyId: row.family_id,
+    email: row.email,
+    expiresAt: row.expires_at,
+    acceptedAt: row.accepted_at,
+    revokedAt: row.revoked_at,
+    supersededAt: row.superseded_at,
+    createdAt: row.created_at,
   };
 }
 
@@ -183,6 +211,105 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
         .select("id");
       if (error) throw error;
       return (data ?? []).length > 0;
+    },
+
+    async createInvitation(input): Promise<Invitation> {
+      /*
+       * Supersede first, then insert. The partial unique index allows exactly one live invitation
+       * per address per household, so without this a second invitation would be refused by the
+       * database rather than replacing the first — and "you already invited them" is not what a
+       * person who has lost the email wants to hear.
+       */
+      const superseded = await supabase
+        .from("invitations")
+        .update({ superseded_at: new Date().toISOString() })
+        .eq("family_id", input.familyId)
+        .eq("email", input.email)
+        .is("accepted_at", null)
+        .is("revoked_at", null)
+        .is("superseded_at", null)
+        .is("deleted_at", null);
+      if (superseded.error) throw superseded.error;
+
+      const { data, error } = await supabase
+        .from("invitations")
+        .insert({
+          family_id: input.familyId,
+          email: input.email,
+          token_hash: input.tokenHash,
+          expires_at: input.expiresAt,
+          invited_by_account_id: input.invitedByAccountId,
+        })
+        .select(INVITATION_COLUMNS)
+        .single();
+      if (error) throw error;
+      return toInvitation(data);
+    },
+
+    async listInvitations(familyId: string): Promise<Invitation[]> {
+      const { data, error } = await supabase
+        .from("invitations")
+        .select(INVITATION_COLUMNS)
+        .eq("family_id", familyId)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data.map(toInvitation);
+    },
+
+    async findPendingInvitationForAddress(email: string) {
+      const { data, error } = await supabase
+        .from("invitations")
+        .select("id, family_id, expires_at")
+        .eq("email", email.trim().toLowerCase())
+        .is("accepted_at", null)
+        .is("revoked_at", null)
+        .is("superseded_at", null)
+        .is("deleted_at", null)
+        .gt("expires_at", new Date().toISOString())
+        // the newest live one, though the unique index allows only one per household
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data ? { id: data.id, familyId: data.family_id } : null;
+    },
+
+    async revokeInvitation(input): Promise<boolean> {
+      const { data, error } = await supabase
+        .from("invitations")
+        .update({ revoked_at: new Date().toISOString() })
+        .eq("id", input.invitationId)
+        // scoped by household as well as id: the service role bypasses RLS, so this is the only
+        // thing between a mistyped id and another household's invitation
+        .eq("family_id", input.familyId)
+        .is("accepted_at", null)
+        .is("revoked_at", null)
+        .select("id");
+      if (error) throw error;
+      return (data ?? []).length > 0;
+    },
+
+    async acceptInvitationById(input): Promise<AcceptInvitationOutcome> {
+      const { data, error } = await supabase.rpc("accept_invitation_by_id", {
+        p_invitation_id: input.invitationId,
+        p_account_id: input.accountId,
+        p_email: input.email,
+        p_display_name: input.displayName,
+      });
+      if (error) throw error;
+      return data as unknown as AcceptInvitationOutcome;
+    },
+
+    async acceptInvitation(input): Promise<AcceptInvitationOutcome> {
+      const { data, error } = await supabase.rpc("accept_invitation", {
+        p_token_hash: input.tokenHash,
+        p_account_id: input.accountId,
+        p_email: input.email,
+        p_display_name: input.displayName,
+      });
+      if (error) throw error;
+      return data as unknown as AcceptInvitationOutcome;
     },
 
     async findEntitlement(familyId: string, appKey: string): Promise<Entitlement | null> {

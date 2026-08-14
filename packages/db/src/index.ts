@@ -60,6 +60,7 @@ export const PLATFORM_TABLES = [
   "devices",
   "subscriptions",
   "entitlements",
+  "invitations",
 ] as const;
 
 export type PlatformTable = (typeof PLATFORM_TABLES)[number];

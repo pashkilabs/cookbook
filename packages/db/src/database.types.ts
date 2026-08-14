@@ -373,6 +373,66 @@ export type Database = {
         }
         Relationships: []
       }
+      invitations: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          deleted_at: string | null
+          email: string
+          expires_at: string
+          family_id: string
+          id: string
+          invited_by_account_id: string | null
+          revoked_at: string | null
+          superseded_at: string | null
+          token_hash: string
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          email: string
+          expires_at: string
+          family_id: string
+          id?: string
+          invited_by_account_id?: string | null
+          revoked_at?: string | null
+          superseded_at?: string | null
+          token_hash: string
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          email?: string
+          expires_at?: string
+          family_id?: string
+          id?: string
+          invited_by_account_id?: string | null
+          revoked_at?: string | null
+          superseded_at?: string | null
+          token_hash?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invitations_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invitations_invited_by_account_id_fkey"
+            columns: ["invited_by_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meal_plans: {
         Row: {
           created_at: string
@@ -909,6 +969,24 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_invitation: {
+        Args: {
+          p_account_id: string
+          p_display_name: string
+          p_email: string
+          p_token_hash: string
+        }
+        Returns: Json
+      }
+      accept_invitation_by_id: {
+        Args: {
+          p_account_id: string
+          p_display_name: string
+          p_email: string
+          p_invitation_id: string
+        }
+        Returns: Json
+      }
       import_claim_next_job: {
         Args: { p_lease_seconds?: number; p_worker: string }
         Returns: {

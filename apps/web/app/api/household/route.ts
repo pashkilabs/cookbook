@@ -34,8 +34,24 @@ export async function POST(request: Request) {
     );
   }
 
+  /*
+   * Two ways to end up with a household: being given a new one, or joining one you were invited
+   * to. `joined` is reported distinctly so the caller can say "you're in the Smiths' kitchen"
+   * rather than implying a household was created for them.
+   */
+  if (outcome.status === "joined") {
+    return Response.json({
+      familyId: outcome.familyId,
+      joined: true,
+      created: false,
+      familyName: outcome.familyName,
+      canWrite: outcome.canWrite,
+    });
+  }
+
   return Response.json({
     familyId: outcome.familyId,
+    joined: false,
     created: outcome.created,
     canWrite: outcome.canWrite,
   });

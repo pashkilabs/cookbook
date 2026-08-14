@@ -2,6 +2,7 @@ import type {
   Device,
   EntitlementResult,
   FamilyMember,
+  Invitation,
   Platform,
   PlatformClient,
   PlatformClientOptions,
@@ -13,6 +14,7 @@ import type {
 } from "./types.js";
 import { DEFAULT_GRACE_DAYS, evaluateAccess, graceUntilFor, systemClock } from "./access.js";
 import { isMemberColour, nextFreeColour } from "./member-colours.js";
+import { invitationExpiry, mintInvitationToken, normaliseInvitedAddress } from "./invitations.js";
 
 /** The counter the recipe app spends. Callers may name another. */
 export const DEFAULT_QUOTA = "imports";
@@ -212,6 +214,49 @@ export function createPlatformClient(options: PlatformClientOptions): PlatformCl
     if (!removed) throw new Error("no such member in this household");
   }
 
+  /**
+   * Invite an adult who will sign in for themselves.
+   *
+   * **Nothing here looks at whether the address already has an account**, which is what makes the
+   * response identical either way. An invitation form that answered differently would be an
+   * address-enumeration oracle on a household app — the same reasoning the signup route already
+   * follows, and the same reason it is worth stating: the safe behaviour here is *not looking*,
+   * not looking and then being careful about the answer.
+   *
+   * Returns the token once, to the caller that will send the email. It is never stored and never
+   * returned again.
+   */
+  async function inviteAdult(email: string): Promise<{ invitation: Invitation; token: string }> {
+    const family = await ownFamily();
+    const address = normaliseInvitedAddress(email ?? "");
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(address)) throw new Error("that is not an email address");
+
+    const members = await store.listMembers(family.id);
+    if (members.length >= 20) throw new Error("that is more people than a household");
+
+    const { token, tokenHash } = mintInvitationToken();
+    const invitation = await store.createInvitation({
+      familyId: family.id,
+      email: address,
+      tokenHash,
+      expiresAt: invitationExpiry(clock()),
+      invitedByAccountId: accountId,
+    });
+    return { invitation, token };
+  }
+
+  async function listInvitations(): Promise<Invitation[]> {
+    return store.listInvitations((await ownFamily()).id);
+  }
+
+  async function revokeInvitation(invitationId: string): Promise<void> {
+    const family = await ownFamily();
+    const revoked = await store.revokeInvitation({ familyId: family.id, invitationId });
+    // scoped by household in the store as well, so this is "not yours or not pending" and says
+    // nothing about which
+    if (!revoked) throw new Error("no such pending invitation in this household");
+  }
+
   async function registerDevice(platform: Platform, deviceId?: string): Promise<Device> {
     return store.registerDevice({
       accountId,
@@ -229,6 +274,9 @@ export function createPlatformClient(options: PlatformClientOptions): PlatformCl
     addChild,
     updateMember,
     removeMember,
+    inviteAdult,
+    listInvitations,
+    revokeInvitation,
   };
 }
 

@@ -2,7 +2,7 @@
  * Fail if anything outside the seam queries a platform table.
  *
  * The app must never touch `accounts`, `families`, `family_members`, `devices`,
- * `subscriptions` or `entitlements` directly — it goes through
+ * `subscriptions`, `entitlements` or `invitations` directly — it goes through
  * `@pashki/platform-client`. That boundary is what makes extracting a real platform
  * for app #2 mechanical instead of surgical, and nothing in the database can enforce
  * it: RLS stops a household reading another's rows, not the recipe app reading its
@@ -21,6 +21,9 @@ const PLATFORM_TABLES = [
   "devices",
   "subscriptions",
   "entitlements",
+  // added with adult invitations: it holds a token hash and decides household membership,
+  // which is exactly the kind of table app code must reach only through the seam
+  "invitations",
 ];
 
 /**

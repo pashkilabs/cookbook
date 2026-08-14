@@ -38,6 +38,17 @@ export function createInMemoryStore(seed: Seed = {}, clock: Clock = () => new Da
   const accounts = [...(seed.accounts ?? [])];
   const families = [...(seed.families ?? [])];
   const members = [...(seed.members ?? [])];
+  const invitations: Array<{
+    id: string;
+    familyId: string;
+    email: string;
+    tokenHash: string;
+    expiresAt: string;
+    acceptedAt: string | null;
+    revokedAt: string | null;
+    supersededAt: string | null;
+    createdAt: string;
+  }> = [];
   const entitlements = (seed.entitlements ?? []).map((e) => ({
     ...e,
     quota: structuredClone(e.quota),
@@ -104,6 +115,98 @@ export function createInMemoryStore(seed: Seed = {}, clock: Clock = () => new Da
       // the real store tombstones and listMembers filters; dropping it here is the same effect
       members.splice(at, 1);
       return true;
+    },
+
+    /* Invitations, in memory — the same rules the SQL enforces, so the fake cannot be kinder. */
+    async createInvitation(input) {
+      for (const live of invitations) {
+        if (
+          live.familyId === input.familyId &&
+          live.email === input.email &&
+          !live.acceptedAt && !live.revokedAt && !live.supersededAt
+        ) {
+          live.supersededAt = clock().toISOString();
+        }
+      }
+      const invitation = {
+        id: `invite-${invitations.length + 1}`,
+        familyId: input.familyId,
+        email: input.email,
+        expiresAt: input.expiresAt,
+        acceptedAt: null as string | null,
+        revokedAt: null as string | null,
+        supersededAt: null as string | null,
+        createdAt: clock().toISOString(),
+      };
+      invitations.push({ ...invitation, tokenHash: input.tokenHash });
+      return invitation;
+    },
+
+    async listInvitations(familyId) {
+      return invitations
+        .filter((i) => i.familyId === familyId)
+        .map(({ tokenHash: _hash, ...rest }) => rest);
+    },
+
+    async findPendingInvitationForAddress(email) {
+      const found = invitations.find(
+        (i) =>
+          i.email === email.trim().toLowerCase() &&
+          !i.acceptedAt && !i.revokedAt && !i.supersededAt &&
+          Date.parse(i.expiresAt) > clock().getTime(),
+      );
+      return found ? { id: found.id, familyId: found.familyId } : null;
+    },
+
+    async revokeInvitation(input) {
+      const found = invitations.find(
+        (i) => i.id === input.invitationId && i.familyId === input.familyId && !i.acceptedAt && !i.revokedAt,
+      );
+      if (!found) return false;
+      found.revokedAt = clock().toISOString();
+      return true;
+    },
+
+    async acceptInvitationById(input) {
+      const found = invitations.find((i) => i.id === input.invitationId);
+      if (!found) return { status: "unknown" as const };
+      return this.acceptInvitation({ ...input, tokenHash: found.tokenHash });
+    },
+
+    async acceptInvitation(input) {
+      const found = invitations.find((i) => i.tokenHash === input.tokenHash);
+      if (!found) return { status: "unknown" as const };
+      if (found.acceptedAt) return { status: "used" as const };
+      if (found.revokedAt) return { status: "revoked" as const };
+      if (found.supersededAt) return { status: "superseded" as const };
+      if (Date.parse(found.expiresAt) <= clock().getTime()) return { status: "expired" as const };
+      if (found.email !== input.email.toLowerCase()) return { status: "wrong-address" as const };
+
+      found.acceptedAt = clock().toISOString();
+      if (!accounts.some((a) => a.id === input.accountId)) {
+        accounts.push({ id: input.accountId, email: input.email.toLowerCase() });
+      }
+      let member = members.find(
+        (m) => m.familyId === found.familyId && m.accountId === input.accountId,
+      );
+      if (!member) {
+        member = {
+          id: `member-${members.length + 1}`,
+          familyId: found.familyId,
+          accountId: input.accountId,
+          displayName: input.displayName,
+          colour: null,
+          isChild: false,
+        };
+        members.push(member);
+      }
+      const family = families.find((f) => f.id === found.familyId)!;
+      return {
+        status: "joined" as const,
+        familyId: family.id,
+        familyName: family.name,
+        memberId: member.id,
+      };
     },
 
     async findEntitlement(familyId, appKey) {

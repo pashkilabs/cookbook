@@ -67,6 +67,41 @@ export interface UpdateMemberInput {
   colour?: string | null;
 }
 
+/** An invitation as a household may see it. Never carries the token or its hash. */
+export interface Invitation {
+  id: string;
+  familyId: string;
+  email: string;
+  expiresAt: string;
+  acceptedAt: string | null;
+  revokedAt: string | null;
+  supersededAt: string | null;
+  createdAt: string;
+}
+
+export interface CreateInvitationInput {
+  familyId: string;
+  email: string;
+  tokenHash: string;
+  expiresAt: string;
+  invitedByAccountId: string;
+}
+
+/**
+ * Every way accepting can fail, named.
+ *
+ * A boolean would make the negative tests unable to tell which rule fired, and a person told
+ * "that did not work" about a link they were sent cannot act on it.
+ */
+export type AcceptInvitationOutcome =
+  | { status: "joined"; familyId: string; familyName: string; memberId: string }
+  | { status: "unknown" }
+  | { status: "used" }
+  | { status: "revoked" }
+  | { status: "superseded" }
+  | { status: "expired" }
+  | { status: "wrong-address" };
+
 export interface Session {
   account: Account;
   family: Family;
@@ -246,6 +281,49 @@ export interface PlatformStore {
   updateMember(input: UpdateMemberInput): Promise<FamilyMember | null>;
   /** Soft delete. Never a hard one — a tombstone is what a syncing device can observe (§20). */
   removeMember(input: { familyId: string; memberId: string }): Promise<boolean>;
+
+  /**
+   * Invitations. The token never reaches this port — only its hash, minted by the caller.
+   *
+   * `createInvitation` supersedes any live invitation to the same address in the same household,
+   * so a second invitation replaces the first rather than leaving two that both work.
+   */
+  createInvitation(input: CreateInvitationInput): Promise<Invitation>;
+  listInvitations(familyId: string): Promise<Invitation[]>;
+  /**
+   * The live invitation waiting for this address, if any.
+   *
+   * Exists for the provisioning branch: a person who signs up *because* they were invited arrives
+   * with a confirmed address and no household, and provisioning must join rather than create. The
+   * address is the binding, and it is the strongest one available at that moment — GoTrue has just
+   * proved they own it.
+   */
+  findPendingInvitationForAddress(email: string): Promise<{ id: string; familyId: string } | null>;
+  revokeInvitation(input: { familyId: string; invitationId: string }): Promise<boolean>;
+  /**
+   * Claim a token and join its household, atomically.
+   *
+   * The whole operation is one SQL statement (migration 094000) because claiming and joining
+   * cannot have a window between them: a double-clicked link would otherwise join twice.
+   */
+  /**
+   * Claim an invitation the caller already identified, without a token.
+   *
+   * The provisioning branch has an id and a just-confirmed address, and never saw the token —
+   * it was in an email. Same single-use guarantee, same joining, different key.
+   */
+  acceptInvitationById(input: {
+    invitationId: string;
+    accountId: string;
+    email: string;
+    displayName: string;
+  }): Promise<AcceptInvitationOutcome>;
+  acceptInvitation(input: {
+    tokenHash: string;
+    accountId: string;
+    email: string;
+    displayName: string;
+  }): Promise<AcceptInvitationOutcome>;
   findEntitlement(familyId: string, appKey: string): Promise<Entitlement | null>;
   /**
    * Atomically add `amount` to a counter, refusing if it would exceed the limit.
@@ -371,6 +449,18 @@ export interface PlatformClient {
   addChild(input: { displayName: string; colour?: string | null }): Promise<FamilyMember>;
   updateMember(memberId: string, changes: { displayName?: string; colour?: string | null }): Promise<FamilyMember>;
   removeMember(memberId: string): Promise<void>;
+
+  /**
+   * Invite an adult who will sign in for themselves.
+   *
+   * Returns the token so a caller can build the link and send it. **The response is the same
+   * whether or not the address already has an account** — nothing here looks, so nothing here can
+   * leak it. Address enumeration is the obvious attack on an invitation form, exactly as on
+   * signup.
+   */
+  inviteAdult(email: string): Promise<{ invitation: Invitation; token: string }>;
+  listInvitations(): Promise<Invitation[]>;
+  revokeInvitation(invitationId: string): Promise<void>;
 }
 
 /** Injected so tests and the grace-window logic never depend on the wall clock. */
