@@ -32,6 +32,15 @@ export interface ImportAttemptResult {
   /** where the photo bytes were put, when there were any. Null until a photos row points at it. */
   storagePath: string | null;
   photoDimensions: { width: number; height: number } | null;
+  /**
+   * Why there is no photograph, when there should have been one.
+   *
+   * Carried rather than swallowed. A photo that would not store is not a failed import — the
+   * recipe is the point — but discarding the reason is how `sharp` failing to load on a deployed
+   * host looked like "this page has no picture" for days. The kind is enough to tell a missing
+   * image from a broken image library.
+   */
+  photoFailure: { kind: string; detail: string } | null;
 }
 
 /**
@@ -54,7 +63,7 @@ export async function attemptImport(url: string, familyId: string): Promise<Impo
   });
 
   if (!outcome.ok || !outcome.photo) {
-    return { outcome, storagePath: null, photoDimensions: null };
+    return { outcome, storagePath: null, photoDimensions: null, photoFailure: null };
   }
 
   const stored = await storeImportedPhoto(
@@ -63,12 +72,19 @@ export async function attemptImport(url: string, familyId: string): Promise<Impo
   );
   if (!stored.ok) {
     // a photo that would not store is not a failed import — the recipe is the point
-    return { outcome, storagePath: null, photoDimensions: null };
+    console.warn(`[pashki] photo not stored: ${stored.failure.kind} — ${stored.failure.detail}`);
+    return {
+      outcome,
+      storagePath: null,
+      photoDimensions: null,
+      photoFailure: { kind: stored.failure.kind, detail: stored.failure.detail },
+    };
   }
   return {
     outcome,
     storagePath: stored.storagePath,
     photoDimensions: { width: stored.width, height: stored.height },
+    photoFailure: null,
   };
 }
 

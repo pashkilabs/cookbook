@@ -13,7 +13,8 @@
     "build": "turbo run build",
     "check:boundaries": "node scripts/check-seed-catalog-usage.mjs && node scripts/check-platform-tables.mjs && node scripts/check-server-only.mjs",
     "check": "pnpm check:boundaries && pnpm typecheck && pnpm test",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "smoke:local": "node scripts/smoke.mjs http://127.0.0.1:3000 --local"
   },
   "devDependencies": {
     "turbo": "^2.3.3",

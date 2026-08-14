@@ -31,7 +31,7 @@ export async function POST(request: Request) {
   const url = typeof body.url === "string" ? body.url.trim() : "";
   if (!url) return Response.json({ error: "paste a recipe link" }, { status: 400 });
 
-  const { outcome, storagePath, photoDimensions } = await attemptImport(url, family.id);
+  const { outcome, storagePath, photoDimensions, photoFailure } = await attemptImport(url, family.id);
 
   if (!outcome.ok) {
     return Response.json(explain(outcome.failure), { status: 422 });
@@ -58,6 +58,9 @@ export async function POST(request: Request) {
     // be shown two different renderings of the same parse
     draft: draftFrom(outcome.recipe),
     photo: storagePath ? { storagePath, ...photoDimensions } : null,
+    // named rather than implied: "no picture" and "the image library will not load here" are
+    // different facts, and only one of them is a deployment problem
+    ...(photoFailure ? { photoFailure } : {}),
     tier: outcome.tier,
     fromCache: outcome.fromCache,
   });

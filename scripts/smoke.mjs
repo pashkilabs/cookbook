@@ -148,6 +148,30 @@ const madeObjects = [];
 
 console.log(`smoking ${base}\n`);
 
+/**
+ * Which build is answering, before anything else is asked.
+ *
+ * A whole session went on inferring deployment state from the shape of a 500. The commit makes
+ * "the fix is not deployed yet" a fact rather than a hypothesis, and the configuration booleans
+ * separate "not set" from "set wrongly" — the distinction the token PEM hid for days.
+ */
+try {
+  const health = await call("GET", "/api/health", { auth: false });
+  if (health.status === 200) {
+    const c = health.body?.configured ?? {};
+    console.log(`build ${String(health.body?.commit ?? "unknown").slice(0, 8)}  env ${health.body?.env}`);
+    console.log(`  configured: ${Object.entries(c).map(([k, v]) => `${k}=${v ? "yes" : "NO"}`).join("  ")}\n`);
+    record("health reports a build", Boolean(health.body?.commit) || health.body?.env === "local");
+    for (const key of ["supabase", "siteUrl", "tokenSigner"]) {
+      record(`configured: ${key}`, c[key] === true, c[key] === true ? "" : "missing on this deployment");
+    }
+  } else {
+    console.log(`(no /api/health on this build — HTTP ${health.status})\n`);
+  }
+} catch {
+  // an old build without the route; the sweep below still runs
+}
+
 try {
   // ---------------------------------------------------------------------------
   // 1. Reachability. Every route class, before any of them is asked to do work.
@@ -273,10 +297,16 @@ try {
     single.status === 200 ? `“${single.body?.draft?.title ?? "?"}”` : "site refused; route still ran",
   );
   if (single.status === 200 && single.body?.photo?.storagePath) madeObjects.push(single.body.photo.storagePath);
+  /*
+   * The check that names the cause instead of shrugging at it. `photoFailure` carries the reason
+   * out of the deployed function, so `resizer-unavailable` and its message are visible here rather
+   * than only in a log nobody is reading.
+   */
+  const photoFailure = single.body?.photoFailure ?? null;
   record(
     "a photograph came back with it",
-    single.status !== 200 || single.body?.photo !== undefined,
-    single.body?.photo ? "stored" : "none — sharp may be unavailable",
+    single.status !== 200 || Boolean(single.body?.photo) || !photoFailure,
+    photoFailure ? `${photoFailure.kind}: ${String(photoFailure.detail).slice(0, 160)}` : single.body?.photo ? "stored" : "the page had none",
   );
 
   const batch = await call("POST", "/api/import/batch", {
@@ -362,6 +392,18 @@ try {
   } catch (error) {
     console.error(`\nWARNING: cleanup incomplete — ${String(error.message).slice(0, 120)}`);
   }
+}
+
+/*
+ * A host that never answered has not told us the deployment is broken — it has told us nothing.
+ * Reporting that as a failure is how a check starts crying wolf and stops being run, which is the
+ * same three-outcome rule the rest of this repo follows.
+ */
+const reached = results.filter((r) => r.detail !== "fetch failed" && !String(r.detail ?? "").includes("ENOTFOUND"));
+if (reached.length === 0) {
+  console.log("-".repeat(72));
+  console.log(`COULD NOT MEASURE: ${base} never answered. Nothing was checked.`);
+  process.exit(CANNOT_MEASURE);
 }
 
 const failed = results.filter((r) => !r.ok);

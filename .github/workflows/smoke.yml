@@ -1,0 +1,62 @@
+# Smoke-test the deployment, so an unverified deploy is visibly unverified.
+#
+# The gap this closes: a green build, green tests and a green parity check coexisted with two dead
+# subsystems in production for days. Nothing in CI had ever called a deployed route. A check that
+# has to be remembered is a check that gets skipped, so this runs itself.
+#
+# It waits for the commit it was triggered by to actually be *serving* — read from
+# /api/health — before testing anything. Testing whichever build happens to answer is how "the fix
+# is deployed" became a hypothesis rather than a fact.
+name: smoke
+
+on:
+  push:
+    branches: [main]
+  # so a configuration fix, which changes no commit, can still be verified
+  workflow_dispatch:
+
+concurrency:
+  # a newer commit supersedes an older one; there is no value in smoking a build already replaced
+  group: smoke-production
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Wait for this commit to be serving
+        id: wait
+        env:
+          TARGET: https://cookbook.pashki.com
+        run: |
+          # Vercel builds after the push; polling /api/health is what makes this test the right
+          # build rather than the previous one. Ten minutes is generous for a Next build.
+          for attempt in $(seq 1 60); do
+            body=$(curl -s --max-time 20 "$TARGET/api/health" || true)
+            serving=$(printf '%s' "$body" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).commit??"")}catch{console.log("")}})')
+            if [ "$serving" = "${GITHUB_SHA}" ]; then
+              echo "serving ${GITHUB_SHA}"; exit 0
+            fi
+            echo "attempt $attempt: serving '${serving:-none}', want ${GITHUB_SHA}"
+            sleep 10
+          done
+          echo "::error::the deployment never started serving ${GITHUB_SHA}; nothing was smoke-tested"
+          exit 1
+
+      - name: Smoke
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/smoke.mjs https://cookbook.pashki.com

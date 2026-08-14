@@ -169,7 +169,46 @@ These are the drift surface. `check:parity` covers Supabase and knows nothing ab
 
 ---
 
-## Verifying a deployment end to end
+## Verifying a deployment — `pnpm smoke`
+
+```bash
+pnpm smoke                                  # production
+pnpm smoke http://127.0.0.1:3000 --local    # a local production build
+```
+
+41 checks across every route class: it signs up, confirms, provisions, writes a recipe, imports
+one, queues a batch, drains it, plans a week, ticks a shopping line, puts an object in storage and
+proves anon cannot read it — then deletes everything it made. Three exit codes: `0` verified, `1`
+broken, `2` the host never answered.
+
+**Any 500 is a failure.** A 401 means the handler ran and refused; a 500 means nothing ran. That
+single rule is what would have caught the sharp fault on day one.
+
+It reads `/api/health` first, so the run states which commit it tested and which configuration
+keys are present (booleans only — never values). "Not deployed yet" stops being a hypothesis.
+
+### It runs itself
+
+`.github/workflows/smoke.yml` runs on every push to `main` and on demand. It **waits for the
+pushed commit to actually be serving**, polling `/api/health`, before testing anything — testing
+whichever build happens to answer is how a fix gets declared deployed when it is not. If the
+deployment never serves that commit, the job fails rather than passing quietly.
+
+**What it costs, stated plainly:**
+
+- **The service-role key must exist in GitHub Actions secrets.** That is a real expansion of where
+  a key that bypasses RLS lives — now Vercel, a developer machine, and GitHub. It is the price of
+  the test being able to create and destroy a household the way a person would.
+- **It writes to production.** A real account, household, recipe, import job and storage object,
+  deleted in a `finally` block. A crashed runner can leave a `pashki-smoke+…@example.invalid`
+  account behind; they are safe to delete.
+- **A few minutes per deploy**, most of it waiting for Vercel.
+- **It spends one import** against the smoke household's own grant, and briefly fetches a real
+  recipe site.
+
+The alternative — remembering to run it — is what produced the fault it exists to catch.
+
+## Verifying by hand
 
 The build passing proves nothing about auth. What proves it:
 
