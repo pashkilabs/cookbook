@@ -403,6 +403,41 @@ for everything else. The flag survives either way; what changes is who may set i
 
 ---
 
+### Reversed in exposure, not in decision (2026-08-14)
+
+**The anon read surface is revoked until something renders a public recipe page.** Everything
+above still stands: when the pages are built, they are built on a flag and not a token, and
+migration `20260811090500` is the specification for putting it back.
+
+What changed is not the reasoning, it is the exposure. `apps/web` is now deployed against a
+hosted project on the public internet, so the anon path is reachable by anyone holding the
+publishable key — which is in every client bundle by design. **Nothing renders those pages**, so
+the surface was live for a feature with no users.
+
+The specific cost is one this file already records as a trap: Postgres checks the new row of an
+`UPDATE` against `SELECT` policies, so loosening a SELECT policy promotes the UPDATE policy from
+redundant to load-bearing. §18 treats that promotion as an achievement, and it was — while
+something was going to use it. Carrying it for an unbuilt feature is paying a risk and taking no
+benefit.
+
+Kept: `recipes.visibility`, because the column costs nothing and dropping it would discard whatever
+anyone has already marked public; and `private.recipe_is_public()`, still used by the
+`authenticated` policies.
+
+**Not included, and worth a separate decision:** the `authenticated` `*_select_public_any`
+policies — a signed-in stranger reading another household's public recipe. Those are what actually
+promote the UPDATE policy, and revoking them would move `scripts/mutate-rls.sh`'s acceptance
+criteria back to `masked`, which is undoing §18 rather than pausing §17. Left in place pending a
+decision.
+
+**Status: decided, migration written (`20260814090000_revoke_anon_reads.sql`), not applied.**
+`scripts/mutate-rls.sh` and `packages/db/test/rls.test.ts` both still assert the old surface and
+must change in the same commit. Blocked on the development machine having no working Docker, and
+therefore no Postgres to prove any of it against.
+
+*Would change if:* the public pages get built. Then this reverses again, deliberately, with
+090500 as the text.
+
 ## 18. Publishing promotes the UPDATE policy from redundant to load-bearing
 
 Recorded because it was predicted, then confirmed, and it will matter again.
@@ -603,6 +638,38 @@ checklist, and the split between what is negotiable and what is not is the decis
 5. Sync authenticates as the user, with server-side rules. No shared key, no
    client-declared scope.
 6. A local write is durable before it is acknowledged.
+7. **A deferred server call survives being offline, not only a replicated row write.**
+   See below — this is the criterion most likely to be discovered late.
+
+**On criterion 7 — the outbox is two mechanisms wearing one name.**
+
+`docs/on-device.md` describes an outbox and means *writes to synced tables*: a rating made
+on a train replicates when signal returns, and the engine owns that. The second mechanism
+has no design and is not the same thing. **Queueing an import is an HTTP call to a table
+the device deliberately does not hold** — `import_jobs` is excluded from the synced set on
+purpose (§20, on-device §4), because syncing raw import payloads to every device forever to
+drive a status spinner is a bad trade. That reasoning is still right.
+
+What follows from it is that the share target — the feature most likely to be used away from
+signal, since sharing a link is what people do while browsing on a phone — has nowhere to put
+the link. It cannot write it to a synced table, because there isn't one. It cannot call the
+server, because there is no server.
+
+Two shapes answer it, and they are not equally cheap:
+
+- **A local queue of deferred operations**, drained on reconnect, alongside the engine's own
+  outbox. It works with any engine and is ours to build and get wrong — retries, idempotency,
+  ordering against replicated writes, and what a person sees for an import that has been
+  pending for two days.
+- **A synced table the device may write**, an outbox in the schema rather than in the client,
+  which the server drains. This costs a table and puts the engine's replication in charge of
+  durability and retry, which is the thing it is good at. It also means the queue submission
+  path stops being HTTP-shaped, which changes `POST /api/import/batch`.
+
+This is a **selection criterion**, not an implementation detail: some engines make the second
+shape natural and some make it awkward, and discovering which after choosing one is how a
+six-month detour starts. It is listed here rather than in on-device.md because the engine
+decision is where it becomes expensive.
 
 **Conceded, in this order:** local foreign keys first (the server holds the
 invariant and the on-device assertion catches the pathological case); then local
