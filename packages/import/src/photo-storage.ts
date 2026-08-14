@@ -1,15 +1,24 @@
 import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { RECIPE_PHOTO_BUCKET } from "./photo-bucket.js";
+import { decodeImage } from "./image.js";
 
 /**
- * Fetch, resize, store — the server side of the photo pipeline.
+ * Validate and store — the server side of the photo pipeline.
  *
  * **Server-only**, and needs the service role: the bucket is private and has no client
  * write policy, so nothing else can put an object there.
  *
- * A separate entry point (`@pashki/import/photo-storage`) because it loads sharp.
- * Anything that only wants tiers 0 and 1 should not pay for libvips at import time.
+ * **No resizing, and therefore no sharp** (decisions §37). Display sizes come from Supabase's
+ * image transformation CDN on read, which architecture §5 already said — so resizing on ingest
+ * was producing one more variant nobody displayed. Removing it takes a native module out of
+ * every deployed function, which is what made this path fragile: sharp cannot be bundled, has to
+ * be traced in by hand, and the tracing bloated seventeen serverless functions past a hosting
+ * limit before anyone noticed the photographs had been missing for days.
+ *
+ * What is given up, stated rather than discovered later: the stored object is the publisher\'s
+ * original, so it is larger and keeps whatever metadata it arrived with. Both are bounded — a
+ * size cap below, and the CDN strips metadata when it transforms on read.
  *
  * Deliberately does **not** insert a `photos` row. No import saves without the user
  * seeing it (CLAUDE.md), so the row is written when they accept the review — and until
@@ -25,14 +34,13 @@ export interface PhotoStorageOptions {
   supabase: SupabaseClient;
   bucket?: string;
   /**
-   * Longest edge to keep.
+   * Refuse anything larger than this many bytes.
    *
-   * One size on ingest, not a set of variants: display sizes come from Supabase's
-   * image transformation CDN on read, so storing four crops of every photo would be
-   * paying twice. Also a placeholder — nothing has measured what a recipe card needs.
+   * The cap that resizing used to provide implicitly. Recipe hero images are usually well under
+   * a megabyte; something far larger is a mistake or a hero video frame, and storing it costs a
+   * shared 1 GB bucket more than the picture is worth.
    */
-  maxDimension?: number;
-  quality?: number;
+  maxBytes?: number;
 }
 
 export interface StoredPhoto {
@@ -41,45 +49,14 @@ export interface StoredPhoto {
   width: number;
   height: number;
   byteLength: number;
-  contentType: "image/jpeg";
+  /** as decoded, not as declared — the publisher\'s own format is what gets stored */
+  contentType: string;
 }
 
 export type PhotoStorageFailure =
   | { kind: "not-an-image"; detail: string }
-  | { kind: "resize-failed"; detail: string }
-  | { kind: "upload-failed"; detail: string }
-  /** the image library could not be loaded here at all — see `loadSharp` */
-  | { kind: "resizer-unavailable"; detail: string };
-
-/**
- * sharp, loaded when it is needed rather than when this module is imported.
- *
- * **A top-level `import sharp` made every route that touched this file die.** sharp is a native
- * addon; on Vercel's linux runtime it failed to load, and because the import was at module scope
- * the failure took the whole route with it — five routes returning 500, including one that wanted
- * nothing from here but a bucket name. Locally it never reproduced, because the darwin binary is
- * sitting in `node_modules` for Node to find.
- *
- * Deferring it changes the blast radius from *the route* to *the photograph*. An import whose
- * picture cannot be resized is still an import; the recipe is the point. And the reason is
- * carried in the failure rather than thrown away, so the next person sees why instead of a 500.
- */
-type Sharp = (typeof import("sharp"))["default"];
-let sharpModule: Sharp | null = null;
-let sharpFailure: string | null = null;
-
-async function loadSharp(): Promise<{ ok: true; sharp: Sharp } | { ok: false; detail: string }> {
-  if (sharpModule) return { ok: true, sharp: sharpModule };
-  if (sharpFailure) return { ok: false, detail: sharpFailure };
-  try {
-    sharpModule = (await import("sharp")).default;
-    return { ok: true, sharp: sharpModule };
-  } catch (thrown) {
-    // remembered, so a hot function does not retry a native load that cannot succeed
-    sharpFailure = thrown instanceof Error ? thrown.message : String(thrown);
-    return { ok: false, detail: sharpFailure };
-  }
-}
+  | { kind: "too-large"; detail: string }
+  | { kind: "upload-failed"; detail: string };
 
 export type PhotoStorageOutcome =
   | ({ ok: true } & StoredPhoto)
@@ -93,58 +70,56 @@ export interface StoreImportedPhotoInput {
   photoId?: string;
 }
 
-const DEFAULTS = { maxDimension: 1600, quality: 82 };
+const DEFAULTS = { maxBytes: 8 * 1024 * 1024 };
+
+/** What `decodeImage` reports, mapped to what Storage should serve it as. */
+const CONTENT_TYPES: Record<string, string> = {
+  jpeg: "image/jpeg",
+  png: "image/png",
+  gif: "image/gif",
+  webp: "image/webp",
+};
 
 /**
- * Resize an imported photo and store it. Returns a typed failure rather than throwing,
- * the same as the rest of this package.
+ * Store an imported photo. Returns a typed failure rather than throwing, the same as the rest of
+ * this package.
+ *
+ * The bytes are validated by **decoding them**, not by trusting a content type — a proxy will
+ * happily label an HTML error page as a JPEG, and that trap is old enough to be in CLAUDE.md.
+ * `decodeImage` is our own header parser, so the validation survived sharp leaving.
  */
 export async function storeImportedPhoto(
   input: StoreImportedPhotoInput,
   options: PhotoStorageOptions,
 ): Promise<PhotoStorageOutcome> {
   const bucket = options.bucket ?? RECIPE_PHOTO_BUCKET;
-  const maxDimension = options.maxDimension ?? DEFAULTS.maxDimension;
-  const quality = options.quality ?? DEFAULTS.quality;
+  const maxBytes = options.maxBytes ?? DEFAULTS.maxBytes;
 
-  const loaded = await loadSharp();
-  if (!loaded.ok) {
-    return { ok: false, failure: { kind: "resizer-unavailable", detail: loaded.detail } };
-  }
-  const sharp = loaded.sharp;
-
-  let resized;
-  try {
-    resized = await sharp(Buffer.from(input.bytes), { failOn: "error" })
-      // apply EXIF orientation, then drop the metadata: a photo lifted off a page can
-      // carry a location and a camera serial, and neither belongs in our storage
-      .rotate()
-      .resize({
-        width: maxDimension,
-        height: maxDimension,
-        fit: "inside",
-        withoutEnlargement: true,
-      })
-      .jpeg({ quality, mozjpeg: true })
-      .toBuffer({ resolveWithObject: true });
-  } catch (thrown) {
-    const detail = thrown instanceof Error ? thrown.message : String(thrown);
-    // sharp refuses non-images and truncated files with the same class of error, so
-    // the distinction is worth drawing for whoever reads the failure
+  const decoded = decodeImage(input.bytes);
+  if (!decoded) {
     return {
       ok: false,
-      failure: /unsupported image format|Input buffer/i.test(detail)
-        ? { kind: "not-an-image", detail }
-        : { kind: "resize-failed", detail },
+      failure: { kind: "not-an-image", detail: `${input.bytes.length} bytes that decode as nothing` },
     };
   }
 
-  const storagePath = `${input.familyId}/${input.photoId ?? randomUUID()}.jpg`;
+  if (input.bytes.length > maxBytes) {
+    return {
+      ok: false,
+      failure: {
+        kind: "too-large",
+        detail: `${input.bytes.length} bytes, over the ${maxBytes} limit`,
+      },
+    };
+  }
+
+  const contentType = CONTENT_TYPES[decoded.format] ?? "application/octet-stream";
+  const storagePath = `${input.familyId}/${input.photoId ?? randomUUID()}.${decoded.format === "jpeg" ? "jpg" : decoded.format}`;
 
   const { error } = await options.supabase.storage
     .from(bucket)
-    .upload(storagePath, resized.data, {
-      contentType: "image/jpeg",
+    .upload(storagePath, input.bytes, {
+      contentType,
       // an explicit photoId means "replace what was there", which is what a retried
       // import should do rather than leaving the first attempt behind
       upsert: input.photoId !== undefined,
@@ -157,10 +132,10 @@ export async function storeImportedPhoto(
   return {
     ok: true,
     storagePath,
-    width: resized.info.width,
-    height: resized.info.height,
-    byteLength: resized.data.byteLength,
-    contentType: "image/jpeg",
+    width: decoded.width,
+    height: decoded.height,
+    byteLength: input.bytes.length,
+    contentType,
   };
 }
 

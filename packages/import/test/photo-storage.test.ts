@@ -121,34 +121,49 @@ describe.skipIf(instance === null)("recipe photo storage", () => {
     }
   });
 
-  describe("resize and store", () => {
-    it("stores a resized JPEG and reports where", async () => {
-      const stored = await storeImportedPhoto(
-        { familyId, bytes: await photoBytes(3000, 2000) },
-        { supabase: admin },
-      );
+  describe("validate and store", () => {
+    it("stores the publisher's own bytes and reports where", async () => {
+      // No resizing on ingest (decisions §37): display sizes come from the transformation CDN,
+      // so a variant stored here is one nobody displays — and it cost a native module in every
+      // deployed function.
+      const original = await photoBytes(3000, 2000);
+      const stored = await storeImportedPhoto({ familyId, bytes: original }, { supabase: admin });
       expect(stored.ok).toBe(true);
       if (!stored.ok) return;
       created.push(stored.storagePath);
 
       expect(stored.storagePath.startsWith(`${familyId}/`)).toBe(true);
-      expect(Math.max(stored.width, stored.height)).toBeLessThanOrEqual(1600);
-      expect(stored.contentType).toBe("image/jpeg");
+      expect([stored.width, stored.height], "dimensions as decoded, not as resized").toEqual([3000, 2000]);
+      expect(stored.byteLength).toBe(original.length);
 
       const { data } = await admin.storage.from(RECIPE_PHOTO_BUCKET).download(stored.storagePath);
       const bytes = new Uint8Array(await data!.arrayBuffer());
+      expect(bytes.length, "byte-for-byte what was fetched").toBe(original.length);
       // decoded, not declared — the same rule as the rest of the pipeline
-      expect(decodeImage(bytes)).toMatchObject({ format: "jpeg", width: stored.width });
+      expect(decodeImage(bytes)).toMatchObject({ format: "png", width: 3000 });
     });
 
-    it("does not enlarge a photo that is already small", async () => {
+    it("names the object for the format it actually is", async () => {
+      // the extension follows the decode, because the bytes are no longer converted to JPEG
       const stored = await storeImportedPhoto(
         { familyId, bytes: await photoBytes(200, 150) },
         { supabase: admin },
       );
       if (!stored.ok) throw new Error("expected success");
       created.push(stored.storagePath);
-      expect([stored.width, stored.height]).toEqual([200, 150]);
+      expect(stored.storagePath.endsWith(".png")).toBe(true);
+      expect(stored.contentType).toBe("image/png");
+    });
+
+    it("refuses something far larger than a recipe photograph", async () => {
+      // the cap resizing used to provide implicitly, now stated
+      const stored = await storeImportedPhoto(
+        { familyId, bytes: await photoBytes(400, 400) },
+        { supabase: admin, maxBytes: 100 },
+      );
+      expect(stored.ok).toBe(false);
+      if (stored.ok) return;
+      expect(stored.failure.kind).toBe("too-large");
     });
 
     it("reports a typed failure for bytes that are not an image", async () => {

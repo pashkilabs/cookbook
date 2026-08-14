@@ -1335,6 +1335,59 @@ be the wrong trade in the other direction. The age is already a parameter for th
 
 ---
 
+## 37. Imported photographs are stored as fetched, and resized by the CDN on read
+
+**Decided.** `storeImportedPhoto` validates the bytes and uploads them unchanged. No resizing on
+ingest, and therefore **no sharp anywhere in the deployed app**.
+
+### Why it was there, and why that reason had already expired
+
+Ingest-time resizing capped the stored size, stripped EXIF, and normalised everything to JPEG.
+But architecture §5 already says display sizes come from **Supabase's image transformation CDN on
+read** — so the resize was producing one more variant that nothing displayed. The CDN was always
+going to be asked for a card-sized image regardless of what was stored.
+
+### What it cost to keep
+
+sharp is a native addon. It cannot be bundled, so it has to be excluded from the bundle *and*
+traced into the function by hand — two separate jobs, and doing only the first ships a deployment
+that fails at runtime with `Could not load the "sharp" module using the linux-x64 runtime`. That
+failure was invisible locally, where the darwin binary sits in `node_modules` regardless.
+
+Then the fix had a fix: tracing libvips into every API route bloated seventeen serverless
+functions past the host's twelve-function limit and the deployment was **refused outright**. A
+day was spent on this, and the photographs had been silently missing from production the whole
+time.
+
+The honest reading is that a resize step nothing needed was holding a native dependency in every
+deployed function, and the dependency was setting the hosting plan.
+
+### What is given up
+
+- **Bigger objects.** The publisher\'s original rather than a 1600px JPEG — megabytes instead of
+  hundreds of kilobytes, against a shared 1 GB bucket. Bounded by an 8 MB `maxBytes` refusal, the
+  cap resizing used to provide implicitly.
+- **Metadata survives.** An imported photo keeps whatever EXIF it arrived with. It is the
+  publisher\'s photograph rather than the household\'s, and the CDN strips metadata when it
+  transforms on read, so nothing with EXIF is ever served — but it is *stored*.
+- **Mixed formats.** The object is named for what it decodes as, so a PNG stays a PNG.
+
+Validation is unaffected: `decodeImage` is our own header parser, so "validate by decoding, never
+by the declared content type" survives sharp leaving.
+
+### Phase 3 is not affected
+
+Photographing the finished plate should resize **on the device**, before upload — where the
+picture is large, the network is the constraint, and there is no serverless packaging problem to
+have. `@pashki/import/sharp` remains for tier 3 screenshot downscaling, which runs in the eval
+harness rather than in a deployed function.
+
+*Would change if:* stored size becomes a real cost, or camera uploads need a server-side resize
+after all. The answer then is a resize in the worker container (Phase 4), which has ffmpeg and no
+function-packaging limits — not sharp back in the web app.
+
+---
+
 ## Open: cascade deletions and tombstones
 
 **Not resolved. This waits on the sync engine choice, and exists so the evaluation
