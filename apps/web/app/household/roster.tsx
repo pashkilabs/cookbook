@@ -27,24 +27,48 @@ export interface RosterMember {
   isYou: boolean;
 }
 
-export function Roster({ members, colours }: { members: RosterMember[]; colours: RosterColour[] }) {
+export interface PendingInvitation {
+  id: string;
+  email: string;
+  expiresAt: string;
+}
+
+export function Roster({
+  members,
+  colours,
+  invitations,
+}: {
+  members: RosterMember[];
+  colours: RosterColour[];
+  invitations: PendingInvitation[];
+}) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
+  const [invitee, setInvitee] = useState("");
+  const [notice, setNotice] = useState<string | null>(null);
 
-  async function send(method: string, body: unknown) {
+  async function send(method: string, body: unknown, path = "/api/members") {
     setBusy(true);
     setError(null);
-    const response = await fetch("/api/members", {
+    setNotice(null);
+    const response = await fetch(path, {
       method,
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
     });
-    const parsed = (await response.json().catch(() => ({}))) as { error?: string };
+    const parsed = (await response.json().catch(() => ({}))) as { error?: string; sent?: boolean };
     setBusy(false);
+    // 202: the invitation is recorded and the email did not go. Said out loud rather than
+    // reported as success, because the person will not receive anything.
+    if (response.status === 202) {
+      setNotice(parsed.error ?? "Saved, but the email could not be sent.");
+      router.refresh();
+      return true;
+    }
     if (!response.ok) {
       setError(parsed.error ?? `that did not work (${response.status})`);
       return false;
@@ -150,10 +174,63 @@ export function Roster({ members, colours }: { members: RosterMember[]; colours:
 
       {error && <p className="error">{error}</p>}
 
-      <div className="notice" style={{ marginTop: "1.5rem" }}>
-        Adding an adult who signs in for themselves is not built yet — everyone added here is
-        rated but does not have an account.
-      </div>
+      <section style={{ marginTop: "2rem" }}>
+        <h2>Invite an adult</h2>
+        <p className="subtitle" style={{ marginBottom: "1rem" }}>
+          They sign in for themselves and share everything — recipes, the week, the shopping list.
+          The link works once and expires in seven days.
+        </p>
+
+        {invitations.length > 0 && (
+          <ul className="roster">
+            {invitations.map((invitation) => (
+              <li key={invitation.id}>
+                <span className="dot" aria-hidden="true" />
+                <span className="who">
+                  <strong>{invitation.email}</strong>
+                  <span className="meta">invited, not yet accepted</span>
+                </span>
+                <button
+                  type="button"
+                  className="quiet"
+                  disabled={busy}
+                  onClick={() => send("DELETE", { id: invitation.id }, "/api/invitations")}
+                >
+                  Withdraw
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <form
+          className="stack"
+          style={{ maxWidth: "none" }}
+          onSubmit={async (event) => {
+            event.preventDefault();
+            const result = await send("POST", { email: invitee }, "/api/invitations");
+            if (result) setInvitee("");
+          }}
+        >
+          <div>
+            <label htmlFor="invite-email">Their email address</label>
+            <div className="row">
+              <input
+                id="invite-email"
+                type="email"
+                required
+                placeholder="them@example.com"
+                value={invitee}
+                onChange={(event) => setInvitee(event.target.value)}
+              />
+              <button type="submit" disabled={busy || !invitee.trim()} style={{ flex: "0 0 auto" }}>
+                {busy ? "Sending…" : "Send invitation"}
+              </button>
+            </div>
+          </div>
+        </form>
+        {notice && <p className="meta">{notice}</p>}
+      </section>
     </>
   );
 }

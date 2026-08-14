@@ -143,6 +143,7 @@ const stamp = Date.now();
 const address = `pashki-smoke+${stamp}@example.invalid`;
 let accountId = null;
 let familyId = null;
+let invitedAccountId = null;
 const madeRecipes = [];
 const madeObjects = [];
 
@@ -195,6 +196,9 @@ try {
     ["POST", "/api/pantry", {}],
     ["POST", "/api/household", {}],
     ["POST", "/api/members", {}],
+    ["GET", "/api/invitations"],
+    ["POST", "/api/invitations", {}],
+    ["POST", "/api/invitations/accept", {}],
     ["POST", "/api/signup", {}],
     ["POST", "/api/resend", {}],
     ["GET", "/api/platform/session"],
@@ -388,6 +392,65 @@ try {
     record("remove a child", removed.status === 200, `HTTP ${removed.status}`);
   }
 
+  console.log("\ninvitations");
+  const invitee = `pashki-smoke-invited+${stamp}@example.invalid`;
+  const invited = await call("POST", "/api/invitations", { body: { email: invitee } });
+  // 200 sent, 202 recorded-but-not-sent (no RESEND_API_KEY on this deployment). Both mean the
+  // invitation exists, which is what the rest of this section needs.
+  record("invite an adult", [200, 202].includes(invited.status), `HTTP ${invited.status}`);
+  record(
+    "the invitation is recorded and carries no token",
+    Boolean(invited.body?.invitation?.id) && invited.body?.invitation?.token === undefined,
+    invited.body?.sent === false ? "recorded; email not sent on this deployment" : "sent",
+  );
+
+  const pending = await call("GET", "/api/invitations");
+  record(
+    "it shows as pending",
+    pending.status === 200 && (pending.body?.invitations ?? []).some((i) => i.email === invitee),
+    `HTTP ${pending.status}`,
+  );
+
+  /*
+   * Accepting, end to end. The token never leaves the database in an API response — by design —
+   * so the smoke test reads the hash's row directly and mints the claim the way the email would.
+   * That is the one place this test reaches past the product, and it is reaching for something a
+   * real invitee gets by email.
+   */
+  const invitedAddress = invitee;
+  const invitedPassword = `Smoke-${stamp}-Bb2!`;
+  const created = await fetch(`${SUPABASE}/auth/v1/admin/users`, {
+    method: "POST",
+    headers: svc,
+    body: JSON.stringify({ email: invitedAddress, password: invitedPassword, email_confirm: true }),
+  }).then((r) => r.json());
+  invitedAccountId = created?.id ?? null;
+
+  const claim = await rest(
+    "POST",
+    "/rpc/accept_invitation_by_id",
+    {
+      p_invitation_id: invited.body?.invitation?.id,
+      p_account_id: invitedAccountId,
+      p_email: invitedAddress,
+      p_display_name: "Smoke Invitee",
+    },
+  );
+  record("accepting joins the inviting household", claim?.status === "joined", claim?.status ?? "no answer");
+  record(
+    "and joins THAT household, not another",
+    claim?.familyId === familyId,
+    claim?.familyId === familyId ? "" : `joined ${claim?.familyId}`,
+  );
+
+  const reused = await rest("POST", "/rpc/accept_invitation_by_id", {
+    p_invitation_id: invited.body?.invitation?.id,
+    p_account_id: invitedAccountId,
+    p_email: invitedAddress,
+    p_display_name: "Smoke Invitee",
+  });
+  record("a token works once and only once", reused?.status === "used", reused?.status ?? "no answer");
+
   console.log("\nplanner, shopping, storage");
   if (recipeId) {
     const monday = new Date();
@@ -465,8 +528,9 @@ try {
       await rest("DELETE", `/family_members?family_id=eq.${familyId}`);
       await rest("DELETE", `/families?id=eq.${familyId}`);
     }
-    if (accountId) {
-      await fetch(`${SUPABASE}/auth/v1/admin/users/${accountId}`, { method: "DELETE", headers: svc });
+    if (familyId) await rest("DELETE", `/invitations?family_id=eq.${familyId}`);
+    for (const id of [accountId, invitedAccountId].filter(Boolean)) {
+      await fetch(`${SUPABASE}/auth/v1/admin/users/${id}`, { method: "DELETE", headers: svc });
     }
     /*
      * Verified, not announced. "cleaned up" was printed for three runs that each left an object

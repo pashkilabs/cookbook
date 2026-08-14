@@ -298,6 +298,16 @@ export interface PlatformStore {
    * address is the binding, and it is the strongest one available at that moment — GoTrue has just
    * proved they own it.
    */
+  /**
+   * The invitation a token names, for the page the link opens.
+   *
+   * Returns it whatever state it is in — the page needs to say "already used" rather than "not
+   * valid", and both are better than a blank refusal for somebody holding a link they were sent.
+   * Carries the household's name so the page can say what they are joining.
+   */
+  findInvitationByTokenHash(
+    tokenHash: string,
+  ): Promise<(Invitation & { familyName: string }) | null>;
   findPendingInvitationForAddress(email: string): Promise<{ id: string; familyId: string } | null>;
   revokeInvitation(input: { familyId: string; invitationId: string }): Promise<boolean>;
   /**

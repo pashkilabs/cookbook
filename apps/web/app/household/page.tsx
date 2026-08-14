@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
-import { MEMBER_COLOURS } from "@pashki/platform-client";
+import { MEMBER_COLOURS, invitationState } from "@pashki/platform-client";
 import { Roster } from "./roster";
 
 /**
@@ -31,7 +31,10 @@ export default async function HouseholdPage() {
     );
   }
 
-  const members = await platformStore().listMembers(family.id);
+  const [members, invitations] = await Promise.all([
+    platformStore().listMembers(family.id),
+    platformStore().listInvitations(family.id),
+  ]);
   const me = members.find((member) => member.accountId === auth.user!.id);
 
   return (
@@ -49,6 +52,13 @@ export default async function HouseholdPage() {
       <Roster
         // the seam owns the vocabulary; a server component is where it may be read
         colours={MEMBER_COLOURS.map((colour) => ({ key: colour.key, label: colour.label }))}
+        invitations={invitations
+          .filter((invitation) => invitationState(invitation) === "pending")
+          .map((invitation) => ({
+            id: invitation.id,
+            email: invitation.email,
+            expiresAt: invitation.expiresAt,
+          }))}
         members={members.map((member) => ({
           id: member.id,
           displayName: member.displayName,

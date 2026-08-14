@@ -1508,6 +1508,80 @@ never uses colour alone.
 *Would change if:* a household asks for a second adult before Phase 3 starts. The work is
 understood; it is sequenced, not blocked.
 
+### Reversed (2026-08-14): invitations are built
+
+**The deferral was overruled, and the reasoning above was wrong in a specific way worth naming.**
+It was not wrong about the cost — acceptance really is the hard half, and it really does branch
+the most-verified path in the application. It was wrong about what to optimise for: it treated
+Phase 3's deep link as something to *solve first*, when a two-adult household is the ordinary
+case and the web flow is what people need now. Sequencing a common case behind an unresolved
+dependency of a phase that has not started is deferring the wrong thing.
+
+Built as migration `20260814094000` and §40 below. What it did to the path this section worried
+about is the part worth recording: **provisioning was not changed.** A branch sits in front of it
+— if the confirmed address has a live invitation, join that household — and joining first makes
+`provisionHousehold` a no-op, because it resolves the household through membership and finds one.
+The idempotency a double-clicked signup depends on is untouched, and the diff reads as an
+addition rather than an edit.
+
+The native app still needs a deep link. It now extends a flow that exists rather than defining
+one, which is the cheaper order after all.
+
+---
+
+## 40. An invitation is a hashed single-use token, and the address is the binding
+
+**Decided.** A household invites an adult by address. The invitation is a row with a SHA-256 of a
+256-bit token, a seven-day expiry, and timestamps for accepted, revoked and superseded.
+
+### The token is never stored
+
+Only its hash. A leaked backup, a stray log line, or a support query over `invitations` yields
+hashes — and a hash cannot be presented to `accept_invitation`. The token exists in the email and
+in the URL the invited person clicks, and nowhere in our infrastructure. No pepper: a pepper
+protects a *low-entropy* secret from an offline attack, and against 256 random bits it would add a
+key to rotate for no gain.
+
+### Claiming is one statement
+
+`accept_invitation` claims the row and adds the member in a single SQL function, for the same
+reason `import_finish_job` does (§32). `accepted_at is null` in the WHERE clause of the UPDATE is
+what makes it single-use **under concurrency**: two simultaneous clicks both run it, and exactly
+one matches a row. Two statements would let a double-clicked link join a household twice.
+
+Every refusal is a named status — `used`, `revoked`, `superseded`, `expired`, `wrong-address`,
+`unknown` — rather than a boolean. A person told "that did not work" about a link they were sent
+cannot act on it, and naming the reason tells the holder nothing they could not already discover,
+since they have the token.
+
+### The address is the binding, not the token alone
+
+A claim must match the address the invitation was sent to. A token in a URL can be forwarded; an
+address has been proved by GoTrue. This is what stops a forwarded link admitting whoever received
+it, and it is why the provisioning branch can work **without a token at all** — somebody who signs
+up because they were invited arrives with a just-confirmed address, which is a stronger claim than
+the link they may or may not still have.
+
+### Enumeration
+
+The invite response is identical whether or not the address has an account, and the reason it is
+safe is that **nothing looks**. There is no branch on existence to get wrong later. The difference
+appears only on the invited person's side, where they already know which case they are in.
+
+### An invitation is a membership, not a purchase
+
+Joining confers no entitlement. The household's own covers its members (§9), which is what makes a
+second adult free and what stops an invitation becoming a way to mint access.
+
+### The seam widened, deliberately
+
+`invitations` is a platform table and joined `check-platform-tables.mjs`, so app code cannot reach
+it. `packages/db`'s exhaustiveness type caught the omission when it was added to the schema and
+not to the classification — the build stopped compiling, which is the guard working.
+
+*Would change if:* invitations need to carry a role. There is no role model today; adding one is a
+column and a check, not a redesign.
+
 ---
 
 ## Open: cascade deletions and tombstones

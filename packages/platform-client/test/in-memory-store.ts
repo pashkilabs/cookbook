@@ -148,6 +148,14 @@ export function createInMemoryStore(seed: Seed = {}, clock: Clock = () => new Da
         .map(({ tokenHash: _hash, ...rest }) => rest);
     },
 
+    async findInvitationByTokenHash(tokenHash) {
+      const found = invitations.find((i) => i.tokenHash === tokenHash);
+      if (!found) return null;
+      const family = families.find((f) => f.id === found.familyId);
+      const { tokenHash: _hash, ...rest } = found;
+      return { ...rest, familyName: family?.name ?? "" };
+    },
+
     async findPendingInvitationForAddress(email) {
       const found = invitations.find(
         (i) =>

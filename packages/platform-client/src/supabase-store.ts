@@ -257,6 +257,19 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
       return data.map(toInvitation);
     },
 
+    async findInvitationByTokenHash(tokenHash: string) {
+      const { data, error } = await supabase
+        .from("invitations")
+        .select(`${INVITATION_COLUMNS}, families!inner(name)`)
+        .eq("token_hash", tokenHash)
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return null;
+      const family = data.families as unknown as { name: string };
+      return { ...toInvitation(data as never), familyName: family.name };
+    },
+
     async findPendingInvitationForAddress(email: string) {
       const { data, error } = await supabase
         .from("invitations")
