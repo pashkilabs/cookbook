@@ -36,6 +36,25 @@ import type {
  * test/supabase-store.test.ts, which runs every one of them against a real database
  * — a wrong column name fails there loudly.
  */
+/** One shape for a member row, since four methods now return one. */
+function toMember(row: {
+  id: string;
+  family_id: string;
+  account_id: string | null;
+  display_name: string;
+  colour: string | null;
+  is_child: boolean;
+}): FamilyMember {
+  return {
+    id: row.id,
+    familyId: row.family_id,
+    accountId: row.account_id,
+    displayName: row.display_name,
+    colour: row.colour,
+    isChild: row.is_child,
+  };
+}
+
 export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformStore {
   return {
     async findAccount(accountId: string): Promise<Account | null> {
@@ -107,6 +126,63 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
         colour: row.colour,
         isChild: row.is_child,
       }));
+    },
+
+    async addMember(input): Promise<FamilyMember> {
+      const { data, error } = await supabase
+        .from("family_members")
+        .insert({
+          family_id: input.familyId,
+          account_id: input.accountId ?? null,
+          display_name: input.displayName,
+          colour: input.colour,
+          is_child: input.isChild,
+        })
+        .select("id, family_id, account_id, display_name, colour, is_child")
+        .single();
+      if (error) throw error;
+      return toMember(data);
+    },
+
+    async updateMember(input): Promise<FamilyMember | null> {
+      const changes: Record<string, unknown> = {};
+      if (input.displayName !== undefined) changes.display_name = input.displayName;
+      if (input.colour !== undefined) changes.colour = input.colour;
+      // nothing to change is not an error, and must not blank the row
+      if (Object.keys(changes).length === 0) {
+        const members = await this.listMembers(input.familyId);
+        return members.find((member) => member.id === input.memberId) ?? null;
+      }
+
+      const { data, error } = await supabase
+        .from("family_members")
+        .update(changes)
+        // scoped by household as well as id: the service role bypasses RLS, so this is the only
+        // thing standing between a mistyped id and another household's row
+        .eq("id", input.memberId)
+        .eq("family_id", input.familyId)
+        .is("deleted_at", null)
+        .select("id, family_id, account_id, display_name, colour, is_child")
+        .maybeSingle();
+      if (error) throw error;
+      return data ? toMember(data) : null;
+    },
+
+    async removeMember(input): Promise<boolean> {
+      /*
+       * A soft delete, and the trigger does the rest: `private.propagate_soft_delete` tombstones
+       * the member's ratings and nulls `recipes.created_by` (091900). A score attributed to
+       * nobody is worse than no score; a recipe nobody wrote is still dinner.
+       */
+      const { data, error } = await supabase
+        .from("family_members")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", input.memberId)
+        .eq("family_id", input.familyId)
+        .is("deleted_at", null)
+        .select("id");
+      if (error) throw error;
+      return (data ?? []).length > 0;
     },
 
     async findEntitlement(familyId: string, appKey: string): Promise<Entitlement | null> {

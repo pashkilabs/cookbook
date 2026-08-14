@@ -68,6 +68,44 @@ export function createInMemoryStore(seed: Seed = {}, clock: Clock = () => new Da
       return members.filter((m) => m.familyId === familyId);
     },
 
+    /*
+     * The member writes, in memory. Deliberately as literal as the Supabase adapter — including
+     * scoping every write by `familyId` as well as id, because a fake that is more forgiving than
+     * the real thing tests the fake.
+     */
+    async addMember(input) {
+      const member = {
+        id: `member-${members.length + 1}`,
+        familyId: input.familyId,
+        accountId: input.accountId ?? null,
+        displayName: input.displayName,
+        colour: input.colour,
+        isChild: input.isChild,
+      };
+      members.push(member);
+      return member;
+    },
+
+    async updateMember(input) {
+      const found = members.find(
+        (m) => m.id === input.memberId && m.familyId === input.familyId,
+      );
+      if (!found) return null;
+      if (input.displayName !== undefined) found.displayName = input.displayName;
+      if (input.colour !== undefined) found.colour = input.colour;
+      return { ...found };
+    },
+
+    async removeMember(input) {
+      const at = members.findIndex(
+        (m) => m.id === input.memberId && m.familyId === input.familyId,
+      );
+      if (at < 0) return false;
+      // the real store tombstones and listMembers filters; dropping it here is the same effect
+      members.splice(at, 1);
+      return true;
+    },
+
     async findEntitlement(familyId, appKey) {
       const found = entitlements.find((e) => e.familyId === familyId && e.appKey === appKey);
       return found ? { ...found, quota: structuredClone(found.quota) } : null;

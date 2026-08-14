@@ -14,6 +14,12 @@
  */
 export * from "./types.js";
 export {
+  MEMBER_COLOURS,
+  isMemberColour,
+  nextFreeColour,
+  type MemberColour,
+} from "./member-colours.js";
+export {
   createPlatformClient,
   createQuotaMeter,
   DEFAULT_QUOTA,

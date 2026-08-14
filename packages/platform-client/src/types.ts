@@ -51,6 +51,22 @@ export interface FamilyMember {
   isChild: boolean;
 }
 
+export interface AddMemberInput {
+  familyId: string;
+  displayName: string;
+  colour: string | null;
+  isChild: boolean;
+  /** null for a child, and for an adult who has not accepted an invitation yet */
+  accountId?: string | null;
+}
+
+export interface UpdateMemberInput {
+  familyId: string;
+  memberId: string;
+  displayName?: string;
+  colour?: string | null;
+}
+
 export interface Session {
   account: Account;
   family: Family;
@@ -218,6 +234,18 @@ export interface PlatformStore {
   /** The account's own household if it owns one, otherwise its earliest membership. */
   findFamilyForAccount(accountId: string): Promise<Family | null>;
   listMembers(familyId: string): Promise<FamilyMember[]>;
+  /**
+   * Member management — the three writes a household makes to its own roster.
+   *
+   * On the port because `family_members` is a platform table and app code may not touch one
+   * (`check-platform-tables.mjs` fails the build on a direct query). Each takes `familyId` as
+   * well as the member id so the write is scoped in SQL and not only by the caller's good
+   * intentions: a mistyped id cannot reach another household's row.
+   */
+  addMember(input: AddMemberInput): Promise<FamilyMember>;
+  updateMember(input: UpdateMemberInput): Promise<FamilyMember | null>;
+  /** Soft delete. Never a hard one — a tombstone is what a syncing device can observe (§20). */
+  removeMember(input: { familyId: string; memberId: string }): Promise<boolean>;
   findEntitlement(familyId: string, appKey: string): Promise<Entitlement | null>;
   /**
    * Atomically add `amount` to a counter, refusing if it would exceed the limit.
@@ -325,6 +353,24 @@ export interface PlatformClient {
   /** Server-authoritative. `quota` defaults to "imports". */
   consumeQuota(appKey: string, amount: number, quota?: string): Promise<QuotaOutcome>;
   registerDevice(platform: Platform, deviceId?: string): Promise<Device>;
+
+  /**
+   * The household's own roster.
+   *
+   * Account-scoped rather than family-scoped on purpose: every method resolves the household
+   * from the signed-in account, so there is **no familyId parameter for a caller to substitute**
+   * — the same property the HTTP surface is built around, applied here.
+   */
+  listMembers(): Promise<FamilyMember[]>;
+  /**
+   * Add a child: a name and a colour, no account, no invitation.
+   *
+   * Most of the value of per-member ratings for the price of a row (decisions §5). An adult who
+   * will sign in is a different action and a different shape — see §39.
+   */
+  addChild(input: { displayName: string; colour?: string | null }): Promise<FamilyMember>;
+  updateMember(memberId: string, changes: { displayName?: string; colour?: string | null }): Promise<FamilyMember>;
+  removeMember(memberId: string): Promise<void>;
 }
 
 /** Injected so tests and the grace-window logic never depend on the wall clock. */

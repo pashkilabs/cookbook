@@ -1,6 +1,7 @@
 import type {
   Device,
   EntitlementResult,
+  FamilyMember,
   Platform,
   PlatformClient,
   PlatformClientOptions,
@@ -11,6 +12,7 @@ import type {
   TokenPayload,
 } from "./types.js";
 import { DEFAULT_GRACE_DAYS, evaluateAccess, graceUntilFor, systemClock } from "./access.js";
+import { isMemberColour, nextFreeColour } from "./member-colours.js";
 
 /** The counter the recipe app spends. Callers may name another. */
 export const DEFAULT_QUOTA = "imports";
@@ -115,6 +117,101 @@ export function createPlatformClient(options: PlatformClientOptions): PlatformCl
     return { status: "exceeded", counter };
   }
 
+  /** The household this account belongs to, or a refusal that says why. */
+  async function ownFamily() {
+    const family = await store.findFamilyForAccount(accountId);
+    if (!family) throw new Error(`account ${accountId} belongs to no family`);
+    return family;
+  }
+
+  async function listMembers(): Promise<FamilyMember[]> {
+    return store.listMembers((await ownFamily()).id);
+  }
+
+  /**
+   * Add a child: a row, and nothing else.
+   *
+   * `isChild: true` and `accountId: null` are set here rather than accepted from a caller,
+   * because the invariant behind the whole split is that a child never has a login. The schema's
+   * `child_has_no_login` check says the same thing; this makes it impossible to *ask* for rather
+   * than merely refused.
+   *
+   * The colour defaults to whichever nobody is using, so adding a child is one field.
+   */
+  async function addChild(input: {
+    displayName: string;
+    colour?: string | null;
+  }): Promise<FamilyMember> {
+    const family = await ownFamily();
+    const displayName = (input.displayName ?? "").trim();
+    if (!displayName) throw new Error("a member needs a name");
+    if (displayName.length > 60) throw new Error("that name is too long");
+
+    const members = await store.listMembers(family.id);
+    if (members.length >= 20) throw new Error("that is more people than a household");
+
+    const colour =
+      input.colour === undefined || input.colour === null
+        ? nextFreeColour(members.map((member) => member.colour))
+        : input.colour;
+    if (!isMemberColour(colour)) throw new Error(`${colour} is not a colour a member may have`);
+
+    return store.addMember({
+      familyId: family.id,
+      displayName,
+      colour,
+      isChild: true,
+      accountId: null,
+    });
+  }
+
+  async function updateMember(
+    memberId: string,
+    changes: { displayName?: string; colour?: string | null },
+  ): Promise<FamilyMember> {
+    const family = await ownFamily();
+
+    const displayName = changes.displayName === undefined ? undefined : changes.displayName.trim();
+    if (displayName !== undefined && !displayName) throw new Error("a member needs a name");
+    if (displayName !== undefined && displayName.length > 60) {
+      throw new Error("that name is too long");
+    }
+    if (changes.colour !== undefined && changes.colour !== null && !isMemberColour(changes.colour)) {
+      throw new Error(`${changes.colour} is not a colour a member may have`);
+    }
+
+    const updated = await store.updateMember({
+      familyId: family.id,
+      memberId,
+      ...(displayName === undefined ? {} : { displayName }),
+      ...(changes.colour === undefined ? {} : { colour: changes.colour }),
+    });
+    if (!updated) throw new Error("no such member in this household");
+    return updated;
+  }
+
+  /**
+   * Remove a member.
+   *
+   * **You cannot remove yourself.** Leaving a household is a different action with different
+   * consequences — who owns it afterwards, what becomes of the recipes — and allowing it here
+   * would let somebody delete the only adult and strand a household behind an account that is no
+   * longer a member of anything.
+   *
+   * The soft delete is the whole removal: `private.propagate_soft_delete` tombstones the member's
+   * ratings and nulls `recipes.created_by` (§30), so nothing here needs to know about either.
+   */
+  async function removeMember(memberId: string): Promise<void> {
+    const family = await ownFamily();
+    const members = await store.listMembers(family.id);
+    const target = members.find((member) => member.id === memberId);
+    if (!target) throw new Error("no such member in this household");
+    if (target.accountId === accountId) throw new Error("you cannot remove yourself");
+
+    const removed = await store.removeMember({ familyId: family.id, memberId });
+    if (!removed) throw new Error("no such member in this household");
+  }
+
   async function registerDevice(platform: Platform, deviceId?: string): Promise<Device> {
     return store.registerDevice({
       accountId,
@@ -123,7 +220,16 @@ export function createPlatformClient(options: PlatformClientOptions): PlatformCl
     });
   }
 
-  return { getSession, getEntitlement, consumeQuota, registerDevice };
+  return {
+    getSession,
+    getEntitlement,
+    consumeQuota,
+    registerDevice,
+    listMembers,
+    addChild,
+    updateMember,
+    removeMember,
+  };
 }
 
 /**
