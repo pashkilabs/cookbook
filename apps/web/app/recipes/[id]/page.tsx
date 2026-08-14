@@ -99,10 +99,26 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
         <Link href="/recipes">← {family.name}</Link>
       </p>
 
+      {/*
+        * The photograph leads. It is what a person recognises the dish by, and putting it under
+        * the title made it look like an attachment to a database row.
+        */}
+      {photoUrl && (
+        // eslint-disable-next-line @next/next/no-img-element -- a signed URL expires; the
+        // optimiser would cache one past its life
+        <img
+          src={photoUrl}
+          alt=""
+          className="photo hero"
+          width={photo.data?.width ?? undefined}
+          height={photo.data?.height ?? undefined}
+        />
+      )}
+
       <div className="bar" style={{ marginBottom: "1.5rem" }}>
         <div>
           <h1>{recipe.title}</h1>
-          <p className="meta" style={{ margin: 0 }}>
+          <ul className="facts">
             {[
               recipe.source_name,
               recipe.servings ? `serves ${recipe.servings}` : null,
@@ -111,8 +127,8 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
               recipe.visibility === "public" ? "published" : null,
             ]
               .filter(Boolean)
-              .join(" · ") || "no details yet"}
-          </p>
+              .map((fact) => <li key={String(fact)}>{fact}</li>)}
+          </ul>
         </div>
         <div className="tabs" style={{ margin: 0 }}>
           <ShortlistButton
@@ -126,16 +142,6 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
           <RemoveRecipe recipeId={recipe.id} title={recipe.title} />
         </div>
       </div>
-
-      {photoUrl && (
-        <img
-          src={photoUrl}
-          alt=""
-          className="photo"
-          width={photo.data?.width ?? undefined}
-          height={photo.data?.height ?? undefined}
-        />
-      )}
 
       <section>
         <h2>Ingredients</h2>

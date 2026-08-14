@@ -17,9 +17,13 @@ export default async function SignInPage() {
   if (data.user) redirect("/recipes");
 
   return (
-    <main>
-      <h1>Pashki Recipes</h1>
-      <p className="subtitle">One subscription, a household that eats well.</p>
+    <main className="welcome">
+      <p className="wordmark">Pashki</p>
+      <h1>Every recipe you like, in one place</h1>
+      <p className="subtitle">
+        Save a recipe from anywhere, plan the week, and get a shopping list that adds up the
+        ingredients across every meal — so you buy one pint of cream, not two halves.
+      </p>
       <ConfirmationFromFragment />
       <SignInForm />
     </main>

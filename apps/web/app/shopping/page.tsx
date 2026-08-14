@@ -53,11 +53,16 @@ export default async function ShoppingPage({
 
       {week && week.plannedCount === 0 && (
         <div className="empty">
-          <p style={{ marginTop: 0 }}>Nothing is planned for this week.</p>
-          <p style={{ marginBottom: 0 }}>
-            <Link href={`/planner?week=${weekStart}`}>Give some recipes a day</Link> and the list
-            builds itself.
+          <h2>No list yet</h2>
+          <p>
+            Give some recipes a day on the planner and the shopping list writes itself — the
+            same ingredient across three meals becomes one thing to buy, in the right size.
           </p>
+          <div className="tabs">
+            <Link className="button" href={`/planner?week=${weekStart}`}>
+              Plan this week
+            </Link>
+          </div>
         </div>
       )}
 

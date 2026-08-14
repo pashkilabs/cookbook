@@ -70,6 +70,37 @@ export default async function RecipesPage({
     .is("deleted_at", null);
   const onThisWeek = new Set((shortlisted ?? []).map((row) => row.recipe_id));
 
+  /*
+   * The photographs, so the list is something a person recognises rather than a wall of titles.
+   *
+   * Two round trips for the whole page, not two per card: one read for the rows, one
+   * `createSignedUrls` for all the paths together. The bucket is private, so a URL has to be
+   * signed — and it is signed as the person viewing, so the storage policy is what authorises it,
+   * the same reasoning as reading the rows.
+   */
+  const photoFor = new Map<string, string>();
+  if (hits.length > 0) {
+    const { data: photos } = await supabase
+      .from("photos")
+      .select("recipe_id, storage_path")
+      .eq("family_id", family.id)
+      .in("recipe_id", hits.map(({ recipe }) => recipe.id))
+      .is("deleted_at", null);
+
+    const paths = [...new Set((photos ?? []).map((row) => row.storage_path as string))];
+    if (paths.length > 0) {
+      const { data: signed } = await supabase.storage
+        .from("recipe-photos")
+        .createSignedUrls(paths, 600);
+      const urlFor = new Map((signed ?? []).map((entry) => [entry.path, entry.signedUrl]));
+      for (const row of photos ?? []) {
+        const url = urlFor.get(row.storage_path as string);
+        // one photograph per card; a recipe with several is showing whichever came back first
+        if (url && !photoFor.has(row.recipe_id as string)) photoFor.set(row.recipe_id as string, url);
+      }
+    }
+  }
+
   return (
     <main>
       <div className="bar">
@@ -99,24 +130,52 @@ export default async function RecipesPage({
         <div className="empty">
           {q || filter ? (
             <>
-              <p style={{ marginTop: 0 }}>Nothing matches that.</p>
-              <p style={{ marginBottom: 0 }}>
-                <Link href="/recipes">Clear the search and filters</Link>
+              <h2>Nothing matches that</h2>
+              <p>
+                Search looks at titles and ingredients, so “chicken” finds the recipes you can
+                cook with what you bought.
               </p>
+              <div className="tabs">
+                <Link className="button quiet" href="/recipes">
+                  Clear search and filters
+                </Link>
+              </div>
             </>
           ) : (
             <>
-              <p style={{ marginTop: 0 }}>No recipes yet.</p>
-              <p style={{ marginBottom: 0 }}>
-                <Link href="/recipes/import">Import one from a link</Link> or <Link href="/recipes/new">type one in</Link>.
+              <h2>Your cookbook is empty</h2>
+              <p>
+                Paste a link from anywhere and it reads the recipe for you — you check it before
+                anything is saved. Or type one in from a card or a book.
               </p>
+              <div className="tabs">
+                <Link className="button" href="/recipes/import">
+                  Import from a link
+                </Link>
+                <Link className="button quiet" href="/recipes/new">
+                  Type one in
+                </Link>
+              </div>
             </>
           )}
         </div>
       )}
 
+      <div className="recipes">
       {hits.map(({ recipe, matchedIngredient }) => (
         <Link className="card" key={recipe.id} href={`/recipes/${recipe.id}`}>
+          {photoFor.has(recipe.id) ? (
+            // eslint-disable-next-line @next/next/no-img-element -- signed URLs expire; the
+            // optimiser would cache a URL that stops working before the cache does
+            <img className="card-photo" src={photoFor.get(recipe.id)} alt="" loading="lazy" />
+          ) : (
+            // holds the grid square so a cookbook part-way through gaining photographs does not
+            // look ragged
+            <span className="card-photo none" aria-hidden="true">
+              {recipe.title.trim().charAt(0).toUpperCase() || "?"}
+            </span>
+          )}
+          <div className="card-body">
           <h2>{recipe.title}</h2>
           <p className="meta" style={{ margin: 0 }}>
             {[
@@ -141,8 +200,10 @@ export default async function RecipesPage({
               shortlisted={onThisWeek.has(recipe.id)}
             />
           </div>
+          </div>
         </Link>
       ))}
+      </div>
     </main>
   );
 }
