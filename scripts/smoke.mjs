@@ -325,6 +325,31 @@ try {
   const progress = await call("GET", "/api/import/jobs");
   record("job progress is readable", progress.status === 200, `HTTP ${progress.status}`);
 
+  /*
+   * The scheduler's door, which is not the one the batch screen uses.
+   *
+   * The route accepted a session and refused the shared secret, so smoke passed while the queue
+   * never drained: the secret was set on both sides and *differed*. Testing the session path only
+   * is how a check can be green about a feature nobody can use.
+   */
+  if (E.PASHKI_DRAIN_SECRET) {
+    const asScheduler = await fetch(`${base}/api/import/drain`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-pashki-drain-secret": E.PASHKI_DRAIN_SECRET },
+      body: JSON.stringify({ maxJobs: 1 }),
+      signal: AbortSignal.timeout(90_000),
+    });
+    record(
+      "the drain route accepts the scheduler's secret",
+      asScheduler.status === 200,
+      asScheduler.status === 401
+        ? "401 — the secret on the host differs from the one the scheduler presents"
+        : `HTTP ${asScheduler.status}`,
+    );
+  } else {
+    console.log("  --    scheduler secret not in the environment; that path was not checked");
+  }
+
   console.log("\nplanner, shopping, storage");
   if (recipeId) {
     const monday = new Date();

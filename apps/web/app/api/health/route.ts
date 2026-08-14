@@ -16,6 +16,24 @@
 export async function GET() {
   const present = (name: string) => Boolean(process.env[name]);
 
+  /*
+   * A fingerprint, not the secret.
+   *
+   * "Present" was not enough: the scheduler's shared secret was set on both sides and *differed*,
+   * so every tick got a 401 and the queue never drained, while every presence check said yes.
+   * Twelve hex characters of SHA-256 over a 256-bit random secret identifies it without being
+   * usable — the same reason key fingerprints are published rather than hidden — and turns "do
+   * these two match" from a guess into a comparison.
+   */
+  const fingerprint = async (value: string | undefined) => {
+    if (!value) return null;
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+    return Array.from(new Uint8Array(digest))
+      .slice(0, 6)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  };
+
   return Response.json(
     {
       ok: true,
@@ -27,6 +45,8 @@ export async function GET() {
         // the two that were wrong in production and invisible for days
         tokenSigner: present("PASHKI_TOKEN_KEY_ID") && present("PASHKI_TOKEN_PRIVATE_KEY"),
         drainSecret: present("PASHKI_DRAIN_SECRET"),
+        drainSecretFingerprint: await fingerprint(process.env.PASHKI_DRAIN_SECRET),
+        drainSecretLength: process.env.PASHKI_DRAIN_SECRET?.length ?? 0,
         devEntitlement: process.env.PASHKI_DEV_ISSUE_ENTITLEMENT === "true",
       },
     },
