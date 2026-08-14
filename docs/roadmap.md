@@ -160,6 +160,30 @@ rebuild, and everything else depends on it.*
 
 ---
 
+## Before the first outside family
+
+**Gates, not open items.** Each is acceptable exactly while this project holds demo data and
+nobody else's recipes. Neither is a judgement call once a household that is not ours has typed
+something in.
+
+- [ ] **Rotate the Supabase access token, the database password and the service-role key**, and
+      update all three homes: Vercel, `~/.pashki-supabase.env`, and GitHub Actions secrets.
+      *Reason:* all three were exposed in conversation during development. The service-role key
+      bypasses row-level security entirely — it is the one credential that makes every household's
+      data readable at once. Tolerable against demo data; not once a family's own recipes are
+      behind it. Rotate once and set all three in the same sitting, or the copies drift (§the
+      drain secret, which was set twice and differed).
+
+- [ ] **Enable point-in-time recovery.** Free-tier Supabase has none, and beta families will enter
+      recipes they cannot recreate — a photographed card from a grandmother, a method typed out
+      over a month. *Deliberately deferred* while there are no users and every row is
+      reproducible from a migration and a seed. **Required the day there is one**, because the
+      failure is unrecoverable rather than inconvenient, and nothing in this repository can
+      compensate for it: `db:push`, `check:parity` and `pnpm smoke` all verify structure, and none
+      of them can bring back a recipe.
+
+---
+
 ## Phase 3 — Native
 
 - [x] **On-device data model design.** `docs/on-device.md` — which nine tables sync
