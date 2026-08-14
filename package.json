@@ -3,14 +3,17 @@
   "private": true,
   "type": "module",
   "packageManager": "pnpm@9.12.0",
-  "engines": { "node": ">=20.11" },
+  "engines": {
+    "node": ">=20.11"
+  },
   "scripts": {
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
     "build": "turbo run build",
     "check:boundaries": "node scripts/check-seed-catalog-usage.mjs && node scripts/check-platform-tables.mjs && node scripts/check-server-only.mjs",
-    "check": "pnpm check:boundaries && pnpm typecheck && pnpm test"
+    "check": "pnpm check:boundaries && pnpm typecheck && pnpm test",
+    "smoke": "node scripts/smoke.mjs"
   },
   "devDependencies": {
     "turbo": "^2.3.3",

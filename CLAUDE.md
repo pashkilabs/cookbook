@@ -237,6 +237,32 @@ models be good enough. Do not add a silent-save path.
   whether previous sessions landed. Run `git log` before any claim about repository
   state. The failure this prevents: reporting an escalating count of uncommitted
   sessions across ten sessions that had each been committed at the time.
+- **A migration's self-check only knows what its own version knew, so `check:parity`
+  passing is not evidence that a newer invariant landed.** The invariants are one
+  function that each migration replaces; an environment running the *older* body
+  passes its own checks happily while missing the rule entirely, and parity compares
+  answers rather than versions. So "parity is green" can mean "both environments
+  agree, and one of them has never heard of the rule you are asking about."
+  **Verify a specific migration by attempting the thing it forbids** — the read it
+  revokes, the write it blocks — not by reading `schema_migrations` and not by
+  trusting parity. And check the attempt could have succeeded: a probe that would
+  report REFUSED against an empty database has measured nothing.
+- **A deployment is not the sum of its migrations, and a green build proves only that
+  it compiled.** Every route importing `sharp` returned 500 from the day it shipped —
+  a native addon webpack cannot bundle, which resolves locally because the darwin
+  binary is sitting in `node_modules` anyway. The build passed, the tests passed,
+  parity passed. What found it was calling the routes. Two lessons stuck: a **500 is
+  never an acceptable answer** where 401 would do, because it means no handler ran;
+  and **module-scope imports decide a route's blast radius** — one route wanted a
+  bucket *name* from a module that imports an image library, and died for it. Load
+  heavy or native things inside the function that needs them.
+- **Verifying a flow does not verify the flows beside it.** Signup, confirmation and
+  provisioning were proven end to end against production while every import route was
+  broken, because provisioning goes through the store and never touches the signer or
+  the image pipeline. Two whole subsystems — the seam's HTTP surface and imports —
+  were dead on a deployment that had been "verified end to end". `pnpm smoke` exists
+  to make that specific mistake harder: it exercises every route class, and treats any
+  500 as a failure.
 - **As `anon`, `select *` on a public recipe fails.** Public reads are limited by
   **column** grants as well as row policies, and asking for a column you cannot
   read is a permission error rather than a filtered subset. Public reads need an

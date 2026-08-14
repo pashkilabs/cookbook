@@ -1,0 +1,375 @@
+#!/usr/bin/env node
+/**
+ * Does the deployed thing actually work?
+ *
+ * Written because it did not, and nothing noticed. Signup, email confirmation and provisioning
+ * were verified end to end against production; **no import route was ever called**. Every route
+ * that touched `sharp` had been returning 500 since the day it deployed, and the build was green,
+ * the tests were green, and `check:parity` said the two environments agreed. A deployment is not
+ * the sum of its migrations.
+ *
+ * So this exercises the *product*, not the front door: it signs up, confirms, provisions, writes
+ * a recipe, imports one, queues a batch, plans a week, reads a shopping list, and puts a
+ * photograph in storage — then deletes everything it made.
+ *
+ * **Any 500 is a failure, always.** A 500 is the deployment telling you a module did not load or
+ * an exception escaped, and it is exactly the shape the sharp failure took. 401 and 403 are
+ * answers; 500 is the absence of one.
+ *
+ *   node scripts/smoke.mjs                              # against $SMOKE_URL or production
+ *   node scripts/smoke.mjs https://cookbook.pashki.com
+ *   node scripts/smoke.mjs http://127.0.0.1:3000 --local
+ *
+ * Exit codes, the same three this repo uses everywhere:
+ *   0  every check passed
+ *   1  at least one failed — the deployment is broken
+ *   2  could not measure — no credentials, or the host never answered
+ *
+ * Needs `apps/web/.env.local` (or the same variables in the environment) for the service role,
+ * which is used only to create and destroy the fixtures a real user would create.
+ */
+import { readFileSync } from "node:fs";
+
+const PASSED = 0;
+const FAILED = 1;
+const CANNOT_MEASURE = 2;
+
+const argv = process.argv.slice(2);
+const base = (argv.find((a) => a.startsWith("http")) ?? process.env.SMOKE_URL ?? "https://cookbook.pashki.com").replace(/\/$/, "");
+
+function env() {
+  const merged = { ...process.env };
+  try {
+    const text = readFileSync(new URL("../apps/web/.env.local", import.meta.url), "utf8");
+    for (const line of text.split("\n")) {
+      const at = line.indexOf("=");
+      if (at > 0 && !line.startsWith("#")) merged[line.slice(0, at)] ||= line.slice(at + 1);
+    }
+  } catch {
+    // the environment alone is fine
+  }
+  return merged;
+}
+
+const E = env();
+const SUPABASE = E.NEXT_PUBLIC_SUPABASE_URL;
+const ANON = E.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const SERVICE = E.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!SUPABASE || !ANON || !SERVICE) {
+  console.error("COULD NOT MEASURE: need NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY.");
+  console.error("  Nothing was checked, which is not the same as nothing being wrong.");
+  process.exit(CANNOT_MEASURE);
+}
+
+const svc = { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, "Content-Type": "application/json" };
+const results = [];
+let session = null;
+
+const record = (name, ok, detail) => {
+  results.push({ name, ok, detail });
+  console.log(`  ${ok ? "ok  " : "FAIL"}  ${name}${detail ? `  — ${detail}` : ""}`);
+  return ok;
+};
+
+/**
+ * The app authenticates by **cookie**, not by bearer token.
+ *
+ * `lib/supabase-server.ts` builds its client from `next/headers` cookies, so a request carrying
+ * only an Authorization header is anonymous to every route — which looks exactly like a broken
+ * route unless you know. `@supabase/ssr` stores the session as `sb-<ref>-auth-token`, base64 with
+ * a marker prefix, split across numbered cookies when it is long.
+ */
+function sessionCookie(token) {
+  const ref = new URL(SUPABASE).host.split(".")[0];
+  const encoded = "base64-" + Buffer.from(JSON.stringify(token)).toString("base64");
+  const LIMIT = 3180;
+  if (encoded.length <= LIMIT) return `sb-${ref}-auth-token=${encoded}`;
+  const parts = [];
+  for (let i = 0; i * LIMIT < encoded.length; i += 1) {
+    parts.push(`sb-${ref}-auth-token.${i}=${encoded.slice(i * LIMIT, (i + 1) * LIMIT)}`);
+  }
+  return parts.join("; ");
+}
+
+async function call(method, path, { body, auth = true, expect } = {}) {
+  const headers = { "Content-Type": "application/json" };
+  if (auth && session) {
+    headers.Authorization = `Bearer ${session.access_token}`;
+    headers.Cookie = sessionCookie(session);
+  }
+  let response;
+  try {
+    response = await fetch(`${base}${path}`, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: AbortSignal.timeout(90_000),
+    });
+  } catch (error) {
+    return { status: 0, body: String(error.message), threw: true };
+  }
+  const text = await response.text();
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    parsed = text.slice(0, 200);
+  }
+  return { status: response.status, body: parsed, expected: expect };
+}
+
+/**
+ * The rule that would have caught the sharp failure.
+ *
+ * A route answering 401 is working — it considered the request and refused it. A route answering
+ * 500 has not considered anything: the module did not load, or an exception escaped. Treating
+ * "not 2xx" as acceptable is what let five broken routes look like protected ones.
+ */
+const alive = (result) => result.status !== 0 && result.status < 500;
+
+async function rest(method, path, body) {
+  const response = await fetch(`${SUPABASE}/rest/v1${path}`, {
+    method,
+    headers: { ...svc, Prefer: "return=representation" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    signal: AbortSignal.timeout(45_000),
+  });
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
+}
+
+const stamp = Date.now();
+const address = `pashki-smoke+${stamp}@example.invalid`;
+let accountId = null;
+let familyId = null;
+const madeRecipes = [];
+const madeObjects = [];
+
+console.log(`smoking ${base}\n`);
+
+try {
+  // ---------------------------------------------------------------------------
+  // 1. Reachability. Every route class, before any of them is asked to do work.
+  //
+  // Unauthenticated on purpose: a 401 proves the module loaded and the handler ran, which is the
+  // property that was missing. This is the sweep that would have caught the sharp failure on the
+  // day it shipped.
+  // ---------------------------------------------------------------------------
+  console.log("routes answer at all (401 is an answer; 500 is not)");
+  const surface = [
+    ["GET", "/api/import/jobs"],
+    ["POST", "/api/import", { url: "https://example.com/x" }],
+    ["POST", "/api/import/batch", { urls: "https://example.com/x" }],
+    ["POST", "/api/import/drain", {}],
+    ["POST", "/api/import/jobs/00000000-0000-0000-0000-000000000000", {}],
+    ["POST", "/api/recipes", {}],
+    ["PATCH", "/api/recipes/00000000-0000-0000-0000-000000000000", {}],
+    ["POST", "/api/plan-entries", {}],
+    ["POST", "/api/shortlist", {}],
+    ["POST", "/api/shopping-ticks", {}],
+    ["POST", "/api/pantry", {}],
+    ["POST", "/api/household", {}],
+    ["POST", "/api/signup", {}],
+    ["POST", "/api/resend", {}],
+    ["GET", "/api/platform/session"],
+  ];
+  for (const [method, path, body] of surface) {
+    const result = await call(method, path, { body, auth: false });
+    record(`${method} ${path}`, alive(result), result.status === 0 ? result.body : `HTTP ${result.status}`);
+  }
+
+  console.log("\npages render");
+  for (const path of ["/", "/sign-in", "/recipes", "/planner", "/shopping", "/recipes/import"]) {
+    const result = await call("GET", path, { auth: false });
+    record(`GET ${path}`, alive(result), `HTTP ${result.status}`);
+  }
+
+  // ---------------------------------------------------------------------------
+  // 2. A real household, made the way a person makes one.
+  // ---------------------------------------------------------------------------
+  console.log("\nauth and provisioning");
+  const signup = await call("POST", "/api/signup", {
+    auth: false,
+    body: { email: address, password: `Smoke-${stamp}-Aa1!`, householdName: "Smoke Test", displayName: "Smoke" },
+  });
+  record("signup accepted", signup.status === 202, `HTTP ${signup.status}`);
+
+  // confirm without waiting for mail: this checks the app, not the inbox, and the mail path has
+  // its own end-to-end verification in docs/deployment.md
+  const users = await (await fetch(`${SUPABASE}/auth/v1/admin/users?per_page=200`, { headers: svc })).json();
+  const user = (users.users ?? []).find((u) => (u.email ?? "").toLowerCase() === address);
+  accountId = user?.id ?? null;
+  if (accountId) {
+    await fetch(`${SUPABASE}/auth/v1/admin/users/${accountId}`, {
+      method: "PUT",
+      headers: svc,
+      body: JSON.stringify({ email_confirm: true }),
+    });
+  }
+  record("account exists and is confirmable", Boolean(accountId));
+
+  const token = await (await fetch(`${SUPABASE}/auth/v1/token?grant_type=password`, {
+    method: "POST",
+    headers: { apikey: ANON, "Content-Type": "application/json" },
+    body: JSON.stringify({ email: address, password: `Smoke-${stamp}-Aa1!` }),
+  })).json();
+  session = token.access_token ? token : null;
+  record("can sign in once confirmed", Boolean(session));
+
+  const provisioned = await call("POST", "/api/household", { body: {} });
+  familyId = provisioned.body?.familyId ?? null;
+  record("provisioning creates a household", provisioned.status === 200 && Boolean(familyId), `HTTP ${provisioned.status}`);
+
+  if (!familyId) throw new Error("no household; the rest cannot be measured");
+
+  // an operator grant, so the write paths below are testing themselves rather than the meter
+  await rest("POST", "/entitlements?on_conflict=family_id,app_key", {
+    family_id: familyId,
+    app_key: "recipes",
+    tier: "full",
+    quota_json: { imports: { limit: 50, used: 0, resetsAt: null, periodDays: 30 } },
+    valid_until: new Date(Date.now() + 86400000).toISOString(),
+    grace_until: new Date(Date.now() + 2 * 86400000).toISOString(),
+  });
+
+  // ---------------------------------------------------------------------------
+  // 3. The product.
+  // ---------------------------------------------------------------------------
+  console.log("\nrecipes");
+  const created = await call("POST", "/api/recipes", {
+    body: {
+      title: "Smoke Test Pie",
+      servings: "4",
+      timeMinutes: "30",
+      sourceName: "",
+      sourceUrl: "",
+      ingredients: "2 cups flour\n1 pint double cream\n3 lemons",
+      steps: "Mix.\nBake.",
+    },
+  });
+  const recipeId = created.body?.id ?? null;
+  if (recipeId) madeRecipes.push(recipeId);
+  record("create a recipe with ingredients and steps", created.status === 200 && Boolean(recipeId), `HTTP ${created.status}`);
+
+  if (recipeId) {
+    const children = await rest("GET", `/recipe_ingredients?recipe_id=eq.${recipeId}&select=item_text`);
+    record("its ingredients were parsed and stored", (children ?? []).length === 3, `${(children ?? []).length} rows`);
+
+    const edited = await call("PATCH", `/api/recipes/${recipeId}`, {
+      body: { title: "Smoke Test Pie II", servings: "6", timeMinutes: "35", sourceName: "", sourceUrl: "", ingredients: "2 cups flour", steps: "Mix." },
+    });
+    record("edit a recipe", edited.status === 200, `HTTP ${edited.status}`);
+  }
+
+  console.log("\nimport — the part that was broken and nothing noticed");
+  const single = await call("POST", "/api/import", { body: { url: "https://www.recipetineats.com/chicken-tikka-masala/" } });
+  // 200 is a read recipe; 422 is an honest failure from a site refusing us. Both mean the route
+  // ran. 500 means it did not, which is the whole point of this file.
+  record("single-URL import runs", [200, 422].includes(single.status), `HTTP ${single.status}`);
+  record(
+    "single-URL import returns a draft",
+    single.status !== 200 || Boolean(single.body?.draft?.title),
+    single.status === 200 ? `“${single.body?.draft?.title ?? "?"}”` : "site refused; route still ran",
+  );
+  if (single.status === 200 && single.body?.photo?.storagePath) madeObjects.push(single.body.photo.storagePath);
+  record(
+    "a photograph came back with it",
+    single.status !== 200 || single.body?.photo !== undefined,
+    single.body?.photo ? "stored" : "none — sharp may be unavailable",
+  );
+
+  const batch = await call("POST", "/api/import/batch", {
+    body: { urls: "https://www.bbcgoodfood.com/recipes/classic-lasagne\nhttps://www.instagram.com/p/x/\nhttps://www.bbcgoodfood.com/recipes/classic-lasagne" },
+  });
+  record("batch import queues", batch.status === 200, `HTTP ${batch.status}`);
+  record(
+    "batch rejects a social link and collapses a duplicate at submission",
+    batch.status === 200 && batch.body?.queued === 1 && batch.body?.rejected === 1 && batch.body?.duplicates === 1,
+    batch.status === 200 ? `queued ${batch.body?.queued}, rejected ${batch.body?.rejected}, duplicate ${batch.body?.duplicates}` : "",
+  );
+
+  const drained = await call("POST", "/api/import/drain", { body: { maxJobs: 2 } });
+  record("the drain route runs", drained.status === 200, `HTTP ${drained.status}`);
+
+  const progress = await call("GET", "/api/import/jobs");
+  record("job progress is readable", progress.status === 200, `HTTP ${progress.status}`);
+
+  console.log("\nplanner, shopping, storage");
+  if (recipeId) {
+    const monday = new Date();
+    monday.setUTCDate(monday.getUTCDate() - ((monday.getUTCDay() + 6) % 7));
+    const weekStart = monday.toISOString().slice(0, 10);
+
+    const planned = await call("POST", "/api/plan-entries", {
+      body: { recipeId, date: weekStart, weekStart, scale: 1 },
+    });
+    record("assign a recipe to a day", planned.status === 200, `HTTP ${planned.status}`);
+
+    const shortlisted = await call("POST", "/api/shortlist", { body: { recipeId, weekStart } });
+    record("shortlist a recipe", shortlisted.status === 200, `HTTP ${shortlisted.status}`);
+
+    const ticked = await call("POST", "/api/shopping-ticks", { body: { weekStart, itemKey: "double-cream", ticked: true } });
+    record("tick a shopping line", ticked.status === 200, `HTTP ${ticked.status}`);
+
+    const shopping = await call("GET", `/shopping?week=${weekStart}`);
+    record("the shopping list renders", alive(shopping), `HTTP ${shopping.status}`);
+  }
+
+  const path = `${familyId}/smoke-${stamp}.jpg`;
+  const upload = await fetch(`${SUPABASE}/storage/v1/object/recipe-photos/${path}`, {
+    method: "POST",
+    headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, "Content-Type": "image/jpeg", "x-upsert": "true" },
+    body: new Uint8Array([0xff, 0xd8, 0xff, 0xdb, ...new Array(64).fill(0)]),
+  });
+  if (upload.ok) madeObjects.push(path);
+  record("storage accepts an object", upload.ok, `HTTP ${upload.status}`);
+
+  const anonRead = await fetch(`${SUPABASE}/storage/v1/object/recipe-photos/${path}`, {
+    headers: { apikey: ANON, Authorization: `Bearer ${ANON}` },
+  });
+  record("and refuses it to anon (decisions §17)", !anonRead.ok, `HTTP ${anonRead.status}`);
+} catch (error) {
+  record("the run completed", false, String(error.message).slice(0, 160));
+} finally {
+  // ---------------------------------------------------------------------------
+  // Leave nothing behind. A smoke test that litters production stops being run.
+  // ---------------------------------------------------------------------------
+  try {
+    if (madeObjects.length) {
+      await fetch(`${SUPABASE}/storage/v1/object/recipe-photos`, {
+        method: "DELETE",
+        headers: svc,
+        body: JSON.stringify({ prefixes: madeObjects }),
+      });
+    }
+    if (familyId) {
+      await rest("PATCH", `/import_jobs?family_id=eq.${familyId}`, { status: "cancelled" });
+      await rest("DELETE", `/import_jobs?family_id=eq.${familyId}`);
+      for (const table of ["shopping_ticks", "shortlist_entries", "plan_entries", "photos", "recipe_ingredients", "recipe_steps", "ratings"]) {
+        await rest("DELETE", `/${table}?family_id=eq.${familyId}`);
+      }
+      await rest("DELETE", `/meal_plans?family_id=eq.${familyId}`);
+      await rest("DELETE", `/recipes?family_id=eq.${familyId}`);
+      await rest("DELETE", `/entitlements?family_id=eq.${familyId}`);
+      await rest("DELETE", `/family_members?family_id=eq.${familyId}`);
+      await rest("DELETE", `/families?id=eq.${familyId}`);
+    }
+    if (accountId) {
+      await fetch(`${SUPABASE}/auth/v1/admin/users/${accountId}`, { method: "DELETE", headers: svc });
+    }
+    console.log("\ncleaned up: household, recipes, jobs, objects, account");
+  } catch (error) {
+    console.error(`\nWARNING: cleanup incomplete — ${String(error.message).slice(0, 120)}`);
+  }
+}
+
+const failed = results.filter((r) => !r.ok);
+console.log("-".repeat(72));
+if (failed.length === 0) {
+  console.log(`SMOKE: ${results.length} checks passed against ${base}`);
+  process.exit(PASSED);
+}
+console.log(`SMOKE: ${failed.length} of ${results.length} FAILED against ${base}`);
+for (const f of failed) console.log(`  ${f.name}${f.detail ? `  — ${f.detail}` : ""}`);
+process.exit(FAILED);

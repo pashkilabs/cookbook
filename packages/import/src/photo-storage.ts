@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import sharp from "sharp";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { RECIPE_PHOTO_BUCKET } from "./photo-bucket.js";
 
@@ -48,7 +47,39 @@ export interface StoredPhoto {
 export type PhotoStorageFailure =
   | { kind: "not-an-image"; detail: string }
   | { kind: "resize-failed"; detail: string }
-  | { kind: "upload-failed"; detail: string };
+  | { kind: "upload-failed"; detail: string }
+  /** the image library could not be loaded here at all — see `loadSharp` */
+  | { kind: "resizer-unavailable"; detail: string };
+
+/**
+ * sharp, loaded when it is needed rather than when this module is imported.
+ *
+ * **A top-level `import sharp` made every route that touched this file die.** sharp is a native
+ * addon; on Vercel's linux runtime it failed to load, and because the import was at module scope
+ * the failure took the whole route with it — five routes returning 500, including one that wanted
+ * nothing from here but a bucket name. Locally it never reproduced, because the darwin binary is
+ * sitting in `node_modules` for Node to find.
+ *
+ * Deferring it changes the blast radius from *the route* to *the photograph*. An import whose
+ * picture cannot be resized is still an import; the recipe is the point. And the reason is
+ * carried in the failure rather than thrown away, so the next person sees why instead of a 500.
+ */
+type Sharp = (typeof import("sharp"))["default"];
+let sharpModule: Sharp | null = null;
+let sharpFailure: string | null = null;
+
+async function loadSharp(): Promise<{ ok: true; sharp: Sharp } | { ok: false; detail: string }> {
+  if (sharpModule) return { ok: true, sharp: sharpModule };
+  if (sharpFailure) return { ok: false, detail: sharpFailure };
+  try {
+    sharpModule = (await import("sharp")).default;
+    return { ok: true, sharp: sharpModule };
+  } catch (thrown) {
+    // remembered, so a hot function does not retry a native load that cannot succeed
+    sharpFailure = thrown instanceof Error ? thrown.message : String(thrown);
+    return { ok: false, detail: sharpFailure };
+  }
+}
 
 export type PhotoStorageOutcome =
   | ({ ok: true } & StoredPhoto)
@@ -75,6 +106,12 @@ export async function storeImportedPhoto(
   const bucket = options.bucket ?? RECIPE_PHOTO_BUCKET;
   const maxDimension = options.maxDimension ?? DEFAULTS.maxDimension;
   const quality = options.quality ?? DEFAULTS.quality;
+
+  const loaded = await loadSharp();
+  if (!loaded.ok) {
+    return { ok: false, failure: { kind: "resizer-unavailable", detail: loaded.detail } };
+  }
+  const sharp = loaded.sharp;
 
   let resized;
   try {
