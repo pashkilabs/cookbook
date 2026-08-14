@@ -37,7 +37,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
     "set:smtp": "node scripts/set-smtp.mjs",
-    "set:site-url": "node scripts/set-site-url.mjs"
+    "set:site-url": "node scripts/set-site-url.mjs",
+    "issue:entitlement": "node scripts/issue-entitlement.mjs"
   },
   "devDependencies": {
     "@pashki/core": "workspace:^",
