@@ -191,17 +191,18 @@ mutate "entitlement check dropped from INSERT policy" catch \
    create policy recipes_insert_in_household on public.recipes for insert to authenticated with check ($PRED);" \
   "$INS_OK" "read-only after grace cannot insert"
 
-mutate "anon SELECT policy made permissive" catch \
-  "drop policy recipes_select_public on public.recipes;
+# The public read surface is revoked (decisions §17, migration 20260814090000), so the two
+# mutations that used to live here — loosening the anon policy, and granting anon the household
+# column — no longer test anything. Neither exposes a row on its own: a grant with no policy is
+# denied by RLS, and a policy with no column grant cannot name a column. Left as one mutation
+# that restores *both* halves, because both together is what the revocation removed and what a
+# future migration might restore by accident.
+mutate "anon given back the public read surface" catch \
+  "grant select on public.recipes to anon;
    create policy recipes_select_public on public.recipes for select to anon using (true);" \
   "drop policy recipes_select_public on public.recipes;
-   create policy recipes_select_public on public.recipes for select to anon using (visibility = 'public' and deleted_at is null);" \
-  "cannot see an unpublished recipe"
-
-mutate "anon granted the household column" catch \
-  "grant select (family_id) on public.recipes to anon;" \
-  "revoke select (family_id) on public.recipes from anon;" \
-  "cannot read the household behind the page"
+   revoke select on public.recipes from anon;" \
+  "refuses a published recipe to anon"
 
 printf -- '-%.0s' {1..100}; echo
 

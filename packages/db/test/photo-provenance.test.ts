@@ -83,9 +83,13 @@ describe.skipIf(instance === null)("photo provenance", () => {
   });
 
   it("keeps the imported photograph invisible to anon", async () => {
-    const { data, error } = await anon.from("photos").select("id").eq("id", importedPhotoId);
-    expect(error).toBeNull();
-    expect(data).toEqual([]);
+    // It used to be invisible because the anon policy required `source = 'camera'`. Since
+    // 20260814090000 revoked the public read surface entirely (decisions §17) it is invisible
+    // for a stronger reason: anon holds no grant on the table at all, so this is a permission
+    // error rather than an empty result. The `source` check above still matters — it is what
+    // the policy will depend on again when public pages are built.
+    const { error } = await anon.from("photos").select("id").eq("id", importedPhotoId);
+    expect(error?.code).toBe(NO_PRIVILEGE);
   });
 
   it("refuses to repoint a row at different bytes", async () => {

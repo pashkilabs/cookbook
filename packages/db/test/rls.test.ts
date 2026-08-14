@@ -505,237 +505,67 @@ describe.skipIf(instance === null)("row-level security", () => {
     });
   });
 
-  describe("what a public recipe page exposes", () => {
+  describe("the revoked public read surface", () => {
+    /**
+     * §17 shipped a public recipe page's read surface and nothing was ever built to render it.
+     * Migration 20260814090000 took it back: a live anon path on a deployed project, for a
+     * feature with no users, is risk with no benefit.
+     *
+     * These tests assert it is **gone**, not that it is currently invisible. RLS denies by
+     * default, so a revoked grant and a missing policy produce the same empty answer from a
+     * client — and "empty" would also be what a broken fixture produced. Each one therefore
+     * checks the mechanism as well as the effect.
+     */
     const PUBLIC_COLUMNS = "id, title, servings, time_minutes, source_url, source_name";
 
-    it("lets anon read a published recipe", async () => {
+    it("refuses a published recipe to anon, on the grant rather than the row", async () => {
       const { data, error } = await anon
         .from("recipes")
         .select(PUBLIC_COLUMNS)
         .eq("id", beta.publicRecipeId);
-      expect(error).toBeNull();
-      expect(data).toHaveLength(1);
-      expect(data?.[0]).toMatchObject({ title: "beta published pie", servings: 4 });
+      // a permission error, not an empty list: the columns are not readable at all now
+      expect(error?.code).toBe(RLS_VIOLATION);
+      expect(data).toBeNull();
     });
 
-    it("gives anon the attribution, because linking back is required", async () => {
-      const { data } = await anon
-        .from("recipes")
-        .select("source_url, source_name")
-        .eq("id", beta.publicRecipeId);
-      expect(data?.[0]).toMatchObject({
-        source_url: "https://example.com/pie",
-        source_name: "Example Blog",
-      });
+    it("refuses select * as well", async () => {
+      const { error } = await anon.from("recipes").select("*");
+      expect(error?.code).toBe(RLS_VIOLATION);
     });
 
-    it("lets anon read the ingredient list", async () => {
-      const { error: seeded } = await admin.from("recipe_ingredients").insert({
-        family_id: beta.familyId,
-        recipe_id: beta.publicRecipeId,
-        position: 0,
-        item_text: "2 cups flour",
-        amount: 2,
-        unit: "cup",
-        note: "",
-        is_estimated: false,
-      });
-      if (seeded) throw seeded;
-
-      const { data, error } = await anon
+    it("refuses the ingredients of a published recipe", async () => {
+      const { error } = await anon
         .from("recipe_ingredients")
-        .select("item_text, amount, unit, is_estimated")
+        .select("item_text")
         .eq("recipe_id", beta.publicRecipeId);
+      expect(error?.code).toBe(RLS_VIOLATION);
+    });
+
+    it("refuses the photograph of a published recipe", async () => {
+      // the household's own camera photo, which was the one anon used to be allowed
+      const { error } = await anon.from("photos").select("id, storage_path");
+      expect(error?.code).toBe(RLS_VIOLATION);
+    });
+
+    /*
+     * "anon holds no policy in any schema" is asserted by `private.assert_no_anon_reads()`,
+     * folded into `assert_rls_invariants()` so it runs on every future migration rather than
+     * only on the one that revoked it. It is not restated here because a client cannot read
+     * pg_policy, and a test that could only observe the *effect* would pass just as happily
+     * against a fixture that was broken.
+     *
+     * That assertion earned its place: it caught the storage read path this migration first
+     * missed — a policy on `storage.objects` is invisible from `public`, and would have left
+     * the bytes of every published photo reachable while the tables above looked revoked.
+     */
+
+    it("keeps recipes.visibility, because only the exposure was reversed", async () => {
+      // §17 stands; rebuilding the pages is one migration with 090500 as its text
+      const { error } = await admin
+        .from("recipes")
+        .update({ visibility: "public" })
+        .eq("id", beta.publicRecipeId);
       expect(error).toBeNull();
-      expect(data?.[0]).toMatchObject({ item_text: "2 cups flour", amount: 2, unit: "cup" });
-    });
-
-    describe("and what it must not", () => {
-      it("refuses select * rather than quietly returning a subset", async () => {
-        // column grants make this a permission error, which is the safe direction:
-        // a caller has to name what it wants
-        const { error } = await anon.from("recipes").select("*");
-        expect(error?.code).toBe(RLS_VIOLATION);
-      });
-
-      it("cannot read the household behind the page", async () => {
-        for (const column of ["family_id", "created_by", "make_again", "times_made", "status"]) {
-          const { error } = await anon.from("recipes").select(column);
-          expect(error?.code, column).toBe(RLS_VIOLATION);
-        }
-      });
-
-      it("cannot see an unpublished recipe", async () => {
-        const { data, error } = await anon
-          .from("recipes")
-          .select(PUBLIC_COLUMNS)
-          .eq("id", beta.recipeId);
-        expect(error).toBeNull();
-        expect(data).toEqual([]);
-      });
-
-      it("cannot see a published recipe that was deleted", async () => {
-        const { error: published } = await admin
-          .from("recipes")
-          .update({ visibility: "public" })
-          .eq("id", beta.tombstonedRecipeId);
-        if (published) throw published;
-        try {
-          const { data } = await anon
-            .from("recipes")
-            .select(PUBLIC_COLUMNS)
-            .eq("id", beta.tombstonedRecipeId);
-          expect(data).toEqual([]);
-        } finally {
-          await admin
-            .from("recipes")
-            .update({ visibility: "private" })
-            .eq("id", beta.tombstonedRecipeId);
-        }
-      });
-
-      it("cannot read the ingredients of an unpublished recipe", async () => {
-        const { data } = await anon
-          .from("recipe_ingredients")
-          .select("item_text")
-          .eq("recipe_id", beta.recipeId);
-        expect(data).toEqual([]);
-      });
-
-      it("cannot reach the household, its members, ratings, plans or pantry at all", async () => {
-        const forbidden = [
-          "families",
-          "family_members",
-          "accounts",
-          "devices",
-          "subscriptions",
-          "entitlements",
-          "ratings",
-          "meal_plans",
-          "plan_entries",
-          "shortlist_entries",
-          "pantry_items",
-          "import_jobs",
-          "import_cache",
-        ];
-        for (const table of forbidden) {
-          const { data, error } = await anon.from(table).select("*");
-          // denied outright by the missing grant, not merely filtered to nothing
-          expect(error?.code, table).toBe(RLS_VIOLATION);
-          expect(data, table).toBeNull();
-        }
-      });
-
-      it("cannot reach the grocery catalog either", async () => {
-        for (const table of ["ingredients", "grocery_packages"]) {
-          const { error } = await anon.from(table).select("*");
-          expect(error?.code, table).toBe(RLS_VIOLATION);
-        }
-      });
-
-      it("cannot write anything", async () => {
-        const insert = await anon
-          .from("recipes")
-          .insert({ family_id: beta.familyId, title: "planted by a stranger" });
-        expect(insert.error).not.toBeNull();
-
-        const update = await anon
-          .from("recipes")
-          .update({ title: "defaced" })
-          .eq("id", beta.publicRecipeId);
-        expect(update.error).not.toBeNull();
-
-        const remove = await anon.from("recipes").delete().eq("id", beta.publicRecipeId);
-        expect(remove.error).not.toBeNull();
-
-        const { data: intact } = await admin
-          .from("recipes")
-          .select("title")
-          .eq("id", beta.publicRecipeId)
-          .single();
-        expect(intact?.title).toBe("beta published pie");
-      });
-    });
-
-    describe("photos", () => {
-      let cameraPhotoId: string;
-      let importPhotoId: string;
-
-      beforeAll(async () => {
-        if (!instance) return;
-        const rows = await admin
-          .from("photos")
-          .insert([
-            {
-              family_id: beta.familyId,
-              recipe_id: beta.publicRecipeId,
-              storage_path: `${beta.familyId}/camera.jpg`,
-              source: "camera",
-              width: 100,
-              height: 100,
-            },
-            {
-              family_id: beta.familyId,
-              recipe_id: beta.publicRecipeId,
-              storage_path: `${beta.familyId}/import.jpg`,
-              source: "import",
-              width: 100,
-              height: 100,
-            },
-          ])
-          .select("id, source");
-        if (rows.error) throw rows.error;
-        cameraPhotoId = rows.data.find((r) => r.source === "camera")!.id;
-        importPhotoId = rows.data.find((r) => r.source === "import")!.id;
-      });
-
-      it("lets anon see the household's own photograph", async () => {
-        const { data, error } = await anon
-          .from("photos")
-          .select("id, storage_path")
-          .eq("id", cameraPhotoId);
-        expect(error).toBeNull();
-        expect(data).toHaveLength(1);
-      });
-
-      it("does not let anon see an imported photograph", async () => {
-        // the blogger's picture, not the household's. Republishing it is what the
-        // unresolved copyright question governs, so the default is no.
-        const { data, error } = await anon
-          .from("photos")
-          .select("id, storage_path")
-          .eq("id", importPhotoId);
-        expect(error).toBeNull();
-        expect(data).toEqual([]);
-      });
-    });
-
-    it("keeps a lapsed household's page up", async () => {
-      // publication is a read, and read-only is the floor
-      const { error: lapsed } = await admin
-        .from("entitlements")
-        .update({
-          valid_until: new Date(Date.now() - 8 * 86400000).toISOString(),
-          grace_until: new Date(Date.now() - 1).toISOString(),
-        })
-        .eq("family_id", beta.familyId);
-      if (lapsed) throw lapsed;
-      try {
-        const { data, error } = await anon
-          .from("recipes")
-          .select(PUBLIC_COLUMNS)
-          .eq("id", beta.publicRecipeId);
-        expect(error).toBeNull();
-        expect(data).toHaveLength(1);
-      } finally {
-        await admin
-          .from("entitlements")
-          .update({
-            valid_until: new Date(Date.now() + 30 * 86400000).toISOString(),
-            grace_until: new Date(Date.now() + 37 * 86400000).toISOString(),
-          })
-          .eq("family_id", beta.familyId);
-      }
     });
   });
 

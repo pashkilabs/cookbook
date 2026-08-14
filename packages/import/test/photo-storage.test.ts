@@ -245,9 +245,12 @@ describe.skipIf(instance === null)("recipe photo storage", () => {
       expect(await canRead(admin, path)).toBe(true);
     });
 
-    it("lists only the objects it may read, not the whole folder", async () => {
-      // listing runs through the same SELECT policy, so anon seeing the one published
-      // photo is correct. What matters is that the private ones are absent.
+    it("lists nothing at all, not even a published photograph", async () => {
+      // Listing runs through the same SELECT policy. While the public read surface existed this
+      // asserted the subtler property — anon sees the published photo and not the private one.
+      // Since 20260814090000 revoked that surface (decisions §17) anon has no storage policy, so
+      // the correct answer is an empty listing. Both paths are still created, so this fails if
+      // the surface comes back rather than passing on an empty fixture.
       const publishedPath = await storeWithRow({
         familyId,
         recipeId: publicRecipeId,
@@ -258,22 +261,34 @@ describe.skipIf(instance === null)("recipe photo storage", () => {
         recipeId: privateRecipeId,
         source: "camera",
       });
+      expect(await canRead(admin, publishedPath), "the object exists").toBe(true);
 
       const { data } = await anon.storage.from(RECIPE_PHOTO_BUCKET).list(familyId);
       const listed = (data ?? []).map((entry) => `${familyId}/${entry.name}`);
-      expect(listed).toContain(publishedPath);
+      expect(listed).not.toContain(publishedPath);
       expect(listed).not.toContain(hiddenPath);
     });
   });
 
   describe("what anon can reach", () => {
-    it("reads the household's own photograph of a published recipe", async () => {
+    it("reaches nothing — the public read surface is revoked", async () => {
+      /*
+       * This used to be the one thing anon *could* read: the household's own photograph of a
+       * recipe it had published. 20260814090000 took the whole surface back until public pages
+       * exist (decisions §17), and the storage policy was the piece most easily forgotten —
+       * a policy on `storage.objects` is invisible from `public`, so the tables can look
+       * revoked while the bytes stay reachable.
+       *
+       * Asserted against an object that demonstrably exists and is demonstrably readable by
+       * the service role, so this cannot pass because the fixture failed to store anything.
+       */
       const path = await storeWithRow({
         familyId,
         recipeId: publicRecipeId,
         source: "camera",
       });
-      expect(await canRead(anon, path)).toBe(true);
+      expect(await canRead(admin, path), "the object is really there").toBe(true);
+      expect(await canRead(anon, path)).toBe(false);
     });
   });
 
