@@ -131,6 +131,42 @@ mutate() {
   fi
 }
 
+# ---------------------------------------------------------------------------
+# Mutations whose guard is a schema invariant, not a test.
+#
+# Some weakenings are invisible to any client. Granting anon a column with no policy
+# behind it exposes nothing — RLS denies by default — so no test can catch it, and a
+# harness that only ran tests would report the hole as "masked" and move on. That is
+# the harness going quiet, which is the failure this whole script exists to prevent.
+#
+# `private.assert_no_anon_reads()` is the guard for those, and it runs on every future
+# migration. This proves it actually raises, by making the change and asserting the
+# invariant refuses it.
+# ---------------------------------------------------------------------------
+psql_raises() {
+  # succeeds when the statement FAILS, which is the whole point
+  ! docker exec -i supabase_db_db psql -U postgres -d postgres -q -v ON_ERROR_STOP=1 \
+      -c "$1" >/dev/null 2>&1
+}
+
+invariant_catches() {
+  local label="$1" mutation="$2" restore="$3"
+  if ! psql "$mutation"; then
+    printf '%-52s COULD NOT MEASURE (mutation SQL failed)\n' "$label"
+    unmeasured=$((unmeasured+1))
+    return
+  fi
+
+  if psql_raises "do \$do\$ begin perform private.assert_rls_invariants(); end; \$do\$;"; then
+    printf '%-52s caught by the invariant (as expected)\n' "$label"
+  else
+    printf '%-52s NOT CAUGHT — the invariant accepted it\n' "$label"
+    regressions=$((regressions+1))
+  fi
+
+  psql "$restore" || printf '            WARNING: restore failed for %s\n' "$label"
+}
+
 printf '%-52s %s\n' "mutation" "outcome"
 printf -- '-%.0s' {1..100}; echo
 
@@ -203,6 +239,16 @@ mutate "anon given back the public read surface" catch \
   "drop policy recipes_select_public on public.recipes;
    revoke select on public.recipes from anon;" \
   "refuses a published recipe to anon"
+
+# The half a client cannot see. A column grant with no policy leaks nothing today, and
+# is exactly how the surface would grow back one migration at a time.
+invariant_catches "anon re-granted a column, with no policy" \
+  "grant select (title) on public.recipes to anon;" \
+  "revoke select on public.recipes from anon;"
+
+invariant_catches "anon given a policy on storage.objects" \
+  "create policy anon_probe on storage.objects for select to anon using (true);" \
+  "drop policy if exists anon_probe on storage.objects;"
 
 printf -- '-%.0s' {1..100}; echo
 
