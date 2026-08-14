@@ -29,6 +29,21 @@ pnpm --filter @pashki/db db:reset      # re-apply every migration, then seed
 pnpm --filter @pashki/db gen:types     # regenerate database.types.ts
 pnpm --filter @pashki/db gen:seed      # regenerate seed.sql from SEED_CATALOG
 pnpm --filter @pashki/db test:mutate   # prove the RLS tests would catch a hole
+
+pnpm --filter @pashki/web dev          # the app, against whatever .env.local points at
+```
+
+Against the hosted project. All need `set -a && . ~/.pashki-supabase.env && set +a`
+first, and all must be run from `packages/db` — the CLI takes its project id from the
+working directory. Each reports three outcomes with distinct exit codes.
+
+```bash
+pnpm --filter @pashki/db db:push:dry            # always before db:push
+pnpm --filter @pashki/db db:push
+pnpm --filter @pashki/db check:parity           # always after; schema, privileges, auth
+pnpm --filter @pashki/db set:smtp               # mail provider for hosted auth
+pnpm --filter @pashki/db set:site-url <url>     # site_url + redirect allow list, together
+pnpm --filter @pashki/db issue:entitlement --email <address>
 ```
 
 Run `pnpm check` before saying a task is done. Database tests skip themselves when
@@ -57,8 +72,11 @@ docs/on-device.md      what a device holds and enforces, and what sync must give
 docs/roadmap.md        phases and current position
 ```
 
-`packages/core`, `packages/db`, `packages/platform-client` and `packages/import`
-exist. Nothing under `apps/` does yet. See `docs/roadmap.md` for what's next.
+`packages/core`, `packages/db`, `packages/platform-client`, `packages/import` and
+`apps/web` exist. `packages/ui`, `apps/mobile`, `apps/api` and `apps/worker` do not.
+`apps/web` is **deployed** at `https://cookbook.pashki.com` against the hosted Supabase
+project — see `docs/deployment.md` for what is configured where, and `docs/roadmap.md`
+for what's next. Public recipe pages have schema and policies but nothing renders them.
 
 Three boundaries are enforced by `pnpm check:boundaries`, not by good intentions:
 

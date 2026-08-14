@@ -1,12 +1,17 @@
 # Roadmap
 
-**Current position: Phase 2's backend is done. What remains of Phase 2 is the app
-itself, and Phase 3 is next.**
+**Current position: Phase 2 is shipped and deployed. Phase 3 is next.**
 
-Built: `packages/core`, `packages/db` (19 tables, RLS, photo bucket, job queue),
+`apps/web` runs at `https://cookbook.pashki.com` against the hosted Supabase project,
+with real email confirmation through Resend and entitlements granted one household at a
+time by hand. `docs/deployment.md` records what is configured where and the seven things
+still standing between this and public signup.
+
+Built: `packages/core`, `packages/db` (20 tables, RLS, photo bucket, job queue),
 `packages/platform-client` (the seam, entitlement token, HTTP surface),
-`packages/import` (tiers 0–3, shared cache, photo storage, job runner). 501 tests
-across four packages.
+`packages/import` (tiers 0–3, shared cache, photo storage, job runner), `apps/web`
+(auth, recipes, planner, shopping, single and batch import). 619 tests across four
+packages and the app.
 
 One Phase 1 item remains open, deliberately: **Stripe → entitlement issuance** is
 blocked on Apple's outside-purchase rules (`docs/decisions.md`, Unresolved).
@@ -82,7 +87,17 @@ rebuild, and everything else depends on it.*
 
 ## Phase 2 — Web app
 
-- [ ] `apps/web` — Next.js shell, auth flow, household setup.
+- [x] `apps/web` — Next.js shell, auth flow, household setup. Email confirmation is
+      real (Resend, `docs/decisions.md` §34), sessions refresh in Node-runtime middleware,
+      and provisioning happens at first confirmed sign-in rather than at signup (§27).
+- [x] **Deployed.** Vercel, custom domain, hosted Supabase. Configuration is applied by
+      scripts rather than dashboards wherever the API allows it — `set:smtp`,
+      `set:site-url`, `issue:entitlement` — and `check:parity` compares the two
+      environments. `docs/deployment.md`.
+- [ ] **Render the public recipe pages.** The schema, the anon policies and the column
+      grants have shipped and nothing uses them: the read surface is live on a
+      public project for a feature that does not exist. Either build it or consider
+      revoking until it is built.
 - [x] **An HTTP surface for the seam.** Session, entitlement, quota spend and device
       registration, as a framework-agnostic router plus a Fetch adapter, so Next.js
       in Phase 2 and any host in Phase 3 share one implementation. The account is
@@ -199,13 +214,36 @@ out, and the routes that do work — screenshots and video files — are the one
 nothing implements yet. Tier 3 accepts images and Phase 4 owns video, so the share
 target's real job is triage, not receiving. Build it as triage.
 
-**`import_jobs` has a drain but no scheduler.** The runner claims work atomically
-and the batch screen now calls it — in slices, while somebody is on the page — so the
-queue is reachable from the product. Nothing calls it on a timer. A device that submits
-an import and closes waits until someone reopens the page. Cron, a queue trigger, or a
-Supabase scheduled function — the choice is small, its absence is not. Decisions §31
-lists what else a deployed worker brings: concurrency, cross-household fairness, and a
-reaper for the photo objects an abandoned review leaves behind.
+**A device cannot capture an import while offline, and that is the share target's
+whole point.** `docs/on-device.md` deliberately excludes `import_jobs` from the synced
+set — it is server-authoritative, and syncing raw import payloads to every device
+permanently to serve a status spinner would be a bad trade. That reasoning holds. What
+it leaves unanswered is the submission: the outbox described in on-device.md carries
+writes to *synced tables*, and queueing an import is an HTTP call to a table the device
+does not hold. So a link shared on a train with no signal has nowhere to go.
+
+The fix is not to sync the queue. It is to notice that the outbox is two things wearing
+one name — replicated row writes, and deferred server calls — and that only the first is
+designed. Decide before the sync engine is chosen, because "does this engine let me
+enqueue an arbitrary deferred operation" is a selection criterion (§24) and is not
+currently on the list.
+
+**Confirmation links have nowhere to land on a phone.** `site_url` and the redirect
+allow list now point at the web app, and `set:site-url` preserves whatever is already
+there. A native signup needs a deep link — `pashki://` or a universal link — added to
+the same allow list, and GoTrue silently substitutes `site_url` for anything unlisted,
+so the failure is a confirmation that opens the website instead of the app the person is
+holding. Small, and invisible until someone tries it.
+
+**`import_jobs` has a drain but no scheduler.** The runner claims work atomically and
+the batch screen calls it — in slices, while somebody is on the page — so the queue is
+reachable from the product. Nothing calls it on a timer, so a device that submits an
+import and closes waits until someone reopens the page. **Now designed and not built:**
+decisions §35 chooses pg_cron with pg_net calling the existing route, with a conditional
+dispatch so an idle queue never leaves the database. It was blocked on having no local
+Postgres to build it against. §31 lists what a deployed worker adds beyond scheduling —
+concurrency, cross-household fairness, and a reaper for the photo objects an abandoned
+review leaves behind.
 
 ---
 

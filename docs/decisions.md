@@ -1100,6 +1100,86 @@ different value of `PASHKI_SMTP_HOST` and one script run.
 
 ---
 
+## 35. The queue is drained by pg_cron calling the app, not by a worker
+
+**Decided and not yet built.** Recorded now because the reasoning was worked out with a database
+in front of me and would otherwise have to be rediscovered.
+
+`import_jobs` is drained only while somebody has the batch screen open (§31). Close the tab and
+queued jobs sit there. The fix is a caller on a timer; the question was which caller.
+
+### pg_cron + pg_net, calling `/api/import/drain`
+
+A scheduled SQL job probes the queue and, when there is work, `net.http_post`s to the route the
+batch screen already calls. **It adds a caller, not a second implementation** — the drained path
+stays the one that has been measured, and the atomic claim is untouched.
+
+The route needs a machine-callable door: it authenticates a signed-in household today, and a cron
+tick has no session. A shared secret in a header, held in Supabase Vault rather than in a
+migration, keeps it out of git.
+
+### Why not a Supabase Edge Function
+
+Edge Functions are Deno. The runner's `storePhoto` goes through **sharp, a native Node addon**, so
+the function could not store a photograph — it would have to drop photos from queued imports or
+reimplement resizing in a second place. That is a lot of new surface to avoid one HTTP hop, and
+the surface would be exactly the part of the pipeline that already has the most edge cases
+(orientation, EXIF stripping, format sniffing).
+
+### Why not Vercel Cron
+
+The project is on Hobby, where **cron fires once a day**. A person waiting on twenty pasted links
+cannot wait until tomorrow. This becomes viable on Pro and is worth revisiting then — it would
+remove pg_net and the shared secret entirely, since a Vercel cron request is already inside the
+deployment.
+
+### Conditional dispatch: an idle queue never leaves the database
+
+The tick does **not** call out unconditionally. It first asks whether anything is claimable:
+
+```sql
+select exists (
+  select 1 from public.import_jobs
+  where deleted_at is null
+    and (status = 'queued'
+         or (status = 'running' and claimed_at < now() - interval '300 seconds'))
+)
+```
+
+That predicate is deliberately the same one `import_claim_next_job` selects on, **expired leases
+included**. Two things follow. A job whose worker died is not merely reclaimable in principle —
+it is what wakes the scheduler up, so the 300-second lease is exercised by the normal path rather
+than by an operator noticing. And the reclaim cannot rot, because the only thing that triggers a
+drain is the same condition that makes a claim succeed.
+
+The cost argument is the reason for the shape. A scheduler that POSTs every minute regardless
+spends 1,440 HTTP calls and 1,440 serverless invocations a day to discover, over and over, that
+nobody has imported anything — a real bill with no users behind it. Probing first makes an idle
+minute one indexed lookup on `import_jobs_queue`, an index that already exists for the claim, on a
+table with tens of rows. Idle cost is effectively zero and stays inside Postgres.
+
+Every minute rather than more often: a minute is below the threshold where somebody watching a
+batch would go looking for a refresh button, and the batch screen still drains directly while it is
+open, so the scheduler is the *fallback* for a closed tab rather than the primary path.
+
+### Deliberately not included
+
+Concurrency and per-household fairness (§31) both stay out. `SKIP LOCKED` already permits parallel
+workers, so adding them later changes the schedule and not the claim — and at one household
+neither is measurable.
+
+### What blocked it
+
+Docker on the development machine wedged with under a gigabyte of disk free, leaving no local
+Postgres — and no `psql` outside the container. Writing a migration that touches the queue's
+correctness without once running it is the trade this repo does not make. Both extensions are
+confirmed available on the hosted project.
+
+*Would change if:* the app moves to a host with a real scheduler, or Vercel moves off Hobby. Both
+delete pg_net and the shared secret rather than changing what runs.
+
+---
+
 ## Open: cascade deletions and tombstones
 
 **Not resolved. This waits on the sync engine choice, and exists so the evaluation

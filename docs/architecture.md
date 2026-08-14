@@ -49,7 +49,7 @@ It is the first product on the **Pashki platform**. Families subscribe to Pashki
 | Auth | Supabase Auth | Platform-owned, wrapped by the platform client |
 | Object storage | Supabase Storage + image CDN | Recipe photos, resized server-side at import |
 | Media worker | Container on Fly.io / Cloud Run | ffmpeg cannot run in serverless functions |
-| Queue | Inngest or Trigger.dev | Batch imports and media jobs are async by nature |
+| Queue | Postgres `import_jobs`, claimed with `FOR UPDATE SKIP LOCKED`; dispatched by pg_cron (decisions §35) | Batch imports and media jobs are async by nature. Inngest and Trigger.dev were not needed: the queue is one table and one function, and a hosted queue would add a vendor to own the one thing the database already does atomically |
 | Billing | Stripe + RevenueCat | RevenueCat exists specifically to unify entitlements across web, App Store and Play |
 | Sync | Postgres→SQLite replication (PowerSync / Electric class) | Local database on device is what makes offline real rather than bolted on |
 | Inference | US-hosted only — see §8 | |
@@ -86,7 +86,10 @@ pashki/
 The two starred packages are the ones worth being precious about.
 
 **Built so far:** `packages/core`, `packages/db`, `packages/platform-client`,
-`packages/import`. Nothing under `apps/` exists yet, and `packages/ui` is still a plan.
+`packages/import` and `apps/web` — the last of which is deployed (`docs/deployment.md`).
+`packages/ui` is still a plan, and `apps/api` never became a separate app: the import
+service and the seam's HTTP surface are route handlers inside `apps/web`, which is one
+fewer deployment for no loss. `apps/mobile` and `apps/worker` are Phases 3 and 4.
 
 `platform-client` and `import` both require the service role, so they run on a server.
 Apps reach the seam through the HTTP routes in `platform-client` (§6) rather than
