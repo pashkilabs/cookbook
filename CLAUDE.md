@@ -256,6 +256,24 @@ models be good enough. Do not add a silent-save path.
   and **module-scope imports decide a route's blast radius** — one route wanted a
   bucket *name* from a module that imports an image library, and died for it. Load
   heavy or native things inside the function that needs them.
+- **A native module needs to be excluded from the bundle *and* traced into the
+  function; doing only the first ships it broken.** `serverExternalPackages: ["sharp"]`
+  correctly stops webpack bundling a `.node` binary — and then the file has to arrive by
+  file tracing instead, which cannot see the dynamic `require("@img/sharp-<platform>")`
+  sharp uses. The deployed function had sharp and not its binary:
+  `Could not load the "sharp" module using the linux-x64 runtime`. Fixed with
+  `outputFileTracingIncludes`, plus `outputFileTracingRoot` at the monorepo root because
+  tracing does not climb out of the app directory. None of it reproduces locally, where
+  the darwin binary is in `node_modules` for Node to find regardless.
+- **A shared secret set on both sides can still be two different secrets.** The scheduler
+  called the drain route every minute and got `401 sign in first` while every presence
+  check said the secret was configured. Presence is not agreement, and neither is
+  "I pasted it twice". `/api/health` publishes a 12-hex SHA-256 fingerprint so the copies
+  can be *compared*; the same reasoning says a health check reporting `tokenSigner: true`
+  for a PEM that cannot be parsed is reporting the wrong thing.
+- **A route with two doors needs both tested.** `pnpm smoke` was green about
+  `/api/import/drain` while the queue never drained: smoke called it with a session and
+  the scheduler calls it with a shared secret. One door worked.
 - **Verifying a flow does not verify the flows beside it.** Signup, confirmation and
   provisioning were proven end to end against production while every import route was
   broken, because provisioning goes through the store and never touches the signer or

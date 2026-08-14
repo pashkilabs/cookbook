@@ -23,6 +23,27 @@
 /** @type {import('next').NextConfig} */
 export default {
   serverExternalPackages: ["sharp"],
+  /*
+   * Tracing has to be told about sharp's platform binary.
+   *
+   * `serverExternalPackages` stops webpack bundling sharp — correct, it cannot be bundled — but
+   * then the file must be *traced* into the deployed function instead. sharp loads
+   * `@img/sharp-<platform>` through a dynamic require that static tracing cannot see, so the
+   * function shipped with sharp and without the binary it needs, and said so:
+   *
+   *     Could not load the "sharp" module using the linux-x64 runtime
+   *
+   * Invisible locally, where the darwin binary sits in node_modules for Node to find anyway.
+   * `outputFileTracingRoot` is the monorepo root because that is where pnpm's store lives, and
+   * tracing does not climb out of the app directory on its own.
+   */
+  outputFileTracingRoot: new URL("../../", import.meta.url).pathname,
+  outputFileTracingIncludes: {
+    "/api/**": [
+      "./node_modules/.pnpm/@img+sharp-linux-x64*/node_modules/@img/**",
+      "./node_modules/.pnpm/@img+sharp-libvips-linux-x64*/node_modules/@img/**",
+    ],
+  },
   transpilePackages: ["@pashki/platform-client", "@pashki/core", "@pashki/db", "@pashki/import"],
   webpack: (config) => {
     config.resolve.extensionAlias = {
