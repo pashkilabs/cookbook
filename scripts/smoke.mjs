@@ -164,10 +164,16 @@ const alive = (result) => result.status !== 0 && result.status < 500;
  * unrelated to what it checks.** Each one costs a session chasing a product bug that is not there.
  * A broken measurement must announce itself as broken.
  */
-async function rest(method, path, body) {
+async function rest(method, path, body, prefer) {
   const response = await fetch(`${SUPABASE}/rest/v1${path}`, {
     method,
-    headers: { ...svc, Prefer: "return=representation" },
+    headers: {
+      ...svc,
+      // `on_conflict=` in the URL does nothing without this: PostgREST treats the request as a
+      // plain insert and answers 409. Dormant against production, where provisioning issues no
+      // entitlement, and immediate against a dev deployment that does.
+      Prefer: ["return=representation", prefer].filter(Boolean).join(","),
+    },
     body: body === undefined ? undefined : JSON.stringify(body),
     signal: AbortSignal.timeout(45_000),
   });
@@ -208,6 +214,9 @@ async function admin(method, path, body) {
   }
   return text ? JSON.parse(text) : null;
 }
+
+/** An upsert, which PostgREST only performs when asked in a header. */
+const restUpsert = (method, path, body) => rest(method, path, body, "resolution=merge-duplicates");
 
 /** The exact select `packages/db`'s catalog reader issues. If they drift, this check is worthless. */
 const INGREDIENT_COLUMNS =
@@ -322,7 +331,7 @@ try {
   if (!familyId) throw new Error("no household; the rest cannot be measured");
 
   // an operator grant, so the write paths below are testing themselves rather than the meter
-  await rest("POST", "/entitlements?on_conflict=family_id,app_key", {
+  await restUpsert("POST", "/entitlements?on_conflict=family_id,app_key", {
     family_id: familyId,
     app_key: "recipes",
     tier: "full",
@@ -353,6 +362,28 @@ try {
   if (recipeId) {
     const children = await rest("GET", `/recipe_ingredients?recipe_id=eq.${recipeId}&select=item_text`);
     record("its ingredients were parsed and stored", (children ?? []).length === 3, `${(children ?? []).length} rows`);
+
+    /*
+     * The calorie estimate, on the screen that shows it.
+     *
+     * Flour, double cream and lemons all carry a figure, so this recipe is fully covered and the
+     * page must state a plain estimate rather than a floor. "at least" appearing here means the
+     * catalog lost a figure it had — which is how the estimate would degrade in practice, quietly
+     * and while still rendering something plausible.
+     */
+    const detail = await call("GET", `/recipes/${recipeId}`);
+    const page = typeof detail.body === "string" ? detail.body : JSON.stringify(detail.body);
+    record("the recipe page renders", alive(detail), `HTTP ${detail.status}`);
+    record(
+      "and shows a calorie estimate per serving",
+      page.includes("kcal") && page.includes("per serving"),
+      page.includes("No calorie estimate") ? "the page declined to state one" : "",
+    );
+    record(
+      "and states it as an estimate rather than a floor, since every ingredient is catalogued",
+      page.includes("kcal") && !page.includes("at least"),
+      page.includes("at least") ? "something in the catalog lost its energy figure" : "",
+    );
 
     const edited = await call("PATCH", `/api/recipes/${recipeId}`, {
       body: { title: "Smoke Test Pie II", servings: "6", timeMinutes: "35", sourceName: "", sourceUrl: "", ingredients: "2 cups flour", steps: "Mix." },
