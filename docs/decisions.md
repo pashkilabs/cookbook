@@ -1854,10 +1854,18 @@ bulk import would actually reach. The next step is finishing the hand-check, not
 `recipe_ingredients` stores the *result* of parsing — `amount`, `unit`, `item_text`, `note`,
 `is_estimated`. It does not store the line the parser was given. When the parser learned to read
 `x 1.5kg free-range whole chicken` and `optional: sprigs of bay`, the rows already in the database
-kept the old reading: nine live lines carry the quantity inside `item_text`
-(`150ml unsweetened apple juice`, `100g runny honey`), match nothing in the catalog, and count as
-unknown forever. This will recur every time the parser improves, which is the point — parsing is
-the part of this system most likely to keep changing.
+kept the old reading and went on matching nothing. Measured across production rather than
+estimated: **seven live rows**, six of them in the two Jamie Oliver recipes. This will recur every
+time the parser improves, which is the point — parsing is the part of this system most likely to
+keep changing.
+
+Repairing those seven exposed the shape of the problem twice over. Four of them
+(`150ml unsweetened apple juice`, `100g runny honey`) were not stale at all: the parser **still**
+could not read them, because `\b` sat after the number and there is no word boundary between `0`
+and `m`. Re-importing would have produced them again, identically. And `x 1.5kg free-range whole
+chicken` could not be recovered from `item_text` alone — the leading `1` the old parser consumed
+was gone, so the multiplier rule had nothing to fire on and the amount had to be put back on the
+front before re-reading. The residue is not the input, which is the whole of this section.
 
 ### Re-import is not the general answer
 
