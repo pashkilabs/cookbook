@@ -15,6 +15,21 @@
 
 begin;
 
+-- Park every canonical name this run is about to write.
+--
+-- Splitting an entry moves a name from an old row to a new one, and both are in the same
+-- statement: `mozzarella` claims "shredded mozzarella" while `shredded-cheese` still holds it.
+-- Unique constraints are checked row by row rather than at commit, so the insert fails against
+-- any database that already has the old row — and never against a local `db reset`, which
+-- builds from nothing and so cannot collide. Local green was not evidence; the hosted push
+-- refused itself with `ingredients_canonical_name_unique`.
+--
+-- Scoped to the keys below so a row present in the database but absent from SEED_CATALOG keeps
+-- its name rather than being stranded under a parked one.
+update public.ingredients
+set canonical_name = 'seed:parking:' || key
+where key in ('heavy-cream', 'half-and-half', 'double-cream', 'single-cream', 'milk', 'semi-skimmed-milk', 'skimmed-milk', 'buttermilk', 'sour-cream', 'yogurt', 'cheddar', 'mozzarella', 'greek-yogurt', 'butter', 'cream-cheese', 'shredded-cheese', 'parmesan', 'feta', 'eggs', 'chicken-breast', 'chicken-thighs', 'ground-beef', 'lean-ground-beef', 'ground-turkey', 'sausage', 'bacon', 'salmon', 'shrimp', 'onion', 'garlic', 'lemon', 'lime', 'potatoes', 'carrots', 'celery', 'bell-pepper', 'spinach', 'tomatoes', 'mushrooms', 'broccoli', 'avocado', 'cilantro', 'parsley', 'basil', 'green-onions', 'olive-oil', 'flour', 'sugar', 'brown-sugar', 'rice', 'pasta', 'canned-tomatoes', 'tomato-paste', 'sun-dried-tomatoes', 'broth', 'coconut-milk', 'beans', 'soy-sauce', 'honey', 'maple-syrup', 'flour-tortillas', 'corn-tortillas', 'tortillas', 'bread', 'frozen-peas');
+
 insert into public.ingredients
   (key, canonical_name, aliases, aisle, dimension, grams_per_cup, can_size,
    grams_each, kcal_per_100g, energy_fdc_id)
