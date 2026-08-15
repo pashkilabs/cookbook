@@ -1,53 +1,55 @@
 # Recipe URLs
 
-One per line. A note on what's awkward about it saves re-deriving it later.
+Eighteen, as supplied. Thirteen are recipe pages; five are deliberate refusals
+(decisions §46). Tier column is a *prediction* until the capture is taken —
+`gen` the fixtures and the harness will say what actually answered.
 
-## Candidates — replace these with your own
+## Recipe pages (13)
 
-These are mine, not yours, and that's the weakness: they're real pages but not
-the recipes your household actually cooks. Keep the ones that are useful, bin
-the rest.
+| # | URL | expected tier | why it's worth having |
+|---|---|---|---|
+| 1 | https://smittenkitchen.com/2026/05/chicken-salad-for-celery-enthusiasts/ | 0? | Long-form prose blog. Smitten Kitchen writes amounts inside sentences; check whether a `Recipe` node exists at all. |
+| 2 | https://pinchofyum.com/saucy-gochujang-noodles-with-chicken | 0 | Sectioned ingredients on the page — a §45 case. |
+| 3 | https://www.bbcgoodfood.com/recipes/summer-roast-chicken-traybake | 0 | UK metric, units closed up against the number (`150ml`) — the form that defeated the parser until 15 Aug. |
+| 4 | https://www.recipetineats.com/mediterranean-baked-chicken-dinner/ | 0 | Dual US/metric in one line. |
+| 5 | https://www.recipetineats.com/chicken-breast-recipe/ | 0 | Same house style, different dish — checks the handling isn't fitted to one page. |
+| 6 | https://www.budgetbytes.com/one-pot-creamy-pesto-chicken-pasta/ | 0 | Prices inside the ingredient lines: `($0.49)`. Vulgar fractions and three competing measures in one parenthetical. |
+| 7 | https://smittenkitchen.com/2020/09/crispy-tortellini-with-peas-and-prosciutto/ | 0? | Older post — the plugin markup may predate the current one. |
+| 8 | https://www.seriouseats.com/easy-pan-seared-chicken-breasts-pan-sauce-recipe | 0 | Technique-led; weights in grams beside volumes. |
+| 9 | https://www.jamieoliver.com/recipes/chicken-recipes/hit-n-run-traybake/ | 0 | `1 x 1.5kg free-range whole chicken` — the British multiplier form. Two of these already reached production badly parsed (§44). |
+| 10 | https://cooking.nytimes.com/recipes/1017532-tomato-jam | 0 | Paywalled. Whether the markup survives the paywall is the measurement. |
+| 11 | https://www.americastestkitchen.com/recipes/11322-crispy-skin-pan-seared-chicken-breasts | 1? | Hard paywall, likely no `Recipe` node to anonymous fetch. |
+| 12 | https://tasty.co/recipe/one-pot-creamy-chicken-and-mushroom-pasta | 0 | Video-first site; ingredients often in a component rather than JSON-LD. |
+| 13 | https://cookpad.com/us/recipes/14561234-easy-homemade-chicken-curry | 0? | User-submitted, so amounts are inconsistent and units are informal. |
 
-Each was fetched and checked for structured data, so the tier is measured rather
-than assumed.
+## Deliberate refusals (5)
 
-| URL | Tier 0? | Why it's worth having |
-|---|---|---|
-| https://www.budgetbytes.com/creamy-tomato-spinach-pasta/ | yes — JSON-LD `Recipe` | Prices inside the ingredient lines: `½ lb penne pasta ($0.49)`, `1  yellow onion (small dice, 340g, 1.5 cups, $0.78)`. Vulgar fractions, a double space, and three competing measures in one parenthetical. |
-| https://www.budgetbytes.com/marry-me-chicken-pasta/ | yes — JSON-LD `Recipe` | Same house style, different dish — checks that the parenthetical handling isn't fitted to one page. |
-| https://www.halfbakedharvest.com/gochujang-butter-pasta/ | yes — JSON-LD `Recipe` | Chatty ingredient prose; brand names in the lines. |
-| https://pinchofyum.com/creamy-garlic-sun-dried-tomato-pasta | yes — JSON-LD `Recipe` | Sectioned ingredients on the page. |
-| https://www.food.com/recipe/rib-sauce-415768 | yes — two `Recipe` nodes | User-submitted, so amounts are inconsistent. Two `Recipe` nodes in one page is the interesting part: tier 0 has to pick one. |
+The correct output is a refusal naming why, **not** a plausible recipe. A recipe
+invented for any of these is a confabulation and is reported as one.
 
-## Gaps worth filling deliberately
+| # | URL | reason | reading |
+|---|---|---|---|
+| 14 | https://www.meallime.com/recipes | `not-a-recipe-page` | An index of recipes, not a recipe. Nothing to offer — the URL is the wrong one. |
+| 15 | https://www.tiktok.com/@gordonramsayofficial/video/7036666579843640582 | `unresolvable-source` | Never resolves server-side (CLAUDE.md). Offer the screenshot or video route. |
+| 16 | https://www.instagram.com/p/C-Xy1z3M-AB/ | `unresolvable-source` | Same. Reject up front rather than after four doomed attempts. |
+| 17 | https://www.reddit.com/r/recipes/comments/1vk9733/what_are_the_best_recipes_on_a_grill/ | `not-a-recipe-page` | The slug settles it: *what are the best recipes on a grill* is a question thread soliciting suggestions, not a post containing a recipe. See the note below. |
+| 18 | https://archive.org/details/cbk_community-cookbook-archive | *see below* | The identifier reads as a **collection** (`cbk_community-cookbook-archive`), not a single scanned book. Unresolved — see below. |
 
-Everything above is a tier-0 hit, which makes it a weak eval set — it measures
-the easy path only. Worth adding:
+### Two readings that needed checking, not accepting
 
-- **A page with no structured data.** `cooks.com` recipe pages look right for
-  this (plain HTML, community-submitted, no recipe plugin), but it rate-limited
-  the check with a `429` before the markup could be confirmed. That rate
-  limiting is itself worth knowing about for the import service.
-- **A page where the recipe is in prose**, not a list — older personal blogs and
-  newspaper archives.
-- **A recipe with an ingredient table** rather than a list.
-- **A paywalled or consent-walled page**, to fix what the failure looks like.
+**17, the Reddit thread — confirmed `not-a-recipe-page`.** Reddit threads often
+*do* carry a full recipe in the post body, and refusing one of those would be a
+false refusal, which is the worse failure: the recipe was right there. This one
+is safe because the slug is a question — `what_are_the_best_recipes_on_a_grill`
+— so the body solicits suggestions rather than stating a recipe. Worth
+re-checking against the live thread when the capture is taken; if the top post
+turns out to contain a full recipe, this fixture becomes a recipe fixture.
 
-## Already known to be a dead end
-
-Facebook, Instagram and TikTok links don't resolve — see `CLAUDE.md`. Those
-belong in `captions/` or `screenshots/`, not here.
-
-## A "what does correct mean" question these raise
-
-Budget Bytes writes `1  yellow onion (small dice, 340g, 1.5 cups, $0.78)`. The
-parenthetical holds a weight, a volume and a price for one onion. The expected
-output has to commit to one reading:
-
-- `{amount: 1, unit: null, item: "yellow onion"}` — trust the count, drop the rest
-- `{amount: 340, unit: "g", item: "yellow onion"}` — trust the stated weight
-
-The second is better for the shopping list, since 340 g consolidates and "1
-onion" doesn't. The first is what the parser does today. This is your call, not
-the parser's, and it should be settled before the expected outputs are written —
-it changes what "correct" means for every page in this house style.
+**18, the archive.org item — still open.** The supplied reading was
+`not-a-recipe-page`, and that is right *if* the page is a collection index. But
+if it is a scanned cookbook page, the honest answer is `image-only-source`: the
+recipe is genuinely there and genuinely a picture, the text tiers cannot read it,
+and the vision tier can. `not-a-recipe-page` would route somebody to nothing
+when a working path exists. The identifier suggests a collection, which would
+make it `not-a-recipe-page`, but that is inference from a slug and the capture
+will settle it.
