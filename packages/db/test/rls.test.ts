@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { readLocalInstance } from "./local-instance.js";
@@ -353,33 +354,51 @@ describe.skipIf(instance === null)("row-level security", () => {
   });
 
   describe("read-only after grace", () => {
-    /** Move a household's window into the past. Both dates: grace cannot precede validity. */
-    const lapse = async (familyId: string, graceOffsetMs: number) => {
-      const { error } = await admin
-        .from("entitlements")
-        .update({
-          valid_until: new Date(Date.now() - 8 * 86400000).toISOString(),
-          grace_until: new Date(Date.now() + graceOffsetMs).toISOString(),
-        })
-        .eq("family_id", familyId);
-      if (error) throw error;
+    /**
+     * Move a household's window into the past — **using the database's clock, not ours**.
+     *
+     * This was intermittent, and the cause was two clocks. `grace_until` was computed here as
+     * `Date.now() - 1` and the RLS predicate compares it against Postgres's `now()` inside the
+     * container. Measured, that container runs **120–150 ms ahead of this machine**, so a boundary
+     * one millisecond in our past was still a tenth of a second in the database's future: the
+     * household was inside its grace window, the write was permitted, and the test failed. It
+     * passed whenever the round-trip happened to outlast the skew, which is why it looked flaky
+     * rather than wrong.
+     *
+     * Widening the offset would have hidden it. Setting the boundary with `now()` removes the
+     * second clock entirely, so the same clock writes the value and evaluates the predicate and
+     * there is nothing left to race.
+     */
+    const sql = (query: string) =>
+      execFileSync(
+        "docker",
+        ["exec", "-i", "supabase_db_db", "psql", "-U", "postgres", "-d", "postgres", "-q",
+         "-v", "ON_ERROR_STOP=1", "-c", query],
+        { encoding: "utf8", timeout: 30_000 },
+      );
+
+    const lapse = async (familyId: string, graceOffset: string) => {
+      sql(
+        `update public.entitlements
+         set valid_until = now() - interval '8 days',
+             grace_until = now() + interval '${graceOffset}'
+         where family_id = '${familyId}'`,
+      );
     };
 
     const restore = async (familyId: string) => {
-      const { error } = await admin
-        .from("entitlements")
-        .update({
-          valid_until: new Date(Date.now() + 30 * 86400000).toISOString(),
-          grace_until: new Date(Date.now() + 37 * 86400000).toISOString(),
-        })
-        .eq("family_id", familyId);
-      if (error) throw error;
+      sql(
+        `update public.entitlements
+         set valid_until = now() + interval '30 days',
+             grace_until = now() + interval '37 days'
+         where family_id = '${familyId}'`,
+      );
     };
 
     it("still reads everything it owns", async () => {
       // decisions §9: a family must not lose access to their own recipes because a
       // card expired mid-shop. This is the half that must keep working.
-      await lapse(alpha.familyId, -1);
+      await lapse(alpha.familyId, '-1 second');
       try {
         const { data, error } = await alpha.client.from("recipes").select("id, title");
         expect(error).toBeNull();
@@ -396,7 +415,7 @@ describe.skipIf(instance === null)("row-level security", () => {
     });
 
     it("cannot insert", async () => {
-      await lapse(alpha.familyId, -1);
+      await lapse(alpha.familyId, '-1 second');
       try {
         const { error } = await alpha.client
           .from("recipes")
@@ -408,7 +427,7 @@ describe.skipIf(instance === null)("row-level security", () => {
     });
 
     it("cannot update", async () => {
-      await lapse(alpha.familyId, -1);
+      await lapse(alpha.familyId, '-1 second');
       try {
         const { error } = await alpha.client
           .from("recipes")
@@ -428,7 +447,7 @@ describe.skipIf(instance === null)("row-level security", () => {
     });
 
     it("cannot delete", async () => {
-      await lapse(alpha.familyId, -1);
+      await lapse(alpha.familyId, '-1 second');
       try {
         // This refusal used to be quiet — zero rows — because DELETE has no with-check
         // clause to fail. Since 091300 a client deletes by writing deleted_at, so the
@@ -453,7 +472,7 @@ describe.skipIf(instance === null)("row-level security", () => {
 
     it("still writes while inside the grace window", async () => {
       // grace means keep working and nag, not stop
-      await lapse(alpha.familyId, 60_000);
+      await lapse(alpha.familyId, '60 seconds');
       try {
         const { error } = await alpha.client
           .from("recipes")
@@ -465,7 +484,7 @@ describe.skipIf(instance === null)("row-level security", () => {
     });
 
     it("does not affect another household", async () => {
-      await lapse(alpha.familyId, -1);
+      await lapse(alpha.familyId, '-1 second');
       try {
         const { error } = await beta.client
           .from("recipes")

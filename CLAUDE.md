@@ -237,6 +237,14 @@ models be good enough. Do not add a silent-save path.
   whether previous sessions landed. Run `git log` before any claim about repository
   state. The failure this prevents: reporting an escalating count of uncommitted
   sessions across ten sessions that had each been committed at the time.
+- **A test that computes a time boundary here and compares it in the database is
+  racing two clocks.** The local Postgres container measured **120–150 ms ahead of the
+  host**, so `grace_until = Date.now() - 1` — one millisecond in our past — was a tenth
+  of a second in *its* future, and a lapsed household was still inside its grace window.
+  The write succeeded, the guard test failed, and it passed whenever the round-trip
+  happened to outlast the skew. It read as flake. **Set the boundary with the database's
+  own `now()`** so one clock writes it and evaluates it; widening the offset hides the
+  race instead of removing it. Anything within a second of a boundary is suspect.
 - **A migration's self-check only knows what its own version knew, so `check:parity`
   passing is not evidence that a newer invariant landed.** The invariants are one
   function that each migration replaces; an environment running the *older* body

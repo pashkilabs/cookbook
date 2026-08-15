@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -172,14 +173,21 @@ describe.skipIf(instance === null)("timestamps and deletion belong to the databa
   it("makes a lapsed household's deletion fail loudly instead of quietly", async () => {
     // decisions §9 recorded the quiet refusal as a consequence of DELETE having no
     // with-check clause. Routed through an UPDATE, the entitlement predicate applies.
-    const { error: lapsed } = await admin
-      .from("entitlements")
-      .update({
-        valid_until: new Date(Date.now() - 8 * 86400000).toISOString(),
-        grace_until: new Date(Date.now() - 1).toISOString(),
-      })
-      .eq("family_id", household.familyId);
-    if (lapsed) throw lapsed;
+    /*
+     * Set with the database's clock, not ours. The container runs ~150 ms ahead of this machine,
+     * so a boundary computed here as "one millisecond ago" is still in the database's future and
+     * the household is inside its grace window — which is what made the same assertion in
+     * rls.test.ts intermittent.
+     */
+    execFileSync(
+      "docker",
+      ["exec", "-i", "supabase_db_db", "psql", "-U", "postgres", "-d", "postgres", "-q",
+       "-v", "ON_ERROR_STOP=1", "-c",
+       `update public.entitlements
+          set valid_until = now() - interval '8 days', grace_until = now() - interval '1 second'
+        where family_id = '${household.familyId}'`],
+      { encoding: "utf8", timeout: 30_000 },
+    );
 
     try {
       const { error } = await household.client
