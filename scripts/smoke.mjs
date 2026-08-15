@@ -136,6 +136,20 @@ async function call(method, path, { body, auth = true, expect } = {}) {
  */
 const alive = (result) => result.status !== 0 && result.status < 500;
 
+/**
+ * A service-role read or write, used to check what the product actually stored.
+ *
+ * **Throws on a refusal rather than returning it as data.** PostgREST answers a 4xx with valid
+ * JSON — `{"code":"42501","message":"..."}` — so returning the parsed body regardless meant a
+ * refused query became an *error object* that callers indexed into. `entries?.[0]?.id` came back
+ * undefined and the assertion above it failed reporting the wrong thing entirely: not "the
+ * database refused us" but "servings did not become the stored multiplier".
+ *
+ * That is the same class as `call()` truncating a page to 200 characters, and the same class as a
+ * mutation harness reading zero matched tests as a pass: **a check that can fail for a reason
+ * unrelated to what it checks.** Each one costs a session chasing a product bug that is not there.
+ * A broken measurement must announce itself as broken.
+ */
 async function rest(method, path, body) {
   const response = await fetch(`${SUPABASE}/rest/v1${path}`, {
     method,
@@ -144,6 +158,13 @@ async function rest(method, path, body) {
     signal: AbortSignal.timeout(45_000),
   });
   const text = await response.text();
+  if (!response.ok) {
+    const failure = new Error(`${method} ${path} -> ${response.status} ${text.slice(0, 160)}`);
+    // the service role being refused is a broken *measurement*, not a broken deployment — three
+    // outcomes, as everywhere else in this repo
+    failure.measurement = true;
+    throw failure;
+  }
   return text ? JSON.parse(text) : null;
 }
 
@@ -576,6 +597,11 @@ try {
   });
   record("and refuses it to anon (decisions §17)", !anonRead.ok, `HTTP ${anonRead.status}`);
 } catch (error) {
+  if (error?.measurement) {
+    console.error(`\nCOULD NOT MEASURE: ${String(error.message).slice(0, 200)}`);
+    console.error("  A service-role query was refused, so what follows would be guesswork.");
+    process.exit(CANNOT_MEASURE);
+  }
   record("the run completed", false, String(error.message).slice(0, 160));
 } finally {
   // ---------------------------------------------------------------------------
