@@ -44,9 +44,29 @@ export interface Catalog {
  * tomatoes" (a tin) from collapsing into "tomatoes" (fresh produce).
  */
 export function createCatalog(items: CatalogItem[]): Catalog {
-  const byLength = items.flatMap((item) =>
+  const raw = items.flatMap((item) =>
     item.names.map((name) => ({ name: name.toLowerCase(), item })),
-  ).sort((a, b) => b.name.length - a.name.length);
+  );
+
+  /*
+   * An alias is indexed as written, but every query arrives normalised — so an alias containing
+   * anything normalisation strips could never be matched by anything.
+   *
+   * regression: "2% milk" was indexed as `2% milk` and looked up as `2 milk`, which does not
+   * contain it. The lookup fell through to the shorter `milk` and answered 61 kcal for a food
+   * that is 50. "5% fat mince" matched nothing at all. Both looked like ordinary catalog gaps.
+   *
+   * The normalised form is added as a second candidate rather than replacing the first, because
+   * normalisation is lossy in ways that matter here: `diced tomatoes` reduces to `tomatoes`, and
+   * a tin is not fresh produce. So a derived candidate is dropped whenever some other item
+   * already claims that exact string — the alias it would shadow is the more specific claim.
+   */
+  const claimed = new Set(raw.map((entry) => entry.name));
+  const derived = raw
+    .map((entry) => ({ name: normaliseName(entry.name), item: entry.item }))
+    .filter((entry) => entry.name && !claimed.has(entry.name));
+
+  const byLength = [...raw, ...derived].sort((a, b) => b.name.length - a.name.length);
 
   const cache = new Map<string, CatalogItem | null>();
 
