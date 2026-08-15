@@ -1696,26 +1696,75 @@ buying, and calories are about eating** — so the two lists are not the same on
 - `oil for frying`, with no amount: genuinely **unknown**, and exactly the kind of line that should
   make a total say "at least".
 
-### Coverage, measured before importing anything
+### Coverage, measured — then measured again after sixteen lookups
 
-Against the 10 recipes in the two real households — 56 ingredient lines:
+The first measurement, with 9 of 55 items carrying a figure, resolved **14%** of lines and
+predicted a **57% ceiling** from populating the existing catalog. That prediction was the argument
+for hand-checking rather than importing, so it was worth testing.
+
+Sixteen more ingredients were then hand-checked — chosen by frequency across the real recipes
+rather than by walking the catalog alphabetically. Re-measured across the same 10 recipes, 56
+lines:
 
 | | lines | |
 |---|---|---|
-| resolved to kcal | 8 | 14%, with 9 of 55 catalog items populated |
+| resolved to kcal | **30** | **54%**, against a 57% prediction |
 | negligible (salt, water) | 5 | not gaps |
-| in catalog, **no energy figure** | 24 | filling in the catalog fixes these |
-| energy known, amount not convertible | 1 | needs `gramsEach` or a density |
-| not in catalog at all | 18 | needs new catalog entries |
+| in catalog, no energy figure | **0** | the sixteen closed this entirely |
+| energy known, amount not convertible | 3 | see below |
+| not in catalog at all | 18 | catalog breadth |
 
-**The number that matters is 57%.** That is the ceiling from populating the *existing* 55 catalog
-items and importing nothing — 32 of 56 lines. The remaining 43% is not an energy-data problem at
-all: it is `smoked paprika`, `tagliatelle`, `bay leaves`, `thyme`, `red wine vinegar`, `leeks`, and
-`x 1.5kg free-range whole chicken` — a catalog-breadth problem and, in the last case, a parsing one.
+**54% against a predicted 57%, from 16 lookups rather than 55.** The three-point shortfall is
+exactly the third row: ingredients that now have an energy figure but an amount nothing can turn
+into grams —
 
-So **importing 380,000 USDA rows would not move this number**, because the bottleneck is what the
-catalog knows about, not what USDA knows about. That is the argument for finishing the hand-check
-of 55 items and re-measuring before considering a bulk import.
+- `chicken thighs` written with no amount at all
+- `extra virgin olive oil` with no amount — the "oil for frying" case, correctly unknown
+- `chopped fresh basil` measured as a bunch, which has no defined weight
+
+Only the last is fixable by data (a `gramsEach` for a bunch, which is a fiction — bunches are not
+standardised). The other two are recipes not stating a quantity, which no catalog can fix.
+
+One recipe now reports a **complete** estimate — Mushroom risotto, `~1610` total, `~400` per
+serving. The rest correctly say "at least".
+
+### Weight per item, and how it was decided
+
+Energy is per 100 g, so anything counted rather than weighed needs a weight for one. These are
+judgements, not FDC nutrient facts, and are recorded as such:
+
+| | grams | basis |
+|---|---|---|
+| onion | 110 | USDA household measure, medium (2½" dia). Real onions run 70–200 g; a recipe saying "1 onion" is being approximate anyway |
+| garlic | 3 | per **clove**, which is the catalog's dimension — not per bulb |
+| lemon | 58 | medium, without peel, matching the row the energy came from |
+| egg | 50 | large, the size recipes assume unless they say otherwise |
+| tomato | 123 | medium whole |
+| bell pepper | 119 | medium |
+| basil | 25 | per bunch, and the weakest figure here — a bunch is not a standard quantity |
+
+Two densities were needed for volume items: heavy cream 238 g/cup and broth 240 g/cup.
+
+### Every judgement made, per row
+
+Sixteen lookups produced **nine** places where the obvious answer was wrong or ambiguous. That
+rate is the argument against automation, and each is recorded with its FDC id:
+
+| ingredient | took | rejected | why |
+|---|---|---|---|
+| ground-beef | 174036, 254 — 80/20 raw | **174493 turkey**, top hit | the first result was a different animal |
+| chicken-thighs | 173627, 121 — dark meat, thigh, meat only, raw | 172385, 221 meat and skin | skin doubles it; boneless skinless is what recipes buy |
+| basil | 172232, 23 — fresh | 171317, **233** dried | tenfold, and recipes saying "basil" mean fresh |
+| heavy-cream | 170859, 340 — heavy whipping | 170858, 292 light whipping | the catalog's aliases include UK double cream, which is fatter still — see below |
+| canned-tomatoes | 333281, 18 — diced | 170052, 26 stewed | diced is the form recipes call for |
+| bell-pepper | 170108, 26 — red | 170427, 20 green | the catalog's canonical name is red |
+| parmesan | 170848, 392 — hard | 171247, 420 grated | grated is a different packing basis, not a different cheese |
+| onion | 170000, 40 — generic raw | 790577, 44 red; 170008, 32 sweet | a 15% spread across varieties nobody distinguishes when cooking |
+| garlic | 1104647, 143 | 169230, 149 | two rows, same name, 4% apart; took the Foundation analysis |
+
+**One known inaccuracy, stated rather than hidden.** The catalog aliases UK *double cream* to US
+*heavy cream*. Double cream is around 48% fat against heavy cream's 36%, so a British recipe's
+cream is understated by roughly a quarter. Splitting them is a catalog change, not an energy one.
 
 ### Matching is the real problem, and it is a judgement call more often than not
 
