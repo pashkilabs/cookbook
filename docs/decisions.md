@@ -1656,6 +1656,90 @@ and the duplicate check moves to `(date, meal)`.
 
 ---
 
+## 43. Calorie estimates are catalog arithmetic, and say when they are incomplete
+
+**Decided, and deliberately unfinished.** `estimateEnergy` in `packages/core` converts an amount to
+grams through the same base-unit conversions the shopping list uses, multiplies by kcal per 100 g
+from the catalog, and **reports what it could not account for**. Nine ingredients carry
+hand-checked figures; the rest do not, and the presentation makes that visible rather than absorbing
+it into a total.
+
+### Incomplete must look incomplete
+
+A total that silently omits the chorizo is worse than no total, because it is *plausible* — it reads
+as a fact and it is wrong in the direction that flatters. So there are three shapes and only one of
+them is a bare number:
+
+```
+complete   ~520
+partial    at least ~480 · 3 ingredients unknown
+nothing    no estimate
+```
+
+"At least" is doing the work. A partial total is a **lower bound**, and saying so makes it true
+rather than merely implied — anybody reading "480" would take it as the answer.
+
+Rounded to 10 kcal, and prefixed with a tilde. `517` asserts a precision nothing here has: one onion
+varies twofold by size, a "medium" chicken breast by more, and how much marinade is eaten rather than
+left in the dish is unknowable. Ten is chosen over a round hundred because a hundred reads as a
+refusal to answer.
+
+### Salt is nothing; oil is not
+
+`isStaple` keeps salt off the shopping list because you already have it. **That is a statement about
+buying, and calories are about eating** — so the two lists are not the same one.
+
+- Salt, pepper, water, ice: no energy. Counted as *negligible*, not unknown, because marking them as
+  gaps would make every recipe look incomplete for no reason.
+- Oils: 884 kcal per 100 g. `2 tbsp olive oil` is ~240 kcal and belongs in the total, however
+  unremarkable buying it is.
+- `oil for frying`, with no amount: genuinely **unknown**, and exactly the kind of line that should
+  make a total say "at least".
+
+### Coverage, measured before importing anything
+
+Against the 10 recipes in the two real households — 56 ingredient lines:
+
+| | lines | |
+|---|---|---|
+| resolved to kcal | 8 | 14%, with 9 of 55 catalog items populated |
+| negligible (salt, water) | 5 | not gaps |
+| in catalog, **no energy figure** | 24 | filling in the catalog fixes these |
+| energy known, amount not convertible | 1 | needs `gramsEach` or a density |
+| not in catalog at all | 18 | needs new catalog entries |
+
+**The number that matters is 57%.** That is the ceiling from populating the *existing* 55 catalog
+items and importing nothing — 32 of 56 lines. The remaining 43% is not an energy-data problem at
+all: it is `smoked paprika`, `tagliatelle`, `bay leaves`, `thyme`, `red wine vinegar`, `leeks`, and
+`x 1.5kg free-range whole chicken` — a catalog-breadth problem and, in the last case, a parsing one.
+
+So **importing 380,000 USDA rows would not move this number**, because the bottleneck is what the
+catalog knows about, not what USDA knows about. That is the argument for finishing the hand-check
+of 55 items and re-measuring before considering a bulk import.
+
+### Matching is the real problem, and it is a judgement call more often than not
+
+Confirmed on the nine looked up. `butter` returns **ghee at 900** above butter at 717 — the top hit
+is wrong. `rice` returns raw at **365** and cooked at **130**, a threefold difference decided
+entirely by which row a person picks, and recipes mean raw. `pasta` has the same split. `honey`
+returns honey-roast ham and breakfast cereal in its first five.
+
+Of nine lookups, **two needed an explicit raw-versus-cooked judgement** (rice, pasta), one needed the
+query rewritten to avoid a wrong top hit (butter), and one was insensitive to the choice (every oil
+is 884). That is a high enough rate of judgement to say plainly: **automated matching against USDA
+would be wrong often, and wrong invisibly.** Each figure carries its FDC id so a wrong number is
+traceable rather than folklore.
+
+### Deliberately absent
+
+No model, and no network call at import or render time. The estimate is arithmetic over data that
+was checked once by a person.
+
+*Would change if:* the hand-checked 55 measure above ~60% and the missing lines cluster somewhere a
+bulk import would actually reach. The next step is finishing the hand-check, not widening the source.
+
+---
+
 ## Open: cascade deletions and tombstones
 
 **Not resolved. This waits on the sync engine choice, and exists so the evaluation

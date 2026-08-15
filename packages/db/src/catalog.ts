@@ -23,6 +23,9 @@ export interface IngredientRow {
   aisle: string;
   dimension: string;
   grams_per_cup: number | string | null;
+  grams_each: number | string | null;
+  kcal_per_100g: number | string | null;
+  energy_fdc_id: string | null;
   can_size: number | string | null;
 }
 
@@ -36,7 +39,7 @@ export interface GroceryPackageRow {
 
 /** What to select, so a caller cannot ask for a column this mapper does not expect. */
 export const INGREDIENT_COLUMNS =
-  "id, key, canonical_name, aliases, aisle, dimension, grams_per_cup, can_size";
+  "id, key, canonical_name, aliases, aisle, dimension, grams_per_cup, can_size, grams_each, kcal_per_100g, energy_fdc_id";
 export const GROCERY_PACKAGE_COLUMNS = "ingredient_id, system, label, base_amount, sort_order";
 
 /**
@@ -81,5 +84,8 @@ export function catalogItemsFromRows(
     // numerics arrive as strings over PostgREST; absent stays absent rather than becoming 0
     ...(row.grams_per_cup === null ? {} : { gramsPerCup: Number(row.grams_per_cup) }),
     ...(row.can_size === null ? {} : { canSize: Number(row.can_size) }),
+    ...(row.grams_each === null ? {} : { gramsEach: Number(row.grams_each) }),
+    ...(row.kcal_per_100g === null ? {} : { kcalPer100g: Number(row.kcal_per_100g) }),
+    ...(row.energy_fdc_id === null ? {} : { energyFdcId: row.energy_fdc_id }),
   }));
 }

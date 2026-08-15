@@ -62,6 +62,22 @@ export interface CatalogItem {
   gramsPerCup?: number;
   /** base-unit contents of one tin, so "1 can beans" becomes a real weight */
   canSize?: number;
+  /**
+   * Weight of one, for things counted rather than measured — an onion, an egg, a lemon.
+   *
+   * Energy is per 100 g, so "2 onions" is unanswerable without this. Absent means the estimate
+   * says so rather than guessing.
+   */
+  gramsEach?: number;
+  /**
+   * Food energy, kcal per 100 g, hand-checked against USDA FoodData Central.
+   *
+   * Absent is a real answer — see `estimateEnergy`, which reports what it could not account for
+   * rather than quietly leaving it out of a total.
+   */
+  kcalPer100g?: number;
+  /** the FDC id the figure came from, so a wrong number is traceable rather than folklore */
+  energyFdcId?: string;
 }
 
 /** One recipe (or one planned meal) feeding into a shopping list. */

@@ -5,6 +5,7 @@ export * from "./parse.js";
 export * from "./catalog.js";
 export * from "./format.js";
 export * from "./consolidate.js";
+export * from "./calories.js";
 export {
   METRIC_PACKAGES,
   SEED_CATALOG,

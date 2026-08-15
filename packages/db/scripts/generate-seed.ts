@@ -23,6 +23,9 @@ const textArray = (values: string[]): string =>
 
 const num = (value: number | undefined): string => (value === undefined ? "null" : String(value));
 
+/** A text literal that may be absent — most items carry no FDC id yet, and that is the point. */
+const litOrNull = (value: string | undefined): string => (value === undefined ? "null" : lit(value));
+
 const rows: string[] = [];
 const packageRows: string[] = [];
 
@@ -32,7 +35,8 @@ for (const item of SEED_CATALOG) {
 
   rows.push(
     `  (${lit(item.key)}, ${lit(canonical)}, ${textArray(aliases)}, ` +
-      `${lit(item.aisle)}, ${lit(item.dimension)}, ${num(item.gramsPerCup)}, ${num(item.canSize)})`,
+      `${lit(item.aisle)}, ${lit(item.dimension)}, ${num(item.gramsPerCup)}, ${num(item.canSize)}, ` +
+      `${num(item.gramsEach)}, ${num(item.kcalPer100g)}, ${litOrNull(item.energyFdcId)})`,
   );
 
   // sort_order preserves the order the catalog lists packages in, which is the
@@ -72,7 +76,8 @@ const sql = `-- GENERATED FILE — do not edit.
 begin;
 
 insert into public.ingredients
-  (key, canonical_name, aliases, aisle, dimension, grams_per_cup, can_size)
+  (key, canonical_name, aliases, aisle, dimension, grams_per_cup, can_size,
+   grams_each, kcal_per_100g, energy_fdc_id)
 values
 ${rows.join(",\n")}
 on conflict (key) do update set
@@ -81,6 +86,9 @@ on conflict (key) do update set
   aisle          = excluded.aisle,
   dimension      = excluded.dimension,
   grams_per_cup  = excluded.grams_per_cup,
+  grams_each     = excluded.grams_each,
+  kcal_per_100g  = excluded.kcal_per_100g,
+  energy_fdc_id  = excluded.energy_fdc_id,
   can_size       = excluded.can_size,
   updated_at     = now();
 

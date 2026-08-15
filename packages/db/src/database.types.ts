@@ -342,8 +342,11 @@ export type Database = {
           canonical_name: string
           created_at: string
           dimension: string
+          energy_fdc_id: string | null
+          grams_each: number | null
           grams_per_cup: number | null
           id: string
+          kcal_per_100g: number | null
           key: string
           updated_at: string
         }
@@ -354,8 +357,11 @@ export type Database = {
           canonical_name: string
           created_at?: string
           dimension: string
+          energy_fdc_id?: string | null
+          grams_each?: number | null
           grams_per_cup?: number | null
           id?: string
+          kcal_per_100g?: number | null
           key: string
           updated_at?: string
         }
@@ -366,8 +372,11 @@ export type Database = {
           canonical_name?: string
           created_at?: string
           dimension?: string
+          energy_fdc_id?: string | null
+          grams_each?: number | null
           grams_per_cup?: number | null
           id?: string
+          kcal_per_100g?: number | null
           key?: string
           updated_at?: string
         }
