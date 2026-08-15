@@ -1849,6 +1849,62 @@ bulk import would actually reach. The next step is finishing the hand-check, not
 
 ---
 
+## 44. A parser fix never reaches data already parsed, so the fix is to keep the input
+
+`recipe_ingredients` stores the *result* of parsing — `amount`, `unit`, `item_text`, `note`,
+`is_estimated`. It does not store the line the parser was given. When the parser learned to read
+`x 1.5kg free-range whole chicken` and `optional: sprigs of bay`, the rows already in the database
+kept the old reading: nine live lines carry the quantity inside `item_text`
+(`150ml unsweetened apple juice`, `100g runny honey`), match nothing in the catalog, and count as
+unknown forever. This will recur every time the parser improves, which is the point — parsing is
+the part of this system most likely to keep changing.
+
+### Re-import is not the general answer
+
+It is the *right* answer for one recipe whose source is still up, and it is what fixes the nine
+rows today. It does not generalise:
+
+- **It needs a live source.** Hand-typed recipes have none, photographed ones have none, and an
+  imported one is a link that rots.
+- **It discards edits.** Somebody who corrected an amount by hand loses the correction.
+- **It cannot be done in bulk without breaking a standing rule.** Every import passes a review
+  screen before saving, and a background job that re-imports a household's recipes is exactly the
+  silent-save path that rule forbids. A hundred recipes is a hundred reviews.
+
+### Re-parsing in place is possible today, and is the wrong shape
+
+`item_text` for a *failed* line still holds the whole original, so re-parsing it would recover
+precisely the rows that are broken. It is tempting and it is a trap: for a line that parsed
+correctly, `item_text` is the residue (`butter`, not `100 g butter`), so a blanket re-parse would
+read `amount: null` off it and overwrite a good amount with nothing. It only works when gated on
+"this row looks unparsed", which is a heuristic guarding a destructive write.
+
+And it can only ever recover what survived. Anything the old parser *discarded* — a note it did
+not keep — is not in `item_text` and is not coming back.
+
+### The decision
+
+**Store the line as written, in a `raw_text` column, and derive everything else from it.** A
+re-parse then becomes recomputing a derived value from an input that is still present, which is
+safe by construction and needs no heuristic: read `raw_text`, parse it with today's parser, write
+the result. It is the same reasoning as base units — keep what you were given, convert on the way
+out — and the same reasoning as `energy_fdc_id`, which exists so a wrong figure is traceable to
+its input rather than being folklore.
+
+Backfill is honest about what it cannot do: `raw_text` for existing rows is unknowable, except
+where the parse failed and the whole line is sitting in `item_text` anyway. So the column is
+populated going forward, backfilled from `item_text` only where `amount is null`, and left null
+elsewhere — a row that cannot be re-parsed says so rather than being re-parsed from a residue.
+
+**A re-parse still goes through the review screen.** Recomputing is safe; saving without anybody
+looking is not, and the rule that lets cheap models be good enough is the same rule here. The
+shape is "re-parse this recipe" offering a diff, not a migration that rewrites a household's
+recipes overnight.
+
+Not built yet: the column, the backfill, and the review-screen route are a task of their own. The
+nine current rows are cheap to fix by re-importing two recipes, and that is what should happen to
+them.
+
 ## Open: cascade deletions and tombstones
 
 **Not resolved. This waits on the sync engine choice, and exists so the evaluation
