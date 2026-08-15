@@ -1773,20 +1773,58 @@ cream is 48%. Its 449 is derived from fat content — 48 g of fat at 9 kcal, plu
 lactose — which agrees with UK composition tables to within a percent. Recorded with no id rather
 than borrowing a nearby one, because a wrong id is worse than none.
 
-**The rest of the catalog was audited for the same fault**, and these alias across a real energy
-difference. None is changed yet; each needs its own lookup and judgement:
+**The rest of the catalog was audited for the same fault**, and these aliased across a real energy
+difference. All five are now split, 57 items becoming 65:
 
-| entry | spans | worst gap |
-|---|---|---|
-| `milk` | whole, 2%, skim | 61 → 34, **nearly twofold** |
-| `shredded-cheese` | mozzarella, cheddar, monterey jack | ~300 → ~400, **a third** |
-| `tortillas` | flour, corn | ~310 → ~220, **a third** |
-| `ground-beef` | ground chuck, beef mince, hamburger | UK mince runs 5–20% fat; 176 → 332 across the range |
-| `yogurt` | Greek, plain | ~97 → ~61 |
-| `beans` | black, kidney, chickpeas, cannellini | modest, but canned versus dried matters more than variety |
+| was | became | figures | source |
+|---|---|---|---|
+| `milk` | `milk` (whole), `semi-skimmed-milk`, `skimmed-milk` | 61 / 50 / 34 | 171265, 171267, 171269 |
+| `shredded-cheese` | `cheddar`, `mozzarella`, `shredded-cheese` (the generic) | 408 / 299 | 328637, 170845 |
+| `tortillas` | `flour-tortillas`, `corn-tortillas`, `tortillas` | 306 / 218 | 175037, 175036 |
+| `ground-beef` | `ground-beef` (80/20), `lean-ground-beef` (90/10) | 254 / 176 | 174036, 174030 |
+| `yogurt` | `yogurt` (plain whole), `greek-yogurt` | 61 / 97 | 171284, 171304 |
+
+Every one found a real FDC row, so nothing here is derived — double cream remains the only figure in
+the catalog without an id. The tortilla rows took three queries: FDC's search returns puff pastry and
+pie crust for "tortilla", and the two Foundation rows that *are* tortillas report no energy in the
+search response at all. The figures came from fetching the food records directly.
+
+The generic keeps the common sort in each case, because most recipes write the bare word: plain
+"milk" is whole, "beef mince" is ordinary mince, "shredded cheese" stays a catch-all. A recipe has to
+say "skimmed" or "lean" to get the other one.
 
 Deliberately *not* faults: `cilantro`/`coriander` and `shrimp`/`prawns` are the same food under two
-names, which is exactly what an alias is for. `butter` salted and unsalted are both 717.
+names, which is exactly what an alias is for. `butter` salted and unsalted are both 717. `beans`
+spans black, kidney and chickpeas, but the spread is modest and canned-versus-dried matters more than
+variety — left alone.
+
+### Splitting cost nothing in coverage, and the risk it carried was real
+
+More entries mean more chances to miss a match, so it was measured rather than assumed: both
+catalogs run against the same live recipe rows, same matcher. **49.2% (31/63 lines) before and
+after** — no name lost, none gained. The live corpus contains none of the five foods, which is why
+the number does not move; where they *do* appear the split is the whole point, taking lean mince from
+1143 kcal to 792 for 450 g and giving milk, yogurt, cheese and tortillas a figure they never had.
+
+The risk was not hypothetical. Asserting only that each old alias still *resolved* would have passed
+while being wrong, because `find` falls back to a substring match — so a dropped "2% milk" still
+answers, quietly, with `milk` at 61 instead of 50. Asserting the resolved **key** caught two genuine
+misses, and one was a matcher bug rather than a data one (below).
+
+**Aliases were indexed as written and queried after normalisation.** Any alias containing a character
+normalisation strips was therefore unreachable by anything: "2% milk" was indexed with the percent
+sign and looked up as "2 milk", fell through to the shorter "milk", and "5% fat mince" matched
+nothing at all. Both read as ordinary catalog gaps. `createCatalog` now indexes the normalised form
+as a second candidate — added rather than substituted, and dropped wherever another item already
+claims that string, because normalisation is lossy in ways that matter: "diced tomatoes" reduces to
+"tomatoes", and a tin is not fresh produce.
+
+A measurement aside, recorded because it cost time: the first coverage figure was 51.8% over 20
+recipes, and both were wrong. Soft-delete propagation reached hosted on 13 August at 14:20 UTC, so
+recipes deleted before then kept live `recipe_ingredients` rows — 23 of them, plus 12 steps and one
+rating. The trigger is correct and everything deleted after that timestamp propagates; the residue is
+historical and reaches no screen, since no live `plan_entries` point at a tombstoned recipe. The
+corpus is nine live recipes, not twenty.
 
 ### Matching is the real problem, and it is a judgement call more often than not
 
