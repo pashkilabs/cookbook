@@ -35,14 +35,38 @@ import { isStaple, normaliseName } from "./text.js";
  *     thing that should make the total say "at least".
  */
 
-/** Staples that are nothing: they are excluded from a total without being counted as a gap. */
-const NEGLIGIBLE = [
-  "salt", "kosher salt", "sea salt", "table salt", "flaky salt",
-  "pepper", "black pepper", "white pepper", "ground black pepper",
-  "water", "ice", "ice water", "cooking spray", "olive oil spray",
+/**
+ * Staples that are nothing: excluded from a total without being counted as a gap.
+ *
+ * Two rules rather than one, because a qualifier in front of a seasoning behaves differently by
+ * seasoning. **"X salt" is still salt** — celery salt, garlic salt, rock salt, sea salt. But "X
+ * pepper" is a vegetable as often as a spice, "X water" is frequently a drink, and "ice X" is
+ * usually a dessert.
+ *
+ * regression: one rule matched any prefix or suffix for all of them and swallowed fifteen real
+ * foods — bell, red, green, yellow, chilli, jalapeño and banana peppers, ice cream, water
+ * chestnuts, coconut water, tonic water, salt cod, salt beef, pepper jack. Written in the plural
+ * they escaped and were counted; written in the singular they were declared to be nothing. So
+ * `1 bell pepper` was zero and `2 bell peppers` was 60, and the catalog held 26 kcal for it all
+ * along. The staples rule is about **buying**; this is about eating, and a pepper is food.
+ */
+const NEGLIGIBLE_ENDING = ["salt"];
+
+const NEGLIGIBLE_EXACT = [
+  "pepper", "black pepper", "white pepper", "ground black pepper", "ground pepper",
+  "cracked black pepper", "cracked pepper", "cayenne pepper", "lemon pepper",
+  "peppercorns", "black peppercorns", "white peppercorns",
+  "salt flakes", "sea salt flakes",
+  "water", "boiling water", "hot water", "warm water", "ice water", "iced water",
+  "filtered water", "rose water", "orange blossom water",
+  "ice", "ice cubes", "crushed ice",
+  "cooking spray", "olive oil spray", "nonstick spray", "non stick spray",
 ];
 
 const MILLILITRES_PER_CUP = 236.588;
+
+/** How much of a recipe must be accounted for before a floor is worth stating. See `formatEnergy`. */
+const STATEABLE_FRACTION = 0.5;
 
 export interface EnergyEstimate {
   /** kcal accounted for. Never the whole story unless `complete` is true. */
@@ -64,9 +88,15 @@ export interface EnergyOptions {
   servings?: number | null;
 }
 
+const isNothing = (n: string): boolean =>
+  NEGLIGIBLE_EXACT.includes(n) || NEGLIGIBLE_ENDING.some((s) => n === s || n.endsWith(` ${s}`));
+
 const isNegligible = (name: string): boolean => {
   const n = normaliseName(name);
-  return NEGLIGIBLE.some((s) => n === s || n.startsWith(`${s} `) || n.endsWith(` ${s}`));
+  if (!n) return false;
+  // "salt and pepper" is one line naming two things, and it is nothing only if both are
+  const parts = n.split(/\s+(?:and|&)\s+/).filter(Boolean);
+  return parts.length > 1 ? parts.every(isNothing) : isNothing(n);
 };
 
 /**
@@ -202,7 +232,27 @@ export function formatEnergy(estimate: EnergyEstimate, per: "total" | "serving" 
   if (value === null || estimate.resolved === 0) return "no estimate";
 
   const rounded = roundEnergy(value);
+  /*
+   * regression: a floor that rounds to nothing is not a floor. `at least ~0` was printed as a
+   * per-serving figure for a rack of ribs where one line of twelve resolved — the module declined
+   * to say `0` when it knew nothing, but not when it knew almost nothing, and `~0` reads as a
+   * claim about the dish rather than a statement about us.
+   */
+  if (rounded === 0) return "no estimate";
   if (estimate.complete) return `~${rounded}`;
+
+  /*
+   * And a floor built from a minority of the ingredients is not worth stating either. Half is the
+   * line: below it, what is missing outweighs what is counted, and "at least ~10" invites someone
+   * to read a number that is wrong by an order of magnitude.
+   *
+   * Counted in lines rather than in mass, because the mass of an unknown ingredient is precisely
+   * what is unknown. That is imperfect — a dal whose lentils and ghee are both missing clears the
+   * bar on three lines of six while missing nearly all of its energy — but no better signal
+   * exists without the figure we are short of.
+   */
+  const countable = estimate.resolved + estimate.unresolved.length;
+  if (estimate.resolved / countable < STATEABLE_FRACTION) return "no estimate";
 
   const missing = estimate.unresolved.length;
   return `at least ~${rounded} · ${missing} ingredient${missing === 1 ? "" : "s"} unknown`;

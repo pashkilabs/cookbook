@@ -28,6 +28,11 @@ const ITEMS: CatalogItem[] = [
   { key: "chorizo", names: ["chorizo"], aisle: "Meat & Seafood", dimension: "weight", packages: [] },
   // energy but no weight-per-item: "2 onions" is unanswerable
   { key: "onion", names: ["onion", "onions"], aisle: "Produce", dimension: "count", packages: [], kcalPer100g: 40 },
+  // a vegetable whose name ends in a seasoning's name
+  {
+    key: "bell-pepper", names: ["bell pepper", "bell peppers", "red pepper"], aisle: "Produce",
+    dimension: "count", packages: [], gramsEach: 119, kcalPer100g: 26,
+  },
 ];
 
 const catalog = createCatalog(ITEMS);
@@ -121,6 +126,37 @@ describe("what it does not know", () => {
     expect(estimate.unresolved).toEqual([]);
   });
 
+  it("counts a pepper as food whether it is written singular or plural", () => {
+    /*
+     * regression: the staples rule matched any name ending in " pepper", so `1 bell pepper` was
+     * declared to be nothing while `2 bell peppers` was counted at 60 — the plural was the only
+     * reason a vegetable in the catalog was ever added up. The rule is about buying; this is
+     * about eating.
+     */
+    const one = estimateEnergy([entry(["1 bell pepper"])], catalog);
+    const two = estimateEnergy([entry(["2 bell peppers"])], catalog);
+    expect(one.negligible, "a bell pepper is not a seasoning").toEqual([]);
+    expect(one.resolved).toBe(1);
+    expect(two.kcal).toBeCloseTo(one.kcal * 2, 5);
+  });
+
+  it("still counts the seasonings as nothing, including two named on one line", () => {
+    const estimate = estimateEnergy(
+      [entry(["1 tsp kosher salt", "black pepper", "salt and pepper", "2 cups cold water"])],
+      catalog,
+    );
+    expect(estimate.negligible.length).toBe(4);
+    expect(estimate.unresolved).toEqual([]);
+  });
+
+  it("treats a food that merely reads like a seasoning as a gap, not as nothing", () => {
+    // ice cream, water chestnuts and salt cod were all swallowed by prefix matching. None is in
+    // this catalog, so the right answer is "unknown" — visible, rather than silently zero.
+    const estimate = estimateEnergy([entry(["200 g ice cream", "100 g water chestnuts"])], catalog);
+    expect(estimate.negligible).toEqual([]);
+    expect(estimate.unresolved).toEqual(["ice cream", "water chestnuts"]);
+  });
+
   it("does not count oil as nothing, because it is not", () => {
     // the other half of the staples rule: excluded from the list, included in the food
     const estimate = estimateEnergy([entry(["2 tbsp olive oil"])], catalog);
@@ -147,11 +183,40 @@ describe("saying it out loud", () => {
   });
 
   it("pluralises, because a total nobody can read is a total nobody reads", () => {
+    // two known against two unknown: enough of the recipe accounted for to state a floor at all,
+    // which is what the threshold above now requires before the wording is reachable
     const estimate = estimateEnergy(
-      [entry(["100 g butter", "200 g chorizo", "olive oil for frying"])],
+      [entry(["100 g butter", "125 g flour", "200 g chorizo", "olive oil for frying"])],
       catalog,
     );
     expect(formatEnergy(estimate)).toMatch(/2 ingredients unknown$/);
+  });
+
+  it("says nothing rather than ~0 when what it knows rounds away", () => {
+    /*
+     * regression: `at least ~0` was printed as a per-serving figure for a rack of ribs where one
+     * line of twelve resolved. The module declined to say `0` when it knew nothing but not when
+     * it knew almost nothing, and `~0` reads as a claim about the dish.
+     */
+    const estimate = estimateEnergy([entry(["1 tsp butter"])], catalog, { servings: 50 });
+    expect(roundEnergy(estimate.perServing!)).toBe(0);
+    expect(formatEnergy(estimate, "serving")).toBe("no estimate");
+  });
+
+  it("refuses to state a floor built from a minority of the ingredients", () => {
+    // eleven unknowns behind one known is not a lower bound anybody should read
+    const estimate = estimateEnergy(
+      [entry(["100 g butter", ...Array.from({ length: 11 }, (_, i) => `50 g mystery${i}`)])],
+      catalog,
+    );
+    expect(estimate.resolved).toBe(1);
+    expect(formatEnergy(estimate)).toBe("no estimate");
+  });
+
+  it("states the floor once half the ingredients are accounted for", () => {
+    const estimate = estimateEnergy([entry(["100 g butter", "125 g flour", "200 g chorizo"])], catalog);
+    expect(estimate.resolved / (estimate.resolved + estimate.unresolved.length)).toBeGreaterThanOrEqual(0.5);
+    expect(formatEnergy(estimate)).toBe("at least ~1170 · 1 ingredient unknown");
   });
 
   it("says nothing rather than zero when it knows nothing", () => {
