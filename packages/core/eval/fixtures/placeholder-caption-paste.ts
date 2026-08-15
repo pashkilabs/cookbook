@@ -28,16 +28,19 @@ export const placeholderCaptionPaste: Fixture = {
     ].join("\n"),
   },
   expected: {
-    title: "Creamy Placeholder Chicken",
-    servings: 4,
-    totalMinutes: 30,
-    ingredients: [
-      { amount: 1, unit: "cup", item: "heavy cream" },
-      { amount: 3, unit: "clove", item: "garlic" },
-      { amount: 2, unit: "tbsp", item: "olive oil" },
-      // the tin states its size, so the truth is a weight rather than a count
-      { amount: 14.5, unit: "oz", item: "diced tomatoes" },
-      { amount: null, unit: null, item: "salt and pepper" },
-    ],
+    outcome: "recipe",
+    recipe: {
+      title: "Creamy Placeholder Chicken",
+      servings: 4,
+      totalMinutes: 30,
+      ingredients: [
+        { amount: 1, unit: "cup", item: "heavy cream" },
+        { amount: 3, unit: "clove", item: "garlic" },
+        { amount: 2, unit: "tbsp", item: "olive oil" },
+        // the tin states its size, so the truth is a weight rather than a count
+        { amount: 14.5, unit: "oz", item: "diced tomatoes" },
+        { amount: null, unit: null, item: "salt and pepper" },
+      ],
+    },
   },
 };

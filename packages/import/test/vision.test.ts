@@ -16,6 +16,21 @@ import {
 } from "../src/index.js";
 import { HTML_PRETENDING_TO_BE_AN_IMAGE, gifBytes, jpegBytes, pngBytes } from "./fixtures.js";
 
+import type { ExtractedRecipe, ExtractorOutput } from "@pashki/core/eval";
+import { isRefusal } from "@pashki/core/eval";
+
+/**
+ * An extractor may now decline (decisions §46), so its output is a union. These tests are about
+ * what it extracts, not about refusing — this narrows and fails loudly if it ever refuses.
+ */
+function asRecipe(output: ExtractorOutput | null): ExtractedRecipe {
+  expect(output).not.toBeNull();
+  if (output === null || isRefusal(output)) {
+    throw new Error(`expected a recipe, got ${output === null ? "a skip" : "a refusal"}`);
+  }
+  return output;
+}
+
 function stubVisionProvider(
   responses: Array<unknown | Error>,
 ): LlmProvider & { requests: LlmRequest[] } {
@@ -414,10 +429,11 @@ describe("as an eval extractor", () => {
       extraImagePaths: ["images/caption.png", "images/plated.jpg"],
     });
 
-    expect(extracted).toMatchObject({ title: "Reel Birria Tacos", servings: 4, totalMinutes: 180 });
-    expect(extracted?.ingredients).toHaveLength(4);
+    const recipe = asRecipe(extracted);
+    expect(recipe).toMatchObject({ title: "Reel Birria Tacos", servings: 4, totalMinutes: 180 });
+    expect(recipe.ingredients).toHaveLength(4);
     expect(provider.requests[0]?.images).toHaveLength(3);
-    expect(extracted?.usage).toMatchObject({ model: PLACEHOLDER_VISION_CASCADE[0]!.model });
+    expect(recipe.usage).toMatchObject({ model: PLACEHOLDER_VISION_CASCADE[0]!.model });
   });
 
   it("handles a single-image fixture as the simple case", async () => {
@@ -428,7 +444,7 @@ describe("as an eval extractor", () => {
       loadImage,
     });
     const extracted = await extractor({ kind: "screenshot", imagePath: "images/plated.jpg" });
-    expect(extracted?.title).toBe("Reel Birria Tacos");
+    expect(asRecipe(extracted).title).toBe("Reel Birria Tacos");
     expect(provider.requests[0]?.images).toHaveLength(1);
   });
 

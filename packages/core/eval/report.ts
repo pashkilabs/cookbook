@@ -66,6 +66,36 @@ export function formatReport(report: EvalReport): string {
   );
   out.push(`cost         ${formatCost(report.cost)}`);
 
+  /*
+   * Sections and refusals print on their own lines rather than inside the accuracy
+   * table, because they answer different questions (decisions §45, §46). A wrong
+   * section misgroups a display; a wrong amount buys the wrong food; an invented
+   * recipe for a page that has none is worse than either.
+   */
+  if (report.sections.total > 0) {
+    out.push(
+      `sections     ${report.sections.correct}/${report.sections.total} ` +
+        `${percent(report.sections)}   (reported apart from the table — decisions §45)`,
+    );
+  }
+
+  const r = report.refusals;
+  if (r.expected > 0) {
+    out.push(
+      `refusals     ${r.refused}/${r.expected} declined · ` +
+        `${r.reasonCorrect}/${r.expected} for the right reason`,
+    );
+    if (r.confabulated > 0) {
+      out.push(
+        `  CONFABULATED ${r.confabulated} — invented ${r.inventedIngredients} ` +
+          `ingredient${r.inventedIngredients === 1 ? "" : "s"} for input with no recipe in it`,
+      );
+    }
+  }
+  if (r.falseRefusals > 0) {
+    out.push(`  FALSE REFUSALS ${r.falseRefusals} — declined a recipe that is there`);
+  }
+
   const skipped = report.outcomes.filter((o) => o.status === "skipped");
   if (skipped.length > 0) {
     out.push("");

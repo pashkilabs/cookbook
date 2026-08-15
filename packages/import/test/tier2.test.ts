@@ -19,6 +19,21 @@ import {
   jpegBytes,
 } from "./fixtures.js";
 
+import type { ExtractedRecipe, ExtractorOutput } from "@pashki/core/eval";
+import { isRefusal } from "@pashki/core/eval";
+
+/**
+ * An extractor may now decline (decisions §46), so its output is a union. These tests are about
+ * what it extracts, not about refusing — this narrows and fails loudly if it ever refuses.
+ */
+function asRecipe(output: ExtractorOutput | null): ExtractedRecipe {
+  expect(output).not.toBeNull();
+  if (output === null || isRefusal(output)) {
+    throw new Error(`expected a recipe, got ${output === null ? "a skip" : "a refusal"}`);
+  }
+  return output;
+}
+
 /** A provider that returns a scripted response per call, recording what it was asked. */
 function stubProvider(
   responses: Array<unknown | Error>,
@@ -350,9 +365,9 @@ describe("as an eval extractor", () => {
       ),
       skipPhoto: true,
     });
-    const extracted = await extractor({ kind: "url", url: PIE });
+    const extracted = asRecipe(await extractor({ kind: "url", url: PIE }));
     expect(extracted).toMatchObject({ title: "Apple Pie", servings: 8, totalMinutes: 80 });
-    expect(extracted?.ingredients).toHaveLength(3);
+    expect(extracted.ingredients).toHaveLength(3);
   });
 
   it("sends a caption straight to tier 2, which is the path it exists for", async () => {

@@ -19,13 +19,16 @@ export const placeholderScreenshotReel: Fixture = {
     imagePath: "images/placeholder-reel.png",
   },
   expected: {
-    title: "Placeholder Two-Ingredient Pasta",
-    // reels rarely state either, and "the source gives none" is a real answer
-    servings: null,
-    totalMinutes: null,
-    ingredients: [
-      { amount: 1, unit: "lb", item: "rigatoni" },
-      { amount: 0.5, unit: "cup", item: "heavy cream" },
-    ],
+    outcome: "recipe",
+    recipe: {
+      title: "Placeholder Two-Ingredient Pasta",
+      // reels rarely state either, and "the source gives none" is a real answer
+      servings: null,
+      totalMinutes: null,
+      ingredients: [
+        { amount: 1, unit: "lb", item: "rigatoni" },
+        { amount: 0.5, unit: "cup", item: "heavy cream" },
+      ],
+    },
   },
 };

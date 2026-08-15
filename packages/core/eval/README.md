@@ -23,6 +23,31 @@ later; today the only extractor is core's line parser.
 | `extractors/` | Things that turn an input into a recipe |
 | `run.ts` | The CLI |
 
+## The baseline
+
+**There is no earlier number to compare against.** A 23/23 figure exists in an old session
+report, but its URLs were discovered from live listing pages and never recorded, so it cannot be
+reproduced and cannot be a baseline — a number you cannot re-measure is an anecdote. Whatever this
+harness reports over the first real fixture set **is** the first baseline, and the tier-2 and
+tier-3 model choices are measured against it rather than against anything predating it.
+
+That is the number tier 2 has to earn. If deterministic extraction answers most of the set, a
+model has to beat it by enough to justify the cost and the latency on every import that would
+otherwise never leave tier 0.
+
+## What a URL fixture stores
+
+**The extracted markup, not the page.** The JSON-LD `Recipe` node plus the ingredient markup, and
+nothing else. Real pages run 300–680 KB of ads and scripts each; eighteen of those is several
+megabytes nobody will ever read, and *an unreviewable fixture rots* — its expectation stops being
+checkable against its input, which is the one thing a fixture is for. The trimmed capture still
+exercises tiers 0 and 1, which are the tiers that read markup.
+
+Every capture carries `url` and `capturedAt`. A snapshot is a claim about a page at a moment;
+without the date, a fixture that stops matching the live page is indistinguishable from one that
+was always wrong. `validateFixtures` refuses a dated-less capture, and exempts placeholders,
+whose markup is invented rather than captured.
+
 ## Adding a fixture
 
 The committed three are **placeholders** demonstrating one input shape each.
@@ -84,6 +109,29 @@ zero that says nothing about the extractor.
 
 `usage` is optional and summed into the report's cost line, which is what makes
 a model swap a comparison rather than an argument.
+
+## Refusals and sections
+
+Two things a fixture can say that are not "here is a recipe":
+
+**A refusal** (decisions §46). Some inputs have no recipe in them — a listing page, a forum
+thread, a caption reading *"comment CHICKEN and I'll DM you the full recipe"*. The correct output
+is a refusal naming why, and a plausible recipe is the worst possible answer. Write it as
+`expected: { outcome: "refusal", because: "no-recipe-in-source" }`; an extractor answers with
+`{ refused: { because } }`.
+
+`null` is **not** a refusal — it means "I do not handle this kind of input" and is recorded as
+skipped. Conflating them would let an extractor that skips everything score perfectly on every
+refusal fixture, which is this repo's oldest trap wearing a new hat.
+
+The report names the two failures separately: **CONFABULATED** (a recipe invented for an input
+with none) and **FALSE REFUSALS** (a real recipe declined).
+
+**A section** (decisions §45). Ingredients carry the heading they sat under —
+`section: "For the sauce"` — or `null`. A heading is never itself an expected ingredient; an
+extractor emitting one has produced a spurious line. Sections are tallied on their own line and
+deliberately kept out of the headline accuracy: a wrong section misgroups a display, a wrong
+amount buys the wrong food, and one percentage covering both hides which moved.
 
 ## How scoring works
 

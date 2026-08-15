@@ -1,4 +1,9 @@
-import type { EvalIngredient, ExpectedRecipe, ExtractedRecipe } from "./types.js";
+import type {
+  EvalIngredient,
+  ExpectedRecipe,
+  ExtractedRecipe,
+  RefusalReason,
+} from "./types.js";
 import { lightName } from "../src/text.js";
 import { canonicalUnit } from "../src/units.js";
 
@@ -40,6 +45,28 @@ export interface IngredientResult {
   amountCorrect: boolean;
   unitCorrect: boolean;
   itemCorrect: boolean;
+  /**
+   * Whether the line was filed under the right heading (decisions §45).
+   *
+   * Deliberately **not** part of `correct`/`total`: a wrong section misgroups a
+   * display, a wrong amount buys the wrong food, and folding them into one
+   * percentage hides which one moved. The runner tallies it on its own line.
+   */
+  sectionCorrect: boolean;
+  /** true when the fixture states a section for this line, so the check means something */
+  sectionChecked: boolean;
+}
+
+/** How an extractor answered a fixture whose correct output is a refusal. */
+export interface RefusalScore {
+  /** it declined rather than inventing a recipe */
+  refused: boolean;
+  /** and named the right reason. False whenever `refused` is false. */
+  reasonCorrect: boolean;
+  expected: RefusalReason;
+  actual: RefusalReason | null;
+  /** ingredients produced for an input that has none — the failure that matters */
+  invented: number;
 }
 
 export interface FixtureScore {
@@ -102,6 +129,17 @@ export function normaliseTitle(input: string | null | undefined): string {
  */
 export function normaliseItem(input: string | null | undefined): string {
   return lightName(String(input ?? ""));
+}
+
+/**
+ * Headings are compared leniently: case, surrounding space and a trailing colon
+ * carry no meaning. "For the sauce", "for the sauce:" and "FOR THE SAUCE" are
+ * one heading written three ways, and scoring them apart would measure a page's
+ * typography rather than an extractor's reading.
+ */
+export function normaliseSection(input: string | null | undefined): string | null {
+  const text = String(input ?? "").trim().replace(/[:：]\s*$/, "").replace(/\s+/g, " ").toLowerCase();
+  return text === "" ? null : text;
 }
 
 /** null and "count" are the same claim — no unit — written two ways. */
@@ -215,6 +253,8 @@ export function scoreRecipe(
   const ingredients: IngredientResult[] = expected.ingredients.map((want, index) => {
     const matchedIndex = pairs.get(index);
     const got = matchedIndex === undefined ? null : produced[matchedIndex] ?? null;
+    // a fixture that never states a section is not asking the question
+    const sectionChecked = want.section !== undefined;
     if (!got) {
       return {
         expected: want,
@@ -222,6 +262,8 @@ export function scoreRecipe(
         amountCorrect: false,
         unitCorrect: false,
         itemCorrect: false,
+        sectionCorrect: false,
+        sectionChecked,
       };
     }
     return {
@@ -230,6 +272,8 @@ export function scoreRecipe(
       amountCorrect: amountsMatch(want.amount, got.amount, options),
       unitCorrect: normaliseUnit(want.unit) === normaliseUnit(got.unit),
       itemCorrect: normaliseItem(want.item) === normaliseItem(got.item),
+      sectionCorrect: normaliseSection(want.section) === normaliseSection(got.section),
+      sectionChecked,
     };
   });
 
@@ -261,4 +305,27 @@ function numberDisplay(value: number | null | undefined): string {
 
 function minutesDisplay(value: number | null | undefined): string {
   return value == null ? "none" : `${value} min`;
+}
+
+/**
+ * Score an answer to a fixture whose correct output is a refusal.
+ *
+ * One check in the headline, because "did it decline" is one question. The
+ * reason is carried alongside rather than folded in: refusing for the wrong
+ * reason still saves somebody from an invented recipe, but routes them to the
+ * wrong remedy, so it must be visible without swamping the field accuracies.
+ */
+export function scoreRefusal(
+  expected: RefusalReason,
+  actual: RefusalReason | null,
+  invented = 0,
+): RefusalScore {
+  const refused = actual !== null;
+  return {
+    refused,
+    reasonCorrect: refused && actual === expected,
+    expected,
+    actual,
+    invented,
+  };
 }

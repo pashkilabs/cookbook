@@ -29,14 +29,17 @@ export const placeholderUrlSnapshot: Fixture = {
     ].join("\n"),
   },
   expected: {
-    title: "Placeholder Drop Biscuits",
-    servings: 12,
-    totalMinutes: 25,
-    ingredients: [
-      { amount: 1.5, unit: "cup", item: "all-purpose flour" },
-      { amount: 0.5, unit: "tsp", item: "kosher salt" },
-      { amount: 1, unit: "stick", item: "unsalted butter" },
-      { amount: 2, unit: null, item: "eggs" },
-    ],
+    outcome: "recipe",
+    recipe: {
+      title: "Placeholder Drop Biscuits",
+      servings: 12,
+      totalMinutes: 25,
+      ingredients: [
+        { amount: 1.5, unit: "cup", item: "all-purpose flour" },
+        { amount: 0.5, unit: "tsp", item: "kosher salt" },
+        { amount: 1, unit: "stick", item: "unsalted butter" },
+        { amount: 2, unit: null, item: "eggs" },
+      ],
+    },
   },
 };

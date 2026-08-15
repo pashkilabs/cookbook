@@ -1,4 +1,5 @@
 import type { FixtureSet } from "./types.js";
+import { REFUSAL_REASONS } from "./types.js";
 import { canonicalUnit } from "../src/units.js";
 
 /**
@@ -19,18 +20,49 @@ export function validateFixtures(fixtures: FixtureSet): string[] {
     else if (seen.has(fixture.id)) problems.push(`${where}: duplicate id`);
     seen.add(fixture.id);
 
-    if (!fixture.expected.title.trim()) problems.push(`${where}: expected title is empty`);
-    if (fixture.expected.ingredients.length === 0) {
+    /*
+     * A URL fixture's snapshot is a claim about a page at a moment (decisions §46's
+     * sibling rule). Without the date, a fixture that stops matching the live page is
+     * indistinguishable from one that was always wrong.
+     */
+    if (
+      fixture.input.kind === "url" &&
+      fixture.input.text &&
+      !fixture.input.capturedAt &&
+      // a placeholder's markup is invented rather than captured, so a capture date
+      // would be a false claim about a page nobody fetched
+      !fixture.placeholder
+    ) {
+      problems.push(`${where}: has a captured snapshot but no capturedAt date`);
+    }
+
+    if (fixture.expected.outcome === "refusal") {
+      if (!REFUSAL_REASONS.includes(fixture.expected.because)) {
+        problems.push(`${where}: ${JSON.stringify(fixture.expected.because)} is not a refusal reason`);
+      }
+      continue;
+    }
+
+    const expected = fixture.expected.recipe;
+    if (!expected.title.trim()) problems.push(`${where}: expected title is empty`);
+    if (expected.ingredients.length === 0) {
       problems.push(`${where}: expected no ingredients — is the expectation filled in?`);
     }
 
-    for (const [index, ingredient] of fixture.expected.ingredients.entries()) {
+    for (const [index, ingredient] of expected.ingredients.entries()) {
       const at = `${where}: ingredient[${index}]`;
       if (!ingredient.item.trim()) problems.push(`${at} has an empty item`);
 
       if (ingredient.amount !== null) {
         if (!Number.isFinite(ingredient.amount)) problems.push(`${at} amount is not a number`);
         else if (ingredient.amount <= 0) problems.push(`${at} amount is not positive`);
+      }
+
+      // a heading is not an ingredient (decisions §45); one written as an expected line
+      // would teach the extractor that emitting it is correct
+      if (ingredient.section !== undefined && ingredient.section !== null
+          && normaliseForHeading(ingredient.item) === normaliseForHeading(ingredient.section)) {
+        problems.push(`${at} repeats its section as the ingredient — a heading is not a line`);
       }
 
       if (ingredient.unit === null) continue;
@@ -49,3 +81,6 @@ export function validateFixtures(fixtures: FixtureSet): string[] {
 
   return problems;
 }
+
+const normaliseForHeading = (input: string): string =>
+  input.trim().replace(/[:：]\s*$/, "").replace(/\s+/g, " ").toLowerCase();

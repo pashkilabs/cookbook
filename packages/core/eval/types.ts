@@ -16,9 +16,21 @@ export type FixtureKind = "url" | "caption" | "screenshot";
  * `text` is the captured raw material. A URL fixture carries a saved snapshot
  * of the page so the eval stays offline and reproducible; re-fetching would
  * make yesterday's score unrepeatable and put a network in `packages/core`.
+ *
+ * **The snapshot is the extracted markup, not the page.** The JSON-LD `Recipe`
+ * node plus the ingredient markup, and nothing else. Real pages run 300–680 KB
+ * of ads and scripts each; committing eighteen of those is several megabytes
+ * nobody will ever read, and *an unreviewable fixture rots* — its expectation
+ * stops being checkable against its input, which is the one thing a fixture is
+ * for. The trimmed capture still exercises tiers 0 and 1, which are the tiers
+ * that read markup.
+ *
+ * `capturedAt` and `url` travel with it because a snapshot is a claim about a
+ * page at a moment. Without the date, a fixture that stops matching the live
+ * page is indistinguishable from a fixture that was always wrong.
  */
 export type FixtureInput =
-  | { kind: "url"; url: string; text?: string }
+  | { kind: "url"; url: string; text?: string; capturedAt?: string }
   | { kind: "caption"; text: string }
   | {
       kind: "screenshot";
@@ -42,6 +54,16 @@ export interface EvalIngredient {
   /** canonical unit key per `canonicalUnit`, or null for whole countable things */
   unit: string | null;
   item: string;
+  /**
+   * The heading this line sat under — "For the sauce", "Chicken Marinade" — or
+   * null where the recipe has no sections (decisions §45).
+   *
+   * Scored and reported **separately** from the headline accuracy: a wrong
+   * section is a display defect and a wrong amount is a shopping defect, and
+   * averaging them together hides which one moved. A heading must never appear
+   * as an ingredient; an extractor emitting one has produced a spurious line.
+   */
+  section?: string | null;
 }
 
 /**
@@ -56,10 +78,52 @@ export interface ExpectedRecipe {
   ingredients: EvalIngredient[];
 }
 
+/**
+ * Why an input has no recipe in it. A closed set, because the reason decides
+ * what the product offers next (decisions §46):
+ *
+ *   no-recipe-in-source  the source withholds it — "comment CHICKEN and I'll DM
+ *                        you the full recipe". Offer: paste the DM, or a screenshot.
+ *   not-a-recipe-page    a listing, a forum thread, an index. Offer: nothing —
+ *                        the URL is simply the wrong one.
+ *   unresolvable-source  Facebook, Instagram, TikTok. These never resolve, and
+ *                        CLAUDE.md already says to reject them up front rather
+ *                        than letting somebody wait through four doomed attempts.
+ *                        Offer: the screenshot or video route.
+ *   image-only-source    a recipe that is genuinely there and genuinely a
+ *                        picture — a scanned page, a photographed card. Not the
+ *                        same claim as "not a recipe page": the text route
+ *                        cannot read it, and the vision route can.
+ */
+export type RefusalReason =
+  | "no-recipe-in-source"
+  | "not-a-recipe-page"
+  | "unresolvable-source"
+  | "image-only-source";
+
+export const REFUSAL_REASONS: readonly RefusalReason[] = [
+  "no-recipe-in-source",
+  "not-a-recipe-page",
+  "unresolvable-source",
+  "image-only-source",
+];
+
+/**
+ * What the right answer is: a recipe, or a refusal naming why.
+ *
+ * A refusal has to be statable as an *expectation*, because for some inputs it
+ * is the correct output and a plausible recipe is the worst possible one —
+ * confident, invented, and indistinguishable from a real answer by anybody who
+ * did not already know the dish.
+ */
+export type Expectation =
+  | { outcome: "recipe"; recipe: ExpectedRecipe }
+  | { outcome: "refusal"; because: RefusalReason };
+
 export interface Fixture {
   id: string;
   input: FixtureInput;
-  expected: ExpectedRecipe;
+  expected: Expectation;
   /** where it came from, so a suspect expectation can be re-checked against the source */
   source?: string;
   /** true while this demonstrates the format rather than measuring anything */
@@ -94,9 +158,27 @@ export interface ExtractedRecipe {
 }
 
 /**
+ * "I read this, and there is no recipe in it."
+ *
+ * Distinct from `null`, which means "I do not handle this *kind* of input" and
+ * is recorded as skipped. Reusing null for both would let an extractor that
+ * skips everything score perfectly on every refusal fixture — no result read as
+ * a pass, which is the trap this repo has now hit three times.
+ */
+export interface ExtractorRefusal {
+  refused: { because: RefusalReason };
+  usage?: ExtractorUsage;
+}
+
+export type ExtractorOutput = ExtractedRecipe | ExtractorRefusal;
+
+export const isRefusal = (output: ExtractorOutput): output is ExtractorRefusal =>
+  "refused" in output && output.refused !== undefined;
+
+/**
  * The plug. Return null for an input this extractor doesn't handle; the runner
  * records that as skipped and leaves it out of the accuracy figures.
  */
 export type Extractor = (
   input: FixtureInput,
-) => ExtractedRecipe | null | Promise<ExtractedRecipe | null>;
+) => ExtractorOutput | null | Promise<ExtractorOutput | null>;
