@@ -1,6 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { formatAsWritten } from "@pashki/core";
+import { INGREDIENT_COLUMNS } from "@pashki/db/catalog";
+import { andList, energyForRecipe } from "@/lib/energy";
 import { scaleIngredientAmounts, servingsForScale } from "@/lib/planner";
 import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
@@ -49,7 +51,7 @@ export default async function RecipePage({
   // an id belonging to another household lands here too, which is the point
   if (!recipe) notFound();
 
-  const [ingredients, steps, ratings, members, photo] = await Promise.all([
+  const [ingredients, steps, ratings, members, photo, catalogRows] = await Promise.all([
     supabase
       .from("recipe_ingredients")
       .select("id, position, amount, unit, item_text, note, is_estimated")
@@ -77,6 +79,8 @@ export default async function RecipePage({
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    // the catalog carries the energy figures; package sizes are about buying, not eating
+    supabase.from("ingredients").select(INGREDIENT_COLUMNS),
   ]);
 
   // The bucket is private, so a URL has to be signed. Signed as the person viewing, so the
@@ -113,6 +117,19 @@ export default async function RecipePage({
       plannedServings = servingsForScale(plannedScale, recipe.servings);
     }
   }
+
+  /*
+   * Energy, at the scale this is being cooked.
+   *
+   * The multiplier cancels in the per-serving figure and survives in the total — cooking a roast
+   * for nine does not make a serving of it more fattening. Coverage is partial and always will
+   * be, so a recipe the catalog cannot fully price says so rather than quietly understating
+   * itself (decisions §43).
+   */
+  const energy = energyForRecipe(ingredients.data ?? [], catalogRows.data ?? [], {
+    servings: recipe.servings,
+    scale: plannedScale,
+  });
 
   const scores = new Map(ratings.data?.map((r) => [r.family_member_id, r.score]) ?? []);
 
@@ -185,6 +202,35 @@ export default async function RecipePage({
 
       <section>
         <h2>Ingredients</h2>
+
+        {/*
+          * An approximation, and it says so. "at least" is load-bearing: a partial total is a
+          * lower bound, and somebody reading a bare number would take it as the answer.
+          */}
+        {energy && (
+          <p className="meta energy">
+            {energy.stated ? (
+              <>
+                <strong>
+                  {energy.isFloor ? "at least " : ""}~
+                  {energy.perServing ?? energy.total} kcal
+                </strong>{" "}
+                {energy.perServing === null
+                  ? "in total"
+                  : `per serving, ~${energy.total} in total`}
+                {energy.unknown.length > 0 && (
+                  <> — no figure yet for {andList(energy.unknown)}</>
+                )}
+              </>
+            ) : (
+              <>
+                No calorie estimate — the catalog has no figure for{" "}
+                {andList(energy.unknown)}
+              </>
+            )}
+          </p>
+        )}
+
         {ingredients.data?.length ? (
           <ul className="ingredients">
             {scaleIngredientAmounts(ingredients.data, plannedScale).map((line) => {
