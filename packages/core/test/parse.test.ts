@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseIngredientLine, parseIngredientList } from "../src/parse.js";
+import { isStaple } from "../src/text.js";
 
 /** Lines lifted from real recipe sites and social captions. */
 describe("parseIngredientLine", () => {
@@ -130,5 +131,67 @@ describe("parseIngredientList", () => {
     ]);
     expect(result).toHaveLength(3);
     expect(result.map((r) => r.item)).toEqual(["for the sauce", "cream", "garlic"]);
+  });
+});
+
+/**
+ * Lines from recipes actually imported into the product, which the parser got wrong.
+ *
+ * Found while measuring calorie coverage: both produced "ingredients" that no catalog entry could
+ * ever match. They are shopping-list bugs first and calorie bugs second — an ingredient called
+ * "x 1.5kg free-range whole chicken" cannot be bought either.
+ */
+describe("lines from real imports", () => {
+  it("reads a British multiplier as the weight it is", () => {
+    // regression: "1 x 1.5kg free-range whole chicken" took 1 as the amount and left the real
+    // weight inside the ingredient name
+    const parsed = parseIngredientLine("1 x 1.5kg free-range whole chicken");
+    expect(parsed).toMatchObject({ amount: 1.5, unit: "kg", item: "free-range whole chicken" });
+  });
+
+  it("multiplies a count of sized containers", () => {
+    // regression: two tins of 400g is 800g, which is what a shopping list needs to buy
+    const parsed = parseIngredientLine("2 x 400g tins chopped tomatoes");
+    expect(parsed?.amount).toBe(800);
+    expect(parsed?.unit).toBe("g");
+  });
+
+  it("leaves a bare count alone rather than inventing a unit", () => {
+    // "1 x chicken" has no weight to find; the multiplier rule must not fire
+    const parsed = parseIngredientLine("1 x free-range chicken");
+    expect(parsed?.item).toContain("chicken");
+    expect(parsed?.unit).toBeNull();
+  });
+
+  it("takes a leading qualifier into the note, not the name", () => {
+    /*
+     * regression: "optional: sprigs of bay" became an ingredient literally called that.
+     *
+     * The item lands as "bay" rather than "sprigs of bay" because the parser already knew how to
+     * drop a "sprigs of" measure — which is the better answer, and only reachable once the
+     * qualifier stops being glued to the front.
+     */
+    const parsed = parseIngredientLine("optional: sprigs of bay");
+    expect(parsed?.item).toBe("bay");
+    expect(parsed?.note).toBe("optional");
+  });
+
+  it("keeps a leading qualifier and a trailing note together", () => {
+    const parsed = parseIngredientLine("optional: 2 sprigs of thyme, finely chopped");
+    expect(parsed?.note).toBe("optional, finely chopped");
+    expect(parsed?.item).toContain("thyme");
+  });
+
+  it("still refuses a qualifier with nothing behind it", () => {
+    expect(parseIngredientLine("optional:")).toBeNull();
+  });
+
+  it("treats salt and pepper as the staple it already knew about", () => {
+    // this one was never a parser bug — `isStaple` handles it, and it reached a gap list only
+    // because the analysis script did not apply the staples rule. Pinned so that stays true.
+    const parsed = parseIngredientLine("salt and pepper");
+    expect(parsed?.item).toBe("salt and pepper");
+    expect(isStaple(parsed!.item)).toBe(true);
+    expect(isStaple("kosher salt and black pepper")).toBe(true);
   });
 });

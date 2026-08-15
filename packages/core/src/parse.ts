@@ -5,6 +5,15 @@ import { expandFractions, readNumber, stripTags } from "./text.js";
 const NUMBER = String.raw`\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:[.,]\d+)?`;
 const LEADING_BULLETS = /^[\u25a1\u25aa\u2022\u2023\u25e6\u25cf\u25cb\u2610\u2611▢□•·*\-–—]+\s*/;
 
+/**
+ * Qualifiers written in front rather than behind: "optional: sprigs of bay".
+ *
+ * `TRAILING_NOTES` only looks at the end of the line, so a leading one stayed glued to the name
+ * and produced an ingredient called "optional: sprigs of bay" — which matches no catalog entry and
+ * never will. Found in a real imported recipe.
+ */
+const LEADING_QUALIFIERS = /^(optional|to serve|for serving|to garnish|for garnish)\s*[:\-–—]\s*/i;
+
 /** Trailing qualifiers that belong in the note, not the ingredient name. */
 const TRAILING_NOTES = [
   "to taste", "for serving", "for garnish", "for topping", "for dusting",
@@ -30,6 +39,14 @@ export function parseIngredientLine(raw: string): ParsedIngredient | null {
   if (!text || text.length > 200) return null;
 
   text = expandFractions(text);
+
+  let leadingNote = "";
+  const qualifier = LEADING_QUALIFIERS.exec(text);
+  if (qualifier) {
+    leadingNote = (qualifier[1] ?? "").toLowerCase();
+    text = text.slice(qualifier[0].length).trim();
+    if (!text) return null;
+  }
 
   // "Juice of 1 lemon" / "Zest and juice of 2 limes"
   const citrus =
@@ -64,6 +81,25 @@ export function parseIngredientLine(raw: string): ParsedIngredient | null {
     }
   }
 
+  /*
+   * "1 x 1.5kg free-range whole chicken", "2 x 400g tins chopped tomatoes".
+   *
+   * British recipe writing, and it defeated the parser completely: the leading number was taken as
+   * the amount and everything after it — including the real weight — became the ingredient name.
+   * The multiplication is the correct reading either way: one chicken of 1.5 kg is 1.5 kg, and two
+   * tins of 400 g is 800 g, which is what a shopping list needs.
+   */
+  const multiplied = new RegExp(`^[x×]\\s*(${NUMBER})\\s*([a-zA-Z]+)\\b`).exec(rest);
+  if (amount !== null && multiplied) {
+    const each = readNumber(multiplied[1] ?? "");
+    const candidate = multiplied[2] ?? "";
+    if (each != null && canonicalUnit(candidate) !== null && canonicalUnit(candidate) !== "count") {
+      amount *= each;
+      unitWord = candidate;
+      rest = rest.slice(multiplied[0].length).trim();
+    }
+  }
+
   const takeParenthetical = (): void => {
     const m = new RegExp(`^\\(\\s*(${NUMBER})\\s*-?\\s*([a-zA-Z]+)\\.?\\s*\\)`).exec(rest);
     if (!m) return;
@@ -75,7 +111,9 @@ export function parseIngredientLine(raw: string): ParsedIngredient | null {
 
   takeParenthetical(); // "1 (14.5 oz) can tomatoes"
 
-  const word = /^([a-zA-Z]+)\.?/.exec(rest);
+  // Not when the multiplier already established one: "2 x 400g tins" is 800 grams, and letting
+  // "tins" win here made it 800 cans.
+  const word = unitWord === null ? /^([a-zA-Z]+)\.?/.exec(rest) : null;
   if (word) {
     const candidate = word[1] ?? ""; // case preserved so "T" and "t" stay distinct
     if (canonicalUnit(candidate) !== null) {
@@ -96,10 +134,10 @@ export function parseIngredientLine(raw: string): ParsedIngredient | null {
     }
   }
 
-  let note = "";
+  let note = leadingNote;
   const comma = rest.indexOf(",");
   if (comma > 0) {
-    note = rest.slice(comma + 1).trim();
+    note = [note, rest.slice(comma + 1).trim()].filter(Boolean).join(", ");
     rest = rest.slice(0, comma).trim();
   }
 
