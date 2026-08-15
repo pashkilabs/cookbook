@@ -1,0 +1,391 @@
+{
+  "url": "https://pinchofyum.com/saucy-gochujang-noodles-with-chicken",
+  "capturedAt": "2026-08-15",
+  "httpStatus": 200,
+  "error": null,
+  "bytes": 379882,
+  "jsonLdBlocks": 1,
+  "recipeNodes": 1,
+  "recipes": [
+    {
+      "@context": "https://schema.org/",
+      "@type": "Recipe",
+      "name": "Saucy Gochujang Noodles with Chicken",
+      "description": "Spicy, peanutty, noodley bit of super easy comfort food coming your way! These gochujang noodles require just a handful of pantry ingredients - like ramen noodles, peanut butter, sesame oil, soy sauce, and more - and come together in just 20 mins. Weeknight win!",
+      "author": {
+        "@type": "Person",
+        "name": "Lindsay Ostrom",
+        "url": "https://pinchofyum.com/about"
+      },
+      "keywords": "gochujang, noodles, stir fry, ground chicken, spicy noodles, weeknight dinner",
+      "image": [
+        "https://pinchofyum.com/tachyon/Gochujang-Noodles-3-Square.jpg?fit=225%2C225",
+        "https://pinchofyum.com/tachyon/Gochujang-Noodles-3-Square.jpg?fit=195%2C195",
+        "https://pinchofyum.com/tachyon/Gochujang-Noodles-3-Square.jpg?fit=180%2C180",
+        "https://pinchofyum.com/tachyon/Gochujang-Noodles-3-Square.jpg"
+      ],
+      "url": "https://pinchofyum.com/saucy-gochujang-noodles-with-chicken",
+      "recipeIngredient": [
+        "3 tablespoons soy sauce",
+        "2-3 tablespoons gochujang sauce (like this one (affiliate link))",
+        "2 tablespoons tomato paste",
+        "2 tablespoons peanut butter",
+        "2 tablespoons water",
+        "1-2 tablespoons brown sugar",
+        "1 tablespoon sesame oil",
+        "1 clove minced garlic",
+        "1-2 cups broth or water for thinning the sauce",
+        "1 pound ground chicken (could also use pork)",
+        "1/2 teaspoon salt",
+        "freshly ground black pepper",
+        "2 packets ramen or stir fry noodles (just the noodles)",
+        "1-2 cups fresh spinach",
+        "1/4 cup chives, scallions, cilantro, basil, or whatever herbs you like for topping",
+        "salt to taste",
+        "1 tablespoon chili oil for finishing",
+        "1 tablespoon sesame seeds for finishing"
+      ],
+      "recipeInstructions": [
+        {
+          "@type": "HowToStep",
+          "text": "Whisk the sauce ingredients (except the extra broth) in a small bowl or shake together in a jar. It should form a thick sauce.",
+          "url": "https://pinchofyum.com/saucy-gochujang-noodles-with-chicken#instruction-step-1"
+        },
+        {
+          "@type": "HowToStep",
+          "text": "Cook the chicken in a large skillet over medium high heat. Season generously with salt and pepper. ",
+          "url": "https://pinchofyum.com/saucy-gochujang-noodles-with-chicken#instruction-step-2"
+        },
+        {
+          "@type": "HowToStep",
+          "text": "Boil the noodles for just a few minutes to soften. Drain and set aside.",
+          "url": "https://pinchofyum.com/saucy-gochujang-noodles-with-chicken#instruction-step-3"
+        },
+        {
+          "@type": "HowToStep",
+          "text": "When the chicken is done, add spinach, cooked noodles, and sauce to the pan, keeping it over medium high heat. Toss to combine; heat until the spinach is wilted. Add extra water or broth to thin the sauce, a little at a time, to get the sauciness that you like (I usually add about 1 1/2 cups total). ",
+          "url": "https://pinchofyum.com/saucy-gochujang-noodles-with-chicken#instruction-step-4"
+        },
+        {
+          "@type": "HowToStep",
+          "text": "Serve topped with fresh herbs, scallions, chili oil, sesame seeds, and whatever else you like. ",
+          "url": "https://pinchofyum.com/saucy-gochujang-noodles-with-chicken#instruction-step-5"
+        }
+      ],
+      "prepTime": "PT10M",
+      "cookTime": "PT20M",
+      "totalTime": "PT30M",
+      "recipeYield": [
+        "4",
+        "4-6 servings"
+      ],
+      "recipeCategory": "Dinner",
+      "cookingMethod": "Stovetop",
+      "recipeCuisine": "Korean-Inspired",
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "reviewCount": "134",
+        "ratingValue": "5"
+      },
+      "nutrition": {
+        "servingSize": null,
+        "calories": "435 calories",
+        "sugarContent": "7.3 g",
+        "sodiumContent": "1012.2 mg",
+        "fatContent": "17.4 g",
+        "saturatedFatContent": "4 g",
+        "transFatContent": "0.1 g",
+        "carbohydrateContent": "41.9 g",
+        "fiberContent": "2.5 g",
+        "proteinContent": "28.6 g",
+        "cholesterolContent": "96.3 mg",
+        "@type": "nutritionInformation"
+      },
+      "video": {
+        "@context": "http://schema.org",
+        "@type": "VideoObject",
+        "name": "Saucy Gochujang Noodles with Chicken",
+        "description": "A spicy, peanutty, noodley bit of super easy comfort food! These gochujang noodles require just a handful of ingredients – like ramen noodles, peanut butter, sesame oil, and soy sauce – and come together in just 20 minutes.",
+        "contentUrl": "https://content.jwplatform.com/videos/A2NutzuP.mp4",
+        "thumbnailUrl": [
+          "https://content.jwplatform.com/thumbs/A2NutzuP-720.jpg"
+        ],
+        "uploadDate": "2022-11-15T17:32:50+00:00"
+      },
+      "review": [
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "author": {
+            "@type": "Person",
+            "name": "Josh"
+          },
+          "datePublished": "2022-06-06",
+          "reviewBody": "When clicking on the Amazon link, did you use the hot and spicy one or the classic? There are four options to that link. Thanks"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "author": {
+            "@type": "Person",
+            "name": "Krista"
+          },
+          "datePublished": "2024-02-10",
+          "reviewBody": "This is delicious and easy to make. My ground chicken was frozen but only took a few extra minutes to cook. I am going to be making this regularly."
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "author": {
+            "@type": "Person",
+            "name": "Jan"
+          },
+          "datePublished": "2024-07-30",
+          "reviewBody": "Made it for the first time tonight. Really enjoyed it. Perfect amount of spicy. Easy and delicious! My kind of recipe!"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "3"
+          },
+          "author": {
+            "@type": "Person",
+            "name": "Emily"
+          },
+          "datePublished": "2026-03-17",
+          "reviewBody": "I thought there was way too much sauce. Maybe a 3rd package of noodles would have helped, just felt like it was too strong? I guess like too rich, even with the water to thin sauce."
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "author": {
+            "@type": "Person",
+            "name": "SV Robinson"
+          },
+          "datePublished": "2022-06-06",
+          "reviewBody": "Just made this….just ate this out of the skillet.  Added mushrooms and topped with scallions and sesame seeds."
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "author": {
+            "@type": "Person",
+            "name": "Tianna"
+          },
+          "datePublished": "2023-11-28",
+          "reviewBody": "Love the spice level in this dish."
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "author": {
+            "@type": "Person",
+            "name": "Sarah"
+          },
+          "datePublished": "2022-06-06",
+          "reviewBody": "This was so delicious! I had everything in my pantry so I jumped on this recipe. I had leeks and kale to use up, so I sautéed those in, and had a bit thicker noodle, but in every way, shape and form, I will be making this many times over!"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "author": {
+            "@type": "Person",
+            "name": "Brenna"
+          },
+          "datePublished": "2025-12-21",
+          "reviewBody": "I had some gochujang paste from another recipe you published, so I used that. I have to say, after mixing the sauce up, it was odd tasting, but strangely addictive and interestingly delicious. With the chicken, noodles and herbs? Yummers!! Thanks for another winner!!"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "author": {
+            "@type": "Person",
+            "name": "Loncy"
+          },
+          "datePublished": "2022-06-06",
+          "reviewBody": "Delicious! This recipe was so easy to make and it is amazing. I used sambal since I didn’t have gochujang and skipped the sugar, definitely spicy but still great with the peanut butter and tomato! Next time I’ll add some extra veggies like carrots and mushrooms!"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "author": {
+            "@type": "Person",
+            "name": "Rita"
+          },
+          "datePublished": "2022-06-08",
+          "reviewBody": "Thanks for sharing this recipe!!  Made it with ground pork but would have been great with tofu because the sauce is amazing.  Added broccoli, mushrooms, bell peppers and onions to make it a more balanced meal.  Quick, easy and immensely satisfying.  I'll definitely make this again :)"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "author": {
+            "@type": "Person",
+            "name": "Stephanie G"
+          },
+          "datePublished": "2022-06-11",
+          "reviewBody": "I made this tonight &amp; LOVED IT. Subbed Pork for the chicken and chili garlic sauce and it was phenomenal. Quick. Insanely flavorful. POY does not disappoint!"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "4"
+          },
+          "author": {
+            "@type": "Person",
+            "name": "Jessica"
+          },
+          "datePublished": "2022-06-13",
+          "reviewBody": "Made this last night and it was so good!\r\nI used chicken thighs instead of the ground chicken (just because we had them), but honestly think the options for a protein are endless.\r\nI bought Gochujang paste, not sure if it's different than the sauce, but with 2tbs it was great.  Definitely spicy, but so good!  I love a good nose sweat when eating spicy food.\r\nI feel like the sauce will be a great recipe to have in my pocket as I think it's really versatile.  Was even thinking to use it for cold noodles.\r\nYou are my go-to for recipes as they are always delicious and well seasoned, so thank you!"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "author": {
+            "@type": "Person",
+            "name": "Jen M"
+          },
+          "datePublished": "2022-06-13",
+          "reviewBody": "I made this gluten free using Lotus ramen noodles (4 squares), Chung Jung One gochujang sauce and tamari.  It was delicious and have to say I think I preferred the leftovers cold right out of the fridge."
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "author": {
+            "@type": "Person",
+            "name": "Rachel"
+          },
+          "datePublished": "2022-06-13",
+          "reviewBody": "This was great! We made it vegetarian by skipping the chicken and adding sugar snap peas, mushrooms and broccoli.  We used the gochujang paste instead of sauce because that's what the grocery store near us had and it was just the right amount of heat. Amazing flavor all around!  Garnished with chives, green onions, sesame seeds and cilantro sprouts.  Totally awesome - thank you!"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "author": {
+            "@type": "Person",
+            "name": "Char"
+          },
+          "datePublished": "2022-06-14",
+          "reviewBody": "This is a good one!  Super easy too!"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "author": {
+            "@type": "Person",
+            "name": "Sarah"
+          },
+          "datePublished": "2022-06-16",
+          "reviewBody": "This was so easy and DELICIOUS. We had it on a weeknight. I was able to find all of the ingredients at our regular big chain grocery store. We'll definitely be enjoying this again soon."
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "author": {
+            "@type": "Person",
+            "name": "Lori"
+          },
+          "datePublished": "2022-06-16",
+          "reviewBody": "These noodles are delicious! I don't eat meat so I added ltos of vegetables, it was a great, quick meal. We are obsessed with gochuchang these days.  The peanut butter made it really creamy but didn't taste overly peanutty!"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "author": {
+            "@type": "Person",
+            "name": "Anjali"
+          },
+          "datePublished": "2022-06-16",
+          "reviewBody": "Thanks for this delicious inspiration! Made with brown rice noodles and garnished with crushed peanuts and lime juice. Household seeks an encore."
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "author": {
+            "@type": "Person",
+            "name": "Anjali"
+          },
+          "datePublished": "2022-06-17",
+          "reviewBody": "Thanks for this delicious recipe! I used brown rice noodles and garnished with lime juice and crushed peanuts. Chef's kiss. My husband asked me to make it again within the same week, which is a high compliment because we like variety!"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "author": {
+            "@type": "Person",
+            "name": "Amy"
+          },
+          "datePublished": "2022-06-17",
+          "reviewBody": "We love Korean flavors at our house so I gave these a try and they were a huge hit. My husband (who doesn't like spicy food) had seconds and my foody teenaged son said these were, \"amazing.\" Will definitely add this to our meal rotation. Thank you!"
+        }
+      ],
+      "datePublished": "2022-06-06",
+      "@id": "https://pinchofyum.com/saucy-gochujang-noodles-with-chicken#recipe",
+      "isPartOf": {
+        "@id": "https://pinchofyum.com/saucy-gochujang-noodles-with-chicken#article"
+      },
+      "mainEntityOfPage": "https://pinchofyum.com/saucy-gochujang-noodles-with-chicken"
+    }
+  ],
+  "ingredientMarkup": [],
+  "sectioned": [],
+  "titles": {
+    "h1": "Saucy Gochujang Noodles with Chicken",
+    "title": "Saucy Gochujang Noodles with Chicken Recipe - Pinch of Yum"
+  }
+}

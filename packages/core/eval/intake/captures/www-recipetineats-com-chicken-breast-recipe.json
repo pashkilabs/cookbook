@@ -1,0 +1,362 @@
+{
+  "url": "https://www.recipetineats.com/chicken-breast-recipe/",
+  "capturedAt": "2026-08-15",
+  "httpStatus": 200,
+  "error": null,
+  "bytes": 535588,
+  "jsonLdBlocks": 2,
+  "recipeNodes": 1,
+  "recipes": [
+    {
+      "@type": "Recipe",
+      "name": "My go-to Chicken Breast recipe",
+      "author": {
+        "@id": "https://www.recipetineats.com/#/schema/person/1684e6a75e9f91ae2e33ca2de95b47e2"
+      },
+      "description": "Recipe video above. Ready in 12 minutes, this is my current go-to chicken breast recipe. AKA Pan-Seared Country Seasoned Chicken Breast with Butter Sauce, it&#39;s fast, simple, not-boring and you can make it anytime with pantry staples!Simple country-inspired seasoning tossed with the tiniest amount of flour so the chicken gets a lovely crust on it, served with a butter sauce made in the same pan so it gets flavour from the residual seasoning.Mix and match magic: Skip the sauce and just serve the seasoned chicken, or skip the spices and let the butter sauce shine with a simple salt-and-pepper seared chicken.",
+      "datePublished": "2025-07-30T16:00:00+00:00",
+      "image": [
+        "https://www.recipetineats.com/tachyon/2025/07/Anytime-Chicken-Breast-in-white-wine-sauce_5.jpg",
+        "https://www.recipetineats.com/tachyon/2025/07/Anytime-Chicken-Breast-in-white-wine-sauce_5.jpg?resize=500%2C500",
+        "https://www.recipetineats.com/tachyon/2025/07/Anytime-Chicken-Breast-in-white-wine-sauce_5.jpg?resize=500%2C375",
+        "https://www.recipetineats.com/tachyon/2025/07/Anytime-Chicken-Breast-in-white-wine-sauce_5.jpg?resize=480%2C270"
+      ],
+      "recipeYield": [
+        "4"
+      ],
+      "prepTime": "PT5M",
+      "cookTime": "PT7M",
+      "recipeIngredient": [
+        "2  large chicken breasts ((250 - 300g/8 - 10 oz each), each cut in half horizontally to form 4 steaks, no need to pound (Note 1))",
+        "20g/ 1 1/2 tbsp  unsalted butter (or 1 1/2 tbsp olive oil)",
+        "1 tsp paprika (, regular/sweet (or smoky))",
+        "1/2 tsp onion powder ((or more garlic))",
+        "1/2 tsp garlic powder ((or more onion))",
+        "1/4 tsp cumin ((sub coriander, thyme leaves crushed between fingers, or omit))",
+        "3/4 tsp cooking salt / kosher salt ((halve for table salt, +50% for flakes))",
+        "1/8 tsp black pepper",
+        "1 1/2 tbsp flour (, plain/all-purpose, GF (Note 2))",
+        "1/3 cup dry white wine ( or chicken stock (low sodium), sub water (Note 3))",
+        "30g/ 2 tbsp  unsalted butter",
+        "1 tbsp roughly chopped parsley (, optional but recommended)"
+      ],
+      "recipeInstructions": [
+        {
+          "@type": "HowToSection",
+          "name": "ABBREVIATED",
+          "itemListElement": [
+            {
+              "@type": "HowToStep",
+              "text": "Dust chicken with Seasoning, pan fry in the butter, remove. Deglaze with wine, melt in butter, serve sauce on chicken.",
+              "name": "Dust chicken with Seasoning, pan fry in the butter, remove. Deglaze with wine, melt in butter, serve sauce on chicken.",
+              "url": "https://www.recipetineats.com/chicken-breast-recipe/#wprm-recipe-181807-step-0-0"
+            }
+          ]
+        },
+        {
+          "@type": "HowToSection",
+          "name": "FULL RECIPE",
+          "itemListElement": [
+            {
+              "@type": "HowToStep",
+              "text": "Season - Mix the Seasoning ingredients in a bowl. Sprinkle on each side of the chicken, spreading with fingertips to coat evenly, then shake off excess.",
+              "name": "Season - Mix the Seasoning ingredients in a bowl. Sprinkle on each side of the chicken, spreading with fingertips to coat evenly, then shake off excess.",
+              "url": "https://www.recipetineats.com/chicken-breast-recipe/#wprm-recipe-181807-step-1-0"
+            },
+            {
+              "@type": "HowToStep",
+              "text": "Sear - Melt the butter in a large non-stick pan over high heat. Cook chicken for 2 1/2 minutes on each side until deep golden, or until the internal temperature reaches 67C/153F. Remove onto a plate.",
+              "name": "Sear - Melt the butter in a large non-stick pan over high heat. Cook chicken for 2 1/2 minutes on each side until deep golden, or until the internal temperature reaches 67C/153F. Remove onto a plate.",
+              "url": "https://www.recipetineats.com/chicken-breast-recipe/#wprm-recipe-181807-step-1-1"
+            },
+            {
+              "@type": "HowToStep",
+              "text": "Pan sauce - Lower then heat to medium high. Add the wine and simmer rapidly for 1 - 1 1/2 minutes, scraping the pan with a rubber spatula to loosen the golden bits into the sauce, until it&#39;s reduced by half. Add the butter and let it melt, mixing well to combine. (Note 4 on sauce amount)",
+              "name": "Pan sauce - Lower then heat to medium high. Add the wine and simmer rapidly for 1 - 1 1/2 minutes, scraping the pan with a rubber spatula to loosen the golden bits into the sauce, until it&#39;s reduced by half. Add the butter and let it melt, mixing well to combine. (Note 4 on sauce amount)",
+              "url": "https://www.recipetineats.com/chicken-breast-recipe/#wprm-recipe-181807-step-1-2"
+            },
+            {
+              "@type": "HowToStep",
+              "text": "Serve - Serve chicken with sauce and sprinkled with parsley. Enjoy!",
+              "name": "Serve - Serve chicken with sauce and sprinkled with parsley. Enjoy!",
+              "url": "https://www.recipetineats.com/chicken-breast-recipe/#wprm-recipe-181807-step-1-3"
+            }
+          ]
+        }
+      ],
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.99",
+        "ratingCount": "76",
+        "reviewCount": "18"
+      },
+      "review": [
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "So dam good! Full of flavour &amp; chicken was succulent. Easy, tasty dinner. Thank you, miss❤️ you Dozer",
+          "author": {
+            "@type": "Person",
+            "name": "Belinda"
+          },
+          "datePublished": "2026-08-08"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "Love this easy, flavourful spice blend and use it with both chicken &amp; pork tenderloin chops. If time permits, pat dry, use rub and dry brine on an open rack in the fridge a few hours before the air fryer. Brilliantly crispy chops or chicken breasts - no sauce! If made in a pan, the butter sauce is lovely. Either or, we enjoy this so much with roasted potatoes and steamed veggies.",
+          "author": {
+            "@type": "Person",
+            "name": "Dee"
+          },
+          "datePublished": "2026-06-18"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "Super flavorful and incredibly quick to make!! Definitely going into the regular rotation. Thank you!!",
+          "author": {
+            "@type": "Person",
+            "name": "annika"
+          },
+          "datePublished": "2026-05-14"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "Simple, tasty and although I did cut my chicken breasts into 2/3 (they were very thick) they didn't dry out and everyone loved them, Thanks for the \r\nrecipe",
+          "author": {
+            "@type": "Person",
+            "name": "ESTHER"
+          },
+          "datePublished": "2026-04-21"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "Amazing! We have a picky 15-yr-old boy and he took one bite and said \"yum\" and demolished it. Hooray! Thank you so much! We served with mashed potatoes (the 15-yr-old enlisted to do the mashing) and then after the deglazing, we refreshed some day-old steamed broccoli in the chicken pan. Usually day-old broccoli is the devil, but this was *mwah* perfect. Thank you, thank you for this recipe!!",
+          "author": {
+            "@type": "Person",
+            "name": "Annie"
+          },
+          "datePublished": "2026-04-18"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "This recipe was very good. I give it five stars. It's very easy and quick. I made it using smoked paprika and in the butter sauce I used chicken stock. I will definitely make this again. So flavorful!",
+          "author": {
+            "@type": "Person",
+            "name": "Nancy Hamm"
+          },
+          "datePublished": "2026-04-11"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "I make this every week since I tried it, sometimes twice a week ok often twice. Its quick to make and best of all delicious! Everyone loves it! thank you love the way you cook!",
+          "author": {
+            "@type": "Person",
+            "name": "eileen pappadopoulos"
+          },
+          "datePublished": "2026-04-04"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "I just made this and I’m eating it while I comment. So good! I used tapioca flour and it has the best gluten-free crust. Thank you!",
+          "author": {
+            "@type": "Person",
+            "name": "Veronica"
+          },
+          "datePublished": "2026-03-26"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "I absolutely love this recipe. It is so quick and easy to do. The end result is absolutely fantastic. Perfect as a quick recipe but lovely meal at the end of a long day. \r\n\r\nThank you so much",
+          "author": {
+            "@type": "Person",
+            "name": "Leanne Borg"
+          },
+          "datePublished": "2026-03-24"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "My new favorite! So easy. We marinated overnight \r\n\r\nRecipetineats always has the best",
+          "author": {
+            "@type": "Person",
+            "name": "Patrick"
+          },
+          "datePublished": "2026-03-23"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "I gave this a shot and absolutely will be putting this on my list for weekly recipes. It’s so simple and turned out amazing. The best part is, the white wine you use to make the sauce pairs perfectly with the meal. Fantastic! Thank you-",
+          "author": {
+            "@type": "Person",
+            "name": "David Hayes"
+          },
+          "datePublished": "2026-03-21"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "Awesome chicken recipe! Very tender and not dry. I'll be making this on repeat. Also love your vanilla cake recipe.",
+          "author": {
+            "@type": "Person",
+            "name": "CC"
+          },
+          "datePublished": "2026-03-21"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "I doubled the recipe for. my family of five.  This is the second time I made it and it was a hit again!  This time I used a red wine because I didn't have the white wine and it was delicious as well.  Served it with small red potatoes, slightly mashed with salt and butter, and parsley mixed in and a salad.  So yummy!",
+          "author": {
+            "@type": "Person",
+            "name": "Rita"
+          },
+          "datePublished": "2026-03-17"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "I’ve been hunting for quick meals to make to help out my daughter in law.  I gave it a try tonight-super quick to make, had all the ingredients already in my pantry. Paired it with mashed potatoes and roasted broccoli. Really delish!",
+          "author": {
+            "@type": "Person",
+            "name": "Lin N."
+          },
+          "datePublished": "2026-03-17"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "test",
+          "author": {
+            "@type": "Person",
+            "name": "test"
+          },
+          "datePublished": "2026-03-13"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "Thank you for sharing this recipe! I made it this evening. I will be making it again",
+          "author": {
+            "@type": "Person",
+            "name": "Paul A Orsi"
+          },
+          "datePublished": "2026-03-06"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "This recipe was chef’s kiss!\r\n\r\nAnd so easy and quick\r\n\r\nI had run out of paprika and used some cayenne pepper instead. Was delicious",
+          "author": {
+            "@type": "Person",
+            "name": "Louisa"
+          },
+          "datePublished": "2026-02-23"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "Quick, easy, and husband approved. Thanks for a great new recipe!",
+          "author": {
+            "@type": "Person",
+            "name": "Carol"
+          },
+          "datePublished": "2026-02-20"
+        }
+      ],
+      "recipeCategory": [
+        "Mains"
+      ],
+      "recipeCuisine": [
+        "Western"
+      ],
+      "keywords": "chicken breast recipe, chicken in white wine butter sauce, pan seared chicken breast",
+      "@id": "https://www.recipetineats.com/chicken-breast-recipe/#recipe",
+      "isPartOf": {
+        "@id": "https://www.recipetineats.com/chicken-breast-recipe/#article"
+      },
+      "mainEntityOfPage": "https://www.recipetineats.com/chicken-breast-recipe/"
+    }
+  ],
+  "ingredientMarkup": [
+    "2 large chicken breasts (250 &ndash; 300g/8 &ndash; 10 oz each), each cut in half horizontally to form 4 steaks, no need to pound (Note 1)",
+    "20g/ 1 1/2 tbsp unsalted butter or 1 1/2 tbsp olive oil",
+    "1 tsp paprika , regular/sweet (or smoky)",
+    "1/2 tsp onion powder (or more garlic)",
+    "1/2 tsp garlic powder (or more onion)",
+    "1/4 tsp cumin (sub coriander, thyme leaves crushed between fingers, or omit)",
+    "3/4 tsp cooking salt / kosher salt (halve for table salt, +50% for flakes)",
+    "1/8 tsp black pepper",
+    "1 1/2 tbsp flour , plain/all-purpose, GF (Note 2)",
+    "1/3 cup dry white wine or chicken stock (low sodium), sub water (Note 3)",
+    "30g/ 2 tbsp unsalted butter",
+    "1 tbsp roughly chopped parsley , optional but recommended"
+  ],
+  "sectioned": [],
+  "titles": {
+    "h1": "My go-to Chicken Breast recipe",
+    "title": "My go-to Chicken Breast recipe - RecipeTin Eats"
+  }
+}

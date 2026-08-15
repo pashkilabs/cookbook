@@ -1,0 +1,122 @@
+{
+  "url": "https://www.americastestkitchen.com/recipes/11322-crispy-skin-pan-seared-chicken-breasts",
+  "capturedAt": "2026-08-15",
+  "httpStatus": 200,
+  "error": null,
+  "bytes": 426178,
+  "jsonLdBlocks": 2,
+  "recipeNodes": 1,
+  "recipes": [
+    {
+      "@context": "https://schema.org",
+      "@type": "Recipe",
+      "name": "Sautéed Mushrooms with Red Wine and Rosemary",
+      "url": "https://www.americastestkitchen.com/recipes/11322-sauteed-mushrooms-with-red-wine-and-rosemary",
+      "author": [
+        {
+          "@type": "Person",
+          "name": "Lan Lam",
+          "url": "https://www.americastestkitchen.com/authors/41"
+        }
+      ],
+      "totalTime": "PT35M",
+      "datePublished": "2018-11-19T00:00:00.000Z",
+      "dateModified": "2026-07-28T23:50:47.559Z",
+      "description": "Want savory, meaty-textured, deeply browned mushrooms without a lot of work, time, or even oil? Start by adding water.",
+      "image": [
+        {
+          "@type": "ImageObject",
+          "height": 1200,
+          "contentUrl": "https://res.cloudinary.com/hksqkdlah/image/upload/c_fill,dpr_2.0,f_auto,fl_lossy.progressive.strip_profile,g_faces:auto,q_auto:low/43118-sfs-sauteedportobellomushroomsredwinerosemary-33",
+          "creditText": "America's Test Kitchen",
+          "representativeOfPage": true,
+          "url": "https://res.cloudinary.com/hksqkdlah/image/upload/c_fill,dpr_2.0,f_auto,fl_lossy.progressive.strip_profile,g_faces:auto,q_auto:low/43118-sfs-sauteedportobellomushroomsredwinerosemary-33",
+          "width": 1200
+        }
+      ],
+      "recipeIngredient": [
+        "1 1/4 pounds mushrooms ",
+        "1/4 cup water ",
+        "1/2 teaspoon vegetable oil ",
+        "1 tablespoon unsalted butter ",
+        "1 shallot, minced",
+        "1 teaspoon minced fresh rosemary ",
+        "1/4 teaspoon table salt ",
+        "1/4 teaspoon pepper ",
+        "1/4 cup red wine ",
+        "1 tablespoon cider vinegar ",
+        "1/2 cup chicken broth "
+      ],
+      "recipeInstructions": [
+        {
+          "@type": "HowToStep",
+          "text": "Cook mushrooms and water in 12-inch nonstick skillet over high heat, stirring occasionally, until skillet is almost dry and mushrooms begin to sizzle, 4 to 8 minutes. Reduce heat to medium-high. Add oil and toss until mushrooms are evenly coated. Continue to cook, stirring occasionally, until mushrooms are well browned, 4 to 8 minutes longer. Reduce heat to medium."
+        },
+        {
+          "@type": "HowToStep",
+          "text": "Push mushrooms to sides of skillet. Add butter to center. When butter has melted, add shallot, rosemary, salt, and pepper to center and cook, stirring constantly, until aromatic, about 30 seconds. Add wine and vinegar and stir mixture into mushrooms. Cook, stirring occasionally, until liquid has evaporated, 2 to 3 minutes. Add broth and cook, stirring occasionally, until glaze is reduced by half, about 3 minutes. Season with salt and pepper to taste, and serve."
+        }
+      ],
+      "nutrition": {
+        "@type": "NutritionInformation",
+        "calories": "97",
+        "carbohydrateContent": "9 g",
+        "cholesterolContent": "9 mg",
+        "fiberContent": "2 g",
+        "proteinContent": "6 g",
+        "sodiumContent": "199 mg"
+      },
+      "recipeYield": [
+        4,
+        "Serves 4"
+      ],
+      "commentCount": 75,
+      "tool": [],
+      "isAccessibleForFree": false,
+      "hasPart": {
+        "@type": "WebPageElement",
+        "isAccessibleForFree": false,
+        "cssSelector": ".paywall-hidden"
+      },
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.26",
+        "reviewCount": 75
+      },
+      "associatedMedia": {
+        "@type": "ImageObject",
+        "contentUrl": "https://res.cloudinary.com/hksqkdlah/image/upload/c_fill,dpr_2.0,f_auto,fl_lossy.progressive.strip_profile,g_faces:auto,q_auto:low/43118-sfs-sauteedportobellomushroomsredwinerosemary-33",
+        "description": "Sautéed Mushrooms with Red Wine and Rosemary"
+      },
+      "recipeCategory": "Side Dishes",
+      "recipeCuisine": "",
+      "keywords": "Vegetables,Quick,Easter",
+      "video": {
+        "@type": "VideoObject",
+        "name": "Sautéed Mushrooms with Red Wine and Rosemary",
+        "thumbnailUrl": [
+          "https://res.cloudinary.com/hksqkdlah/image/upload/ar_1/ATK-S20_20190513_09-20-57_40919_kcqtqp",
+          "https://res.cloudinary.com/hksqkdlah/image/upload/ar_1.33/ATK-S20_20190513_09-20-57_40919_kcqtqp",
+          "https://res.cloudinary.com/hksqkdlah/image/upload/ar_0.5/ATK-S20_20190513_09-20-57_40919_kcqtqp"
+        ],
+        "embedUrl": "https://player.zype.com/embed/5ea9d130760f64000180bab3.html",
+        "uploadDate": "2019-12-17T18:53:30.165Z"
+      }
+    }
+  ],
+  "ingredientMarkup": [],
+  "sectioned": [
+    {
+      "section": null,
+      "text": "Cook mushrooms and water in 12-inch nonstick skillet over high heat, stirring occasionally, until skillet is almost dry and mushrooms begin to sizzle, 4 to 8 minutes. Reduce heat to medium-high. Add oil and toss until mushrooms are evenly coated. Continue to cook, stirring occasionally, until mushrooms are well browned, 4 to 8 minutes longer. Reduce heat to medium."
+    },
+    {
+      "section": null,
+      "text": "Push mushrooms to sides of skillet. Add butter to center. When butter has melted, add shallot, rosemary, salt, and pepper to center and cook, stirring constantly, until aromatic, about 30 seconds. Add wine and vinegar and stir mixture into mushrooms. Cook, stirring occasionally, until liquid has evaporated, 2 to 3 minutes. Add broth and cook, stirring occasionally, until glaze is reduced by half, about 3 minutes. Season with salt and pepper to taste, and serve."
+    }
+  ],
+  "titles": {
+    "h1": "Sautéed Mushrooms with Red Wine and Rosemary",
+    "title": "Sautéed Mushrooms with Red Wine and Rosemary | America&#x27;s Test Kitchen"
+  }
+}

@@ -1,0 +1,457 @@
+{
+  "url": "https://cooking.nytimes.com/recipes/1017532-tomato-jam",
+  "capturedAt": "2026-08-15",
+  "httpStatus": 200,
+  "error": null,
+  "bytes": 640032,
+  "jsonLdBlocks": 4,
+  "recipeNodes": 1,
+  "recipes": [
+    {
+      "@context": "https://schema.org",
+      "@id": "urn:nyt:ScoopRecipe:a81be512d95a567daa7d8dfabba7e712",
+      "@type": "Recipe",
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingCount": 1711,
+        "ratingValue": 5
+      },
+      "author": {
+        "@id": "nyt://person/83cb79c0-6b11-5a3e-8c4d-fba1ec752388",
+        "@type": "Person",
+        "description": "Mark Bittman contributed hundreds of recipes to The New York Times and wrote the Minimalist&nbsp;column for the Dining section for 13 years, beginning in 1997. He was later a Times Opinion columnist and the lead food writer for The New York Times Magazine.",
+        "name": "Mark Bittman",
+        "sameAs": [
+          "https://www.nytimes.com/by/mark-bittman",
+          "https://x.com/bittman"
+        ],
+        "url": "https://cooking.nytimes.com/author/mark-bittman"
+      },
+      "cookingMethod": "Boil, Simmer",
+      "copyrightHolder": {
+        "@id": "https://cooking.nytimes.com/#publisher",
+        "@type": "Organization",
+        "name": "NYT Cooking"
+      },
+      "copyrightYear": 2015,
+      "dateModified": "2015-07-07T00:00:00Z",
+      "datePublished": "2015-07-07T00:00:00Z",
+      "description": "Good tomatoes and balance are crucial. You need sugar for the kind of gooey, sticky quality we associate with jam; otherwise, all you’re producing is a tomato sauce, no matter how different the flavor is from the classic. Once you add that sugar, however, you need acid, because even though tomatoes are plenty acidic, they can’t counter all that sugar. I tried lemon juice, vinegar and finally lime, deciding that I liked the last best.",
+      "image": [
+        {
+          "@id": "nyt://image/c2ea9439-f708-57d9-aff6-4d09cb410d25#superJumbo",
+          "@type": "ImageObject",
+          "contentUrl": "https://static01.nyt.com/images/2015/07/07/dining/tomato-jam/tomato-jam-superJumbo.jpg",
+          "creditText": "Evan Sung for The New York Times",
+          "dateModified": "2015-07-07T23:30:34.000Z",
+          "datePublished": "2015-07-07T23:30:55.000Z",
+          "height": "1361",
+          "uploadDate": "2015-07-07T23:30:55.000Z",
+          "url": "https://static01.nyt.com/images/2015/07/07/dining/tomato-jam/tomato-jam-superJumbo.jpg",
+          "width": "2048"
+        },
+        {
+          "@id": "nyt://image/c2ea9439-f708-57d9-aff6-4d09cb410d25#facebookJumbo",
+          "@type": "ImageObject",
+          "contentUrl": "https://static01.nyt.com/images/2015/07/07/dining/tomato-jam/tomato-jam-facebookJumbo.jpg",
+          "creditText": "Evan Sung for The New York Times",
+          "dateModified": "2015-07-07T23:30:34.000Z",
+          "datePublished": "2015-07-07T23:30:55.000Z",
+          "height": "550",
+          "uploadDate": "2015-07-07T23:30:55.000Z",
+          "url": "https://static01.nyt.com/images/2015/07/07/dining/tomato-jam/tomato-jam-facebookJumbo.jpg",
+          "width": "1050"
+        }
+      ],
+      "isAccessibleForFree": false,
+      "keywords": "Project, Tomato",
+      "mainEntityOfPage": {
+        "@id": "//cooking.nytimes.com/recipes/1017532-tomato-jam",
+        "@type": "WebPage",
+        "name": "Tomato Jam"
+      },
+      "name": "Tomato Jam",
+      "nutrition": {
+        "@type": "NutritionInformation",
+        "calories": "230",
+        "carbohydrateContent": "58 grams",
+        "fatContent": "0.5 grams",
+        "fiberContent": "2.3 grams",
+        "proteinContent": "1.7 grams",
+        "saturatedFatContent": "0.1 grams",
+        "sodiumContent": "535.3 milligrams",
+        "sugarContent": "54.6 grams",
+        "unsaturatedFatContent": "0.2 grams"
+      },
+      "publisher": {
+        "@id": "https://cooking.nytimes.com/#publisher",
+        "@type": "Organization",
+        "name": "NYT Cooking"
+      },
+      "recipeCategory": "Jams, Jellies and Preserves",
+      "recipeIngredient": [
+        "1 ½ pounds good ripe tomatoes (Roma are best), cored and coarsely chopped",
+        "1 cup sugar",
+        "2 tablespoons freshly squeezed lime juice",
+        "1 tablespoon fresh grated or minced ginger",
+        "1 teaspoon ground cumin",
+        "¼ teaspoon ground cinnamon",
+        "⅛ teaspoon ground cloves",
+        "1 teaspoon salt",
+        "1 jalapeño or other peppers, stemmed, seeded and minced, or red pepper flakes or cayenne to taste"
+      ],
+      "recipeInstructions": [
+        {
+          "@type": "HowToStep",
+          "text": "Combine all ingredients in a heavy medium saucepan, Bring to a boil over medium heat, stirring often.",
+          "url": "https://cooking.nytimes.com/recipes/1017532-tomato-jam#recipe-step-1"
+        },
+        {
+          "@type": "HowToStep",
+          "text": "Reduce heat and simmer, stirring occasionally, until mixture has consistency of thick jam, about 1 hour 15 minutes. Taste and adjust seasoning, then cool and refrigerate until ready to use; this will keep at least a week.",
+          "url": "https://cooking.nytimes.com/recipes/1017532-tomato-jam#recipe-step-2"
+        }
+      ],
+      "recipeYield": "1 pint",
+      "review": [
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": "Beth in Boston"
+          },
+          "datePublished": "2026-08-05T01:42:51Z",
+          "reviewBody": "This tomato jam is ketchup‘s cousin that went to Europe for a semester abroad and returned forever changed— sophisticated, stylish, newfound depth."
+        },
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": "KnW"
+          },
+          "datePublished": "2026-07-30T18:19:13Z",
+          "reviewBody": "Made a version of this and it’s DELICIOUS. I can’t imagine it with all the sugar. This just tastes like tomatoes and it’s wonderful. We’ve eaten almost half of it in less than 2 days. I plan to make more and properly can it so I can save it for when tomatoes are no longer plentiful. \n2 lb Sungold\nHeaping 1/4 cup sugar\n1 tsp salt\nWhite pepper\n3/4 tsp chili flake\nZest and juice of one lemon"
+        },
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": "Lizzielou"
+          },
+          "datePublished": "2026-07-07T14:15:05Z",
+          "reviewBody": "I love cumin, but this is far too cumin-forward for me - it's the dominant flavor. I'd make this again, but reduce the cumin by at least half."
+        },
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": "Chris"
+          },
+          "datePublished": "2026-08-11T00:13:44Z",
+          "reviewBody": "@kate no need. I don’t even bother to core them :)"
+        },
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": "kate"
+          },
+          "datePublished": "2026-04-28T19:02:37Z",
+          "reviewBody": "Do I need to peel the tomatoes?"
+        },
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": "TerryB"
+          },
+          "datePublished": "2026-01-17T23:20:05Z",
+          "reviewBody": "I make this with smoked cherry tomatoes and it’s chef’s kiss, especially spread over a block of cream cheese with crackers."
+        },
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": "Mindy"
+          },
+          "datePublished": "2025-11-09T17:05:45Z",
+          "reviewBody": "@Evie\nJust core it. No need to remove the seeds"
+        },
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": "Evie"
+          },
+          "datePublished": "2025-11-03T01:52:06Z",
+          "reviewBody": "When you core a tomato, do you remove the seeds, or just the tough stem end?"
+        },
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": "Nikki"
+          },
+          "datePublished": "2025-10-13T06:49:04Z",
+          "reviewBody": "I'm shocked by these ratings, overall I think this is a good base recipe, minus all the sugar. I have a sweet tooth and LOVE sugar, while I read the comments, I did take the advice of a few who mentioned cutting the sugar down to at least 1/2 cup, but in honestly I should have cut this to 1/4 cup, I let it simmer down much longer, I adding chili flakes, chipotle powder to give it a slight kick, in an attempt to help cut the sweetness, it helped a little."
+        },
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": "Tanya"
+          },
+          "datePublished": "2025-10-10T14:29:51Z",
+          "reviewBody": "As per other comments, I would not use any sugar, add Pomona pectin and maybe use fruit like ground cherries or apple or maybe xylotol or stevia if a sweetener was needed."
+        },
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": "Ellen in NM"
+          },
+          "datePublished": "2025-09-30T23:14:15Z",
+          "reviewBody": "I have an abundance of tomatoes this year and have made this recipe four times now (with about 25 pounds of tomatoes). I made a bunch of changes, but the one I wanted to to share is how to reduce the cooking time.\n\nYou can pre-cook the tomatoes in an InstantPot, let it cool and then drain off a lot of the liquid (instead of cooking it down). My 6 quart InstantPot held about 9 pounds of chopped paste tomatoes. I cooked it on low pressure for 1 minute, did a quick release, and then drained the liquid. It still took several hours to cook down. With added onions and bell peppers, this made 6-1/2 pints of jam."
+        },
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": "Emily Rose"
+          },
+          "datePublished": "2025-09-20T02:44:49Z",
+          "reviewBody": "I especially like this on peanut butter toast. I've made it twice, each time with cherry tomatoes and habanero from the garden."
+        },
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": "Cooking with Cats"
+          },
+          "datePublished": "2025-09-15T13:42:13Z",
+          "reviewBody": "Canned about 5 jars using Mark's recipe and adding a few extra spices. Pectin enhanced sugar and sterilized jars were the key. Haven't tried it yet but a taste test before putting into jars was promising."
+        },
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": "Audrey M"
+          },
+          "datePublished": "2025-09-09T03:54:47Z",
+          "reviewBody": "Amazing recipe. Great way to use up a bunch of extra tomatoes from the garden. I've made this recipe twice - the second time I cooked it for about ~15 minutes longer than instructed to get my desired consistency. I used a mix of different varieties of tomatoes (whatever I had on hand) and it turned out great. We love it on eggs and toast!"
+        },
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": "Sophia Louise"
+          },
+          "datePublished": "2025-09-08T07:41:28Z",
+          "reviewBody": "Instead of jalapeños I used 1/2 tsp of chili flakes and I felt that gave it the perfect amount of spice"
+        },
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": "Jay"
+          },
+          "datePublished": "2025-08-31T13:12:46Z",
+          "reviewBody": "I halved the sugar and it's still far too sweet for my taste! Next time I make this, I'll try 1/4 cup. After all, you can add sugar, but you can't take it away.\n\nUnless you love incredibly sweet things, heed the warnings to reduce the sugar"
+        },
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": "Chad H"
+          },
+          "datePublished": "2025-08-29T02:19:52Z",
+          "reviewBody": "This is an absolute winner!  A great addition to a cheese board.  I make it every summer"
+        },
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": "Len"
+          },
+          "datePublished": "2015-08-26T20:55:07Z",
+          "reviewBody": "Folks,<br/><br/>You may want to check out a pectin called Pomona's Universal Pectin.  It differs from \"normal\" pectins in that it does not need any sugar to make the jam.  The pectin is from citrus skins.  It uses Calcium (provided as the catalyst).  Find it on amazon.  We are reducing sugar intake (typically 50 to 85% in jams). This makes a very good jam.  For a light sweetness, we use maple syrup or honey.  You can also use artificial sweeteners.  Jams actually taste fruity.  Highly recommend."
+        },
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": "Melinda"
+          },
+          "datePublished": "2016-06-03T14:12:38Z",
+          "reviewBody": "When I am too lazy to put much effort into dinner, I toast some bread, spread this jam on top, then scramble an egg with hot pepper flakes and parmesan cheese and put that on top also."
+        },
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": "Mary Ann"
+          },
+          "datePublished": "2015-09-12T16:26:07Z",
+          "reviewBody": "Nice flavor but too much sugar.  I would start with 1/4 cup and add up to 1/2 cup as needed.  I also put 1 chopped yellow pepper and 1/2 chopped red onion into it."
+        },
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": "Natalie"
+          },
+          "datePublished": "2015-09-05T13:48:08Z",
+          "reviewBody": "Halve the sugar, half again the cooking time.<br/>Cook until a path scraped across the bottom doesn't fill in.<br/>Made just under two half-pints, jars preheated at 325° for 15 minutes to seal."
+        },
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": "Julie"
+          },
+          "datePublished": "2015-08-19T14:21:08Z",
+          "reviewBody": "I have made a large batch or two of this every year for the last 4 years, reduce the sugar, increase the lime juice and ginger, use jalapeño, serrano or habanero peppers and cook it down in an electric skillet on low to reduce the need to stir and the risk of scorching. Taste.  I do a hot water bath as for other jams and give as gifts with friends asking when they will receive another jar of jam. Is very good in chicken/turkey sandwiches, pork sausage patties and biscuits and seasoning stir fry"
+        },
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": "Kathy"
+          },
+          "datePublished": "2015-09-30T01:01:06Z",
+          "reviewBody": "With crackers and sharp cheese!<br/>You can make this recipe and then freeze it in small amounts.  Thaws just great when someone comes over."
+        },
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": "Kate"
+          },
+          "datePublished": "2016-11-09T09:57:24Z",
+          "reviewBody": "Used 6 lbs of tomatoes, so quadrupled the recipe with two exceptions: 1) Only added 2 t of salt rather than 4 (and it was kosher, not table salt). 2) I used 2 c white sugar and 1 cup dark brown sugar for a total of 3 c of sugar, rather than 4 c (since other users remarked it was too sweet).<br/><br/>Simmered on low heat for a good 6 hours or so, until it had reduced by just over half. Absolutely scrumptious. Ended up with approx 5 c of jam (40 oz.)"
+        },
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": "Kathy D"
+          },
+          "datePublished": "2015-08-18T17:00:08Z",
+          "reviewBody": "Check out the \"Food in Jars\" blog - she does not advise canning recipes that have not been specifically tested for canning; however, she also has a tomato jam recipe on the current blog, and in her archive/cookbook.  My gut says this one would be fine; but check first.<br/><a href=\"http://www.foodinjars.com\" title=\"www.foodinjars.com\" target=\"_blank\">www.foodinjars.com</a>"
+        },
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": "charlie"
+          },
+          "datePublished": "2017-08-26T18:15:24Z",
+          "reviewBody": "I've made this several times now and the stated directions are best. When I tried halving the sugar, the jam tasted too much like marinara. 75 minutes was just about right for cooking time if you cook at a medium temp. I guess the cooking time could be shorter if you have drier tomatoes or cook on high, but my tomatoes were straight from the garden and full of moisture. "
+        },
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": "Getty"
+          },
+          "datePublished": "2015-09-02T10:06:09Z",
+          "reviewBody": "Love a nice tomato jam for spreading on crackers with creamy goat cheese - fantastic appetizer. Also good with any roasted or barbecued meat. Try it on burgers instead of ketchup.<br/>Here's a recipe that's great for safe canning as well as links to a couple of other great tomato jams (of which this is one!). <a href=\"http://www.gettystewart.com/tomato-jam/\" title=\"http://www.gettystewart.com/tomato-jam/\" target=\"_blank\">http://www.gettystewart.com/tomato-jam/</a>"
+        },
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": "Joanne L"
+          },
+          "datePublished": "2016-08-23T15:01:00Z",
+          "reviewBody": "I hope you did not seal using a preheated oven.  Either put in fridge for up to 2 weeks or water bath can according to the alritude where you live. 10 mins in boiling water is the minimum!"
+        },
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": "Reg"
+          },
+          "datePublished": "2015-08-24T11:41:09Z",
+          "reviewBody": "My guess is that the larger amount of sugar is needed to preserve.  Most fruit jams call for a sugar amount that is 3/4 of the fruit amount.  Perhaps this recipe would last more than a week......."
+        },
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": "Joni"
+          },
+          "datePublished": "2017-07-10T10:14:06Z",
+          "reviewBody": "Did I miss something?  Does this recipe need pectin?  I don't see it listed."
+        },
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": "Janice P."
+          },
+          "datePublished": "2016-08-17T21:09:27Z",
+          "reviewBody": "This has been a stand=by recipe for years. I can it, processing for 20 minutes, 1/4 inch headspace. Love it."
+        },
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": "KRM"
+          },
+          "datePublished": "2015-08-19T22:41:06Z",
+          "reviewBody": "I reduced the sugar to 1/2 cup upon reading the other notes and I am glad I did."
+        }
+      ],
+      "totalTime": "PT1H30M",
+      "url": "//cooking.nytimes.com/recipes/1017532-tomato-jam"
+    }
+  ],
+  "ingredientMarkup": [],
+  "sectioned": [
+    {
+      "section": null,
+      "text": "1 ½ pounds good ripe tomatoes (Roma are best), cored and coarsely chopped"
+    },
+    {
+      "section": null,
+      "text": "1 cup sugar"
+    },
+    {
+      "section": null,
+      "text": "2 tablespoons freshly squeezed lime juice"
+    },
+    {
+      "section": null,
+      "text": "1 tablespoon fresh grated or minced ginger"
+    },
+    {
+      "section": null,
+      "text": "1 teaspoon ground cumin"
+    },
+    {
+      "section": null,
+      "text": "1 teaspoon salt"
+    },
+    {
+      "section": null,
+      "text": "1 jalapeño or other peppers, stemmed, seeded and minced, or red pepper flakes or cayenne to taste"
+    },
+    {
+      "section": "Nutritional analysis per serving",
+      "text": "Step 1 Combine all ingredients in a heavy medium saucepan, Bring to a boil over medium heat, stirring often."
+    },
+    {
+      "section": "Nutritional analysis per serving",
+      "text": "Step 2 Reduce heat and simmer, stirring occasionally, until mixture has consistency of thick jam, about 1 hour 15 minutes. Taste and adjust seasoning, then cool and refrigerate until ready to use; this will keep at least a week."
+    },
+    {
+      "section": "Recipe Tags",
+      "text": "Boil"
+    }
+  ],
+  "titles": {
+    "h1": "Tomato Jam",
+    "title": "Tomato Jam Recipe"
+  }
+}

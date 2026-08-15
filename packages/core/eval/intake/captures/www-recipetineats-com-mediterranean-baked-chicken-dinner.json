@@ -1,0 +1,355 @@
+{
+  "url": "https://www.recipetineats.com/mediterranean-baked-chicken-dinner/",
+  "capturedAt": "2026-08-15",
+  "httpStatus": 200,
+  "error": null,
+  "bytes": 521938,
+  "jsonLdBlocks": 2,
+  "recipeNodes": 1,
+  "recipes": [
+    {
+      "@type": "Recipe",
+      "name": "Mediterranean Chicken Dinner",
+      "author": {
+        "@type": "Person",
+        "name": "Nagi | RecipeTin Eats"
+      },
+      "description": "Recipe video above. Infused with classic Mediterranean flavours of garlic, lemon, oregano and paprika, this is a terrific quick dinner idea. The sauce is the star of this and marinating is optional! I made this with drumsticks but you can make this with bone-in chicken thigh fillets too.",
+      "datePublished": "2020-03-02T11:20:52+00:00",
+      "image": [
+        "https://www.recipetineats.com/tachyon/2015/11/Lemon-Garlic-Chicken-Potato-Bake_7-copy.jpg",
+        "https://www.recipetineats.com/tachyon/2015/11/Lemon-Garlic-Chicken-Potato-Bake_7-copy.jpg?resize=500%2C500",
+        "https://www.recipetineats.com/tachyon/2015/11/Lemon-Garlic-Chicken-Potato-Bake_7-copy.jpg?resize=500%2C375",
+        "https://www.recipetineats.com/tachyon/2015/11/Lemon-Garlic-Chicken-Potato-Bake_7-copy.jpg?resize=480%2C270"
+      ],
+      "recipeYield": [
+        "4",
+        "4 - 5 people"
+      ],
+      "prepTime": "PT10M",
+      "cookTime": "PT55M",
+      "totalTime": "PT55M",
+      "recipeIngredient": [
+        "1kg / 2lb  bone in, skin on chicken thighs and drumsticks ((Note 1))",
+        "1/2 cup (125 ml)  lemon juice",
+        "6 cloves garlic (, minced)",
+        "2 tsp Dijon mustard ((Optional - Note 2))",
+        "2 tbsp honey or 1 tbsp sugar ((or maple or other sweetener))",
+        "1 tbsp dried oregano",
+        "1.5 tsp paprika",
+        "1 tbsp olive oil",
+        "1/2 tsp EACH salt and pepper",
+        "5  smallish potatoes (7.5cm/3&quot; wide) (, quartered (Note 3))",
+        "2  red onions (, quartered)",
+        "1 cup (250ml)  chicken broth/stock (, low sodium)",
+        "250g/8oz  cherry tomatoes ((whole))",
+        "1/2 tsp EACH salt and pepper",
+        "1 tbsp Olive oil (or oil spray)",
+        "Fresh oregano (, for garnish (optional))"
+      ],
+      "recipeInstructions": [
+        {
+          "@type": "HowToStep",
+          "text": "Mix Marinade ingredients in a bowl, then add chicken and toss to coat. If time permits, marinate for 24 hours, otherwise proceed to next step.",
+          "name": "Mix Marinade ingredients in a bowl, then add chicken and toss to coat. If time permits, marinate for 24 hours, otherwise proceed to next step.",
+          "url": "https://www.recipetineats.com/mediterranean-baked-chicken-dinner/#wprm-recipe-24918-step-0-0"
+        },
+        {
+          "@type": "HowToStep",
+          "text": "Preheat oven to 180C/350F.",
+          "name": "Preheat oven to 180C/350F.",
+          "url": "https://www.recipetineats.com/mediterranean-baked-chicken-dinner/#wprm-recipe-24918-step-0-1"
+        },
+        {
+          "@type": "HowToStep",
+          "text": "Place potatoes and onion in baking pan, top with chicken. Pour over the chicken stock then marinade from the bowl.",
+          "name": "Place potatoes and onion in baking pan, top with chicken. Pour over the chicken stock then marinade from the bowl.",
+          "url": "https://www.recipetineats.com/mediterranean-baked-chicken-dinner/#wprm-recipe-24918-step-0-2"
+        },
+        {
+          "@type": "HowToStep",
+          "text": "Bake for 20 minutes, then remove from oven.",
+          "name": "Bake for 20 minutes, then remove from oven.",
+          "url": "https://www.recipetineats.com/mediterranean-baked-chicken-dinner/#wprm-recipe-24918-step-0-3"
+        },
+        {
+          "@type": "HowToStep",
+          "text": "Scatter over cherry tomatoes, drizzle everything with 1 tbsp olive oil, sprinkle with salt and pepper. Bake for a further 30 - 35 minutes until chicken is golden and potatoes are cooked.",
+          "name": "Scatter over cherry tomatoes, drizzle everything with 1 tbsp olive oil, sprinkle with salt and pepper. Bake for a further 30 - 35 minutes until chicken is golden and potatoes are cooked.",
+          "url": "https://www.recipetineats.com/mediterranean-baked-chicken-dinner/#wprm-recipe-24918-step-0-4"
+        },
+        {
+          "@type": "HowToStep",
+          "text": "Remove from oven, garnish with fresh oregano if using and serve!",
+          "name": "Remove from oven, garnish with fresh oregano if using and serve!",
+          "url": "https://www.recipetineats.com/mediterranean-baked-chicken-dinner/#wprm-recipe-24918-step-0-5"
+        }
+      ],
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.82",
+        "ratingCount": "165",
+        "reviewCount": "16"
+      },
+      "review": [
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "I just came to scroll down and see Dozer on the 3 seater couch all to himself. Lovely memories of our Recipetin Mascot.\r\nA wintery day in Brisbane and ready to put this in the oven. Absolute classic and I will make some garlic bread for dipping xxx",
+          "author": {
+            "@type": "Person",
+            "name": "Preeya Rook"
+          },
+          "datePublished": "2026-08-06"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "I made this a couple of weeks ago and am planning on making it again this weekend for company.  It was absolutely delicious.\r\n\r\nI went a little heavier on the garlic and added some sumac to the potatoes/veggies just to double up a little on the citrus notes.\r\nI cooked it in my big 14\" cast iron skillet for about 30 minutes with a lid on and then another 25 or 30 with the lid off after adding the cherry tomatoes.\r\nVery, very good and great for my low sodium diet.",
+          "author": {
+            "@type": "Person",
+            "name": "Collin"
+          },
+          "datePublished": "2026-07-25"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "I too am so much more confident, and way more adventurous, in the kitchen since I discovered Nagi and Recipetineats.com a few years ago. I'm so grateful for her wonderful generosity in sharing her recipes, cooking skills, tips and tricks with us all. I purchased Dinner and Tonight as a way to give back, but I mainly still use the website. I love the scaling functionality as I am usually feeding a crowd.\r\nI vote Nagi for Australian of the year! Lol",
+          "author": {
+            "@type": "Person",
+            "name": "Peta"
+          },
+          "datePublished": "2026-07-13"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "4"
+          },
+          "reviewBody": "Although I enjoyed this easy to cook meal I found it a bit watery. Like others, I par boiled the potatoes but I think I’d put less liquid in next time as the marinade was tasty and the chicken would produce enough liquid I’d think. If I cooked it again, I’d add black olives. You’re still my favourite recipe creator",
+          "author": {
+            "@type": "Person",
+            "name": "Leonie Beckett"
+          },
+          "datePublished": "2026-07-11"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "3"
+          },
+          "reviewBody": "Love the flavours and concept but I followed the recipe very closely and needed a lot longer in the oven, or a slightly higher cook temp. The chicken and onions were not cooked enough and the potatoes came out very firm, even though they were cut nice and small. Also the potatoes really must be pre boiled. They don’t soften up due to all the acid in the liquid. I would also add a bit less liquid.",
+          "author": {
+            "@type": "Person",
+            "name": "Matty"
+          },
+          "datePublished": "2026-03-31"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "I found the same, great flavour but wanted a thicker sauce. I removed chicken and veggies from the pan and poured the liquid into a saucepan and boiled until desired consistency. It coats the chicken and veggies perfectly.",
+          "author": {
+            "@type": "Person",
+            "name": "Peggy"
+          },
+          "datePublished": "2026-03-25"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "I made this for my family for Shabbat dinner. It came out so good. I only did potatoes and red onion but it was perfect. The chicken was juicy but still had a crispy outside. I did splash a little lemon juice over everything and cooked uncovered for 10 mins before serving. Thank you!",
+          "author": {
+            "@type": "Person",
+            "name": "Titra"
+          },
+          "datePublished": "2026-03-25"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "I made this recipe last night.\r\nMy husband said it was the best chicken he’s ever had!!( he cooks too)He doesn’t give compliments.\r\nI did add olives, carrots and champignon mushrooms.\r\nI would give this recipe 10/10\r\nThe flavours are delectable",
+          "author": {
+            "@type": "Person",
+            "name": "Julia"
+          },
+          "datePublished": "2026-03-15"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "Easy to do. Full of flavkur",
+          "author": {
+            "@type": "Person",
+            "name": "Sheila Paddison"
+          },
+          "datePublished": "2026-01-25"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "Cooked this for lunch again today. I added carrots and tiny tomberry tomatoes this time. Marinating chicken drumsticks overnight certainly adds more depth of flavour. I've made this several times now, and each time it's a hit. It's an absolutely delicious and versatile dish.",
+          "author": {
+            "@type": "Person",
+            "name": "Kim"
+          },
+          "datePublished": "2025-12-28"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "Thanks Nagi for another midweek lifesaver — these throw-everything-in-a-tray recipes are always a win in my house. I love how the potatoes soak up all that lemon-garlic goodness, especially when they get a little crisp around the edges.\r\n\r\nI’ll sometimes tuck in a handful of olives or swap in sweet potato if that’s what I’ve got around — still turns out perfect. Definitely bookmarking this one for nights when I want something low effort but full payoff.",
+          "author": {
+            "@type": "Person",
+            "name": "Solis Paris"
+          },
+          "datePublished": "2025-12-08"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "Such an easy recipe and tasted beautiful!",
+          "author": {
+            "@type": "Person",
+            "name": "YUMIKO TSUJI"
+          },
+          "datePublished": "2025-10-26"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "Made this twice now, So good and so simple! Nagi do you think I could do this with fish?",
+          "author": {
+            "@type": "Person",
+            "name": "S ali"
+          },
+          "datePublished": "2025-10-19"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "Delicious. Added carrots, pumpkin pieces and olives as that’s what I had as well as the onions, potatoes etc.\r\nA hit with everyone and it’s been asked to be repeated. Thanks Nagi!",
+          "author": {
+            "@type": "Person",
+            "name": "Wayne"
+          },
+          "datePublished": "2025-10-14"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "This is absolutely delicious! Thanks Nagi for the great recipe!",
+          "author": {
+            "@type": "Person",
+            "name": "Samuel Lin"
+          },
+          "datePublished": "2025-09-13"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "Just made this today - what a winner. I added a quartered beetroot and a quartered round courgette from the garden. It made 5 good sized portions and the marinade gave it such a good flavour. Thank you x.",
+          "author": {
+            "@type": "Person",
+            "name": "Janet"
+          },
+          "datePublished": "2025-09-12"
+        }
+      ],
+      "recipeCategory": [
+        "Dinner"
+      ],
+      "recipeCuisine": [
+        "Mediterranean",
+        "Western"
+      ],
+      "keywords": "chicken and potatoes, Chicken dinner, chicken tray bake",
+      "nutrition": {
+        "@type": "NutritionInformation",
+        "servingSize": "503 g",
+        "calories": "90 kcal",
+        "carbohydrateContent": "50.6 g",
+        "proteinContent": "31.5 g",
+        "fatContent": "10 g",
+        "saturatedFatContent": "2.3 g",
+        "cholesterolContent": "81 mg",
+        "sodiumContent": "607 mg",
+        "fiberContent": "7.5 g",
+        "sugarContent": "14.4 g"
+      },
+      "@id": "https://www.recipetineats.com/mediterranean-baked-chicken-dinner/#recipe",
+      "isPartOf": {
+        "@id": "https://www.recipetineats.com/mediterranean-baked-chicken-dinner/#article"
+      },
+      "mainEntityOfPage": "https://www.recipetineats.com/mediterranean-baked-chicken-dinner/"
+    }
+  ],
+  "ingredientMarkup": [
+    "1kg / 2lb bone in, skin on chicken thighs and drumsticks (Note 1)",
+    "1/2 cup (125 ml) lemon juice",
+    "6 cloves garlic , minced",
+    "2 tsp Dijon mustard (Optional &ndash; Note 2)",
+    "2 tbsp honey or 1 tbsp sugar (or maple or other sweetener)",
+    "1 tbsp dried oregano",
+    "1.5 tsp paprika",
+    "1 tbsp olive oil",
+    "1/2 tsp EACH salt and pepper",
+    "5 smallish potatoes (7.5cm/3\" wide) , quartered (Note 3)",
+    "2 red onions , quartered",
+    "1 cup (250ml) chicken broth/stock , low sodium",
+    "250g/8oz cherry tomatoes (whole)",
+    "1/2 tsp EACH salt and pepper",
+    "1 tbsp Olive oil (or oil spray)",
+    "Fresh oregano , for garnish (optional)"
+  ],
+  "sectioned": [],
+  "titles": {
+    "h1": "Mediterranean Baked Chicken Dinner",
+    "title": "Mediterranean Baked Chicken Dinner - RecipeTin Eats"
+  }
+}

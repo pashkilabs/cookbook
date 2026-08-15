@@ -53,3 +53,32 @@ and the vision tier can. `not-a-recipe-page` would route somebody to nothing
 when a working path exists. The identifier suggests a collection, which would
 make it `not-a-recipe-page`, but that is inference from a slug and the capture
 will settle it.
+
+---
+
+## Capture results, 15 Aug 2026
+
+Seven of the thirteen recipe URLs carry a JSON-LD `Recipe` node. Three are dead,
+two are live but refuse a server-side fetch, one serves the wrong recipe's markup.
+Full readings and every ambiguity in `EXPECTED-DRAFT.md`.
+
+| # | HTTP | tier 0? | note |
+|---|---|---|---|
+| 1 smittenkitchen chicken-salad | 200 | no | markup only — tier 1 |
+| 2 pinchofyum gochujang | 200 | yes | sections on the page, not in the JSON-LD |
+| 3 bbcgoodfood traybake | 200 | yes | `2 x 400g cans`, `1 ½kg` |
+| 4 recipetineats mediterranean | 200 | yes | dual units; `1/2 tsp EACH salt and pepper` |
+| 5 recipetineats chicken-breast | 200 | yes | no `totalTime`, only prep + cook |
+| 6 budgetbytes pesto pasta | 200 | yes | prices in every line |
+| 7 smittenkitchen tortellini | **404** | — | **dead URL** |
+| 8 seriouseats | **402** | — | live, refuses a server fetch |
+| 9 jamieoliver hit-n-run-traybake | **404** | — | **dead URL**, on both path forms |
+| 10 nytimes tomato jam | 200 | yes | yield is `1 pint`, not a serving count |
+| 11 americastestkitchen | 200 | ⚠ | **markup is a different recipe** — mushrooms, not chicken |
+| 12 tasty.co | **406** | — | live, refuses a server fetch |
+| 13 cookpad chicken curry | **404** | — | **dead URL** |
+| 18 archive.org | **404** | — | identifier does not exist; the refusal reason cannot be read off a page that is not there |
+
+**Tier-0 hit rate: 7/13 as supplied (54%)**, 7/10 of those that resolve, 7/8 of
+those returning HTML. The first is the number that matters to somebody pasting a
+link, because a dead link is a failed import whatever the cause.

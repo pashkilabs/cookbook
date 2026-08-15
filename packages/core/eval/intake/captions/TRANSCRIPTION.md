@@ -27,25 +27,25 @@ wrappers.
 
 ## Three notes for whoever writes the expected output
 
-**Seventeen, not fourteen.** The paste contains seventeen distinct captions. Two
-pairs arrived run together, split here at Facebook's "See less" boundary:
-pad thai / chile lime bowl, and street corn bowls / crispy rice salad. If three
-of these were not meant to be fixtures, say which.
+**Seventeen, not fourteen — all seventeen are fixtures.** Two pairs arrived run
+together and are split here at Facebook's "See less" boundary: pad thai / chile
+lime bowl, and street corn bowls / crispy rice salad. Confirmed correct.
 
 **`facebook-sweet-chilli-crispy-rice-salad.txt` was truncated in the paste**, mid
-hashtag. The recipe itself is complete — ingredients, method and macros all
-arrived — so it is usable, but the tail is missing.
+hashtag. Only trailing hashtags are lost: ingredients, method and macros all
+arrived, so the fixture is usable as it stands.
 
-**Two are not recipes in the sense the harness means**, and are candidate
-refusals rather than candidate recipes (decisions §46):
+**Two look like refusals and are not.** Both are recipes, and both are the most
+valuable text fixtures in the set (decisions §46):
 
-- `instagram-summer-toast-board.txt` — three toast *ideas* with no quantities on
-  most components. Arguably `no-recipe-in-source`, arguably a recipe with almost
-  every amount null. Worth deciding deliberately: it is the honest hard case.
-- `instagram-texas-twinkies.txt` — a method with no quantities at all
-  (`Shred cheddar cheese to your desire`, `half a block of cream cheese`).
+- `instagram-texas-twinkies.txt` — every ingredient named, every amount absent.
+  Expected output is the named ingredients with `amount: null` and **no invented
+  quantities**. This is the cleanest measure of whether an extractor fabricates
+  when a source declines to specify — the same failure the reel path will have,
+  where amounts are spoken aloud and never written.
+- `instagram-summer-toast-board.txt` — three toasts as three sections under §45,
+  mostly null amounts with a few stated (`2 ears of corn`, `1 block feta`).
 
-Several others gate the *link* behind a comment — "comment 'recipe' and I'll DM
-you" — while still printing the full ingredient list. Those are recipes: the
-withholding is of the blog link, not of the recipe. Only a caption withholding
+The rule behind both, now recorded as decisions §46: a caption withholding a
+**link** while printing the ingredients is a recipe. Only a caption withholding
 the **ingredients** is `no-recipe-in-source`.

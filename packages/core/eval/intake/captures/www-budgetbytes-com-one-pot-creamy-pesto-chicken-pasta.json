@@ -1,0 +1,328 @@
+{
+  "url": "https://www.budgetbytes.com/one-pot-creamy-pesto-chicken-pasta/",
+  "capturedAt": "2026-08-15",
+  "httpStatus": 200,
+  "error": null,
+  "bytes": 693124,
+  "jsonLdBlocks": 1,
+  "recipeNodes": 1,
+  "recipes": [
+    {
+      "@type": "Recipe",
+      "name": "One Pot Creamy Pesto Chicken Pasta",
+      "author": {
+        "@id": "https://www.budgetbytes.com/#/schema/person/de533a4dad507aefcf8ea04e131701f9"
+      },
+      "description": "This super lush and Creamy Pesto Chicken Pasta is perfect for busy weeknights. Everything cooks in one pot and is done in under 30 minutes! ",
+      "datePublished": "2025-01-09T08:30:00+00:00",
+      "image": [
+        "https://www.budgetbytes.com/wp-content/uploads/2019/10/Creamy-Pesto-Chicken-Pasta-close-plate.jpg",
+        "https://www.budgetbytes.com/wp-content/uploads/2019/10/Creamy-Pesto-Chicken-Pasta-close-plate-500x500.jpg",
+        "https://www.budgetbytes.com/wp-content/uploads/2019/10/Creamy-Pesto-Chicken-Pasta-close-plate-500x375.jpg",
+        "https://www.budgetbytes.com/wp-content/uploads/2019/10/Creamy-Pesto-Chicken-Pasta-close-plate-480x270.jpg"
+      ],
+      "video": {
+        "name": "One Pot Creamy Pesto Chicken Pasta",
+        "description": "This super lush and Creamy Pesto Chicken Pasta is perfect for busy weeknights. Everything cooks in one pot and is done in under 30 minutes! FULL RECIPE BELOW. 👇\n\nPRINTABLE RECIPE: https://www.budgetbytes.com/one-pot-creamy-pesto-chicken-pasta/\n\nINGREDIENTS\n1 lb. boneless, skinless chicken breast ($5.56)\n2 Tbsp butter ($0.26)\n2 cloves garlic ($0.16)\n1/2 lb. penne pasta ($0.40)\n1.5 cups chicken broth ($0.20)\n1 cup milk ($0.32)\n3 oz. cream cheese ($0.29)\n1/3 cup basil pesto ($0.73)\n1/4 cup grated Parmesan ($0.44)\nfreshly cracked pepper ($0.03)\n1 pinch crushed red pepper ($0.02)\nOPTIONAL ADD-INS\n3 cup fresh spinach ($0.90)\n1/4 cup sliced sun dried tomatoes ($1.10)\n\nINSTRUCTIONS\n1. Cut the chicken breast into 1-inch pieces. Add the butter to a deep skillet and melt over medium heat. Add the chicken to the skillet and cook over medium heat until the chicken is slightly browned on the outside.\n2. While the chicken is cooking, mince the garlic. Add the garlic to the skillet with the chicken and continue to sauté for one minute more.\n3. Add the uncooked pasta and chicken broth to the skillet with the chicken and garlic. Stir to dissolve any browned bits from the bottom of the skillet. Place a lid on the skillet, turn the heat up to medium-high, and bring the broth up to a boil.\n4. Once the broth comes to a full boil, give the pasta a quick stir, replace the lid, and turn the heat down to medium-low. Let the pasta simmer over medium-low heat for about 8 minutes, or until the pasta is tender and most of the broth has been absorbed. Stir the pasta briefly every two minutes as it simmers, replacing the lid quickly each time.\n5. Once the pasta is tender and most of the broth absorbed, add the milk, cream cheese (cut into chunks), and pesto. Stir and cook over medium heat until the cream cheese has fully melted into the sauce. Finally, add the grated Parmesan and stir until combined.\n6. If using, add the fresh spinach and sliced sun dried tomatoes. Stir until the spinach has wilted, then remove the pasta from the heat. Top the pasta with freshly cracked pepper and a pinch of crushed red pepper, then serve.\n\nSee how we calculate recipe costs here: https://www.budgetbytes.com/how-to-calculate-recipe-costs/\n\nInstagram: budgetbytes\nFacebook: budgetbytes1\nPinterest: budgetbytes\nTwitter: budget_bytes\n\nTIMESTAMPS\n0:00 Introduction\n0:09 Sauté Chicken in Butter\n0:14 Add Minced Garlic\n0:17 Add Pasta and Broth\n0:24 Simmer\n0:31 Stir in Cream Cheese, Pesto, and Milk\n0:43 Add Parmesan\n0:47 Season with Pepper and Crushed Red Pepper\n0:49 Fold in Sun Dried Tomatoes and Spinach\n1:00 Serve and Enjoy!",
+        "uploadDate": "2020-12-06T16:30:02+00:00",
+        "duration": "PT1M8S",
+        "thumbnailUrl": "https://i.ytimg.com/vi/cxTSOlWNXy0/hqdefault.jpg",
+        "embedUrl": "https://www.youtube.com/embed/cxTSOlWNXy0?feature=oembed",
+        "contentUrl": "https://www.youtube.com/watch?v=cxTSOlWNXy0",
+        "@type": "VideoObject"
+      },
+      "recipeYield": [
+        "4"
+      ],
+      "prepTime": "PT5M",
+      "cookTime": "PT20M",
+      "totalTime": "PT25M",
+      "recipeIngredient": [
+        "1 lb. boneless, skinless chicken breast ($6.25)",
+        "2 Tbsp butter ($0.28)",
+        "2 cloves garlic ($0.16)",
+        "1/2 lb. penne pasta ($0.67)",
+        "1.5 cups chicken broth ($0.20)",
+        "1 cup milk ($0.19)",
+        "3 oz. cream cheese* ($0.80)",
+        "1/3 cup basil pesto ($0.73)",
+        "1/4 cup grated Parmesan ($0.44)",
+        "freshly cracked pepper ($0.03)",
+        "1 pinch  crushed red pepper ($0.02)",
+        "3 cup fresh spinach ($0.90)",
+        "1/4 cup sliced sun dried tomatoes ($1.10)"
+      ],
+      "recipeInstructions": [
+        {
+          "@type": "HowToStep",
+          "text": "Cut the chicken breast into 1-inch pieces. Add the butter to a deep skillet and melt over medium heat. Add the chicken to the skillet and cook over medium heat until the chicken is slightly browned on the outside.",
+          "name": "Cut the chicken breast into 1-inch pieces. Add the butter to a deep skillet and melt over medium heat. Add the chicken to the skillet and cook over medium heat until the chicken is slightly browned on the outside.",
+          "url": "https://www.budgetbytes.com/one-pot-creamy-pesto-chicken-pasta/#wprm-recipe-45797-step-0-0"
+        },
+        {
+          "@type": "HowToStep",
+          "text": "While the chicken is cooking, mince the garlic. Add the garlic to the skillet with the chicken and continue to sauté for one minute more.",
+          "name": "While the chicken is cooking, mince the garlic. Add the garlic to the skillet with the chicken and continue to sauté for one minute more.",
+          "url": "https://www.budgetbytes.com/one-pot-creamy-pesto-chicken-pasta/#wprm-recipe-45797-step-0-1"
+        },
+        {
+          "@type": "HowToStep",
+          "text": "Add the uncooked pasta and chicken broth to the skillet with the chicken and garlic. Stir to dissolve any browned bits from the bottom of the skillet. Place a lid on the skillet, turn the heat up to medium-high, and bring the broth up to a boil.",
+          "name": "Add the uncooked pasta and chicken broth to the skillet with the chicken and garlic. Stir to dissolve any browned bits from the bottom of the skillet. Place a lid on the skillet, turn the heat up to medium-high, and bring the broth up to a boil.",
+          "url": "https://www.budgetbytes.com/one-pot-creamy-pesto-chicken-pasta/#wprm-recipe-45797-step-0-2"
+        },
+        {
+          "@type": "HowToStep",
+          "text": "Once the broth comes to a full boil, give the pasta a quick stir, replace the lid, and turn the heat down to medium-low. Let the pasta simmer over medium-low heat for about 8 minutes, or until the pasta is tender and most of the broth has been absorbed. Stir the pasta briefly every two minutes as it simmers, replacing the lid quickly each time.",
+          "name": "Once the broth comes to a full boil, give the pasta a quick stir, replace the lid, and turn the heat down to medium-low. Let the pasta simmer over medium-low heat for about 8 minutes, or until the pasta is tender and most of the broth has been absorbed. Stir the pasta briefly every two minutes as it simmers, replacing the lid quickly each time.",
+          "url": "https://www.budgetbytes.com/one-pot-creamy-pesto-chicken-pasta/#wprm-recipe-45797-step-0-3"
+        },
+        {
+          "@type": "HowToStep",
+          "text": "Once the pasta is tender and most of the broth absorbed, add the milk, cream cheese (cut into chunks), and pesto. Stir and cook over medium heat until the cream cheese has fully melted into the sauce. Finally, add the grated Parmesan and stir until combined.",
+          "name": "Once the pasta is tender and most of the broth absorbed, add the milk, cream cheese (cut into chunks), and pesto. Stir and cook over medium heat until the cream cheese has fully melted into the sauce. Finally, add the grated Parmesan and stir until combined.",
+          "url": "https://www.budgetbytes.com/one-pot-creamy-pesto-chicken-pasta/#wprm-recipe-45797-step-0-4"
+        },
+        {
+          "@type": "HowToStep",
+          "text": "If using, add the fresh spinach and sliced sun dried tomatoes. Stir until the spinach has wilted, then remove the pasta from the heat. Top the pasta with freshly cracked pepper and a pinch of crushed red pepper, then serve.",
+          "name": "If using, add the fresh spinach and sliced sun dried tomatoes. Stir until the spinach has wilted, then remove the pasta from the heat. Top the pasta with freshly cracked pepper and a pinch of crushed red pepper, then serve.",
+          "url": "https://www.budgetbytes.com/one-pot-creamy-pesto-chicken-pasta/#wprm-recipe-45797-step-0-5"
+        }
+      ],
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.84",
+        "ratingCount": "254",
+        "reviewCount": "14"
+      },
+      "review": [
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "4"
+          },
+          "reviewBody": "I think I will use chicken thighs instead of breast next time as thighs can stand up to the cooking times and still be more juicy than chicken breast. Otherwise, my family loved it especially the sauce. Thank you.",
+          "author": {
+            "@type": "Person",
+            "name": "Angela Jones"
+          },
+          "datePublished": "2026-08-10"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "1"
+          },
+          "reviewBody": "This recipe was not good for me. I would do it completely different next time. I would cook the chicken with only a small amount of oil in the cast iron to get it browned on high, and cook the noodles separately. There was not enough broth to cook the noodles, I had to add more, and then I had to cut back in milk. Doubled the pesto and cheese to make it thicker. In the end the chicken was basically boiled and overcooked.\r\n\r\nDisappointing recipe. :/",
+          "author": {
+            "@type": "Person",
+            "name": "Lilli"
+          },
+          "datePublished": "2026-08-04"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "This was delicious! I added extra garlic and I didn’t have tomatoes or spinach on hand so I used canned artichokes instead. Next time I’ll cook as directed! Wonderful recipe!!",
+          "author": {
+            "@type": "Person",
+            "name": "Kristen"
+          },
+          "datePublished": "2026-06-26"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "I just made this for the second time.  We love it.  Second time I didn't have cream cheese but used heavy cream and it turned out great.  This will be on rotation.  Quick and easy.  It's also a great way to use up homemade pesto.",
+          "author": {
+            "@type": "Person",
+            "name": "Kathleen Schwendeman"
+          },
+          "datePublished": "2026-04-27"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "This was delicious! A really yummy, easy, one pot recipe that comes together really nicely. Make sure you get a good quality basil pesto as I think that makes a big difference. I also used half a cup more chicken stock and a bit more pasta.",
+          "author": {
+            "@type": "Person",
+            "name": "Brooke"
+          },
+          "datePublished": "2026-04-27"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "I love this recipe, I don't add the milk, but use garlic and herb cream cheese, copious amounts of it. Always double the pesto and parmesan, spinach and sun-dried tomatoes. It's a winner iny house, one pan dinners are my absolute favourite, much less washing up than a roast dinner. Thankyou for posting this, I have printed and laminated your recipe and it's become extremely popular with the girls at work. UK fan here, I will be trying your other recipes",
+          "author": {
+            "@type": "Person",
+            "name": "Yve"
+          },
+          "datePublished": "2026-04-12"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "Made this last night for supper. My family really enjoyed it and there were no leftovers. I used homemade garlic chive pesto and homemade sundried tomatoes. It was really quick as well.",
+          "author": {
+            "@type": "Person",
+            "name": "Jerilea"
+          },
+          "datePublished": "2026-03-03"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "This was a hit, I added just a little rotisserie chicken seasoning to my chicken while it was cooking. Thanks for another great recipe to add to our meal plan!",
+          "author": {
+            "@type": "Person",
+            "name": "Kirsten"
+          },
+          "datePublished": "2026-02-26"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "Bless you for this recipe. My teenage son requested this in our regular rotation. Delicious! I always double this and sub the spinach for the \"power greens\" mix and have enough for a few days at least.",
+          "author": {
+            "@type": "Person",
+            "name": "Aileen D"
+          },
+          "datePublished": "2026-02-19"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "This was genuinely amazing like 11/10 my favorite pasta ever!!!’nn",
+          "author": {
+            "@type": "Person",
+            "name": "Jacob Winans"
+          },
+          "datePublished": "2026-01-14"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "made this and love it!!!\r\nI accidentally bought roasted red peppers so I just used them and it was absolutely delicious!\r\nThe next day i decided to make it again , so it  can have lunches for the coming week. I used the sun dried tomatoes &amp; I got to say I liked the prepped better but it was still delicious!\r\nOne of my new favorites!",
+          "author": {
+            "@type": "Person",
+            "name": "Delilah Bell"
+          },
+          "datePublished": "2025-11-02"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "Made this with protein (chickpea) Farfalle noodles and it turned out fantastic!  Farfalle needs a couple extra minutes to become tender in the middle so use a “heaping” 1.5 cups of broth.",
+          "author": {
+            "@type": "Person",
+            "name": "Hunter"
+          },
+          "datePublished": "2025-10-07"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "I have a question! I only have frozen spinach. Should I I thaw it, drain it and then add to this recipe?",
+          "author": {
+            "@type": "Person",
+            "name": "Esther Tolooei"
+          },
+          "datePublished": "2025-09-23"
+        },
+        {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "5"
+          },
+          "reviewBody": "Hi Beth! I made this recipe tonight and it is phenomenal, I'm just starting to learn to cook on my own and this was both easy and delicious. My sauce was VERY runny, I think a product of using bouillon over real broth. I'll reduce the amount next time and see how it goes. Thanks again for posting this!!",
+          "author": {
+            "@type": "Person",
+            "name": "Zachary Aaron Taylor"
+          },
+          "datePublished": "2025-08-31"
+        }
+      ],
+      "recipeCategory": [
+        "Dinner",
+        "Main Course"
+      ],
+      "recipeCuisine": [
+        "American"
+      ],
+      "keywords": "Easy Dinner, Weeknight Recipe",
+      "nutrition": {
+        "@type": "NutritionInformation",
+        "servingSize": "1 Serving",
+        "calories": "748.68 kcal",
+        "carbohydrateContent": "52.55 g",
+        "proteinContent": "41.75 g",
+        "fatContent": "41.53 g",
+        "fiberContent": "4.1 g",
+        "sodiumContent": "1099.28 mg"
+      },
+      "@id": "https://www.budgetbytes.com/one-pot-creamy-pesto-chicken-pasta/#recipe",
+      "isPartOf": {
+        "@id": "https://www.budgetbytes.com/one-pot-creamy-pesto-chicken-pasta/#article"
+      },
+      "mainEntityOfPage": "https://www.budgetbytes.com/one-pot-creamy-pesto-chicken-pasta/"
+    }
+  ],
+  "ingredientMarkup": [
+    "▢ 1 lb. ( 450 g ) boneless, skinless chicken breast ($6.25)",
+    "▢ 2 Tbsp ( 30 g ) butter ($0.28)",
+    "▢ 2 cloves garlic ($0.16)",
+    "▢ 1/2 lb. ( 230 g ) penne pasta ($0.67)",
+    "▢ 1.5 cups ( 350 ml ) chicken broth ($0.20)",
+    "▢ 1 cup ( 240 ml ) milk ($0.19)",
+    "▢ 3 oz. ( 90 g ) cream cheese* ($0.80)",
+    "▢ 1/3 cup ( 80 g ) basil pesto ($0.73)",
+    "▢ 1/4 cup ( 25 g ) grated Parmesan ($0.44)",
+    "▢ freshly cracked pepper ($0.03)",
+    "▢ 1 pinch crushed red pepper ($0.02)",
+    "▢ 3 cup ( 90 g ) fresh spinach ($0.90)",
+    "▢ 1/4 cup ( 30 g ) sliced sun dried tomatoes ($1.10)"
+  ],
+  "sectioned": [],
+  "titles": {
+    "h1": "One Pot Creamy Pesto Chicken Pasta",
+    "title": "One Pot Creamy Pesto Chicken Pasta Recipe - Budget Bytes"
+  }
+}

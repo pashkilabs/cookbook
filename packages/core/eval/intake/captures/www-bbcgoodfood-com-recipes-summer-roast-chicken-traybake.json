@@ -1,0 +1,174 @@
+{
+  "url": "https://www.bbcgoodfood.com/recipes/summer-roast-chicken-traybake",
+  "capturedAt": "2026-08-15",
+  "httpStatus": 200,
+  "error": null,
+  "bytes": 534159,
+  "jsonLdBlocks": 3,
+  "recipeNodes": 1,
+  "recipes": [
+    {
+      "@context": "https://schema.org",
+      "@id": "https://www.bbcgoodfood.com/recipes/summer-roast-chicken-traybake#Recipe",
+      "@type": "Recipe",
+      "description": "Revamp your roast chicken for the summer months with just a few ingredients. Serve our easy traybake with salad or crusty bread for a winning chicken dinner",
+      "image": [
+        {
+          "@type": "ImageObject",
+          "url": "https://images.immediate.co.uk/production/volatile/sites/30/2020/08/5_ingredients_chicken-384d57e.jpg?resize=440,400",
+          "width": 440,
+          "height": 400
+        }
+      ],
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": "https://www.bbcgoodfood.com/recipes/summer-roast-chicken-traybake"
+      },
+      "name": "Summer roast chicken traybake",
+      "url": "https://www.bbcgoodfood.com/recipes/summer-roast-chicken-traybake",
+      "author": [
+        {
+          "@type": "Person",
+          "name": "Esther Clark",
+          "url": "https://www.bbcgoodfood.com/author/estherclark"
+        }
+      ],
+      "dateModified": "2026-07-13T16:29:43+01:00",
+      "datePublished": "2019-06-10T20:42:57+01:00",
+      "headline": "Summer roast chicken traybake",
+      "keywords": "Chicken, Esther Clark, Fibre, Folate, Gluten free, Roast chicken, Summer, Traybake",
+      "publisher": {
+        "@type": "Organization",
+        "name": "Good Food",
+        "url": "https://www.bbcgoodfood.com",
+        "logo": {
+          "@type": "ImageObject",
+          "height": 325,
+          "url": "https://images.immediate.co.uk/production/volatile/sites/30/2026/02/goodfood.logo-f37096c.png?resize=1312,325",
+          "width": 1312
+        }
+      },
+      "cookTime": "PT1H20M",
+      "nutrition": {
+        "@type": "NutritionInformation",
+        "calories": "550 calories",
+        "fatContent": "33 grams fat",
+        "saturatedFatContent": "8 grams saturated fat",
+        "carbohydrateContent": "22 grams carbohydrates",
+        "sugarContent": "7 grams sugar",
+        "fiberContent": "6 grams fiber",
+        "proteinContent": "37 grams protein",
+        "sodiumContent": "0.9 milligram of sodium"
+      },
+      "prepTime": "PT10M",
+      "recipeCategory": "Dinner, Main course",
+      "recipeIngredient": [
+        "1 ½kg whole chicken",
+        "4 tbsp olive oil",
+        "600g frozen mixed roasted veg",
+        "2 x 400g cans cannellini beans drained and rinsed",
+        "145g fresh pesto",
+        "400g cherry tomatoes on the vine"
+      ],
+      "recipeInstructions": [
+        {
+          "@type": "HowToStep",
+          "text": "Heat the oven to 190C/170C fan/gas 5. Rub the chicken with the oil, then generously season the skin and inside the cavity with salt and black pepper. Arrange the veg in a large roasting tin and sit the chicken on top. Roast for 1 hr, uncovered."
+        },
+        {
+          "@type": "HowToStep",
+          "text": "Tip the beans and pesto into the tin and stir through the veg. Add 150ml water and arrange the tomatoes over the beans and veg. Return the tin to the oven and cook for a further 20 mins, or until the chicken is cooked through and the juices run clear."
+        },
+        {
+          "@type": "HowToStep",
+          "text": "Remove from the oven, cover loosely with foil and rest for 20 mins before carving and serving."
+        }
+      ],
+      "recipeYield": "Serves 4-6",
+      "suitableForDiet": "https://schema.org/GlutenFreeDiet",
+      "totalTime": "PT1H30M"
+    }
+  ],
+  "ingredientMarkup": [
+    "1 ½kg whole chicken",
+    "4 tbsp olive oil",
+    "600g frozen mixed roasted veg",
+    "2 x 400g cans cannellini beans drained and rinsed",
+    "145g fresh pesto",
+    "400g cherry tomatoes on the vine"
+  ],
+  "sectioned": [
+    {
+      "section": null,
+      "text": "1 ½kg whole chicken"
+    },
+    {
+      "section": null,
+      "text": "4 tbsp olive oil"
+    },
+    {
+      "section": null,
+      "text": "600g frozen mixed roasted veg"
+    },
+    {
+      "section": null,
+      "text": "2 x 400g cans cannellini beans drained and rinsed"
+    },
+    {
+      "section": null,
+      "text": "145g fresh pesto"
+    },
+    {
+      "section": null,
+      "text": "400g cherry tomatoes on the vine"
+    },
+    {
+      "section": "Nutrition: Per serving (6)",
+      "text": "kcal 550"
+    },
+    {
+      "section": "Nutrition: Per serving (6)",
+      "text": "fat 33 g"
+    },
+    {
+      "section": "Nutrition: Per serving (6)",
+      "text": "saturates 8 g"
+    },
+    {
+      "section": "Nutrition: Per serving (6)",
+      "text": "carbs 22 g"
+    },
+    {
+      "section": "Nutrition: Per serving (6)",
+      "text": "sugars 7 g"
+    },
+    {
+      "section": "Nutrition: Per serving (6)",
+      "text": "fibre 6 g"
+    },
+    {
+      "section": "Nutrition: Per serving (6)",
+      "text": "protein 37 g"
+    },
+    {
+      "section": "Nutrition: Per serving (6)",
+      "text": "salt 0.9 g"
+    },
+    {
+      "section": "Nutrition: Per serving (6)",
+      "text": "step 1 Heat the oven to 190C/170C fan/gas 5. Rub the chicken with the oil, then generously season the skin and inside the cavity with salt and black pepper. Arrange the veg in a large roasting tin and sit the chicken on top. Roast for 1 hr, uncovered."
+    },
+    {
+      "section": "Nutrition: Per serving (6)",
+      "text": "step 2 Tip the beans and pesto into the tin and stir through the veg. Add 150ml water and arrange the tomatoes over the beans and veg. Return the tin to the oven and cook for a further 20 mins, or until the chicken is cooked through and the juices run clear."
+    },
+    {
+      "section": "Nutrition: Per serving (6)",
+      "text": "step 3 Remove from the oven, cover loosely with foil and rest for 20 mins before carving and serving."
+    }
+  ],
+  "titles": {
+    "h1": "Summer roast chicken traybake",
+    "title": "Summer roast chicken traybake recipe | Good Food"
+  }
+}

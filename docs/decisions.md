@@ -1993,6 +1993,27 @@ and an extractor gains a third thing it can return, distinct from `null`:
 { refused: { because: RefusalReason } }
 ```
 
+### A withheld link is not a withheld recipe
+
+The commonest social pattern is *"comment 'recipe' and I'll DM you"* — and most of those captions
+**print the whole ingredient list anyway**. What is being withheld is the blog link, not the
+recipe. So:
+
+> A caption withholding a **link** while printing the ingredients is a recipe.
+> Only a caption withholding the **ingredients** is `no-recipe-in-source`.
+
+Getting this backwards in either direction is expensive. Refusing every caption that says "comment
+below" would decline most of the corpus — a false refusal on recipes that are fully present.
+Accepting one that has nothing but a promise invites the model to fill the gap, which is the
+confabulation this whole section exists to catch.
+
+A recipe with **no amounts at all** is still a recipe. `instagram-texas-twinkies.txt` names every
+ingredient and quantifies none of them — "half a block of cream cheese", "shred cheddar cheese to
+your desire". The correct output is those ingredients with `amount: null`, and it is the sharpest
+fixture in the set: it measures directly whether an extractor invents quantities when the source
+declines to give them. That is the same failure the reel path will have, where the amounts are
+spoken aloud and never written.
+
 `RefusalReason` is a closed set, because the reason decides what the product offers next:
 
 | reason | what it means | what the product offers |
