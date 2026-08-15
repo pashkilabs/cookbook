@@ -74,8 +74,26 @@ export async function buildShoppingWeek(
       .is("deleted_at", null),
   ]);
 
-  const failure = plan.error ?? ingredientRows.error ?? packageRows.error ?? pantryRows.error ?? tickRows.error;
-  if (failure) return { week: null, error: failure.message };
+  /*
+   * The catalog is an improvement, not a prerequisite.
+   *
+   * A failed catalog read used to take the whole list down — Stephen saw
+   * "column ingredients.grams_each does not exist" and no shopping list at all, on a week he had
+   * planned. But `consolidate` works without a catalog: it buckets by name, merges what shares a
+   * unit, and simply cannot suggest package sizes or aisles. **A list of the right ingredients
+   * with no package advice is worth a great deal more than an error message**, and the household
+   * is standing in a shop.
+   *
+   * The plan itself is different: with no planned recipes there is nothing to show, so that
+   * failure is still fatal and still reported.
+   */
+  const fatal = plan.error ?? pantryRows.error ?? tickRows.error;
+  if (fatal) return { week: null, error: fatal.message };
+
+  const catalogFailure = ingredientRows.error ?? packageRows.error;
+  if (catalogFailure) {
+    console.error(`[pashki] shopping list built without the catalog: ${catalogFailure.message}`);
+  }
 
   const planned = (plan.data ?? []).map((entry) => ({
     id: entry.id as string,
@@ -84,6 +102,8 @@ export async function buildShoppingWeek(
     recipe: entry.recipes as unknown as { id: string; title: string },
   }));
 
+  // an empty catalog is a working catalog that knows nothing — every item falls through to its
+  // own name, which is exactly the degraded behaviour wanted
   const catalog = createCatalog(
     catalogItemsFromRows(ingredientRows.data ?? [], packageRows.data ?? [], system),
   );

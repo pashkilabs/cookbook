@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { formatAsWritten } from "@pashki/core";
+import { scaleIngredientAmounts, servingsForScale } from "@/lib/planner";
 import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
 import { startOfWeek, todayIso } from "@/lib/week";
@@ -20,8 +21,15 @@ import { Verdicts } from "./verdicts";
  * guess. The filter is what makes an id that is not yours indistinguishable from an id that
  * does not exist — both are `notFound()`, and neither confirms the recipe is real.
  */
-export default async function RecipePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function RecipePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ planned?: string }>;
+}) {
   const { id } = await params;
+  const { planned } = await searchParams;
   const supabase = await userClient();
 
   const { data: auth } = await supabase.auth.getUser();
@@ -79,6 +87,31 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
       .from("recipe-photos")
       .createSignedUrl(photo.data.storage_path, 600);
     photoUrl = signed.data?.signedUrl ?? null;
+  }
+
+  /*
+   * Opened from the planner, at the servings it was planned for.
+   *
+   * The scale is read from the plan entry rather than taken from the URL: a query parameter is a
+   * caller's assertion, and a stale link would otherwise show amounts for a meal that has since
+   * been changed. **Filtered by family_id as well as id** — the id comes from a URL, and RLS
+   * returning nothing is not the same as this household owning it.
+   */
+  let plannedScale = 1;
+  let plannedServings: number | null = null;
+  if (planned) {
+    const { data: entry } = await supabase
+      .from("plan_entries")
+      .select("scale, date")
+      .eq("id", planned)
+      .eq("family_id", family.id)
+      .eq("recipe_id", id)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (entry) {
+      plannedScale = Number(entry.scale) || 1;
+      plannedServings = servingsForScale(plannedScale, recipe.servings);
+    }
   }
 
   const scores = new Map(ratings.data?.map((r) => [r.family_member_id, r.score]) ?? []);
@@ -143,11 +176,18 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
         </div>
       </div>
 
+      {plannedScale !== 1 && (
+        <div className="notice">
+          Amounts shown for <strong>{plannedServings ?? `${plannedScale}×`} servings</strong>, as
+          planned. <Link href={`/recipes/${recipe.id}`}>Show the recipe as written</Link>.
+        </div>
+      )}
+
       <section>
         <h2>Ingredients</h2>
         {ingredients.data?.length ? (
           <ul className="ingredients">
-            {ingredients.data.map((line) => {
+            {scaleIngredientAmounts(ingredients.data, plannedScale).map((line) => {
               // formatted by packages/core, so the web app and the app agree on what
               // "1½ cup" looks like without either of them deciding
               const measure = formatAsWritten(

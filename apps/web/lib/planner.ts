@@ -106,3 +106,25 @@ export function parseScale(value: unknown): number | null {
   if (!Number.isFinite(parsed) || parsed <= 0 || parsed > MAX_SCALE) return null;
   return Math.round(parsed * 1000) / 1000;
 }
+
+/**
+ * The recipe's amounts, as the planned meal needs them.
+ *
+ * The multiplier was reaching the shopping list and nothing else. Somebody who planned a recipe
+ * for nine and opened it to cook saw the original amounts — so the figure they typed changed what
+ * they bought and not what they made, which is the half that is in your hands at the stove.
+ *
+ * A scale that is not a usable multiplier returns the lines untouched. The value arrives from a
+ * URL, and a stale or hand-edited one must not silently halve somebody's dinner.
+ */
+export function scaleIngredientAmounts<T extends { amount: number | null }>(
+  lines: T[],
+  scale: number,
+): T[] {
+  if (!Number.isFinite(scale) || scale <= 0 || scale === 1) return lines;
+  return lines.map((line) => ({
+    ...line,
+    // an unstated amount is not 1.5 of anything — "salt to taste" stays "salt to taste"
+    amount: line.amount === null ? null : line.amount * scale,
+  }));
+}

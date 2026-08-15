@@ -139,6 +139,10 @@ async function rest(method, path, body) {
   return text ? JSON.parse(text) : null;
 }
 
+/** The exact select `packages/db`'s catalog reader issues. If they drift, this check is worthless. */
+const INGREDIENT_COLUMNS =
+  "id, key, canonical_name, aliases, aisle, dimension, grams_per_cup, can_size, grams_each, kcal_per_100g, energy_fdc_id";
+
 const stamp = Date.now();
 const address = `pashki-smoke+${stamp}@example.invalid`;
 let accountId = null;
@@ -512,8 +516,42 @@ try {
     const ticked = await call("POST", "/api/shopping-ticks", { body: { weekStart, itemKey: "double-cream", ticked: true } });
     record("tick a shopping line", ticked.status === 200, `HTTP ${ticked.status}`);
 
+    /*
+     * The check that would have caught the dead shopping list.
+     *
+     * It used to assert HTTP 200 and nothing else — and the page degrades to 200 with an error
+     * message in it, so a missing column sailed through CI twice while the list was gone for a
+     * real household. **A status code is not a rendered page.** This asserts the planned recipe's
+     * ingredients actually appear, and that the failure banner does not.
+     */
     const shopping = await call("GET", `/shopping?week=${weekStart}`);
+    const html = typeof shopping.body === "string" ? shopping.body : JSON.stringify(shopping.body);
     record("the shopping list renders", alive(shopping), `HTTP ${shopping.status}`);
+    record(
+      "and does not report a failure",
+      !html.includes("Could not build the list"),
+      html.includes("Could not build the list") ? "the page says it could not build the list" : "",
+    );
+    record(
+      "and actually lists the planned ingredients",
+      html.includes("flour"),
+      html.includes("flour") ? "" : "the planned recipe's ingredients are not on the page",
+    );
+
+    /*
+     * The class behind that bug: code selecting a column its database lacks. Asserted directly
+     * against the app's own select string, so a schema/code split fails here rather than in a
+     * household's kitchen — and with no credentials this test did not already hold.
+     */
+    const contract = await fetch(
+      `${SUPABASE}/rest/v1/ingredients?select=${encodeURIComponent(INGREDIENT_COLUMNS)}&limit=1`,
+      { headers: svc },
+    );
+    record(
+      "the database has every column the app selects",
+      contract.ok,
+      contract.ok ? "" : `PostgREST refused the app's select: ${await contract.text().then((t) => t.slice(0, 120))}`,
+    );
   }
 
   const path = `${familyId}/smoke-${stamp}.jpg`;

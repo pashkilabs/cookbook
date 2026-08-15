@@ -194,7 +194,8 @@ export function PlannerWeek(props: {
 
               {forDay.map((entry) => (
                 <div className="entry" key={entry.id}>
-                  <Link href={`/recipes/${entry.recipe.id}`}>{entry.recipe.title}</Link>
+                  {/* carries the plan entry, so the recipe opens at the servings it was planned for */}
+                  <Link href={`/recipes/${entry.recipe.id}?planned=${entry.id}`}>{entry.recipe.title}</Link>
                   {entry.recipe.time_minutes && (
                     <p className="meta" style={{ margin: "0.15rem 0 0.4rem" }}>
                       {entry.recipe.time_minutes} min
