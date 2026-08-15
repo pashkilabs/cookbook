@@ -195,3 +195,47 @@ describe("lines from real imports", () => {
     expect(isStaple("kosher salt and black pepper")).toBe(true);
   });
 });
+
+describe("a unit closed up against its number", () => {
+  /**
+   * British recipe writing, and it defeated the parser completely — not by mis-reading the line
+   * but by declining to read it. `\b` sat after the number, and there is no word boundary
+   * between a digit and a letter, so `150ml` matched nothing and the whole line became the
+   * ingredient name. Four lines like it were in production, permanently unmatchable against the
+   * catalog, and a re-import would have produced them again.
+   */
+  it("reads a metric amount written without a space", () => {
+    // regression: "150ml unsweetened apple juice" parsed as an ingredient called "150ml ..."
+    for (const [line, amount, unit, item] of [
+      ["150ml unsweetened apple juice", 150, "ml", "unsweetened apple juice"],
+      ["100g runny honey", 100, "g", "runny honey"],
+      ["30ml low-salt soy sauce", 30, "ml", "low-salt soy sauce"],
+      ["1.5kg whole chicken", 1.5, "kg", "whole chicken"],
+    ] as const) {
+      const [parsed] = parseIngredientList([line]);
+      expect(parsed?.amount, line).toBe(amount);
+      expect(parsed?.unit, line).toBe(unit);
+      expect(parsed?.item, line).toBe(item);
+    }
+  });
+
+  it("still reads the spaced form identically, because both are the same recipe", () => {
+    const [closed] = parseIngredientList(["150ml apple juice"]);
+    const [spaced] = parseIngredientList(["150 ml apple juice"]);
+    expect(closed?.amount).toBe(spaced?.amount);
+    expect(closed?.unit).toBe(spaced?.unit);
+    expect(closed?.item).toBe(spaced?.item);
+  });
+
+  it("reads a closed-up range by its upper bound, as any other range", () => {
+    const [parsed] = parseIngredientList(["150-200ml stock"]);
+    expect(parsed?.amount).toBe(200);
+    expect(parsed?.unit).toBe("ml");
+  });
+
+  it("does not mistake a fraction or a decimal for the end of a number", () => {
+    expect(parseIngredientList(["1/2 cup flour"])[0]?.amount).toBe(0.5);
+    expect(parseIngredientList(["1 1/2 cups flour"])[0]?.amount).toBe(1.5);
+    expect(parseIngredientList(["1.5 kg beef"])[0]?.amount).toBe(1.5);
+  });
+});

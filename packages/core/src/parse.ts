@@ -66,15 +66,29 @@ export function parseIngredientLine(raw: string): ParsedIngredient | null {
   let rest = text;
   let paren: { amount: number; unit: string } | null = null;
 
+  /*
+   * A number is over when the digits are, even if a letter follows it immediately.
+   *
+   * regression: this was `\b`, and there is no word boundary between `0` and `m` — both are word
+   * characters. So `150ml` matched nothing at all and the entire line became the ingredient name,
+   * while `150 ml` parsed perfectly. British sites write the unit closed up more often than not,
+   * which made a whole class of import silently unmatchable: four such lines were sitting in
+   * production, and re-importing them would have produced them again.
+   */
+  const NUMBER_END = String.raw`(?![\d.,/])`;
+
   // A range means "buy enough" — take the upper bound so we don't come up short.
-  const range = new RegExp(`^(${NUMBER})\\s*(?:-|–|—|to|or)\\s*(${NUMBER})\\b`, "i").exec(rest);
+  const range = new RegExp(
+    `^(${NUMBER})\\s*(?:-|–|—|to|or)\\s*(${NUMBER})${NUMBER_END}`,
+    "i",
+  ).exec(rest);
   if (range) {
     const lo = readNumber(range[1] ?? "");
     const hi = readNumber(range[2] ?? "");
     amount = Math.max(lo ?? 0, hi ?? 0) || null;
     rest = rest.slice(range[0].length).trim();
   } else {
-    const single = new RegExp(`^(${NUMBER})\\b`).exec(rest);
+    const single = new RegExp(`^(${NUMBER})${NUMBER_END}`).exec(rest);
     if (single) {
       amount = readNumber(single[1] ?? "");
       rest = rest.slice(single[0].length).trim();
