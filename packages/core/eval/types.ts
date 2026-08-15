@@ -150,6 +150,13 @@ export interface ExtractorUsage {
  * measured on what it extracted, not on how its wrapper serialises nothing.
  */
 export interface ExtractedRecipe {
+  /**
+   * Which tier produced this, when the extractor is a cascade.
+   *
+   * Carried because "how often does the free deterministic path answer" is the
+   * question that decides how much tier 2 has to earn. It was being discarded.
+   */
+  tier?: string;
   title?: string | null;
   servings?: number | null;
   totalMinutes?: number | null;

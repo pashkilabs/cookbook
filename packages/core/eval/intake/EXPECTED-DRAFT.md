@@ -285,3 +285,98 @@ piece of work rather than a regex.
 **Tier-1 pages need more captured than the ingredient list.** Smitten Kitchen has
 no JSON-LD, so title, servings and time have to come from the page, and my capture
 kept only ingredient lines. Three of its five fields are therefore uncheckable.
+
+---
+
+# Round two — screenshots, and the ambiguities that need Stephen
+
+## archive.org — decided from the page, and the answer is neither
+
+`https://archive.org/metadata/cbk_community-cookbook-archive` returns **`{}`**, and
+`/details/` 404s. The identifier does not exist on archive.org at all. So it is
+neither `image-only-source` nor `not-a-recipe-page` — **there is no page to read**,
+and any reason chosen would be a guess dressed as a judgement.
+
+⚠ That is a fourth outcome the closed set has no word for: **a URL that does not
+resolve**. It is different from `unresolvable-source` (Instagram, TikTok — sites
+that never serve a recipe to a server) because a 404 is a mistyped or rotted link
+and the remedy is "check the link", not "send a screenshot". Whether that earns a
+reason of its own is Stephen's call; three of the thirteen recipe URLs are also
+404, so it is not a one-off.
+
+## Reddit could not be read either
+
+The thread returns an **8 KB loading shell** to a server-side fetch — Reddit
+serves no content without a browser. So `not-a-recipe-page` cannot be confirmed
+from the page any more than it could from the slug. Tier 0 will decline it, but
+for the wrong reason: "no recipe found in this markup", not "this is a discussion
+thread". ⚠ A refusal that happens to be right for the wrong reason still scores
+as a refusal under §46 and would be reported as a reason mismatch. That is the
+behaviour working, but it is worth knowing that two of the five refusals cannot
+be *checked* against their source.
+
+## The screenshots
+
+Fourteen frames arrived, not five — several reels contributed more than one. Two
+identified by reading them:
+
+- `frame-01` — **a second tiffy.cooks post**, not the curry one: *"Here is
+  everything I made for my husband's lunchbox this week… Full recipes link in
+  bio"*. Another withheld recipe, and a cleaner `no-recipe-in-source` than the
+  curry, because it does not even name a dish.
+- `frame-02` — the coconut curry reel, mid-shot, with **`Garlic powder` on
+  screen**.
+
+⚠ **`frame-02` breaks the tiffy fixture's expected output.** The caption is the
+refusal case — "comment CHICKEN and I will dm you the full recipe" — but the video
+frames *name ingredients the caption withholds*: garlic powder here, hot rice in
+another, and the comments discuss a Japanese curry cube and coconut milk. So:
+
+- scored as a **caption**, tiffy.cooks is `no-recipe-in-source` — settled.
+- scored as a **reel**, it is a partial recipe: several named ingredients, no
+  amounts anywhere, assembled across frames.
+
+Those are different correct answers for the same post, and which one is right
+depends on what the product does when somebody shares a reel: refuse because the
+caption withholds, or extract what the frames show and mark it incomplete. **This
+is the single most consequential ambiguity in the set**, because it decides
+whether the reel path is allowed to answer at all.
+
+## The two Stephen named
+
+**"A splash of cream" — estimate flagged as guessed, or no amount?**
+
+My reading: **no amount** — `amount: null`, and the note keeps the words. The
+reason is §43's: an estimate that looks like a measurement is worse than an
+absence, because it is plausible and it is wrong in a direction nobody can see.
+`ParsedIngredient` already carries `estimated`, and the review screen already
+shows an "estimated" badge, so a guessed amount is *expressible* — but a guess
+made by a model from "a splash" has no basis to be 1 tbsp rather than 3, and the
+shopping list would buy against it silently.
+
+⚠ Against that: `null` means the shopping list buys nothing for cream, and the
+person cooking finds out at the pan. An estimate flagged as guessed at least puts
+cream on the list. This is a genuine trade and I have not resolved it — it is the
+same shape as the calorie decision, where the answer was "say it is incomplete
+rather than quietly understate", which argues for null.
+
+**Caption versus pinned comment, when they disagree.**
+
+My reading: **the pinned comment wins**, and the disagreement is surfaced rather
+than silently resolved. A pinned comment is nearly always the author correcting
+or completing the caption — it is written later, and it is pinned *because* the
+caption was insufficient. But a review screen that silently drops the caption's
+version hides a real conflict from the only person who can settle it.
+
+⚠ The fixture format cannot currently express "these two sources disagree", so
+either the expectation encodes only the winner (and the eval cannot measure
+whether an extractor noticed the conflict) or the format grows a way to say it.
+Not decided.
+
+## What is not done
+
+Expected outputs are written for **8 URL fixtures** (above) and none of the
+captions or screenshots. The captions are the larger job — seventeen of them,
+several with sections — and doing them at speed would produce exactly the
+plausible-looking, unchecked expectations the intake README warns against. The
+baseline run is blocked on them, and on the calls above.

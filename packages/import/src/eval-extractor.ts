@@ -71,7 +71,27 @@ export function createImportExtractor(options: ImportExtractorOptions): Extracto
     }
 
     if (input.kind === "url") {
-      const outcome = await importRecipe(input.url, options);
+      /*
+       * A fixture's captured snapshot is the input, not the live page. Re-fetching
+       * would make yesterday's score unrepeatable and would measure whatever the
+       * site published this morning. The fetcher is swapped for one that serves the
+       * capture, so tiers 0 and 1 read exactly what was hand-checked.
+       */
+      const snapshot = input.text;
+      const withSnapshot: ImportExtractorOptions = snapshot
+        ? {
+            ...options,
+            fetcher: {
+              async page() {
+                return { finalUrl: input.url, contentType: "text/html", html: snapshot };
+              },
+              async bytes() {
+                throw new Error("a fixture carries no images");
+              },
+            },
+          }
+        : options;
+      const outcome = await importRecipe(input.url, withSnapshot);
       if (!outcome.ok) return null;
       return toEvalRecipe(outcome.recipe, outcome.tier);
     }
@@ -120,8 +140,8 @@ function toEvalRecipe(
   recipe: { title: string; servings: number | null; totalMinutes: number | null; ingredients: EvalRecipe["ingredients"] },
   tier: Tier,
 ): EvalRecipe {
-  void tier;
   return {
+    tier,
     title: recipe.title,
     servings: recipe.servings,
     totalMinutes: recipe.totalMinutes,
