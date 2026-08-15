@@ -23,12 +23,36 @@ import type { CatalogItem, MeasurementSystem, PackageSize } from "./types.js";
  */
 export const SEED_CATALOG: CatalogItem[] = [
   // ---- Dairy ----
-  { key: "heavy-cream", names: ["heavy cream", "heavy whipping cream", "whipping cream", "double cream"],
+  { key: "heavy-cream", names: ["heavy cream", "heavy whipping cream", "whipping cream"],
     aisle: "Dairy", dimension: "volume",
     packages: [{ label: "½ pint (8 oz)", amount: 237 }, { label: "pint (16 oz)", amount: 473 }, { label: "quart (32 oz)", amount: 946 }] , gramsPerCup: 238, kcalPer100g: 340, energyFdcId: "170859"},
-  { key: "half-and-half", names: ["half and half", "half & half", "single cream"],
+  { key: "half-and-half", names: ["half and half", "half & half"],
     aisle: "Dairy", dimension: "volume",
     packages: [{ label: "pint", amount: 473 }, { label: "quart", amount: 946 }] },
+  /*
+   * British cream is a different product, not a synonym.
+   *
+   * `double cream` was aliased to US heavy cream and `single cream` to half-and-half, which
+   * understated a British recipe's cream by a quarter and a half respectively — and Stephen
+   * imports from UK blogs. Fat content is what cream's energy is: 48% against 36%, and 18%
+   * against 11%.
+   */
+  { key: "double-cream", names: ["double cream", "extra thick double cream"],
+    aisle: "Dairy", dimension: "volume", gramsPerCup: 237,
+    packages: [{ label: "300 ml pot", amount: 300 }, { label: "600 ml pot", amount: 600 }],
+    /*
+     * 449 kcal/100g, and **not from FDC** — its ladder stops at heavy whipping (36-40% fat,
+     * 340 kcal, id 170859) and double cream is 48%. Derived from fat content, which is what
+     * cream's energy almost entirely is: 48 g of fat at 9 kcal is 432, plus ~17 for the protein
+     * and lactose. It agrees with the UK composition tables to within a percent. Recorded with no
+     * FDC id rather than borrowing a nearby one, because a wrong id is worse than none.
+     */
+    kcalPer100g: 449 },
+  { key: "single-cream", names: ["single cream", "pouring cream"],
+    aisle: "Dairy", dimension: "volume", gramsPerCup: 240,
+    packages: [{ label: "300 ml pot", amount: 300 }, { label: "600 ml pot", amount: 600 }],
+    // 18% fat, which FDC does carry: "Cream, fluid, light (coffee cream or table cream)"
+    kcalPer100g: 195, energyFdcId: "170857" },
   { key: "milk", names: ["whole milk", "2% milk", "skim milk", "milk"],
     aisle: "Dairy", dimension: "volume",
     packages: [{ label: "quart", amount: 946 }, { label: "½ gallon", amount: 1893 }, { label: "gallon", amount: 3785 }] },

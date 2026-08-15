@@ -3,7 +3,7 @@
 -- Written by scripts/generate-seed.ts from SEED_CATALOG in @pashki/core.
 -- Regenerate with: pnpm --filter @pashki/db gen:seed
 --
--- 55 ingredients, 163 package sizes.
+-- 57 ingredients, 167 package sizes.
 --
 -- Idempotent: `supabase db reset` runs this after the migrations, and running it
 -- again upserts rather than duplicating. Both tables have the unique constraints
@@ -19,8 +19,10 @@ insert into public.ingredients
   (key, canonical_name, aliases, aisle, dimension, grams_per_cup, can_size,
    grams_each, kcal_per_100g, energy_fdc_id)
 values
-  ('heavy-cream', 'heavy cream', array['heavy whipping cream', 'whipping cream', 'double cream'], 'Dairy', 'volume', 238, null, null, 340, '170859'),
-  ('half-and-half', 'half and half', array['half & half', 'single cream'], 'Dairy', 'volume', null, null, null, null, null),
+  ('heavy-cream', 'heavy cream', array['heavy whipping cream', 'whipping cream'], 'Dairy', 'volume', 238, null, null, 340, '170859'),
+  ('half-and-half', 'half and half', array['half & half'], 'Dairy', 'volume', null, null, null, null, null),
+  ('double-cream', 'double cream', array['extra thick double cream'], 'Dairy', 'volume', 237, null, null, 449, null),
+  ('single-cream', 'single cream', array['pouring cream'], 'Dairy', 'volume', 240, null, null, 195, '170857'),
   ('milk', 'whole milk', array['2% milk', 'skim milk', 'milk'], 'Dairy', 'volume', null, null, null, null, null),
   ('buttermilk', 'buttermilk', '{}'::text[], 'Dairy', 'volume', null, null, null, null, null),
   ('sour-cream', 'sour cream', '{}'::text[], 'Dairy', 'weight', 230, null, null, null, null),
@@ -99,6 +101,10 @@ from (values
   ('half-and-half', 'us', 'pint', 473, 0),
   ('half-and-half', 'us', 'quart', 946, 1),
   ('half-and-half', 'metric', '300 ml pot', 300, 0),
+  ('double-cream', 'us', '300 ml pot', 300, 0),
+  ('double-cream', 'us', '600 ml pot', 600, 1),
+  ('single-cream', 'us', '300 ml pot', 300, 0),
+  ('single-cream', 'us', '600 ml pot', 600, 1),
   ('milk', 'us', 'quart', 946, 0),
   ('milk', 'us', '½ gallon', 1893, 1),
   ('milk', 'us', 'gallon', 3785, 2),
@@ -278,6 +284,10 @@ where gp.ingredient_id = i.id
   ('half-and-half', 'us', 'pint', 473, 0),
   ('half-and-half', 'us', 'quart', 946, 1),
   ('half-and-half', 'metric', '300 ml pot', 300, 0),
+  ('double-cream', 'us', '300 ml pot', 300, 0),
+  ('double-cream', 'us', '600 ml pot', 600, 1),
+  ('single-cream', 'us', '300 ml pot', 300, 0),
+  ('single-cream', 'us', '600 ml pot', 600, 1),
   ('milk', 'us', 'quart', 946, 0),
   ('milk', 'us', '½ gallon', 1893, 1),
   ('milk', 'us', 'gallon', 3785, 2),

@@ -1762,9 +1762,31 @@ rate is the argument against automation, and each is recorded with its FDC id:
 | onion | 170000, 40 — generic raw | 790577, 44 red; 170008, 32 sweet | a 15% spread across varieties nobody distinguishes when cooking |
 | garlic | 1104647, 143 | 169230, 149 | two rows, same name, 4% apart; took the Foundation analysis |
 
-**One known inaccuracy, stated rather than hidden.** The catalog aliases UK *double cream* to US
-*heavy cream*. Double cream is around 48% fat against heavy cream's 36%, so a British recipe's
-cream is understated by roughly a quarter. Splitting them is a catalog change, not an energy one.
+**That inaccuracy is now fixed, and it was worse than estimated.** UK *double cream* was aliased to
+US *heavy cream*, and UK *single cream* to *half-and-half*. Both are now their own catalog items:
+300 ml of double cream reads **~1350 kcal against ~1030** — a **32%** understatement, not the
+quarter first guessed. Single cream at 18% fat matched a real FDC row ("Cream, fluid, light",
+170857, 195) where half-and-half is 131.
+
+Double cream carries **no FDC id**: the ladder stops at heavy whipping (36–40% fat, 340) and double
+cream is 48%. Its 449 is derived from fat content — 48 g of fat at 9 kcal, plus the protein and
+lactose — which agrees with UK composition tables to within a percent. Recorded with no id rather
+than borrowing a nearby one, because a wrong id is worse than none.
+
+**The rest of the catalog was audited for the same fault**, and these alias across a real energy
+difference. None is changed yet; each needs its own lookup and judgement:
+
+| entry | spans | worst gap |
+|---|---|---|
+| `milk` | whole, 2%, skim | 61 → 34, **nearly twofold** |
+| `shredded-cheese` | mozzarella, cheddar, monterey jack | ~300 → ~400, **a third** |
+| `tortillas` | flour, corn | ~310 → ~220, **a third** |
+| `ground-beef` | ground chuck, beef mince, hamburger | UK mince runs 5–20% fat; 176 → 332 across the range |
+| `yogurt` | Greek, plain | ~97 → ~61 |
+| `beans` | black, kidney, chickpeas, cannellini | modest, but canned versus dried matters more than variety |
+
+Deliberately *not* faults: `cilantro`/`coriander` and `shrimp`/`prawns` are the same food under two
+names, which is exactly what an alias is for. `butter` salted and unsalted are both 717.
 
 ### Matching is the real problem, and it is a judgement call more often than not
 
