@@ -125,6 +125,41 @@ describe("the whole list, both ways", () => {
     expect(us.needed).toBe(metric.needed);
   });
 
+  it("says what each meal takes in the household's units too", () => {
+    /*
+     * regression: the reported bug. `uses[].display` rendered the parse as written while the
+     * need and the packages rendered in the household's system, so a metric household read
+     * "600 ml pot" and "500 g" beside "Tuesday takes 1 lb" — two systems on one page, in the
+     * one document that is read in a shop.
+     */
+    for (const line of consolidate(WEEK, catalog, { system: "metric" })) {
+      for (const use of line.uses) {
+        expect(use.display, `${line.key} — ${use.label}`).not.toMatch(/\b(lb|oz|cup|cups|qt|gal|tbsp|tsp|pint)\b/);
+      }
+    }
+  });
+
+  it("keeps a US household on US units, including for a recipe written in metric", () => {
+    /*
+     * The other half, asserted rather than assumed — the same guard §28's formatter work used.
+     * Stating it honestly, though: this is **not** "no change at all" for US households. Before,
+     * a US household holding a metric recipe read "Tuesday takes 500 g" beside "2 lb needed",
+     * because the usage line rendered as written. Now it reads in US units. That is the same bug
+     * mirrored, and fixing it in one direction only would have been fixing half of it.
+     *
+     * What is unchanged for a US household: the default, and every recipe already written in US
+     * units — which is all of them in the seeded corpus.
+     */
+    const stated = consolidate(WEEK, catalog, { system: "us" });
+    const omitted = consolidate(WEEK, catalog);
+    expect(stated).toEqual(omitted);
+    for (const line of stated) {
+      for (const use of line.uses) {
+        expect(use.display, `${line.key} — ${use.label}`).not.toMatch(/\b(g|kg|ml|l)\b/);
+      }
+    }
+  });
+
   it("says the leftover in the same system as the need", () => {
     // the wart this closes: "2.5 kg bag" above "3 lb spare"
     for (const line of consolidate(WEEK, catalog, { system: "metric" })) {

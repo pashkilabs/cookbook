@@ -2042,6 +2042,51 @@ Neither §45 nor §46 is built yet — deliberately. They are recorded first so 
 expected outputs are written against the intended answer rather than against what the code does
 today.
 
+## 47. Quantities are stored as written and converted at display — and an editing screen shows what will be stored
+
+A household sets `families.measurement_system`. Somebody in that household types `1 lb chicken`,
+or imports a recipe from a US blog. Is `1 lb` stored, or is `454 g` stored?
+
+**Stored as written; converted when displayed.** The same reasoning as base units, and as §29's
+"as written means the parse": keep what you were given, convert on the way out. Converting on save
+is lossy and irreversible — it turns `1 lb` into `453.59 g`, and no later change of preference can
+get `1 lb` back. It also silently rewrites somebody's recipe, which is theirs and not ours.
+
+And **an imported recipe's source system is a fact about the source, not about the household.** A
+recipe from a British blog is written in grams whoever imports it; a household preference is a
+statement about how its members like to *read* quantities, not about what the recipe says. Storing
+the household's units would conflate the two, and would make the same imported recipe different
+rows in two households — which is exactly what §28 refused for package sizes.
+
+### The consequence that is not obvious: an editing surface must not convert
+
+`formatAsWritten` renders the parse, and the recipe editor and the import review screen **round-trip
+through it**: they render each line to text, a person edits the text, and it is re-parsed on save.
+So a screen that converted for display would convert *into the store* on the next save — a metric
+household opening a US recipe, changing the title, and unknowingly rewriting every amount.
+
+So the rule is not "every screen converts". It is:
+
+| surface | shows | why |
+|---|---|---|
+| shopping list | household units | it is the household's document, read in a shop against packages priced in those units |
+| recipe detail, planner | household units | read-only; nothing round-trips |
+| recipe editor, import review | **as written** | the text shown is the text that will be saved; converting would rewrite the recipe |
+
+A screen that edits shows what will be stored. A screen that reads shows what the household asked
+for. Stated this way the two halves stop competing.
+
+### What the reported bug actually was
+
+Not a missing preference on the recipe page — the shopping list itself was mixed. `consolidate`
+rendered the need and the packages with `formatMeasure(system)` and the per-recipe usage line with
+`formatAsWritten`, so a metric household read `600 ml pot` and `500 g` beside `Tuesday takes 1 lb`.
+One page, two systems, in the one document read standing in a shop.
+
+Fixed symmetrically, which is worth saying plainly because it **is** a change for US households
+too: one holding a metric recipe previously read `Tuesday takes 500 g` beside `2 lb needed`, and
+now reads US units throughout. Fixing it in one direction only would have been fixing half of it.
+
 ## Open: cascade deletions and tombstones
 
 **Not resolved. This waits on the sync engine choice, and exists so the evaluation

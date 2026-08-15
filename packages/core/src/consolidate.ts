@@ -62,7 +62,23 @@ export function consolidate(
         label: entry.label,
         ...(entry.groupKey !== undefined ? { groupKey: entry.groupKey } : {}),
         amount: measure?.amount ?? 0,
-        display: formatAsWritten(scaled, ingredient.unit),
+        /*
+         * The household's units, not the recipe's.
+         *
+         * regression: this was `formatAsWritten`, which renders the parse as the recipe wrote it
+         * (§29). On a shopping list that put two systems on one page — "600 ml pot" and "500 g
+         * needed" beside "Tuesday takes 1 lb" — for a household that had asked for metric. A
+         * shopping list is the household's document: it is read in a shop, against packages
+         * priced in the household's units, and a line that needs converting in somebody's head
+         * is the one thing this list exists to remove.
+         *
+         * `formatAsWritten` keeps its job on the recipe itself, where "as written" is the point.
+         * A measure that cannot reach base units (an unknown unit) still falls back to it,
+         * because a line rendered wrongly is worse than one rendered in the recipe's own words.
+         */
+        display: measure
+          ? formatMeasure(measure.amount, measure.dimension, system)
+          : formatAsWritten(scaled, ingredient.unit),
       });
 
       if (measure) {
