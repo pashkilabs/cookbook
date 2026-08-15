@@ -66,6 +66,20 @@ const svc = { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, "Content-Type
 const results = [];
 let session = null;
 
+/**
+ * A check that could not run.
+ *
+ * Recorded rather than merely printed. The skip line was already on screen, but it never reached
+ * the verdict — so the run announced "71 checks passed" where the last one said 72, and the only
+ * thing distinguishing a complete run from an incomplete one was remembering the old number.
+ * Silence reads as success; so does a smaller number nobody is counting.
+ */
+const skipped = [];
+const skip = (name, why) => {
+  skipped.push({ name, why });
+  console.log(`  --    ${name}  — NOT CHECKED: ${why}`);
+};
+
 const record = (name, ok, detail) => {
   results.push({ name, ok, detail });
   console.log(`  ${ok ? "ok  " : "FAIL"}  ${name}${detail ? `  — ${detail}` : ""}`);
@@ -168,6 +182,33 @@ async function rest(method, path, body) {
   return text ? JSON.parse(text) : null;
 }
 
+/**
+ * A GoTrue admin call, held to the same rule as `rest`.
+ *
+ * These *set up* a measurement — list the account signup just made, mint an invitee to accept with
+ * — rather than testing the product. So a refusal here is a broken measurement, and returning the
+ * error body as data would surface it as `accountId = null` and report "account exists and is
+ * confirmable — FAIL", which names the wrong thing entirely.
+ *
+ * Sign-in is deliberately *not* routed through this: whether a confirmed account can sign in is
+ * the product under test, so a 400 there is a real failure and must stay an assertion.
+ */
+async function admin(method, path, body) {
+  const response = await fetch(`${SUPABASE}/auth/v1/admin${path}`, {
+    method,
+    headers: svc,
+    body: body === undefined ? undefined : JSON.stringify(body),
+    signal: AbortSignal.timeout(45_000),
+  });
+  const text = await response.text();
+  if (!response.ok) {
+    const failure = new Error(`${method} /auth/v1/admin${path} -> ${response.status} ${text.slice(0, 160)}`);
+    failure.measurement = true;
+    throw failure;
+  }
+  return text ? JSON.parse(text) : null;
+}
+
 /** The exact select `packages/db`'s catalog reader issues. If they drift, this check is worthless. */
 const INGREDIENT_COLUMNS =
   "id, key, canonical_name, aliases, aisle, dimension, grams_per_cup, can_size, grams_each, kcal_per_100g, energy_fdc_id";
@@ -259,16 +300,10 @@ try {
 
   // confirm without waiting for mail: this checks the app, not the inbox, and the mail path has
   // its own end-to-end verification in docs/deployment.md
-  const users = await (await fetch(`${SUPABASE}/auth/v1/admin/users?per_page=200`, { headers: svc })).json();
+  const users = await admin("GET", "/users?per_page=200");
   const user = (users.users ?? []).find((u) => (u.email ?? "").toLowerCase() === address);
   accountId = user?.id ?? null;
-  if (accountId) {
-    await fetch(`${SUPABASE}/auth/v1/admin/users/${accountId}`, {
-      method: "PUT",
-      headers: svc,
-      body: JSON.stringify({ email_confirm: true }),
-    });
-  }
+  if (accountId) await admin("PUT", `/users/${accountId}`, { email_confirm: true });
   record("account exists and is confirmable", Boolean(accountId));
 
   const token = await (await fetch(`${SUPABASE}/auth/v1/token?grant_type=password`, {
@@ -277,7 +312,8 @@ try {
     body: JSON.stringify({ email: address, password: `Smoke-${stamp}-Aa1!` }),
   })).json();
   session = token.access_token ? token : null;
-  record("can sign in once confirmed", Boolean(session));
+  // the reason, not just the verdict: an unconfirmed account and a wrong password fail alike
+  record("can sign in once confirmed", Boolean(session), String(token.error_description ?? token.msg ?? "").slice(0, 90));
 
   const provisioned = await call("POST", "/api/household", { body: {} });
   familyId = provisioned.body?.familyId ?? null;
@@ -385,7 +421,7 @@ try {
         : `HTTP ${asScheduler.status}`,
     );
   } else {
-    console.log("  --    scheduler secret not in the environment; that path was not checked");
+    skip("the drain route accepts the scheduler's secret", "PASHKI_DRAIN_SECRET is not in the environment");
   }
 
   console.log("\nhousehold members");
@@ -452,11 +488,9 @@ try {
    */
   const invitedAddress = invitee;
   const invitedPassword = `Smoke-${stamp}-Bb2!`;
-  const inviteeAccount = await fetch(`${SUPABASE}/auth/v1/admin/users`, {
-    method: "POST",
-    headers: svc,
-    body: JSON.stringify({ email: invitedAddress, password: invitedPassword, email_confirm: true }),
-  }).then((r) => r.json());
+  const inviteeAccount = await admin("POST", "/users", {
+    email: invitedAddress, password: invitedPassword, email_confirm: true,
+  });
   invitedAccountId = inviteeAccount?.id ?? null;
 
   const claim = await rest(
@@ -686,9 +720,12 @@ if (reached.length === 0) {
 const failed = results.filter((r) => !r.ok);
 console.log("-".repeat(72));
 if (failed.length === 0) {
-  console.log(`SMOKE: ${results.length} checks passed against ${base}`);
+  const note = skipped.length ? `, ${skipped.length} NOT CHECKED` : "";
+  console.log(`SMOKE: ${results.length} checks passed${note} against ${base}`);
+  for (const s of skipped) console.log(`  not checked: ${s.name} — ${s.why}`);
   process.exit(PASSED);
 }
-console.log(`SMOKE: ${failed.length} of ${results.length} FAILED against ${base}`);
+console.log(`SMOKE: ${failed.length} of ${results.length} FAILED against ${base}${skipped.length ? `, ${skipped.length} NOT CHECKED` : ""}`);
 for (const f of failed) console.log(`  ${f.name}${f.detail ? `  — ${f.detail}` : ""}`);
+for (const s of skipped) console.log(`  not checked: ${s.name} — ${s.why}`);
 process.exit(FAILED);
