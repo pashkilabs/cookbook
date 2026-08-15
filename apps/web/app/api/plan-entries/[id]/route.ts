@@ -2,7 +2,7 @@ import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
 import { refusal } from "@/lib/refusal";
 import { statusFor } from "@/lib/recipe-writes";
-import { isScale } from "@/lib/planner";
+import { MAX_SERVINGS, parseScale, parseServings, scaleForServings, servingsForScale } from "@/lib/planner";
 
 /** Change how much to cook, or take it off the day. */
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -11,14 +11,44 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if ("response" in scope) return scope.response;
   const { supabase, familyId } = scope;
 
-  let body: { scale?: unknown };
+  let body: { servings?: unknown; scale?: unknown };
   try {
     body = (await request.json()) as typeof body;
   } catch {
     return Response.json({ error: "expected a JSON body" }, { status: 400 });
   }
-  const scale = Number(body.scale);
-  if (!isScale(scale)) return Response.json({ error: "scale must be 1, 1.5 or 2" }, { status: 400 });
+
+  /*
+   * The recipe's own yield is needed to turn a servings figure into the stored multiplier, and it
+   * is read through the entry so the household scope is never taken from the caller.
+   */
+  const entry = await supabase
+    .from("plan_entries")
+    .select("id, recipes!inner(servings)")
+    .eq("id", id)
+    .eq("family_id", familyId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!entry.data) return Response.json({ error: "no such entry" }, { status: 404 });
+  const recipeServings = (entry.data.recipes as unknown as { servings: number | null }).servings;
+
+  let scale: number | null;
+  if (body.servings !== undefined) {
+    const servings = parseServings(body.servings);
+    scale = servings === null ? null : scaleForServings(servings, recipeServings);
+  } else {
+    scale = parseScale(body.scale);
+  }
+  if (scale === null) {
+    return Response.json(
+      {
+        error: recipeServings
+          ? `servings must be a whole number of people, 1 to ${MAX_SERVINGS}`
+          : "this recipe does not say what it serves, so send a batch multiplier",
+      },
+      { status: 400 },
+    );
+  }
 
   const { data, error } = await supabase
     .from("plan_entries")
@@ -31,7 +61,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   // an update matching nothing returns success with zero rows, so the count is what says whether
   // it was ours — the same reasoning as editing a recipe
   if (data.length === 0) return Response.json({ error: "no such entry" }, { status: 404 });
-  return Response.json({ id, scale });
+  return Response.json({ id, scale, servings: servingsForScale(scale, recipeServings) });
 }
 
 export async function DELETE(_request: Request, context: { params: Promise<{ id: string }> }) {

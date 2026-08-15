@@ -45,10 +45,64 @@ export async function findOrCreateWeek(
   return { message: created.error.message, code: created.error.code };
 }
 
-/** The scales the prototype offered. A free numeric field invites 0.3333. */
-export const SCALES = [1, 1.5, 2] as const;
-export type Scale = (typeof SCALES)[number];
+/**
+ * Servings, not multipliers.
+ *
+ * `plan_entries.scale` is still what is **stored** — a batch multiplier is what
+ * `packages/core` consolidates against, and the planner already rendered
+ * `recipe.servings × scale` to show a number of servings. So the reading existed and only the
+ * input was a menu. These invert that computation at the edge and change nothing downstream.
+ *
+ * Storing servings instead was the alternative and was rejected: `recipes.servings` is nullable,
+ * so a recipe with no stated yield has no defined "feed six", while a multiplier is always
+ * defined. Decisions §41 records the consequence — editing a recipe's own servings changes what a
+ * plan feeds rather than what it multiplies — and why that reading is the honest one.
+ */
 
-export function isScale(value: unknown): value is Scale {
-  return SCALES.some((scale) => scale === Number(value));
+/** Nobody is cooking for more than this, and a typo should not become a shopping list. */
+export const MAX_SERVINGS = 50;
+/** The stored multiplier is bounded too, for a recipe with an unusable servings figure. */
+export const MAX_SCALE = 50;
+
+/**
+ * A typed servings figure, or null if it is not one.
+ *
+ * Whole people. `2.5` servings is a number a spreadsheet produces, not a person, and admitting
+ * fractions here is how `0.3333` ends up in a shopping list.
+ */
+export function parseServings(value: unknown): number | null {
+  const parsed = typeof value === "number" ? value : Number(String(value ?? "").trim());
+  if (!Number.isFinite(parsed)) return null;
+  if (!Number.isInteger(parsed)) return null;
+  if (parsed < 1 || parsed > MAX_SERVINGS) return null;
+  return parsed;
+}
+
+/**
+ * The multiplier that turns a recipe into that many servings.
+ *
+ * A recipe with no stated yield cannot answer this, so the caller has to ask for a multiplier
+ * instead — which is what the planner does, rather than inventing a yield of 1 and quietly
+ * multiplying by six.
+ */
+export function scaleForServings(servings: number, recipeServings: number | null): number | null {
+  if (!recipeServings || recipeServings <= 0) return null;
+  const scale = servings / recipeServings;
+  if (!Number.isFinite(scale) || scale <= 0 || scale > MAX_SCALE) return null;
+  // three places is finer than any kitchen and keeps 1/3 from becoming a repeating decimal in the
+  // database; the shopping list rounds up to packages anyway
+  return Math.round(scale * 1000) / 1000;
+}
+
+/** What a stored scale feeds, against the recipe as it stands now. */
+export function servingsForScale(scale: number, recipeServings: number | null): number | null {
+  if (!recipeServings || recipeServings <= 0) return null;
+  return Math.max(1, Math.round(recipeServings * scale));
+}
+
+/** A multiplier, for the recipes that cannot express themselves in servings. */
+export function parseScale(value: unknown): number | null {
+  const parsed = typeof value === "number" ? value : Number(String(value ?? "").trim());
+  if (!Number.isFinite(parsed) || parsed <= 0 || parsed > MAX_SCALE) return null;
+  return Math.round(parsed * 1000) / 1000;
 }

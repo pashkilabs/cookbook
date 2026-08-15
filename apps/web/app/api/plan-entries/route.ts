@@ -2,7 +2,14 @@ import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
 import { refusal } from "@/lib/refusal";
 import { statusFor } from "@/lib/recipe-writes";
-import { findOrCreateWeek, isScale } from "@/lib/planner";
+import {
+  MAX_SERVINGS,
+  findOrCreateWeek,
+  parseScale,
+  parseServings,
+  scaleForServings,
+  servingsForScale,
+} from "@/lib/planner";
 import { isIsoDate, startOfWeek } from "@/lib/week";
 
 /**
@@ -16,6 +23,20 @@ import { isIsoDate, startOfWeek } from "@/lib/week";
  * week: the composite key ties it to the *household*, not the week. So the one source is the day
  * being planned.
  */
+/** Servings when the recipe can express them, a multiplier when it cannot. */
+function readScale(
+  body: { servings?: unknown; scale?: unknown },
+  recipeServings: number | null,
+): number | null {
+  if (body.servings !== undefined) {
+    const servings = parseServings(body.servings);
+    return servings === null ? null : scaleForServings(servings, recipeServings);
+  }
+  if (body.scale !== undefined) return parseScale(body.scale);
+  // nothing asked for: one batch, which is what the recipe already says it feeds
+  return 1;
+}
+
 export async function POST(request: Request) {
   const supabase = await userClient();
   const { data: auth } = await supabase.auth.getUser();
@@ -23,7 +44,14 @@ export async function POST(request: Request) {
   const family = await platformStore().findFamilyForAccount(auth.user.id);
   if (!family) return Response.json({ error: "no household" }, { status: 403 });
 
-  let body: { recipeId?: unknown; date?: unknown; scale?: unknown };
+  let body: {
+    recipeId?: unknown;
+    date?: unknown;
+    servings?: unknown;
+    scale?: unknown;
+    /** "yes, two entries, I meant it" */
+    force?: unknown;
+  };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -35,19 +63,69 @@ export async function POST(request: Request) {
   if (!isIsoDate(body.date)) {
     return Response.json({ error: "date must be a calendar date" }, { status: 400 });
   }
-  const scale = body.scale === undefined ? 1 : Number(body.scale);
-  if (!isScale(scale)) {
-    return Response.json({ error: "scale must be 1, 1.5 or 2" }, { status: 400 });
-  }
-
   const owned = await supabase
     .from("recipes")
-    .select("id")
+    .select("id, title, servings")
     .eq("id", body.recipeId)
     .eq("family_id", family.id)
     .is("deleted_at", null)
     .maybeSingle();
   if (!owned.data) return Response.json({ error: "no such recipe" }, { status: 404 });
+
+  /*
+   * Servings in, multiplier stored.
+   *
+   * `scale` is still what `plan_entries` holds and what `packages/core` consolidates against —
+   * this only inverts the arithmetic the planner was already doing to *display* servings.
+   * Decisions §41.
+   *
+   * A recipe with no stated yield cannot answer "feed six", so the caller sends a multiplier
+   * instead. Two shapes, because there are genuinely two questions and answering the second with
+   * an invented yield of 1 would multiply everything by six.
+   */
+  const scale = readScale(body, owned.data.servings);
+  if (scale === null) {
+    return Response.json(
+      {
+        error: owned.data.servings
+          ? `servings must be a whole number of people, 1 to ${MAX_SERVINGS}`
+          : "this recipe does not say what it serves, so send a batch multiplier",
+      },
+      { status: 400 },
+    );
+  }
+
+  /*
+   * Already on that day.
+   *
+   * Not refused and not silently merged: the caller is told, and given the entry so it can offer
+   * to feed more people instead. Two entries stay *possible* — decisions §41 — because a
+   * household cooking the same thing twice in a day is real and the planner has no concept of
+   * meals to express it with.
+   */
+  const already = await supabase
+    .from("plan_entries")
+    .select("id, scale")
+    .eq("family_id", family.id)
+    .eq("recipe_id", body.recipeId)
+    .eq("date", body.date)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (already.data && body.force !== true) {
+    return Response.json(
+      {
+        error: "already-planned",
+        existing: {
+          id: already.data.id,
+          scale: Number(already.data.scale),
+          servings: servingsForScale(Number(already.data.scale), owned.data.servings),
+        },
+        recipe: { title: owned.data.title, servings: owned.data.servings },
+      },
+      { status: 409 },
+    );
+  }
 
   const week = await findOrCreateWeek(supabase, family.id, startOfWeek(body.date));
   if ("message" in week) {

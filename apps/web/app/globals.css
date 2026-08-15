@@ -548,3 +548,14 @@ ul.roster button { font-size: 0.82rem; min-height: 2.25rem; padding: 0.3rem 0.7r
 }
 .swatch.on { border-color: var(--ink); }
 
+
+/*
+ * Servings on a planner entry: a field, not a menu. Sized for a thumb and narrow enough that a
+ * seven-day grid still fits a phone.
+ */
+label.servings { display: inline-flex; align-items: center; gap: var(--s1); }
+label.servings input {
+  width: 3.4rem; min-height: 2.25rem; padding: 0.25rem 0.4rem;
+  text-align: center; font-variant-numeric: tabular-nums;
+}
+label.servings .meta { font-size: 0.75rem; color: var(--muted); }

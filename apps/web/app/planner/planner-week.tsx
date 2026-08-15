@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { SCALES } from "@/lib/planner";
+import { ServingsField } from "./servings-field";
 
 /**
  * The week, and the writes that arrange it.
@@ -33,6 +33,13 @@ export function PlannerWeek(props: {
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [duplicate, setDuplicate] = useState<{
+    entryId: string;
+    title: string;
+    servings: number | null;
+    recipeServings: number | null;
+    scale: number;
+  } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
   async function call(key: string, path: string, method: string, body?: unknown) {
@@ -44,7 +51,29 @@ export function PlannerWeek(props: {
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
     if (!response.ok) {
-      const failed = (await response.json().catch(() => ({}))) as { error?: string };
+      const failed = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        existing?: { id: string; servings: number | null; scale: number };
+        recipe?: { title: string; servings: number | null };
+      };
+
+      /*
+       * Already on that day. Not merged silently and not refused — the household is told, and
+       * offered the thing they almost certainly meant: feed more people from the one entry
+       * (decisions §41).
+       */
+      if (response.status === 409 && failed.error === "already-planned" && failed.existing) {
+        setDuplicate({
+          entryId: failed.existing.id,
+          title: failed.recipe?.title ?? "That recipe",
+          servings: failed.existing.servings,
+          recipeServings: failed.recipe?.servings ?? null,
+          scale: failed.existing.scale,
+        });
+        setBusy(null);
+        return false;
+      }
+
       setError(failed.error ?? `that did not work (${response.status})`);
       setBusy(null);
       return false;
@@ -54,12 +83,58 @@ export function PlannerWeek(props: {
     return true;
   }
 
-  const place = (recipeId: string, date: string) =>
-    call(`place-${recipeId}-${date}`, "/api/plan-entries", "POST", { recipeId, date });
+  const place = (recipeId: string, date: string) => {
+    setDuplicate(null);
+    return call(`place-${recipeId}-${date}`, "/api/plan-entries", "POST", { recipeId, date });
+  };
+
+  const moreServings = duplicate
+    ? (duplicate.servings ?? 0) + (duplicate.recipeServings ?? 0)
+    : 0;
 
   return (
     <>
       {error && <p className="error">{error}</p>}
+
+      {/*
+        * Already planned. Said out loud, with the thing they almost certainly meant one tap away —
+        * a household adding a recipe to a day it is already on wants more food, not two entries.
+        */}
+      {duplicate && (
+        <div className="notice">
+          <p style={{ margin: 0 }}>
+            <strong>{duplicate.title}</strong> is already on that day
+            {duplicate.servings ? `, for ${duplicate.servings}` : ""}.
+          </p>
+          <div className="tabs" style={{ marginTop: "0.75rem", marginBottom: 0 }}>
+            {duplicate.recipeServings && duplicate.servings ? (
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={async () => {
+                  const ok = await call(
+                    `more-${duplicate.entryId}`,
+                    `/api/plan-entries/${duplicate.entryId}`,
+                    "PATCH",
+                    { servings: moreServings },
+                  );
+                  if (ok) setDuplicate(null);
+                }}
+              >
+                Feed {moreServings} instead
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="quiet"
+              disabled={busy !== null}
+              onClick={() => setDuplicate(null)}
+            >
+              Leave it as it is
+            </button>
+          </div>
+        </div>
+      )}
 
       <section>
         <h2>Waiting for a day</h2>
@@ -120,32 +195,21 @@ export function PlannerWeek(props: {
               {forDay.map((entry) => (
                 <div className="entry" key={entry.id}>
                   <Link href={`/recipes/${entry.recipe.id}`}>{entry.recipe.title}</Link>
-                  <p className="meta" style={{ margin: "0.15rem 0 0.4rem" }}>
-                    {[
-                      entry.recipe.servings
-                        ? `${Math.round(entry.recipe.servings * entry.scale)} servings`
-                        : null,
-                      entry.recipe.time_minutes ? `${entry.recipe.time_minutes} min` : null,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
+                  {entry.recipe.time_minutes && (
+                    <p className="meta" style={{ margin: "0.15rem 0 0.4rem" }}>
+                      {entry.recipe.time_minutes} min
+                    </p>
+                  )}
                   <span className="scale">
-                    {SCALES.map((scale) => (
-                      <button
-                        key={scale}
-                        type="button"
-                        aria-pressed={entry.scale === scale}
-                        className={entry.scale === scale ? "" : "quiet"}
-                        disabled={busy !== null}
-                        title={`Cook ${scale}× the recipe`}
-                        onClick={() =>
-                          call(`scale-${entry.id}`, `/api/plan-entries/${entry.id}`, "PATCH", { scale })
-                        }
-                      >
-                        {scale}×
-                      </button>
-                    ))}
+                    <ServingsField
+                      entryId={entry.id}
+                      scale={entry.scale}
+                      recipeServings={entry.recipe.servings}
+                      busy={busy !== null}
+                      onSave={(patch) =>
+                        call(`scale-${entry.id}`, `/api/plan-entries/${entry.id}`, "PATCH", patch)
+                      }
+                    />
                     <button
                       type="button"
                       className="quiet"
