@@ -458,9 +458,53 @@ try {
     const weekStart = monday.toISOString().slice(0, 10);
 
     const planned = await call("POST", "/api/plan-entries", {
-      body: { recipeId, date: weekStart, weekStart, scale: 1 },
+      body: { recipeId, date: weekStart, weekStart, servings: 9 },
     });
-    record("assign a recipe to a day", planned.status === 200, `HTTP ${planned.status}`);
+    record("assign a recipe to a day, for nine", planned.status === 200, `HTTP ${planned.status}`);
+
+    /*
+     * The recipe serves 6 by the time the planner runs (it was edited above), so nine people is
+     * 1.5× — and that multiplier is what reaches
+     * `packages/core`. Read back from the database because the whole point of the change is that
+     * the shopping list buys for six.
+     */
+    const entries = await rest("GET", `/plan_entries?family_id=eq.${familyId}&select=id,scale&deleted_at=is.null`);
+    const entryId = entries?.[0]?.id;
+    record(
+      "servings become the stored multiplier",
+      Number(entries?.[0]?.scale) === 1.5,
+      `scale ${entries?.[0]?.scale}`,
+    );
+
+    const absurd = await call("POST", "/api/plan-entries", {
+      body: { recipeId, date: weekStart, weekStart, servings: 0 },
+    });
+    record("refuses nobody-servings", absurd.status === 400, `HTTP ${absurd.status}`);
+
+    const nonsense = await call("POST", "/api/plan-entries", {
+      body: { recipeId, date: weekStart, weekStart, servings: "six" },
+    });
+    record("refuses a servings figure that is not a number", nonsense.status === 400, `HTTP ${nonsense.status}`);
+
+    // the same recipe on the same day: told, not merged and not refused
+    const again = await call("POST", "/api/plan-entries", {
+      body: { recipeId, date: weekStart, weekStart, servings: 4 },
+    });
+    record(
+      "adding it twice offers to feed more instead",
+      again.status === 409 && again.body?.error === "already-planned" && Boolean(again.body?.existing?.id),
+      `HTTP ${again.status}`,
+    );
+    record(
+      "and says what is already there",
+      again.body?.existing?.servings === 9,
+      `existing serves ${again.body?.existing?.servings}`,
+    );
+
+    if (entryId) {
+      const more = await call("PATCH", `/api/plan-entries/${entryId}`, { body: { servings: 10 } });
+      record("raising the servings works", more.status === 200 && more.body?.servings === 10, `HTTP ${more.status}`);
+    }
 
     const shortlisted = await call("POST", "/api/shortlist", { body: { recipeId, weekStart } });
     record("shortlist a recipe", shortlisted.status === 200, `HTTP ${shortlisted.status}`);

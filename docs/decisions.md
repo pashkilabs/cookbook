@@ -1584,6 +1584,78 @@ column and a check, not a redesign.
 
 ---
 
+## 41. The planner asks for servings and stores a multiplier
+
+**Decided.** A planner entry is typed as a number of people. `plan_entries.scale` still holds a
+batch multiplier, and the conversion happens at the edge.
+
+### Why store the multiplier rather than the servings
+
+The obvious alternative — store the figure the person typed — is more faithful to their intent and
+was rejected on one fact: **`recipes.servings` is nullable.** A recipe that never stated a yield
+has no defined "feed six", while a multiplier is always defined. Storing servings would need a
+fallback for exactly the recipes least able to provide one, and the fallback would be an invented
+yield of 1 that quietly multiplies every ingredient by six.
+
+Three smaller things followed the same way. `packages/core` consolidates against a multiplier, so
+nothing downstream changes — the shopping list file was not touched. No migration means no new
+column grant on a table that has column-level grants (§26). And the planner was **already**
+rendering `recipe.servings × scale` to display a servings figure, so the reading existed and only
+the input was a menu; this inverts the arithmetic it was already doing.
+
+### The consequence, stated
+
+Editing a recipe's own yield changes what an existing plan *feeds* rather than what it
+*multiplies*. A recipe for 4 planned at 1.5× shows "6 servings"; change the recipe to serve 2 and
+the same entry shows 3.
+
+That is the honest reading rather than a bug: the entry says "cook half again as much", and half
+again as much of a smaller recipe feeds fewer people. Nothing lies — the number shown is always
+true of the recipe as it stands — and the person can see it and correct it. Storing servings would
+preserve the intent and silently change the multiplier instead, which is the same trade facing the
+other way.
+
+*Would change if:* recipes start changing their yields often enough for people to notice. The fix
+is a `planned_servings` column recording the intent alongside the multiplier, not replacing it.
+
+### Guards
+
+Servings are whole people, 1 to 50. Fractions are refused — `2.5` servings is a number a
+spreadsheet produces, and admitting it is how `0.3333` reaches a shopping list. Zero, negative,
+non-numeric and absurd each get an answer. A recipe with no stated yield is given a multiplier
+field instead, with its own bounds.
+
+---
+
+## 42. The same recipe twice in a day is discouraged, not impossible
+
+**Decided.** Adding a recipe to a day it is already on returns `409` with the existing entry, and
+the planner offers to increase its servings. It does **not** merge silently and does **not**
+refuse.
+
+### Why not impossible
+
+A unique index on `(family_id, date, recipe_id)` would be one line and is the wrong line. The
+planner is one meal per day *today*; a household cooking the same thing at lunch and dinner is a
+real case, and the schema has no concept of meals to express it with. Making it impossible now
+means dropping the index when meals arrive — and, until then, a household with a genuine reason
+has no way to say so.
+
+### Why not silent
+
+Merging quietly is the shape of a well-meant feature that later gets described as "it changed my
+plan". The household is told what is already there and what pressing the button will do, and the
+alternative — leave both — remains available.
+
+The offer defaults to the sum: a recipe for 6 already planned for 9, added again, offers 15. That
+is what "I want to cook this for more people" means arithmetically, and it is a suggestion rather
+than an action.
+
+*Would change if:* the planner gains meals. Then two entries on a day are two *different* meals
+and the duplicate check moves to `(date, meal)`.
+
+---
+
 ## Open: cascade deletions and tombstones
 
 **Not resolved. This waits on the sync engine choice, and exists so the evaluation
