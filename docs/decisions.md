@@ -1913,6 +1913,114 @@ Not built yet: the column, the backfill, and the review-screen route are a task 
 nine current rows are cheap to fix by re-importing two recipes, and that is what should happen to
 them.
 
+## 45. A section is a label on an ingredient line, not an entity — and a section's yield is not the recipe's
+
+Real recipes arrive in components. A crunchwrap has a sauce; cinnamon rolls have dough, filling,
+caramel and icing; one fixture reads `Pineapple Mango Salsa (makes 2 servings)`, then
+`Chicken Marinade`, then `For Serving`.
+
+`recipe_ingredients` has no section column, so a heading has two possible fates today and both are
+wrong: dropped, or parsed as an ingredient. The second is already measurable — the eval reports
+`for the sauce` as a spurious ingredient, and precision sits at 60% partly because of it.
+
+### What is stored: a nullable `section` column, not a components table
+
+The heading, verbatim, on each line beneath it. Null when the recipe has no sections.
+
+A heading is a *property of the line* until something needs a component to behave like a thing.
+Modelling components as entities means another table, its own RLS policies and grants, soft-delete
+propagation, a sync story and a review screen that can edit them — a large surface to buy something
+that today only needs to stop being a phantom ingredient and start grouping a display.
+
+**What would reverse it:** the first feature that needs a component to *do* something — scaling one
+component alone ("double the icing"), a per-component energy figure, or a shopping list that buys
+per component. Then components become entities and `section` becomes a foreign key. That is a
+migration, not a redesign, which is the point of choosing the cheap shape first.
+
+### A section's yield is not the recipe's, and must never be read as one
+
+`Pineapple Mango Salsa (makes 2 servings)` sits inside a dish that serves six. Dividing the whole
+dish's energy by two is wrong by threefold, and wrong in the direction that flatters — the same
+failure `estimateEnergy` was built to refuse (§43).
+
+So **`servings` is dish-scoped and read only from dish scope**: the JSON-LD `recipeYield` on the
+`Recipe` node, or a yield line outside any section. A number inside a section heading is a
+component's yield and is **discarded rather than stored**, because there is nowhere honest to put it
+and putting it on the recipe would be a lie. It returns when components become entities and it has
+somewhere to live.
+
+### What this means for expected outputs
+
+- Every expected ingredient carries the section it appeared under, verbatim, or null.
+- A section heading is **never** an expected ingredient. An extractor emitting one has produced a
+  spurious line and is scored down for it.
+- `servings` is the dish's. Where a page states only a component's yield, expected `servings` is
+  `null` — which is a different claim from "the extractor missed it", and the format already
+  distinguishes those.
+- Section is **reported separately rather than folded into the headline accuracy**. A wrong section
+  is a display defect; a wrong amount is a shopping defect. Averaging them together hides which one
+  moved.
+
+---
+
+## 46. A refusal is an answer, and the fixture format has to be able to state it
+
+One fixture contains no recipe at all: `comment CHICKEN and I'll DM you the full recipe`. Three of
+the URLs are deliberately not recipe pages — a listing page, a Reddit thread, a scanned book
+archive. The correct output for each is a refusal naming why. **A plausible curry is the worst
+possible output**, because it is confident, invented, and indistinguishable from a real answer by
+anybody who did not already know the recipe.
+
+The harness cannot express this. `Fixture.expected` is an `ExpectedRecipe`, and an extractor
+returning `null` means "I do not handle this *kind* of input" — the runner records it as skipped and
+leaves it out of the figures. Reusing `null` for "there is no recipe here" would let an extractor
+that skips everything score perfectly on every refusal fixture, which is the mutation-harness trap
+in a new costume: no result read as a pass.
+
+### The shape
+
+`expected` becomes a discriminated union — a fixture states either a recipe or a refusal:
+
+```ts
+type Expectation =
+  | { outcome: "recipe"; recipe: ExpectedRecipe }
+  | { outcome: "refusal"; because: RefusalReason };
+```
+
+and an extractor gains a third thing it can return, distinct from `null`:
+
+```ts
+{ refused: { because: RefusalReason } }
+```
+
+`RefusalReason` is a closed set, because the reason decides what the product offers next:
+
+| reason | what it means | what the product offers |
+|---|---|---|
+| `no-recipe-in-source` | the source withholds it — "comment CHICKEN" | paste the DM'd text, or a screenshot |
+| `not-a-recipe-page` | a listing, a forum thread, an archive scan | nothing; the URL is wrong |
+| `unresolvable-source` | Facebook, Instagram, TikTok — these never resolve | the screenshot or video route |
+
+That last one already exists as a rule in `CLAUDE.md` — detect and reject up front rather than
+letting somebody wait through four doomed attempts. This gives it a measurable form.
+
+### Scoring
+
+| fixture | extractor said | outcome |
+|---|---|---|
+| refusal | refusal | correct |
+| refusal | a recipe | **confabulation** — counted and reported on its own line |
+| recipe | refusal | **false refusal** — counted and reported on its own line |
+| either | `null` | skipped, exactly as today |
+
+A refusal fixture is one check in the headline. The **reason** is scored separately rather than
+folded in: refusing for the wrong reason still saves somebody from an invented recipe, but routes
+them wrongly, so it has to be visible without swamping the per-field accuracies.
+
+Neither §45 nor §46 is built yet — deliberately. They are recorded first so the hand-checked
+expected outputs are written against the intended answer rather than against what the code does
+today.
+
 ## Open: cascade deletions and tombstones
 
 **Not resolved. This waits on the sync engine choice, and exists so the evaluation
