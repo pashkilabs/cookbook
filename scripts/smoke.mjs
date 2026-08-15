@@ -114,7 +114,15 @@ async function call(method, path, { body, auth = true, expect } = {}) {
   try {
     parsed = JSON.parse(text);
   } catch {
-    parsed = text.slice(0, 200);
+    /*
+     * The whole body, not a slice.
+     *
+     * This truncated to 200 characters, which is `<!DOCTYPE html><head>` and nothing else — so the
+     * content assertions below were matching against a page prefix and failing on a page that was
+     * perfectly correct. A check that cannot see what it is checking is worse than no check: it
+     * cost a round of investigating the product for a bug in the test.
+     */
+    parsed = text;
   }
   return { status: response.status, body: parsed, expected: expect };
 }
