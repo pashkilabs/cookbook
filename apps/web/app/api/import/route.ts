@@ -14,6 +14,11 @@ import { draftFrom } from "@/lib/draft";
  * a person who abandons a review has still spent it. It is not spent on a cache hit, because a
  * recipe already extracted for somebody else costs nothing to hand over.
  */
+/** Phone screenshots run 1.5–3.7 MB; this is generous for one and refuses an unresized photo. */
+const MAX_IMAGE_BYTES = 4_500_000;
+/** A reel spans a few frames, not an album. */
+const MAX_IMAGES = 6;
+
 export async function POST(request: Request) {
   const supabase = await userClient();
   const { data: auth } = await supabase.auth.getUser();
@@ -22,16 +27,73 @@ export async function POST(request: Request) {
   const family = await platformStore().findFamilyForAccount(auth.user.id);
   if (!family) return Response.json({ error: "this account has no household" }, { status: 403 });
 
-  let body: { url?: unknown; text?: unknown };
-  try {
-    body = (await request.json()) as typeof body;
-  } catch {
-    return Response.json({ error: "expected a JSON body" }, { status: 400 });
+  /*
+   * Three channels on one route, in one order.
+   *
+   * Not three routes: each route file is a serverless function and a deployment has already been
+   * refused for exceeding the host's twelve-function limit (§37).
+   *
+   * §49 sets the order — **link beats text beats images.** A page that publishes structured data
+   * is free, byte-identical and scored 99.3%; a caption scores 80.4% for $0.0007; a reel scores
+   * about a third of its caption twin and costs more. So a request carrying more than one channel
+   * is served by the best one available, and the others are ignored rather than merged.
+   */
+  const contentType = request.headers.get("content-type") ?? "";
+  let url = "";
+  let text = "";
+  let images: { bytes: Uint8Array; label: string }[] = [];
+
+  if (contentType.includes("multipart/form-data")) {
+    let form: FormData;
+    try {
+      form = await request.formData();
+    } catch {
+      return Response.json({ error: "that upload could not be read" }, { status: 400 });
+    }
+    url = String(form.get("url") ?? "").trim();
+    text = String(form.get("text") ?? "").trim();
+
+    const parts = form.getAll("images").filter((part): part is File => part instanceof File);
+    if (parts.length > MAX_IMAGES) {
+      return Response.json(
+        { error: `${parts.length} images is more than one recipe needs. ${MAX_IMAGES} at a time.` },
+        { status: 413 },
+      );
+    }
+
+    for (const part of parts) {
+      /*
+       * The ceiling is checked here, before an image library is anywhere near the bytes.
+       *
+       * A 20 MB upload should never reach sharp: decoding is where the memory goes, and a native
+       * addon is the last thing that should be handed something unvalidated. The preparer has its
+       * own limit and that is the second line, not the first.
+       */
+      if (part.size > MAX_IMAGE_BYTES) {
+        return Response.json(
+          {
+            error: `${part.name || "that image"} is ${(part.size / 1e6).toFixed(1)} MB. The limit is ${MAX_IMAGE_BYTES / 1e6} MB — a phone screenshot resized to about 1500px wide is comfortably under it.`,
+          },
+          { status: 413 },
+        );
+      }
+      images.push({ bytes: new Uint8Array(await part.arrayBuffer()), label: part.name || "image" });
+    }
+  } else {
+    let body: { url?: unknown; text?: unknown };
+    try {
+      body = (await request.json()) as typeof body;
+    } catch {
+      return Response.json({ error: "expected a JSON body" }, { status: 400 });
+    }
+    url = typeof body.url === "string" ? body.url.trim() : "";
+    text = typeof body.text === "string" ? body.text.trim() : "";
   }
-  const url = typeof body.url === "string" ? body.url.trim() : "";
-  const text = typeof body.text === "string" ? body.text.trim() : "";
-  if (!url && !text) {
-    return Response.json({ error: "paste a recipe link or the text of one" }, { status: 400 });
+  if (!url && !text && images.length === 0) {
+    return Response.json(
+      { error: "paste a recipe link, the text of one, or a screenshot" },
+      { status: 400 },
+    );
   }
 
   /*
@@ -44,7 +106,8 @@ export async function POST(request: Request) {
   const { outcome, storagePath, photoDimensions, photoFailure } = url
     ? await attemptImport(url, family.id)
     : {
-        outcome: await attemptPasteImport({ text }),
+        // text before images, per §49: a caption reads better than a picture of one
+        outcome: await attemptPasteImport(text ? { text } : { images }),
         storagePath: null,
         photoDimensions: null,
         photoFailure: null,
