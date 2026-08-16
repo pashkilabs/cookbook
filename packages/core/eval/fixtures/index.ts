@@ -29,10 +29,16 @@ import {
   caption_pb_cookie_dough_smores_bites,
   caption_street_corn_beef_bowls,
   caption_sweet_chilli_crispy_rice_salad,
+  reel_crispy_rice_salad,
+  reel_street_corn_bowls,
+  reel_chile_lime_bowl,
+  reel_pad_thai,
+  reel_coconut_curry,
+  reel_tiffy_lunchbox,
 } from "./real.js";
 
 /**
- * The fixture set: 8 recipe URLs, 4 refusals, 4 captions.
+ * The fixture set: 8 recipe URLs, 5 refusals, 17 captions, 6 reels.
  *
  * The placeholders are gone — every fixture here is a real source with hand-checked output.
  * Thirteen captions and six reels are still to be written; see `intake/EXPECTED-CAPTIONS.md`.
@@ -67,4 +73,10 @@ export const FIXTURES: FixtureSet = [
   caption_pb_cookie_dough_smores_bites,
   caption_street_corn_beef_bowls,
   caption_sweet_chilli_crispy_rice_salad,
+  reel_crispy_rice_salad,
+  reel_street_corn_bowls,
+  reel_chile_lime_bowl,
+  reel_pad_thai,
+  reel_coconut_curry,
+  reel_tiffy_lunchbox,
 ];

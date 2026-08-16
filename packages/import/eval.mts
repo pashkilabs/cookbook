@@ -8,7 +8,9 @@
  * captions — there is no markup in a caption for tier 0 or 1 to read. So the caption row uses
  * core's line parser as a stand-in: not a rival to a model, but the floor beneath it.
  */
+import { readFile } from "node:fs/promises";
 import { createImportExtractor } from "./src/eval-extractor.js";
+import { createSharpImagePreparer } from "./src/sharp-preparer.js";
 import { providerFromEnv } from "./src/openai-compatible.js";
 import { PLACEHOLDER_CASCADE, RECIPE_JSON_SCHEMA } from "./src/provider.js";
 import { coreParser, FIXTURES, formatReport, runEval } from "@pashki/core/eval";
@@ -77,11 +79,29 @@ if (!provider) {
     process.exit(2);
   }
 
+  /*
+   * Vision is a separate list, not a flag on the text models (§7): the escalation order for
+   * images is its own question, and the reels are the hardest input in the product.
+   */
+  const visionModel = process.env.PASHKI_LLM_VISION_MODEL;
   const withModel = createImportExtractor({
     skipPhoto: true,
-    llm: { provider, models },
+    llm: {
+      provider,
+      models,
+      ...(visionModel
+        ? { visionModels: [{ provider: provider.key, model: visionModel, region: "us" as const, temperature: 0 }] }
+        : {}),
+    },
     reportUsage: true,
+    // screenshots are 1.5–3.7 MB phone captures and the vision path caps an image at 1.5 MB;
+    // the passthrough preparer rejects them all, which reads as "vision failed" when nothing
+    // was ever sent. sharp is what makes a reel sendable (roadmap, §7).
+    preparer: createSharpImagePreparer(),
+    loadImage: async (path: string) =>
+      new Uint8Array(await readFile(new URL(`../core/eval/intake/screenshots/${path}`, import.meta.url))),
   });
+  if (!visionModel) console.log("  (no PASHKI_LLM_VISION_MODEL — reels will skip rather than score)");
   console.log("\n" + "─".repeat(72));
   const tier2 = await runEval(FIXTURES, withModel, { label: `tier 0/1/2 — ${models[0]!.model}` });
   console.log(formatReport(tier2).split("skipped —")[0]);

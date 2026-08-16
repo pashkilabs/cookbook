@@ -44,7 +44,10 @@ export const VISION_JSON_SCHEMA: JsonSchema = {
   additionalProperties: false,
   required: ["title", "servings", "totalMinutes", "ingredientLines", "steps", "dishImageIndex"],
   properties: {
-    title: { type: "string", description: "The recipe's name." },
+    title: {
+      type: ["string", "null"],
+      description: "The recipe's name. null if nothing on screen names a dish.",
+    },
     servings: { type: ["integer", "null"], description: "Servings, or null if not shown." },
     totalMinutes: {
       type: ["integer", "null"],
@@ -57,17 +60,22 @@ export const VISION_JSON_SCHEMA: JsonSchema = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["text", "amountEstimated"],
+        required: ["text", "section", "amountEstimated"],
         properties: {
           text: {
             type: "string",
             description:
-              "The ingredient as written, including amount and unit. If no amount was shown or spoken, write the ingredient with your best amount.",
+              "The ingredient exactly as shown, including amount and unit if they are shown. If no amount appears, write the ingredient alone. Never invent one.",
+          },
+          section: {
+            type: ["string", "null"],
+            description:
+              "The heading this ingredient appeared under, verbatim, or null if there are none.",
           },
           amountEstimated: {
             type: "boolean",
             description:
-              "true if you inferred the amount rather than reading it. 'a splash of cream' becomes an amount with this set to true.",
+              "true if the amount was spoken aloud or implied rather than shown as text. Never a substitute for inventing one: if no amount exists, write none.",
           },
         },
       },
@@ -85,17 +93,21 @@ export const VISION_INSTRUCTIONS = [
   "Read the recipe from the images into the given JSON schema.",
   "The images are parts of one recipe — an on-screen card, a caption, a comment — so combine them into a single recipe rather than describing each.",
   "Copy ingredient text as written.",
-  "Where an amount is not shown, give your best amount and set amountEstimated to true.",
+  "Where no amount is shown, write the ingredient with no amount. Never invent one.",
+  "Set amountEstimated to true only for an amount you heard rather than read.",
+  "Give each ingredient the heading it appeared under, verbatim, or null.",
+  "If nothing on screen names a dish, the title is null.",
   "Set dishImageIndex to the image that best shows the finished dish.",
 ].join(" ");
 
 export interface VisionIngredient {
   text: string;
+  section: string | null;
   amountEstimated: boolean;
 }
 
 export interface VisionPayload {
-  title: string;
+  title: string | null;
   servings: number | null;
   totalMinutes: number | null;
   ingredientLines: VisionIngredient[];
@@ -163,6 +175,7 @@ export function validateVisionPayload(value: unknown, imageCount: number): Visio
       ingredients.push({
         text: line.text.trim(),
         amountEstimated: line.amountEstimated === true,
+        section: typeof line.section === "string" ? line.section : null,
       });
     }
   }
@@ -316,7 +329,12 @@ function toIngredients(lines: VisionIngredient[]): ExtractedRecipe["ingredients"
   for (const line of lines) {
     const ingredient = parseIngredientLine(line.text);
     if (!ingredient) continue;
-    parsed.push(line.amountEstimated ? { ...ingredient, estimated: true } : ingredient);
+    parsed.push({
+      ...ingredient,
+      ...(line.amountEstimated ? { estimated: true } : {}),
+      // the heading rides along with its line (decisions §45)
+      ...(line.section === undefined ? {} : { section: line.section }),
+    });
   }
   return parsed;
 }

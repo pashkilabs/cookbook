@@ -830,3 +830,190 @@ export const caption_sweet_chilli_crispy_rice_salad: Fixture = {
     },
   },
 };
+
+/** The reel twin of `caption-sweet-chilli-crispy-rice-salad`. Same recipe, same expectation — any difference
+ *  is the vision tier's error and not a different truth. */
+export const reel_crispy_rice_salad: Fixture = {
+  id: "reel-crispy-rice-salad",
+  input: {
+    kind: "screenshot",
+    imagePath: "reel-crispy-rice-salad-01.png",
+    extraImagePaths: ["reel-crispy-rice-salad-02.png"],
+  },
+  expected: {
+    outcome: "recipe",
+    recipe: {
+      title: "Sweet Chilli Crispy Rice Salad",
+      servings: 4,
+      totalMinutes: null,
+      ingredients: [
+        { amount: 450, unit: "g", item: "cooked jasmine rice", section: "Crispy Rice" },
+        { amount: 3, unit: "tsp", item: "soy sauce", section: "Crispy Rice" },
+        { amount: 1, unit: "tbsp", item: "chilli crisp oil", section: "Crispy Rice" },
+        { amount: 1, unit: "tbsp", item: "sesame oil", section: "Crispy Rice" },
+        { amount: 2, unit: null, item: "large cucumbers", section: "Salad" },
+        { amount: 1, unit: "cup", item: "edamame", section: "Salad" },
+        { amount: 1, unit: "bunch", item: "green onions", section: "Salad" },
+        { amount: 1, unit: null, item: "avocado", section: "Salad" },
+        { amount: null, unit: null, item: "Cooked crispy chicken or grilled chicken", section: "Salad" },
+        { amount: null, unit: null, item: "Chopped peanuts", section: "Salad" },
+        { amount: 0.25, unit: "cup", item: "Greek yoghurt", section: "Sweet Chilli Creamy Dressing" },
+        { amount: 0.25, unit: "cup", item: "mayo", section: "Sweet Chilli Creamy Dressing" },
+        { amount: 50, unit: "ml", item: "sweet chilli sauce", section: "Sweet Chilli Creamy Dressing" },
+        { amount: 0.5, unit: "tsp", item: "paprika", section: "Sweet Chilli Creamy Dressing" },
+        { amount: null, unit: null, item: "Water to thin", section: "Sweet Chilli Creamy Dressing" },
+      ],
+    },
+  },
+};
+
+/** The reel twin of `caption-street-corn-beef-bowls`. Same recipe, same expectation — any difference
+ *  is the vision tier's error and not a different truth. */
+export const reel_street_corn_bowls: Fixture = {
+  id: "reel-street-corn-bowls",
+  input: {
+    kind: "screenshot",
+    imagePath: "reel-street-corn-bowls-01.png",
+    extraImagePaths: ["reel-street-corn-bowls-02.png", "reel-street-corn-bowls-03.png", "reel-street-corn-bowls-04.png"],
+  },
+  expected: {
+    outcome: "recipe",
+    recipe: {
+      title: null,
+      servings: null,
+      totalMinutes: null,
+      ingredients: [
+        { amount: 2, unit: "lb", item: "ground beef" },
+        { amount: 2, unit: null, item: "pkg taco seasoning" },
+        { amount: 4, unit: null, item: "sweet potatoes" },
+        { amount: 3, unit: "tbsp", item: "avocado oil" },
+        { amount: 3, unit: "tbsp", item: "kinders the blend seasoning" },
+        { amount: 2, unit: "tbsp", item: "cumin" },
+        { amount: 1, unit: null, item: "bag roasted corn" },
+        { amount: 0.25, unit: "cup", item: "plain greek yogurt" },
+        { amount: 2, unit: "tbsp", item: "mayo" },
+        { amount: 0.5, unit: null, item: "lime" },
+        { amount: 2, unit: "tbsp", item: "elote seasoning" },
+        { amount: 0.25, unit: "cup", item: "cotija cheese" },
+        { amount: 2, unit: "tbsp", item: "fresh cilantro" },
+        { amount: 1, unit: null, item: "avocado" },
+        { amount: 0.25, unit: "cup", item: "cotija cheese" },
+        { amount: null, unit: null, item: "fresh cilantro" },
+      ],
+    },
+  },
+};
+
+/** The reel twin of `caption-chile-lime-chicken-bowl`. Same recipe, same expectation — any difference
+ *  is the vision tier's error and not a different truth. */
+export const reel_chile_lime_bowl: Fixture = {
+  id: "reel-chile-lime-bowl",
+  input: {
+    kind: "screenshot",
+    imagePath: "reel-chile-lime-bowl-01.png",
+    extraImagePaths: ["reel-chile-lime-bowl-02.png"],
+  },
+  expected: {
+    outcome: "recipe",
+    recipe: {
+      title: "Chile Lime Chicken Bowl",
+      servings: null,
+      totalMinutes: null,
+      ingredients: [
+        { amount: 0.5, unit: "cup", item: "diced mango", section: "Pineapple Mango Salsa" },
+        { amount: 0.5, unit: "cup", item: "diced pineapple", section: "Pineapple Mango Salsa" },
+        { amount: 1, unit: "tbsp", item: "diced jalapeño", section: "Pineapple Mango Salsa" },
+        { amount: 2, unit: "tbsp", item: "diced red onion", section: "Pineapple Mango Salsa" },
+        { amount: 0.5, unit: "tbsp", item: "chopped cilantro", section: "Pineapple Mango Salsa" },
+        { amount: 0.25, unit: "tsp", item: "chile lime seasoning", section: "Pineapple Mango Salsa" },
+        { amount: 0.5, unit: null, item: "lime", section: "Pineapple Mango Salsa" },
+        { amount: 2, unit: "tbsp", item: "plain Greek yogurt", section: "Chicken Marinade" },
+        { amount: 0.5, unit: "tsp", item: "chopped cilantro", section: "Chicken Marinade" },
+        { amount: 0.5, unit: "tsp", item: "chile lime seasoning", section: "Chicken Marinade" },
+        { amount: 0.25, unit: "tsp", item: "garlic powder", section: "Chicken Marinade" },
+        { amount: 1, unit: "tbsp", item: "lime juice", section: "Chicken Marinade" },
+        { amount: null, unit: null, item: "pepper", section: "Chicken Marinade" },
+        { amount: 2, unit: null, item: "boneless, skinless chicken thighs", section: "Chicken Marinade" },
+        { amount: 0.5, unit: "cup", item: "cilantro lime rice", section: "For Serving" },
+        { amount: null, unit: null, item: "lime juice", section: "For Serving" },
+      ],
+    },
+  },
+};
+
+/** The reel twin of `caption-chicken-pad-thai`. Same recipe, same expectation — any difference
+ *  is the vision tier's error and not a different truth. */
+export const reel_pad_thai: Fixture = {
+  id: "reel-pad-thai",
+  input: {
+    kind: "screenshot",
+    imagePath: "reel-pad-thai-01.png",
+    extraImagePaths: ["reel-pad-thai-02.png"],
+  },
+  expected: {
+    outcome: "recipe",
+    recipe: {
+      title: "30-Min Saucy Chicken Pad Thai",
+      servings: 6,
+      totalMinutes: 30,
+      ingredients: [
+        { amount: 14, unit: "oz", item: "rice noodles", section: "PAD THAI" },
+        { amount: 1, unit: "tbsp", item: "olive oil", section: "PAD THAI" },
+        { amount: 1, unit: "lb", item: "boneless skinless chicken thighs", section: "PAD THAI" },
+        { amount: 2, unit: "tbsp", item: "low sodium soy sauce", section: "PAD THAI" },
+        { amount: 1, unit: "cup", item: "bean sprouts", section: "PAD THAI" },
+        { amount: 1, unit: null, item: "red bell pepper", section: "PAD THAI" },
+        { amount: 1, unit: "cup", item: "shredded carrots", section: "PAD THAI" },
+        { amount: 3, unit: "clove", item: "garlic", section: "PAD THAI" },
+        { amount: 2, unit: null, item: "eggs", section: "PAD THAI" },
+        { amount: 1, unit: "cup", item: "green onions", section: "PAD THAI" },
+        { amount: 0.5, unit: "cup", item: "cilantro", section: "PAD THAI" },
+        { amount: 1, unit: null, item: "lime", section: "PAD THAI" },
+        { amount: 0.5, unit: "tsp", item: "red pepper flakes", section: "PAD THAI" },
+        { amount: 0.5, unit: "cup", item: "low sodium soy sauce or tamari", section: "SAUCE" },
+        { amount: 2, unit: "tbsp", item: "toasted sesame oil", section: "SAUCE" },
+        { amount: 3, unit: "tbsp", item: "fish sauce", section: "SAUCE" },
+        { amount: 0.333, unit: "cup", item: "coconut sugar", section: "SAUCE" },
+        { amount: 3, unit: "tbsp", item: "rice vinegar", section: "SAUCE" },
+        { amount: 0.25, unit: "cup", item: "creamy natural peanut butter", section: "SAUCE" },
+        { amount: 1, unit: "tsp", item: "ground ginger", section: "SAUCE" },
+        { amount: 0.333, unit: "cup", item: "chopped peanuts", section: "GARNISH" },
+        { amount: 1, unit: null, item: "lime", section: "GARNISH" },
+      ],
+    },
+  },
+};
+
+/** The caption withholds everything; the frames name ingredients. Two channels, two correct
+ *  answers — the only fixture in the set where that is true (decisions §46). */
+export const reel_coconut_curry: Fixture = {
+  id: "reel-coconut-curry",
+  input: {
+    kind: "screenshot",
+    imagePath: "reel-coconut-curry-02.png",
+    extraImagePaths: ["reel-coconut-curry-03.png"],
+  },
+  expected: {
+    outcome: "recipe",
+    recipe: {
+      title: "creamy coconut curry chicken",
+      servings: null,
+      totalMinutes: 30,
+      ingredients: [
+        { amount: null, unit: null, item: "chicken", section: null },
+        { amount: null, unit: null, item: "garlic powder", section: null },
+        { amount: null, unit: null, item: "rice", section: null },
+      ],
+    },
+  },
+  notes:
+    "Thin by design: the expectation is only what the two captured frames legibly show. " +
+    "The caption twin is a refusal; this is a partial recipe with every amount null.",
+};
+
+/** No dish named, recipe withheld entirely — the clean refusal. */
+export const reel_tiffy_lunchbox: Fixture = {
+  id: "reel-tiffy-lunchbox",
+  input: { kind: "screenshot", imagePath: "reel-tiffy-lunchbox-01.png" },
+  expected: { outcome: "refusal", because: "no-recipe-in-source" },
+};

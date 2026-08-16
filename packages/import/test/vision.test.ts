@@ -121,7 +121,7 @@ describe("the vision schema", () => {
   it("asks for the estimate flag per ingredient, not as a note", () => {
     const items = (VISION_JSON_SCHEMA.properties as Record<string, { items?: unknown }>)
       .ingredientLines?.items as { required?: string[] };
-    expect(items?.required).toEqual(["text", "amountEstimated"]);
+    expect(items?.required).toEqual(["text", "section", "amountEstimated"]);
   });
 
   it("asks which supplied image shows the dish, by index", () => {
