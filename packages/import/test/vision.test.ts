@@ -478,8 +478,10 @@ describe("a heading is never also an ingredient", () => {
      * prompt instruction forbidding it. A rule a model may decline is not a rule — so it is
      * enforced here, where the fixture validator has always enforced it.
      */
+    // the shape a real card actually produced: the heading carries the column label it was
+    // written beside, and arrives with no section of its own
     const out = toIngredients([
-      { text: "Brownie Layer", section: "Brownie Layer", amountEstimated: false },
+      { text: "Brownie Layer (9x13)", section: null, amountEstimated: false },
       { text: "1 stick butter", section: "Brownie Layer", amountEstimated: false },
     ]);
     expect(out.map((i) => i.item)).toEqual(["butter"]);

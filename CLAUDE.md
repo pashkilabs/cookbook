@@ -246,6 +246,17 @@ models be good enough. Do not add a silent-save path.
   production" was true and meaningless. A feature is reachable from a screen; until it
   is, say plainly that an endpoint exists and the feature does not.
 
+- **When a guess about a shape is wrong, print the shape.** A heading came back as an
+  ingredient from a real card. The first fix compared the line's text to its section
+  and missed a `(9x13)` column label appended to it; the second required the line to
+  carry no digit, and `9x13` sailed through the guard meant to catch it. Both passed
+  their unit tests, because the tests asserted the shape I had imagined. Printing one
+  raw payload took a single call and showed `{"text":"Brownie Layer (9x13)","section":null}`
+  — which settled in seconds what two guesses had not. Same reasoning as `git log` over
+  `git status`: look at the thing itself, not at a summary of it or a model of it. And a
+  test that passes while the real input is unchanged is the same class as a test that
+  never runs — it is counted.
+
 - **`git status` cannot tell you what has been committed.** It describes the working
   tree and nothing else, so a dirty tree at the end of a session says nothing about
   whether previous sessions landed. Run `git log` before any claim about repository

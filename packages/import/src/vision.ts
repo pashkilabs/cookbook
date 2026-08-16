@@ -337,8 +337,21 @@ export async function extractFromImages(input: VisionInput): Promise<VisionResul
  * misaligned "we guessed this amount" marker is worse than no marker: it tells
  * somebody a number is trustworthy when it is not.
  */
+/**
+ * A heading, reduced to the words that identify it.
+ *
+ * The parenthetical goes: a real card writes `Brownie Layer (9x13)` where `(9x13)` labels the
+ * second column, not the layer. Two guesses failed before the payload was printed — the first
+ * compared text to section as written and missed the suffix, the second required the line to
+ * carry no digit and `9x13` sailed straight through the guard meant to catch it.
+ */
 const asHeading = (text: string) =>
-  String(text ?? "").trim().replace(/[:：]\s*$/, "").replace(/\s+/g, " ").toLowerCase();
+  String(text ?? "")
+    .replace(/\([^)]*\)/g, " ")
+    .trim()
+    .replace(/[:：]\s*$/, "")
+    .replace(/\s+/g, " ")
+    .toLowerCase();
 
 export function toIngredients(lines: VisionIngredient[]): ExtractedRecipe["ingredients"] {
   /*
@@ -355,7 +368,8 @@ export function toIngredients(lines: VisionIngredient[]): ExtractedRecipe["ingre
 
   const parsed: ExtractedRecipe["ingredients"] = [];
   for (const line of lines) {
-    if (headings.has(asHeading(line.text)) && !/\d/.test(line.text)) continue;
+    // a line that is only its own heading, whatever column label trails it
+    if (line.section === null && headings.has(asHeading(line.text))) continue;
     const ingredient = parseIngredientLine(line.text);
     if (!ingredient) continue;
     parsed.push({
