@@ -2038,6 +2038,33 @@ A refusal fixture is one check in the headline. The **reason** is scored separat
 folded in: refusing for the wrong reason still saves somebody from an invented recipe, but routes
 them wrongly, so it has to be visible without swamping the per-field accuracies.
 
+### Three answers that shape the expectations
+
+**A recipe that names its ingredients and quantifies none of them is a recipe.** Not a refusal —
+the same call as `instagram-texas-twinkies.txt`. So the tiffy.cooks coconut curry has *two* correct
+answers, and which applies depends on what it is read as:
+
+| read as | correct output |
+|---|---|
+| the caption alone | `refusal: no-recipe-in-source` — the caption withholds everything |
+| the reel, with frames | a partial recipe: the ingredients the frames name, every amount `null` |
+
+`frame-01` — a different tiffy.cooks post, *"Full recipes link in bio"* — is the clean refusal,
+because it does not even name a dish.
+
+**URL fixtures state no sections.** JSON-LD carries none: `recipeIngredient` is a flat array, and
+pinchofyum renders `Gochujang Sauce:` and `Ramen:` in its card markup where the Recipe node cannot
+see them. Expecting sections from a format that cannot express them would score tier 0 against the
+*capture*, not against itself. Sections stay expected for **captions**, where the headings are in
+the text being read.
+
+**A page whose structured data is a different recipe is scored on what it contains.** The America's
+Test Kitchen URL says crispy-skin chicken; its only `Recipe` node is `Sautéed Mushrooms with Red
+Wine and Rosemary`. Tier 0 reads that correctly, so the expectation is the mushrooms — scoring it
+otherwise would mark a correct read wrong. It is recorded as a **known-wrong fixture**: the product
+behaviour is a confident wrong recipe with no signal, which is a trap worth a title-mismatch check
+of its own rather than a scoring question.
+
 Neither §45 nor §46 is built yet — deliberately. They are recorded first so the hand-checked
 expected outputs are written against the intended answer rather than against what the code does
 today.
