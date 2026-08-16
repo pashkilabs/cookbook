@@ -3,17 +3,20 @@ import { redirect } from "next/navigation";
 import { userClient } from "@/lib/supabase-server";
 import { ImportFlow } from "./import-flow";
 import { BatchFlow } from "./batch-flow";
+import { PasteFlow } from "./paste-flow";
 
 export default async function ImportPage({
   searchParams,
 }: {
-  searchParams: Promise<{ many?: string }>;
+  searchParams: Promise<{ many?: string; tab?: string }>;
 }) {
   const supabase = await userClient();
   const { data } = await supabase.auth.getUser();
   if (!data.user) redirect("/sign-in");
 
-  const many = (await searchParams).many === "1";
+  const params = await searchParams;
+  const many = params.many === "1";
+  const tab = params.tab === "text" ? "text" : params.tab === "photos" ? "photos" : null;
 
   return (
     <main>
@@ -22,9 +25,13 @@ export default async function ImportPage({
       </p>
       <h1>Import a recipe</h1>
       <p className="subtitle">
-        {many
-          ? "Paste as many links as you like. Nothing is saved until you have looked at it."
-          : "Paste a link. Nothing is saved until you have looked at it."}
+        {tab === "text"
+          ? "Paste the caption itself — this is what to use when a link will not resolve."
+          : tab === "photos"
+            ? "For a reel whose recipe is on screen. A caption reads better; use this when there is none."
+            : many
+              ? "Paste as many links as you like. Nothing is saved until you have looked at it."
+              : "Paste a link. Nothing is saved until you have looked at it."}
       </p>
 
       {/* links rather than client state: a half-finished batch survives coming back to it */}
@@ -35,9 +42,23 @@ export default async function ImportPage({
         <Link className={`chip${many ? " on" : ""}`} href="/recipes/import?many=1">
           A whole folder
         </Link>
+        <Link className={`chip${tab === "text" ? " on" : ""}`} href="/recipes/import?tab=text">
+          Paste text
+        </Link>
+        <Link className={`chip${tab === "photos" ? " on" : ""}`} href="/recipes/import?tab=photos">
+          Photos
+        </Link>
       </div>
 
-      {many ? <BatchFlow /> : <ImportFlow />}
+      {tab === "text" ? (
+        <PasteFlow mode="text" />
+      ) : tab === "photos" ? (
+        <PasteFlow mode="photos" />
+      ) : many ? (
+        <BatchFlow />
+      ) : (
+        <ImportFlow />
+      )}
     </main>
   );
 }

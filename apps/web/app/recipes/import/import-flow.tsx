@@ -106,7 +106,9 @@ export function ImportFlow() {
       <div className="notice" style={{ marginTop: "1.5rem" }}>
         Most recipe sites publish their recipes in a form a machine can read, and that is what this
         uses — no model, nothing invented. Pages that publish nothing readable cannot be imported
-        yet, and Facebook, Instagram and TikTok links never resolve to the recipe at all.
+        yet, and Facebook, Instagram and TikTok links never resolve to the recipe at all —{" "}
+        <a href="/recipes/import?tab=text">paste the caption instead</a>, or{" "}
+        <a href="/recipes/import?tab=photos">a screenshot of it</a>.
       </div>
     </>
   );
