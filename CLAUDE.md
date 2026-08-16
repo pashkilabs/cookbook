@@ -88,6 +88,9 @@ Three boundaries are enforced by `pnpm check:boundaries`, not by good intentions
   the seam, the import package or an inference credential.
 - `check-native-imports.mjs` — no native module (`sharp` and friends) at module scope
   in `apps/web`. A written trap did not prevent this twice; a build does.
+- `check-tests-run.mjs` — every `*.test.*` file is matched by a vitest config. A `.tsx`
+  test outside a `*.test.ts` include ran nowhere and the suite reported the same count
+  as before it existed: seven tests, counted, never executed.
 
 ## Rules that matter
 

@@ -10,6 +10,7 @@ import { startOfWeek, todayIso } from "@/lib/week";
 import { ShortlistButton } from "../shortlist-button";
 import { RemoveRecipe } from "./remove";
 import { Verdicts } from "./verdicts";
+import { linkify } from "./linkify";
 
 /**
  * One recipe: what is in it, how to make it, who liked it, and what it looked like.
@@ -263,12 +264,29 @@ export default async function RecipePage({
         )}
       </section>
 
+      {/*
+        * Where it came from, on every recipe that has it.
+        *
+        * `source_url` was only ever shown when a recipe had no steps, so an imported recipe with
+        * a method hid its own provenance — the copyright posture is unresolved (§open) and a link
+        * back to the source is the least this can do meanwhile.
+        */}
+      {recipe.source_url && (
+        <p className="meta" style={{ marginBottom: "1.5rem" }}>
+          From{" "}
+          <a href={recipe.source_url} target="_blank" rel="noopener noreferrer">
+            {recipe.source_name || new URL(recipe.source_url).hostname.replace(/^www\./, "")}
+          </a>
+        </p>
+      )}
+
       <section>
         <h2>Method</h2>
         {steps.data?.length ? (
           <ol className="steps">
+            {/* linked at render time, never stored as markup — see ./linkify */}
             {steps.data.map((step) => (
-              <li key={step.id}>{step.text}</li>
+              <li key={step.id}>{linkify(step.text)}</li>
             ))}
           </ol>
         ) : (
