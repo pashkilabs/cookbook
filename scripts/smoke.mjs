@@ -641,6 +641,40 @@ try {
       `${SUPABASE}/rest/v1/ingredients?select=${encodeURIComponent(INGREDIENT_COLUMNS)}&limit=1`,
       { headers: svc },
     );
+    /*
+     * A metric household reads one system, everywhere.
+     *
+     * The bug this guards: `consolidate` rendered the need and the packages in the household's
+     * system and the per-recipe usage line as written, so a metric household read "600 ml pot"
+     * and "500 g" beside "Tuesday takes 1 lb" — one page, two systems, in the document that is
+     * read standing in a shop. Checked end to end because the setting, the seam and the
+     * formatter each work in isolation and the fault was in how they met.
+     */
+    const toMetric = await call("PATCH", "/api/household", { body: { measurementSystem: "metric" } });
+    record("a household can choose metric", toMetric.status === 200
+      && toMetric.body?.measurementSystem === "metric", `HTTP ${toMetric.status}`);
+
+    const metricList = await call("GET", `/shopping?week=${weekStart}`);
+    const metricHtml = typeof metricList.body === "string" ? metricList.body : JSON.stringify(metricList.body);
+    // the list's own quantities, not the surrounding prose — strip tags first
+    const quantities = metricHtml.replace(/<[^>]+>/g, " ");
+    record("and the shopping list renders for it", alive(metricList), `HTTP ${metricList.status}`);
+    record(
+      "and reads in one system throughout",
+      /\b\d[\d.,½¼¾⅓⅔⅛]*\s?(g|kg|ml|l)\b/.test(quantities)
+        && !/\b\d[\d.,½¼¾⅓⅔⅛]*\s?(lb|oz|cup|cups|qt|gal|pint)\b/.test(quantities),
+      /\b\d[\d.,½¼¾⅓⅔⅛]*\s?(lb|oz|cup|cups|qt|gal|pint)\b/.exec(quantities)?.[0]
+        ? `imperial on a metric page: ${/\b\d[\d.,½¼¾⅓⅔⅛]*\s?(lb|oz|cup|cups|qt|gal|pint)\b/.exec(quantities)[0]}`
+        : "",
+    );
+
+    const backToUs = await call("PATCH", "/api/household", { body: { measurementSystem: "us" } });
+    record("and can change back", backToUs.status === 200
+      && backToUs.body?.measurementSystem === "us", `HTTP ${backToUs.status}`);
+
+    const refused = await call("PATCH", "/api/household", { body: { measurementSystem: "imperialish" } });
+    record("and refuses a system that is not one", refused.status === 400, `HTTP ${refused.status}`);
+
     record(
       "the database has every column the app selects",
       contract.ok,
