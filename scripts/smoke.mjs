@@ -675,6 +675,43 @@ try {
     const refused = await call("PATCH", "/api/household", { body: { measurementSystem: "imperialish" } });
     record("and refuses a system that is not one", refused.status === 400, `HTTP ${refused.status}`);
 
+    /*
+     * A pasted caption, end to end (decisions §48).
+     *
+     * The path tier 2 exists for: no markup to read, so tiers 0 and 1 have nothing to do. A 500
+     * here means no handler ran; a 422 means the model was asked and found nothing, which is an
+     * answer. A deployment with no model configured answers 422 too — checked separately below so
+     * "not configured" and "answered badly" stay distinguishable.
+     */
+    const caption = [
+      "Creamy Potato & Sausage Soup",
+      "1 lb Italian sausage",
+      "6 cups chicken broth",
+      "1 cup heavy cream",
+      "3 cloves garlic, minced",
+    ].join("\n");
+    const pasted = await call("POST", "/api/import", { body: { text: caption } });
+    record("a pasted caption imports", alive(pasted), `HTTP ${pasted.status}`);
+    if (pasted.status === 200) {
+      const lines = pasted.body?.draft?.ingredients ?? "";
+      record(
+        "and the model found the ingredients",
+        typeof lines === "string" && /sausage/i.test(lines) && /broth/i.test(lines),
+        typeof lines === "string" ? lines.slice(0, 60) : "no draft",
+      );
+      record(
+        "and core parsed the amounts rather than the model",
+        typeof lines === "string" && /\b1 lb\b/i.test(lines) && /\b6 cups?\b/i.test(lines),
+        "verbatim lines, parsed by core (§48)",
+      );
+    } else {
+      record(
+        "a pasted caption is refused for a stated reason, not a crash",
+        pasted.status === 422 || pasted.status === 429,
+        `HTTP ${pasted.status} — ${String(pasted.body?.error ?? "").slice(0, 70)}`,
+      );
+    }
+
     record(
       "the database has every column the app selects",
       contract.ok,

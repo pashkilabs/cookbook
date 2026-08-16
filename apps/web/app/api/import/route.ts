@@ -1,6 +1,6 @@
 import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
-import { attemptImport, spendImportQuota } from "@/lib/import";
+import { attemptImport, attemptPasteImport, spendImportQuota } from "@/lib/import";
 import { draftFrom } from "@/lib/draft";
 
 /**
@@ -22,22 +22,40 @@ export async function POST(request: Request) {
   const family = await platformStore().findFamilyForAccount(auth.user.id);
   if (!family) return Response.json({ error: "this account has no household" }, { status: 403 });
 
-  let body: { url?: unknown };
+  let body: { url?: unknown; text?: unknown };
   try {
     body = (await request.json()) as typeof body;
   } catch {
     return Response.json({ error: "expected a JSON body" }, { status: 400 });
   }
   const url = typeof body.url === "string" ? body.url.trim() : "";
-  if (!url) return Response.json({ error: "paste a recipe link" }, { status: 400 });
+  const text = typeof body.text === "string" ? body.text.trim() : "";
+  if (!url && !text) {
+    return Response.json({ error: "paste a recipe link or the text of one" }, { status: 400 });
+  }
 
-  const { outcome, storagePath, photoDimensions, photoFailure } = await attemptImport(url, family.id);
+  /*
+   * A link and a caption are two channels, and the link wins (decisions §49).
+   *
+   * Where a recipe exists as both, the caption path scores about a third of the page path and
+   * costs money; a page that publishes structured data is free and byte-identical. So a request
+   * carrying both is a page import, and the text is ignored rather than merged.
+   */
+  const { outcome, storagePath, photoDimensions, photoFailure } = url
+    ? await attemptImport(url, family.id)
+    : {
+        outcome: await attemptPasteImport({ text }),
+        storagePath: null,
+        photoDimensions: null,
+        photoFailure: null,
+      };
 
   if (!outcome.ok) {
     return Response.json(explain(outcome.failure), { status: 422 });
   }
 
-  if (!outcome.fromCache) {
+  // a pasted caption is never cached — it has no URL to key on — so it always charges
+  if (!("fromCache" in outcome) || !outcome.fromCache) {
     const spent = await spendImportQuota(auth.user.id);
     if (spent.status !== "allowed") {
       return Response.json(

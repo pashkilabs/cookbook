@@ -36,7 +36,7 @@ const SERVER_ONLY = [
 
 /** Anything that looks like an inference or service-role credential. */
 const SECRETS =
-  /process\.env\.[A-Z0-9_]*(OPENAI|ANTHROPIC|GROQ|TOGETHER|GEMINI|INFERENCE|SERVICE_ROLE|SIGNING)[A-Z0-9_]*/;
+  /process\.env\.[A-Z0-9_]*(OPENAI|ANTHROPIC|GROQ|TOGETHER|GEMINI|INFERENCE|LLM|SERVICE_ROLE|SIGNING)[A-Z0-9_]*/;
 
 /** The packages themselves are allowed to reference their own names in docs and tests. */
 const ALLOWED_PREFIXES = [
