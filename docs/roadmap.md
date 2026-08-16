@@ -41,6 +41,27 @@ rebuild, and everything else depends on it.*
       recall and precision, cost per run, and a diff for every failure.
       `pnpm --filter @pashki/core eval`. Extractors are plain functions, so a
       model plugs in without touching the harness.
+- [ ] **Substitution table.** §6's rule applied to a new feature: "I have no buttermilk"
+      has a correct answer that needs no model, and reaching for one there is the same
+      mistake as consulting tier 2 for a page that publishes structured data.
+      *Seed data in `packages/core`, same shape as `SEED_CATALOG` — a table it can grow
+      into, not a constant it imports.* Keyed on catalog ingredients where possible so it
+      speaks the language the shopping list and the calorie work already speak.
+      Each entry carries what to use instead, **in what ratio**, and **what it costs** —
+      the caveat matters as much as the substitution, because somebody who does not know
+      what they are trading should not be told to trade it. Buttermilk is milk plus a
+      tablespoon of acid per cup and works everywhere; self-raising flour is plain flour
+      plus baking powder and the ratio is load-bearing; butter for oil is not one-to-one
+      and changes the texture. Where a substitution holds only in some uses, say so:
+      Greek yogurt for sour cream is fine in a sauce and wrong in a bake.
+      Forty to fifty entries covering what a household actually runs out of, not an
+      exhaustive reference.
+      Then the UI: an ingredient on a recipe offers "no X?" and shows what to use.
+      **Read-only — no rewriting the recipe, no model, no quota.** Rewriting is a later
+      and larger feature; this is the free half and ships on its own.
+      Record as a decision including what is deliberately absent: the tail that needs a
+      model, and dietary rewrites, which are a safety feature and separate work.
+
 - [ ] **Catalog expansion.** Grow `SEED_CATALOG` toward the items a real family
       buys. Every addition needs a package list in base units.
 
