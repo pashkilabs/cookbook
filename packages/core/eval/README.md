@@ -50,6 +50,11 @@ Measured over five runs of `openai/gpt-oss-120b` + `google/gemma-4-31B-it`:
 | sections | 61.3% | 56.0–65.3 (±4.7) |
 | cost | $0.0141 | $0.0116–$0.0164 |
 
+**`servings` is too unstable to compare models on.** At ±6.6 the spread is wider than most
+differences worth acting on, so two models within about thirteen points of each other on that
+field are indistinguishable from one run each. Either raise the run count until the spread closes
+or judge on another field.
+
 **Seven of thirty-five fixtures changed status between runs** — six captions that scored in some
 runs and skipped in others, and one reel that did the reverse. The same input, the same
 temperature, a different answer. That is the noise floor, and it is why `overall 84.3%` from a

@@ -69,7 +69,7 @@ export function createImportExtractor(options: ImportExtractorOptions): Extracto
         preparer: options.preparer ?? createPassthroughImagePreparer(),
       });
       if (!outcome.ok) {
-        const refusal = refusalFor(outcome.failure);
+        const refusal = refusalFor(outcome.failure, input.kind);
         // null still means "not my kind of input"; a refusal means "I read it and there is no
         // recipe here". Conflating them left confabulation unmeasured on the path most likely
         // to do it — a reel that shows a dish and withholds the recipe.
@@ -105,7 +105,7 @@ export function createImportExtractor(options: ImportExtractorOptions): Extracto
         : options;
       const outcome = await importRecipe(input.url, withSnapshot);
       if (!outcome.ok) {
-        const refusal = refusalFor(outcome.failure);
+        const refusal = refusalFor(outcome.failure, "url");
         return refusal ? { refused: { because: refusal } } : null;
       }
       return toEvalRecipe(outcome.recipe, outcome.tier);
@@ -172,12 +172,21 @@ function toEvalRecipe(
  * fetch is not an answer about the page at all, and reporting it as a refusal would score the
  * network as if it were a judgement.
  */
-function refusalFor(failure: { kind: string } | undefined): RefusalReason | null {
+function refusalFor(
+  failure: { kind: string } | undefined,
+  kind: FixtureInput["kind"],
+): RefusalReason | null {
   switch (failure?.kind) {
     case "no-recipe-found":
     case "recipe-incomplete":
-      // read, and there was nothing in it
-      return "not-a-recipe-page";
+      /*
+       * Read, and there was nothing in it — but *what* that means depends on the channel.
+       * "This is not a recipe page" is a statement about a URL and is meaningless about a
+       * screenshot: a reel is not a page, and telling somebody their photograph is the wrong
+       * URL sends them nowhere. A caption or a reel that carries no recipe is a source
+       * withholding it, which is a different remedy — paste the DM, or a different frame.
+       */
+      return kind === "url" ? "not-a-recipe-page" : "no-recipe-in-source";
     case "blocked-platform":
       // Instagram, TikTok, Facebook — these never resolve server-side (CLAUDE.md)
       return "unresolvable-source";
