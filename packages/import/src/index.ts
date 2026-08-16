@@ -113,3 +113,5 @@ export {
 } from "./vision.js";
 export { createOpenAiCompatibleProvider, providerFromEnv } from "./openai-compatible.js";
 export type { OpenAiCompatibleOptions } from "./openai-compatible.js";
+export { createAnthropicProvider, visionProviderFromEnv } from "./anthropic.js";
+export type { AnthropicOptions } from "./anthropic.js";
