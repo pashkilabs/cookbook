@@ -400,3 +400,23 @@ describe("as an eval extractor", () => {
     expect(await extractor({ kind: "caption", text: "1 lb spaghetti" })).toBeNull();
   });
 });
+
+describe("a source that names no dish", () => {
+  it("accepts a null title rather than escalating for it", async () => {
+    // regression: the schema allowed null and the validator still demanded a string, so every
+    // untitled caption escalated and then failed — a fault in the harness read as a bad model
+    const provider = stubProvider([{ ...goodPayload, title: null }]);
+    const result = await extractWithLlm({
+      content: "here are the toast details", sourceUrl: "", sourceName: null, cascade: cascade(provider),
+    });
+    expect(result.recipe?.title).toBeNull();
+  });
+
+  it("still treats an empty string as a field the model failed to fill", async () => {
+    const provider = stubProvider([{ ...goodPayload, title: "  " }, goodPayload]);
+    const result = await extractWithLlm({
+      content: "x", sourceUrl: "", sourceName: null, cascade: cascade(provider),
+    });
+    expect(result.attempts[0]?.outcome).toBe("invalid-output");
+  });
+});

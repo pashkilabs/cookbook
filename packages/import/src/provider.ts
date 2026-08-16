@@ -260,9 +260,14 @@ export function validateRecipePayload(value: unknown): ValidationResult {
   }
   const candidate = value as Record<string, unknown>;
 
+  /*
+   * null is a valid answer: a caption reading "here are the toast details" names no dish, and a
+   * model that supplies one has invented it (decisions §46). An empty string is not the same
+   * claim — that is a field the model failed to fill, and it escalates.
+   */
   const title = candidate.title;
-  if (typeof title !== "string") errors.push("title is not a string");
-  else if (!title.trim()) errors.push("title is empty");
+  if (title !== null && typeof title !== "string") errors.push("title is not a string or null");
+  else if (typeof title === "string" && !title.trim()) errors.push("title is empty");
 
   for (const field of ["servings", "totalMinutes"] as const) {
     const raw = candidate[field];
