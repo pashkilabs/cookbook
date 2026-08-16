@@ -21,7 +21,6 @@ import {
 
 import type { ExtractedRecipe, ExtractorOutput } from "@pashki/core/eval";
 import { isRefusal } from "@pashki/core/eval";
-import { createImportExtractor } from "../src/eval-extractor.js";
 
 /**
  * An extractor may now decline (decisions §46), so its output is a union. These tests are about
@@ -430,7 +429,7 @@ describe("what the extractor says when there is no recipe", () => {
    */
   it("refuses a page it read and found no recipe in", async () => {
     const extractor = createImportExtractor({
-      fetcher: createFakeFetcher({ "https://x.test/none": PAGE_WITH_NO_RECIPE }),
+      fetcher: createFakeFetcher({ "https://x.test/none": { html: PAGE_WITH_NO_RECIPE } }),
       cache: createFakeCache(),
       skipPhoto: true,
     });
