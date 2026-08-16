@@ -19,6 +19,9 @@ const TRAILING_NOTES = [
   "to taste", "for serving", "for garnish", "for topping", "for dusting",
   "optional", "divided", "plus more for serving", "plus more",
   "at room temperature", "or more to taste", "if needed", "or to taste",
+  // prep the tin arrives needing, written without a comma on plenty of UK sites
+  "drained and rinsed", "drained", "rinsed", "peeled and deveined", "finely minced",
+  "room temp", "melted and cooled", "freshly grated", "thinly sliced",
 ];
 
 /**
@@ -137,6 +140,25 @@ export function parseIngredientLine(raw: string): ParsedIngredient | null {
     }
   }
 
+  /*
+   * A restated measure: "20g/ 1 1/2 tbsp unsalted butter", "1kg / 2lb chicken", "250g/8oz tomatoes".
+   *
+   * RecipeTin Eats writes every line this way and it is one of the household's most-used sources.
+   * The parser took the first measure and left the rest of it — slash and all — glued to the front
+   * of the ingredient, so `unsalted butter` became `/ 1 1/2 tbsp unsalted butter` and matched
+   * nothing in the catalog. The second measure is the *same quantity said again*, not more food,
+   * so it is dropped rather than added.
+   *
+   * A number after the slash is what makes it a measure. `cooking salt / kosher salt` and
+   * `chicken broth/stock` are alternatives between two foods and must survive untouched.
+   */
+  if (amount !== null) {
+    const restated = new RegExp(`^/\\s*(${NUMBER})\\s*([a-zA-Z]+)\\.?\\b`).exec(rest);
+    if (restated && canonicalUnit(restated[2] ?? "") !== null) {
+      rest = rest.slice(restated[0].length).trim();
+    }
+  }
+
   if (!paren) takeParenthetical(); // "1 can (14.5 oz) tomatoes"
 
   // A sized container is worth more than a count of tins.
@@ -148,8 +170,69 @@ export function parseIngredientLine(raw: string): ParsedIngredient | null {
     }
   }
 
+  /*
+   * WPRM wraps an already-parenthesised note in parentheses of its own, so RecipeTin Eats emits
+   * `cumin ((sub coriander, thyme leaves crushed between fingers, or omit))`. Collapsed before
+   * anything reads them, because every rule below assumes one level.
+   */
+  rest = rest.replace(/\(\s*\(/g, "(").replace(/\)\s*\)/g, ")");
+
+  /*
+   * "½ tsp EACH salt and pepper" — one amount, two ingredients, and the word that says so.
+   *
+   * The line cannot become two rows here: this function returns one ingredient, and splitting it
+   * would change the shape of every caller. What it can do is stop `each` becoming part of the
+   * food, so the item is `salt and pepper` rather than `each salt and pepper` — which at least
+   * matches a catalog entry and reads correctly on a list. Splitting properly is a change to
+   * `parseIngredientList`, which is where a line may legitimately become two.
+   */
+  rest = rest.replace(/^each\s+/i, "");
+
+  /*
+   * "1 pinch crushed red pepper", "a dash of hot sauce", "a handful of parsley".
+   *
+   * A pinch is not a unit — nothing converts it and no shopping list buys one — so it belongs in
+   * the note, not glued to the front of the food. The amount goes with it: "1 pinch" is one
+   * pinch, not one crushed red pepper, and leaving the 1 behind would claim a quantity the
+   * recipe never gave.
+   */
+  // "a pinch of" as often as "1 pinch": the article is not a number, so it is still sitting here
+  const vague = /^(?:an?\s+)?(pinch|pinches|dash|dashes|handful|handfuls|splash|splashes|sprinkle|drizzle|squeeze)e?s?\s+(?:of\s+)?/i.exec(rest);
+  if (vague) {
+    leadingNote = [leadingNote, (vague[1] ?? "").toLowerCase()].filter(Boolean).join(", ");
+    rest = rest.slice(vague[0].length).trim();
+    amount = null;
+    unitWord = null;
+  }
+
+  /*
+   * "2 x 400g cans cannellini beans" — the multiplier already turned this into 800 g, so the
+   * container word is spent. It was left on the front of the food, giving `cans cannellini beans`.
+   * Only stripped when a real measure was established, so "2 cans tomatoes" keeps its cans.
+   */
+  if (unitWord !== null && canonicalUnit(unitWord) !== "can") {
+    const spentContainer = /^([a-zA-Z]+)\s+/.exec(rest);
+    if (spentContainer && CONTAINER_WORDS.has((spentContainer[1] ?? "").toLowerCase())) {
+      rest = rest.slice(spentContainer[0].length).trim();
+    }
+  }
+
+  /*
+   * "2 tbsp honey or 1 tbsp sugar" — an alternative with its own measure.
+   *
+   * The first is the recipe's choice; the rest is a substitution note. Kept as a note rather than
+   * dropped, because "or maple syrup" is the sort of thing somebody standing in a shop wants.
+   * Only fires when the alternative carries a *number*, so "salt or pepper" and "chicken broth or
+   * stock" are left alone as the single ingredients they are.
+   */
+  const alternative = new RegExp(`\\s+or\\s+(${NUMBER})\\s*[a-zA-Z]`, "i").exec(rest);
+  if (alternative && alternative.index > 0) {
+    leadingNote = [leadingNote, rest.slice(alternative.index + 1).trim()].filter(Boolean).join(", ");
+    rest = rest.slice(0, alternative.index).trim();
+  }
+
   let note = leadingNote;
-  const comma = rest.indexOf(",");
+  const comma = firstCommaOutsideParens(rest);
   if (comma > 0) {
     note = [note, rest.slice(comma + 1).trim()].filter(Boolean).join(", ");
     rest = rest.slice(0, comma).trim();
@@ -188,4 +271,22 @@ export function parseIngredientList(lines: string[]): ParsedIngredient[] {
   return lines
     .map((line) => parseIngredientLine(line))
     .filter((x): x is ParsedIngredient => x !== null);
+}
+
+/**
+ * The first comma that separates the ingredient from its note — ignoring any inside brackets.
+ *
+ * regression: the split used `indexOf(",")`, so `cumin (sub coriander, thyme, or omit)` broke at
+ * the comma *inside* the note and left the ingredient as `cumin (sub coriander`. Nothing in a
+ * catalog matches that, and the failure looked like a missing ingredient rather than a mis-split.
+ */
+function firstCommaOutsideParens(text: string): number {
+  let depth = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    if (char === "(") depth += 1;
+    else if (char === ")") depth = Math.max(0, depth - 1);
+    else if (char === "," && depth === 0) return i;
+  }
+  return -1;
 }

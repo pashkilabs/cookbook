@@ -228,7 +228,7 @@ describe("flagging amounts the model guessed", () => {
     expect(result.recipe?.ingredients.map((i) => [i.item, i.estimated ?? false])).toEqual([
       ["beef chuck", false],
       ["dried guajillo chiles", false],
-      ["splash of vinegar", true],
+      ["vinegar", true],
       ["beef broth", true],
     ]);
   });
@@ -252,7 +252,10 @@ describe("flagging amounts the model guessed", () => {
     });
     expect(result.recipe?.ingredients).toHaveLength(1);
     expect(result.recipe?.ingredients[0]).toMatchObject({
-      item: "splash of cream",
+      // "splash of" is now read as the vague quantity it is and moved to the note, so the
+      // ingredient is the food. The alignment this test guards is unchanged: the surviving row
+      // keeps its own flag rather than inheriting the dropped line's.
+      item: "cream",
       estimated: true,
     });
   });

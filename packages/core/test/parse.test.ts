@@ -239,3 +239,146 @@ describe("a unit closed up against its number", () => {
     expect(parseIngredientList(["1.5 kg beef"])[0]?.amount).toBe(1.5);
   });
 });
+
+describe("a measure restated in the other system", () => {
+  /**
+   * RecipeTin Eats writes every ingredient twice — `20g/ 1 1/2 tbsp unsalted butter` — and the
+   * second measure is the same quantity said again, not more food. The parser took the first and
+   * left the rest glued to the ingredient, so it matched nothing in the catalog.
+   */
+  it("keeps the first measure and drops the restatement", () => {
+    // regression: "unsalted butter" arrived as "/ 1 1/2 tbsp unsalted butter"
+    for (const [line, amount, unit, item] of [
+      ["20g/ 1 1/2 tbsp unsalted butter", 20, "g", "unsalted butter"],
+      ["1kg / 2lb bone in, skin on chicken thighs", 1, "kg", "bone in"],
+      ["250g/8oz cherry tomatoes", 250, "g", "cherry tomatoes"],
+      ["1 cup/240ml milk", 1, "cup", "milk"],
+    ] as const) {
+      const [parsed] = parseIngredientList([line]);
+      expect(parsed?.amount, line).toBe(amount);
+      expect(parsed?.unit, line).toBe(unit);
+      expect(parsed?.item, line).toBe(item);
+    }
+  });
+
+  it("leaves a slash between two foods alone, because that is a choice and not a measure", () => {
+    // the guard: a number after the slash is what makes it a restatement
+    expect(parseIngredientList(["3/4 tsp cooking salt / kosher salt"])[0]?.item)
+      .toBe("cooking salt / kosher salt");
+    expect(parseIngredientList(["1 cup chicken broth/stock"])[0]?.item)
+      .toBe("chicken broth/stock");
+  });
+});
+
+describe("a note that contains its own commas", () => {
+  it("splits at the comma outside the brackets, not the first one it finds", () => {
+    /*
+     * regression: `indexOf(",")` broke inside the note, leaving the ingredient as
+     * `cumin ((sub coriander`. Nothing matches that, and it read as a missing ingredient
+     * rather than a mis-split — the failure pointed at the wrong thing.
+     */
+    const [parsed] = parseIngredientList([
+      "1/4 tsp cumin ((sub coriander, thyme leaves crushed between fingers, or omit))",
+    ]);
+    expect(parsed?.item).toBe("cumin");
+    expect(parsed?.amount).toBe(0.25);
+    expect(parsed?.note).toContain("sub coriander");
+  });
+
+  it("collapses the doubled brackets a recipe plugin emits", () => {
+    const [parsed] = parseIngredientList(["250g/8oz cherry tomatoes ((whole))"]);
+    expect(parsed?.item).toBe("cherry tomatoes");
+    expect(parsed?.note).toBe("whole");
+  });
+
+  it("still splits an ordinary trailing note", () => {
+    const [parsed] = parseIngredientList(["2 tomatoes, diced"]);
+    expect(parsed?.item).toBe("tomatoes");
+    expect(parsed?.note).toBe("diced");
+  });
+});
+
+describe("one line naming more than one thing", () => {
+  it("does not let EACH become part of the food", () => {
+    // regression: "½ tsp EACH salt and pepper" produced an ingredient called "each salt and pepper"
+    const [parsed] = parseIngredientList(["1/2 tsp EACH salt and pepper"]);
+    expect(parsed?.item).toBe("salt and pepper");
+    expect(parsed?.amount).toBe(0.5);
+    expect(parsed?.unit).toBe("tsp");
+  });
+
+  it("takes the first of two measured alternatives and keeps the other as a note", () => {
+    /*
+     * regression: "2 tbsp honey or 1 tbsp sugar" scored as a missing honey *and* a spurious line,
+     * costing twice. The substitution is worth keeping — somebody in a shop wants to know — but
+     * it is not a second thing to buy.
+     */
+    const [parsed] = parseIngredientList(["2 tbsp honey or 1 tbsp sugar"]);
+    expect(parsed?.item).toBe("honey");
+    expect(parsed?.amount).toBe(2);
+    expect(parsed?.note).toContain("1 tbsp sugar");
+  });
+
+  it("leaves an unmeasured alternative as the one ingredient it is", () => {
+    // the guard: only a number after "or" makes it a separate measure
+    expect(parseIngredientList(["1 cup chicken broth or stock"])[0]?.item).toBe("chicken broth or stock");
+    expect(parseIngredientList(["1 lb mild or spicy Italian sausage"])[0]?.item)
+      .toBe("mild or spicy italian sausage");
+  });
+});
+
+describe("a quantity that is not one", () => {
+  it("puts a pinch in the note and claims no amount", () => {
+    /*
+     * regression: "1 pinch crushed red pepper" produced an ingredient called "pinch crushed red
+     * pepper" with an amount of 1 — a number the recipe never gave for a food nobody can buy a
+     * pinch of.
+     */
+    const [parsed] = parseIngredientList(["1 pinch crushed red pepper"]);
+    expect(parsed?.item).toBe("crushed red pepper");
+    expect(parsed?.amount).toBeNull();
+    expect(parsed?.note).toContain("pinch");
+  });
+
+  it("does the same for a dash, a handful and a squeeze", () => {
+    for (const [line, item] of [
+      ["a dash of hot sauce", "hot sauce"],
+      ["a handful of parsley", "parsley"],
+      ["squeeze of fresh lemon juice", "fresh lemon juice"],
+    ] as const) {
+      const [parsed] = parseIngredientList([line]);
+      expect(parsed?.item, line).toBe(item);
+      expect(parsed?.amount, line).toBeNull();
+    }
+  });
+});
+
+describe("a container word the multiplier already spent", () => {
+  it("drops the tin once its size has been counted", () => {
+    // regression: "2 x 400g cans cannellini beans" is 800 g of beans, and the word "cans" was
+    // left on the front of the food
+    const [parsed] = parseIngredientList(["2 x 400g cans cannellini beans drained and rinsed"]);
+    expect(parsed?.amount).toBe(800);
+    expect(parsed?.unit).toBe("g");
+    // "drained and rinsed" moved to the note by the trailing-note rule below, which landed after
+    // this test was written — the better answer, so the expectation follows it
+    expect(parsed?.item).toBe("cannellini beans");
+  });
+
+  it("keeps the tin when the tin is the measure", () => {
+    // the guard: "2 cans tomatoes" has no other measure, so cans is what you buy
+    const [parsed] = parseIngredientList(["2 cans diced tomatoes"]);
+    expect(parsed?.unit).toBe("can");
+    expect(parsed?.item).toBe("diced tomatoes");
+  });
+});
+
+describe("prep written without a comma", () => {
+  it("reads drained and rinsed as a note, not part of the bean", () => {
+    // regression: "2 x 400g cans cannellini beans drained and rinsed" gave an ingredient nothing
+    // in a catalog matches. UK sites routinely omit the comma.
+    const [parsed] = parseIngredientList(["2 x 400g cans cannellini beans drained and rinsed"]);
+    expect(parsed?.item).toBe("cannellini beans");
+    expect(parsed?.note).toContain("drained and rinsed");
+  });
+});

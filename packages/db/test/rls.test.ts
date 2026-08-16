@@ -147,6 +147,16 @@ describe.skipIf(instance === null)("row-level security", () => {
     alpha = await build("alpha");
     beta = await build("beta");
 
+    /*
+     * Sweep any row a previous run left behind before adding this run's.
+     *
+     * `afterAll` cleans up, but an interrupted run does not reach it — and the leak lands in the
+     * *catalog*, which is shared. The next run then fails `catalog-roundtrip` with "expected 65,
+     * got 66", which points at the seed and not at the leak. A test that poisons a different
+     * test's result is the same misattribution this repo keeps paying for.
+     */
+    await admin.from("ingredients").delete().like("key", "test-cream-%");
+
     const ingredient = await admin
       .from("ingredients")
       .insert({
