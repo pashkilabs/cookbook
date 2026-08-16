@@ -86,6 +86,8 @@ Three boundaries are enforced by `pnpm check:boundaries`, not by good intentions
   `SEED_CATALOG`.
 - `check-server-only.mjs` — no `"use client"` file or `apps/mobile` file may import
   the seam, the import package or an inference credential.
+- `check-native-imports.mjs` — no native module (`sharp` and friends) at module scope
+  in `apps/web`. A written trap did not prevent this twice; a build does.
 
 ## Rules that matter
 
