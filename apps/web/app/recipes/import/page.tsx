@@ -16,7 +16,7 @@ export default async function ImportPage({
 
   const params = await searchParams;
   const many = params.many === "1";
-  const tab = params.tab === "text" ? "text" : params.tab === "photos" ? "photos" : null;
+  const tab = params.tab === "text" ? "text" : null;
 
   return (
     <main>
@@ -27,9 +27,7 @@ export default async function ImportPage({
       <p className="subtitle">
         {tab === "text"
           ? "Paste the caption itself — this is what to use when a link will not resolve."
-          : tab === "photos"
-            ? "For a reel whose recipe is on screen. A caption reads better; use this when there is none."
-            : many
+          : many
               ? "Paste as many links as you like. Nothing is saved until you have looked at it."
               : "Paste a link. Nothing is saved until you have looked at it."}
       </p>
@@ -45,15 +43,18 @@ export default async function ImportPage({
         <Link className={`chip${tab === "text" ? " on" : ""}`} href="/recipes/import?tab=text">
           Paste text
         </Link>
-        <Link className={`chip${tab === "photos" ? " on" : ""}`} href="/recipes/import?tab=photos">
-          Photos
-        </Link>
+        {/*
+          * Photos is hidden until an upload works end to end.
+          *
+          * A visible feature over a 500 is worse than an invisible one: it wastes somebody's
+          * time and teaches them the app is unreliable. The tab returns when a screenshot has
+          * been through it in a browser — the route and the flow both exist and are one
+          * verified upload away.
+          */}
       </div>
 
       {tab === "text" ? (
         <PasteFlow mode="text" />
-      ) : tab === "photos" ? (
-        <PasteFlow mode="photos" />
       ) : many ? (
         <BatchFlow />
       ) : (

@@ -10,6 +10,7 @@ import {
   type ImportOutcome,
   type LlmCascade,
   type TierAttempt,
+  createPassthroughImagePreparer,
 } from "@pashki/import";
 import { createSupabaseImportCache } from "@pashki/import/supabase";
 import { storeImportedPhoto } from "@pashki/import/photo-storage";
@@ -153,9 +154,9 @@ export async function spendImportQuota(accountId: string) {
  * built for. Against the fixture set it scores **80.4% ± 2.8** where core's line parser alone
  * scores 48.9%, for about $0.0007 a caption (decisions §48).
  *
- * **Screenshots go through the sharp preparer.** Phone captures run 1.5–3.7 MB and the vision path
- * caps an image at 1.5 MB, so without it every reel is rejected before a call is made — which
- * reads as "vision failed" when nothing was tried (§49).
+ * **Screenshots are resized by the browser, not the server.** The client downscales and re-encodes
+ * as JPEG before upload, so no image library runs in a serverless function — a native addon that
+ * cannot be traced into a Vercel build has now caused two outages (§37, and again here).
  */
 export type PasteOutcome =
   | { ok: true; recipe: ExtractedRecipe; attempts: readonly TierAttempt[] }
@@ -169,17 +170,29 @@ export async function attemptPasteImport(
 
   if ("images" in input) {
     /*
-     * sharp is loaded here, not at module scope.
+     * No sharp. The client already did the work, and this is the second outage it has caused.
      *
-     * It is a native addon, and a module-scope import pulls it into every route that touches this
-     * file — which is how five routes returned 500 from the day they shipped, for wanting a bucket
-     * name from a module that imported an image library (CLAUDE.md). Only the screenshot path
-     * needs it, so only the screenshot path pays for it.
+     * The browser downscales to ~1500px and re-encodes as JPEG at 0.8 before upload, so what
+     * arrives is already small — and `canvas.toBlob` re-encodes from raw pixels, which strips EXIF
+     * outright. That covers two of the three things the sharp preparer bought:
+     *
+     *   resizing        the client does it, and better — it saves the upload too
+     *   EXIF stripping  the canvas re-encode drops it entirely; a device identifier
+     *                   never reaches a prompt
+     *   orientation     `.rotate()` applies an EXIF tag a screenshot does not carry;
+     *                   screenshots are captured upright
+     *
+     * **What is lost, said plainly:** the quality step-down that rescued an image still over the
+     * byte ceiling. Without it such an image is *rejected* with a stated reason rather than
+     * silently re-compressed. That is a worse outcome for one edge case and a better one for the
+     * deployment, which is the same trade §37 made when it took sharp out the first time.
+     *
+     * Validation survives: `decodeImage` is our own header parser, so bytes are still decoded
+     * rather than trusted (CLAUDE.md — never trust a content type).
      */
-    const { createSharpImagePreparer } = await import("@pashki/import/sharp");
     const outcome = await importFromImages(input.images, {
       cascade: llm,
-      preparer: createSharpImagePreparer(),
+      preparer: createPassthroughImagePreparer(),
     });
     return outcome.ok
       ? { ok: true, recipe: outcome.recipe, attempts: outcome.attempts }
