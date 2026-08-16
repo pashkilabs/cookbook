@@ -1,4 +1,6 @@
 import { provisionForConfirmedAccount } from "@/lib/provisioning";
+import { platformClient } from "@/lib/platform";
+import { userClient } from "@/lib/supabase-server";
 
 /**
  * Provision the household for whoever holds this bearer token.
@@ -55,4 +57,40 @@ export async function POST(request: Request) {
     created: outcome.created,
     canWrite: outcome.canWrite,
   });
+}
+
+/**
+ * Change a household setting. Today that is the measurement system and nothing else.
+ *
+ * On this route rather than a new one: each route file is a serverless function and a deployment
+ * has already been refused for exceeding the host's twelve-function limit (§37). A household
+ * setting belongs beside household provisioning anyway.
+ *
+ * `families` is a platform table, so the write goes through the seam — app code may not touch one
+ * (`check-platform-tables.mjs` fails the build on a direct query).
+ */
+export async function PATCH(request: Request) {
+  const supabase = await userClient();
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return Response.json({ error: "sign in first" }, { status: 401 });
+
+  let body: { measurementSystem?: unknown };
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return Response.json({ error: "expected a JSON body" }, { status: 400 });
+  }
+
+  const system = body.measurementSystem;
+  if (system !== "us" && system !== "metric") {
+    return Response.json({ error: "measurementSystem must be us or metric" }, { status: 400 });
+  }
+
+  try {
+    const family = await platformClient(auth.user.id).setMeasurementSystem(system);
+    return Response.json({ measurementSystem: family.measurementSystem });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "that did not work";
+    return Response.json({ error: message }, { status: 400 });
+  }
 }

@@ -172,6 +172,26 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
       return toMember(data);
     },
 
+    async setMeasurementSystem(input): Promise<Family | null> {
+      const { data, error } = await supabase
+        .from("families")
+        .update({ measurement_system: input.system })
+        // scoped by household id: the service role bypasses RLS, so this is the only thing
+        // standing between a mistyped id and another household's row
+        .eq("id", input.familyId)
+        .is("deleted_at", null)
+        .select("id, name, owner_account_id, measurement_system")
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      if (!data) return null;
+      return {
+        id: data.id,
+        name: data.name,
+        ownerAccountId: data.owner_account_id,
+        measurementSystem: (data.measurement_system === "metric" ? "metric" : "us"),
+      };
+    },
+
     async updateMember(input): Promise<FamilyMember | null> {
       const changes: Record<string, unknown> = {};
       if (input.displayName !== undefined) changes.display_name = input.displayName;

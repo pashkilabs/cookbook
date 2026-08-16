@@ -283,6 +283,17 @@ export interface PlatformStore {
   removeMember(input: { familyId: string; memberId: string }): Promise<boolean>;
 
   /**
+   * Which units the household reads (§28, §47).
+   *
+   * On the port because `families` is a platform table. Scoped by `familyId` in SQL rather than
+   * by the caller having resolved the right household, the same as the member writes above.
+   */
+  setMeasurementSystem(input: {
+    familyId: string;
+    system: MeasurementSystem;
+  }): Promise<Family | null>;
+
+  /**
    * Invitations. The token never reaches this port — only its hash, minted by the caller.
    *
    * `createInvitation` supersedes any live invitation to the same address in the same household,
@@ -458,6 +469,14 @@ export interface PlatformClient {
    */
   addChild(input: { displayName: string; colour?: string | null }): Promise<FamilyMember>;
   updateMember(memberId: string, changes: { displayName?: string; colour?: string | null }): Promise<FamilyMember>;
+  /**
+   * Set the units the whole household reads.
+   *
+   * A household setting rather than a personal one, because the document it governs — the
+   * shopping list — is shared. Two people standing in the same shop reading different units off
+   * the same list is the thing this prevents (§28).
+   */
+  setMeasurementSystem(system: MeasurementSystem): Promise<Family>;
   removeMember(memberId: string): Promise<void>;
 
   /**

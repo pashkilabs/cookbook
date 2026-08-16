@@ -3,6 +3,7 @@ import { createCatalog } from "../src/catalog.js";
 import { SEED_CATALOG } from "../src/seed-catalog.js";
 import { parseIngredientList } from "../src/parse.js";
 import { consolidate } from "../src/consolidate.js";
+import { formatAsWritten, formatInSystem } from "../src/format.js";
 import { formatMeasure, formatVolume, formatWeight } from "../src/format.js";
 import type { ConsolidationEntry, MeasurementSystem } from "../src/types.js";
 
@@ -166,6 +167,59 @@ describe("the whole list, both ways", () => {
       if (line.leftoverDisplay) {
         expect(line.leftoverDisplay, line.key).not.toMatch(/\b(lb|oz|cup|qt|gal|tbsp|tsp)\b/);
       }
+    }
+  });
+});
+
+/**
+ * A recipe page in the household's units (decisions §47).
+ *
+ * Read-only, so it converts. The editor and the import review deliberately do not — they re-parse
+ * what they display, and converting there would rewrite the stored recipe on the next save.
+ */
+describe("a quantity in the household's units", () => {
+  const WRITTEN = [
+    [1, "pint"], [2, "cup"], [0.5, "cup"], [2, "tbsp"], [1, "tsp"],
+    [1.5, "lb"], [8, "oz"], [1, "stick"],
+  ] as const;
+
+  it("changes nothing at all for a US household reading a US recipe", () => {
+    /*
+     * regression: the reason this converts by unit rather than by round trip. `formatVolume`
+     * picks its unit by magnitude, so converting unconditionally would render `1 pint cream` as
+     * `2 cup cream` on the page of somebody who never asked for anything to change.
+     */
+    for (const [amount, unit] of WRITTEN) {
+      expect(formatInSystem(amount, unit, "us"), `${amount} ${unit}`)
+        .toBe(formatAsWritten(amount, unit));
+    }
+  });
+
+  it("leaves a metric recipe alone for a metric household, for the same reason", () => {
+    for (const [amount, unit] of [[150, "ml"], [1.5, "kg"], [500, "g"], [1, "l"]] as const) {
+      expect(formatInSystem(amount, unit, "metric"), `${amount} ${unit}`)
+        .toBe(formatAsWritten(amount, unit));
+    }
+  });
+
+  it("converts a US recipe for a metric household", () => {
+    expect(formatInSystem(1, "pint", "metric")).toBe("473 ml");
+    expect(formatInSystem(1.5, "lb", "metric")).toBe("680 g");
+    expect(formatInSystem(2, "cup", "metric")).toBe("473 ml");
+  });
+
+  it("converts a metric recipe for a US household, which is the same bug mirrored", () => {
+    // 500 g is 1.10 lb, and saying "1 lb" would be the silent rounding this repo keeps refusing
+    expect(formatInSystem(500, "g", "us")).toBe("1⅛ lb");
+    expect(formatInSystem(1, "l", "us")).toBe("1⅛ qt");
+  });
+
+  it("leaves counts and cloves alone, and anything it cannot measure", () => {
+    for (const system of ["us", "metric"] as const) {
+      expect(formatInSystem(3, null, system)).toBe(formatAsWritten(3, null));
+      expect(formatInSystem(2, "clove", system)).toBe(formatAsWritten(2, "clove"));
+      expect(formatInSystem(1, "can", system)).toBe(formatAsWritten(1, "can"));
+      expect(formatInSystem(null, "cup", system)).toBe(formatAsWritten(null, "cup"));
     }
   });
 });

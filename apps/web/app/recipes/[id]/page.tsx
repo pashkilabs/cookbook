@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { formatAsWritten } from "@pashki/core";
+import { formatInSystem } from "@pashki/core";
 import { INGREDIENT_COLUMNS } from "@pashki/db/catalog";
 import { andList, energyForRecipe } from "@/lib/energy";
 import { scaleIngredientAmounts, servingsForScale } from "@/lib/planner";
@@ -234,11 +234,15 @@ export default async function RecipePage({
         {ingredients.data?.length ? (
           <ul className="ingredients">
             {scaleIngredientAmounts(ingredients.data, plannedScale).map((line) => {
-              // formatted by packages/core, so the web app and the app agree on what
-              // "1½ cup" looks like without either of them deciding
-              const measure = formatAsWritten(
+              /*
+               * In the household's units (§47). Read-only, so it converts — the editor and the
+               * import review must not, because they re-parse what they show and would rewrite
+               * the recipe on save. A household whose units match the recipe's sees no change.
+               */
+              const measure = formatInSystem(
                 line.amount === null ? null : Number(line.amount),
                 line.unit,
+                family.measurementSystem,
               );
               return (
                 <li key={line.id}>

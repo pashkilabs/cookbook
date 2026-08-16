@@ -1,6 +1,6 @@
 import type { Dimension, MeasurementSystem } from "./types.js";
 import { formatQuantity } from "./text.js";
-import { UNITS } from "./units.js";
+import { UNITS, canonicalUnit, toBaseMeasure } from "./units.js";
 
 /**
  * Millilitres and grams in the units the household reads (decisions §28).
@@ -208,4 +208,43 @@ function matchCase(original: string, replacement: string): string {
     return replacement[0]!.toUpperCase() + replacement.slice(1);
   }
   return replacement;
+}
+
+/**
+ * Units that belong to a market, for deciding whether a line needs converting at all.
+ *
+ * Counts, cloves, cans and bunches are in neither: three onions are three onions anywhere.
+ */
+const US_UNITS = new Set(["cup", "pint", "quart", "gallon", "tbsp", "tsp", "oz", "lb", "stick"]);
+const METRIC_UNITS = new Set(["ml", "l", "g", "kg"]);
+
+/**
+ * A quantity in the units the household reads (decisions §47).
+ *
+ * **Only converts when the recipe's unit belongs to the other market.** A US household reading a
+ * US recipe gets exactly what `formatAsWritten` gives, byte for byte — which is not a nicety.
+ * `formatVolume` picks a unit by magnitude, so a blanket round trip would turn `1 pint cream` into
+ * `2 cup cream` on the page of somebody who never asked for anything to change. Conversion is for
+ * the lines that would otherwise need doing in somebody's head.
+ *
+ * Read-only surfaces use this. Editing surfaces must not (§47): the recipe editor and the import
+ * review screen re-parse what they display, so converting there would rewrite the stored recipe
+ * on the next save.
+ */
+export function formatInSystem(
+  amount: number | null,
+  unit: string | null,
+  system: MeasurementSystem = "us",
+): string {
+  const canonical = canonicalUnit(unit);
+  if (amount === null || canonical === null) return formatAsWritten(amount, unit);
+
+  const written = US_UNITS.has(canonical) ? "us" : METRIC_UNITS.has(canonical) ? "metric" : null;
+  if (written === null || written === system) return formatAsWritten(amount, unit);
+
+  const measure = toBaseMeasure(amount, canonical, null);
+  if (!measure || (measure.dimension !== "volume" && measure.dimension !== "weight")) {
+    return formatAsWritten(amount, unit);
+  }
+  return formatMeasure(measure.amount, measure.dimension, system);
 }

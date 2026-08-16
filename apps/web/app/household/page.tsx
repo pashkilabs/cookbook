@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { UnitsSetting } from "./units";
 import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
 import { MEMBER_COLOURS, invitationState } from "@pashki/platform-client";
@@ -43,7 +44,19 @@ export default async function HouseholdPage() {
         <Link href="/recipes">← {family.name}</Link>
       </p>
 
-      <h1>Who eats here</h1>
+      <h1>Household</h1>
+
+      <section style={{ marginBottom: "2rem" }}>
+        <h2>Units</h2>
+        <p className="subtitle">
+          How quantities are shown to everyone here — on the shopping list, the planner and each
+          recipe. Recipes are stored exactly as they were written, so changing this converts what
+          you read and never what you saved.
+        </p>
+        <UnitsSetting current={family.measurementSystem} />
+      </section>
+
+      <h2>Who eats here</h2>
       <p className="subtitle">
         Everyone you add can have their own opinion of a recipe. Children get a name and a colour
         — no account, no sign-in, nothing to remember.

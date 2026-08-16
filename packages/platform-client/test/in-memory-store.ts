@@ -107,6 +107,13 @@ export function createInMemoryStore(seed: Seed = {}, clock: Clock = () => new Da
       return { ...found };
     },
 
+    async setMeasurementSystem(input) {
+      const family = families.find((f) => f.id === input.familyId);
+      if (!family) return null;
+      family.measurementSystem = input.system;
+      return { ...family };
+    },
+
     async removeMember(input) {
       const at = members.findIndex(
         (m) => m.id === input.memberId && m.familyId === input.familyId,

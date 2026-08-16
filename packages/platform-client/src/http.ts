@@ -109,7 +109,13 @@ export function createPlatformRouter(options: PlatformRouterOptions): PlatformRo
           status: 200,
           body: {
             account: { id: session.account.id, email: session.account.email },
-            family: { id: session.family.id, name: session.family.name },
+            family: {
+              id: session.family.id,
+              name: session.family.name,
+              // the household's units travel with the session: a client that renders a quantity
+              // needs them on every screen, and a second round trip per screen is a worse shape
+              measurementSystem: session.family.measurementSystem,
+            },
             members: session.members.map((member) => ({
               id: member.id,
               displayName: member.displayName,
@@ -167,6 +173,17 @@ export function createPlatformRouter(options: PlatformRouterOptions): PlatformRo
           return { status: 429, body: { error: { code: "quota-exceeded", message: "quota exceeded" }, counter: outcome.counter } };
         }
         return { status: 200, body: { counter: outcome.counter } };
+      }
+
+      if (path === "/family/measurement-system") {
+        if (method !== "PATCH") return methodNotAllowed("PATCH");
+        const body = asObject(request.body);
+        if (!body) return fail(400, "bad-request", "a JSON body is required");
+        if (body.system !== "us" && body.system !== "metric") {
+          return fail(400, "bad-request", "system must be us or metric");
+        }
+        const family = await platform.setMeasurementSystem(body.system);
+        return { status: 200, body: { family } };
       }
 
       if (path === "/devices") {

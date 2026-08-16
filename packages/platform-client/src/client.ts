@@ -1,7 +1,9 @@
 import type {
   Device,
   EntitlementResult,
+  Family,
   FamilyMember,
+  MeasurementSystem,
   Invitation,
   Platform,
   PlatformClient,
@@ -192,6 +194,18 @@ export function createPlatformClient(options: PlatformClientOptions): PlatformCl
     return updated;
   }
 
+  async function setMeasurementSystem(system: MeasurementSystem): Promise<Family> {
+    const family = await ownFamily();
+    // the column is a check constraint; refuse here too so the error names the field rather
+    // than surfacing as a Postgres violation the UI has to decode
+    if (system !== "us" && system !== "metric") {
+      throw new Error(`${String(system)} is not a measurement system`);
+    }
+    const updated = await store.setMeasurementSystem({ familyId: family.id, system });
+    if (!updated) throw new Error("no such household");
+    return updated;
+  }
+
   /**
    * Remove a member.
    *
@@ -274,6 +288,7 @@ export function createPlatformClient(options: PlatformClientOptions): PlatformCl
     addChild,
     updateMember,
     removeMember,
+    setMeasurementSystem,
     inviteAdult,
     listInvitations,
     revokeInvitation,
