@@ -51,9 +51,18 @@ export function createAnthropicProvider(options: AnthropicOptions): LlmProvider 
        * a recipe card: the instruction is read in the light of the picture rather than the other
        * way round.
        */
+      /*
+       * Anthropic rejects an empty text block outright — `text content blocks must be non-empty`.
+       * The vision path sends images and no prose, because the instruction is the system prompt
+       * and the card is the content, so the block has to be omitted rather than sent blank. A
+       * request with neither images nor text is not a request.
+       */
+      const text = String(request.content ?? "").trim();
+      const images = (request.images ?? []).map(imageBlock);
       const content = [
-        ...(request.images ?? []).map(imageBlock),
-        { type: "text", text: request.content },
+        ...images,
+        ...(text ? [{ type: "text", text }] : []),
+        ...(text || images.length === 0 ? [] : [{ type: "text", text: "Read the recipe in these images." }]),
       ];
 
       const response = await doFetch(`${base}/v1/messages`, {

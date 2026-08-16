@@ -112,6 +112,16 @@ export interface LlmCascade {
    * models from the text workhorse.
    */
   visionModels?: ModelConfig[];
+  /**
+   * The provider for images, when it is not the one above.
+   *
+   * Vision and text are different questions with different answers (§7), and they turned out to
+   * need different *wire protocols* too: the text workhorse is on Together speaking Chat
+   * Completions, and Anthropic — the only thing measured to read a handwritten card — speaks
+   * `/v1/messages` with a forced tool call. Defaults to `provider`, so a cascade that uses one
+   * for both needs no change.
+   */
+  visionProvider?: LlmProvider;
 }
 
 /**

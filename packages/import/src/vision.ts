@@ -65,7 +65,7 @@ export const VISION_JSON_SCHEMA: JsonSchema = {
           text: {
             type: "string",
             description:
-              "The ingredient exactly as shown, including amount and unit if they are shown. If no amount appears, write the ingredient alone. Never invent one.",
+              "The ingredient exactly as shown, including amount and unit if they are shown. If no amount appears, write the ingredient alone. Never invent one, and never convert a parenthetical note into a unit — '2 squares (2 oz.)' is 2 squares.",
           },
           section: {
             type: ["string", "null"],
@@ -96,7 +96,19 @@ export const VISION_INSTRUCTIONS = [
   "Where no amount is shown, write the ingredient with no amount. Never invent one.",
   "Set amountEstimated to true only for an amount you heard rather than read.",
   "Give each ingredient the heading it appeared under, verbatim, or null.",
+  // regression: `brownie layer` came back as an ingredient. The prompt said headings exist; it
+  // never said a heading is *only* a heading, and the fixture validator has forbidden this all
+  // along — the two should agree.
+  "A heading is never also an ingredient. Never list a section heading as a line of its own.",
   "If nothing on screen names a dish, the title is null.",
+  /*
+   * regression: a card whose `serves` field was left blank came back as 12 servings. The
+   * no-inventing rule was scoped to ingredient quantities, so every other field was fair game —
+   * and an invented serving count silently divides a per-serving calorie figure by a number
+   * nobody wrote down.
+   */
+  "This rule is not only about ingredients: any field the source leaves blank stays null.",
+  "If the card does not state how many it serves, servings is null. If it states no time, totalMinutes is null.",
   "Set dishImageIndex to the image that best shows the finished dish.",
 ].join(" ");
 
@@ -261,7 +273,8 @@ export async function extractFromImages(input: VisionInput): Promise<VisionResul
   for (const model of models) {
     let response;
     try {
-      response = await input.cascade.provider.extract({
+      // the vision provider when there is one, otherwise the same provider as text
+      response = await (input.cascade.visionProvider ?? input.cascade.provider).extract({
         model,
         responseSchema: VISION_JSON_SCHEMA,
         instructions: VISION_INSTRUCTIONS,
@@ -324,9 +337,25 @@ export async function extractFromImages(input: VisionInput): Promise<VisionResul
  * misaligned "we guessed this amount" marker is worse than no marker: it tells
  * somebody a number is trustworthy when it is not.
  */
-function toIngredients(lines: VisionIngredient[]): ExtractedRecipe["ingredients"] {
+const asHeading = (text: string) =>
+  String(text ?? "").trim().replace(/[:：]\s*$/, "").replace(/\s+/g, " ").toLowerCase();
+
+export function toIngredients(lines: VisionIngredient[]): ExtractedRecipe["ingredients"] {
+  /*
+   * A heading is never also an ingredient (decisions §45), enforced here rather than asked for.
+   *
+   * The prompt says it and the model emitted `brownie layer` as a line anyway, twice, with the
+   * instruction present. The fixture validator has forbidden this all along, so the extractor and
+   * the validator now agree — and a rule a model may decline is not a rule.
+   *
+   * Only a line carrying no quantity is dropped: `1 cup orzo` under a section called `ORZO` is a
+   * real ingredient, and the validator learned that same lesson the same way.
+   */
+  const headings = new Set(lines.map((line) => asHeading(line.section ?? "")).filter(Boolean));
+
   const parsed: ExtractedRecipe["ingredients"] = [];
   for (const line of lines) {
+    if (headings.has(asHeading(line.text)) && !/\d/.test(line.text)) continue;
     const ingredient = parseIngredientLine(line.text);
     if (!ingredient) continue;
     parsed.push({

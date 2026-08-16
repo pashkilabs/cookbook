@@ -7,6 +7,7 @@ import {
   createPassthroughImagePreparer,
   extractFromImages,
   importFromImages,
+  toIngredients,
   validateVisionPayload,
   type LlmProvider,
   type LlmRequest,
@@ -467,5 +468,28 @@ describe("as an eval extractor", () => {
       loadImage,
     });
     expect(await extractor({ kind: "screenshot", imagePath: "images/nope.jpg" })).toBeNull();
+  });
+});
+
+describe("a heading is never also an ingredient", () => {
+  it("drops a line that repeats its own section and carries no quantity", () => {
+    /*
+     * regression: `brownie layer` came back as an ingredient from a real card, twice, with a
+     * prompt instruction forbidding it. A rule a model may decline is not a rule — so it is
+     * enforced here, where the fixture validator has always enforced it.
+     */
+    const out = toIngredients([
+      { text: "Brownie Layer", section: "Brownie Layer", amountEstimated: false },
+      { text: "1 stick butter", section: "Brownie Layer", amountEstimated: false },
+    ]);
+    expect(out.map((i) => i.item)).toEqual(["butter"]);
+  });
+
+  it("keeps an ingredient named after its section, because that is ordinary", () => {
+    // `1 cup orzo` under `ORZO:` is a real line — the same lesson the validator learned
+    const out = toIngredients([
+      { text: "1 cup orzo", section: "ORZO", amountEstimated: false },
+    ]);
+    expect(out).toHaveLength(1);
   });
 });

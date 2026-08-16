@@ -12,6 +12,7 @@ import { readFile } from "node:fs/promises";
 import { createImportExtractor } from "./src/eval-extractor.js";
 import { createSharpImagePreparer } from "./src/sharp-preparer.js";
 import { providerFromEnv } from "./src/openai-compatible.js";
+import { visionProviderFromEnv } from "./src/anthropic.js";
 import { PLACEHOLDER_CASCADE, RECIPE_JSON_SCHEMA } from "./src/provider.js";
 import { coreParser, FIXTURES, formatReport, runEval } from "@pashki/core/eval";
 import type { Extractor } from "@pashki/core/eval";
@@ -83,14 +84,22 @@ if (!provider) {
    * Vision is a separate list, not a flag on the text models (§7): the escalation order for
    * images is its own question, and the reels are the hardest input in the product.
    */
+  /*
+   * Vision has its own provider as well as its own model (§7): Anthropic speaks /v1/messages and
+   * a forced tool call, Together speaks Chat Completions. The text workhorse is untouched.
+   */
+  const visionProvider = visionProviderFromEnv();
   const visionModel = process.env.PASHKI_LLM_VISION_MODEL;
   const withModel = createImportExtractor({
     skipPhoto: true,
     llm: {
       provider,
       models,
-      ...(visionModel
-        ? { visionModels: [{ provider: provider.key, model: visionModel, region: "us" as const, temperature: 0 }] }
+      ...(visionModel && visionProvider
+        ? {
+            visionProvider,
+            visionModels: [{ provider: visionProvider.key, model: visionModel, region: "us" as const, temperature: 0 }],
+          }
         : {}),
     },
     reportUsage: true,

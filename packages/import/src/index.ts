@@ -101,6 +101,7 @@ export {
   VISION_JSON_SCHEMA,
   extractFromImages,
   importFromImages,
+  toIngredients,
   validateVisionPayload,
   type SelectedPhoto,
   type VisionImportOptions,
