@@ -1,4 +1,4 @@
-import { parseIngredientList, stripTags } from "@pashki/core";
+import { parseSectionedIngredients, stripTags } from "@pashki/core";
 import type { ExtractedRecipe, TierAttempt } from "./types.js";
 import {
   EXTRACTION_INSTRUCTIONS,
@@ -116,7 +116,9 @@ export async function extractWithLlm(input: Tier2Input): Promise<Tier2Result> {
         servings: validated.value.servings,
         totalMinutes: validated.value.totalMinutes,
         // the model found the lines; core parses them, the same as every other tier
-        ingredients: parseIngredientList(validated.value.ingredientLines),
+        // the model finds the lines and their headings; core parses them, the same as every
+        // other tier — so the eval measures extraction rather than two different parsers
+        ingredients: parseSectionedIngredients(validated.value.ingredientLines),
         steps: validated.value.steps,
         // a model is never asked for an image URL: it would invent a plausible one,
         // and a wrong image is worse than none. Images come from the page's markup.

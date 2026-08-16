@@ -59,7 +59,11 @@ const goodPayload = {
   title: "Caption Carbonara",
   servings: 4,
   totalMinutes: 25,
-  ingredientLines: ["1 lb spaghetti", "4 egg yolks", "100 g pecorino"],
+  ingredientLines: [
+    { text: "1 lb spaghetti", section: null },
+    { text: "4 egg yolks", section: null },
+    { text: "100 g pecorino", section: null },
+  ],
   steps: ["Boil the pasta.", "Toss off the heat."],
 };
 
@@ -80,7 +84,8 @@ describe("schema validation decides escalation", () => {
       [{ ...goodPayload, servings: "four" }, /servings is not a number/],
       [{ ...goodPayload, servings: -1 }, /servings is not positive/],
       [{ ...goodPayload, ingredientLines: "1 lb spaghetti" }, /not an array/],
-      [{ ...goodPayload, ingredientLines: [1, 2] }, /non-string/],
+      [{ ...goodPayload, ingredientLines: [1, 2] }, /not \{ text, section \}/],
+      [{ ...goodPayload, ingredientLines: ["1 lb spaghetti"] }, /not \{ text, section \}/],
       [{ ...goodPayload, ingredientLines: [] }, /empty/],
       [{ ...goodPayload, steps: {} }, /steps is not an array/],
     ];
@@ -115,7 +120,10 @@ describe("the cascade", () => {
 
   it("parses ingredient lines through core, not through the model", async () => {
     const provider = stubProvider([
-      { ...goodPayload, ingredientLines: ["1 (14.5 ounce) can diced tomatoes, drained", "2 T butter"] },
+      { ...goodPayload, ingredientLines: [
+        { text: "1 (14.5 ounce) can diced tomatoes, drained", section: null },
+        { text: "2 T butter", section: null },
+      ] },
     ]);
     const result = await extractWithLlm({
       content: "text",

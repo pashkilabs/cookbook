@@ -49,7 +49,13 @@ export interface TierAttempt {
 
 /** What an extraction produced, before it becomes rows. */
 export interface ExtractedRecipe {
-  title: string;
+  /**
+   * null when the source names no dish — a caption reading "here are the toast details".
+   *
+   * A model that supplies one has invented it, which is the fault the review screen exists to
+   * catch; the person importing supplies the title there rather than inheriting a guess.
+   */
+  title: string | null;
   servings: number | null;
   /** total time in minutes — a number can be scaled, "1 hr 20" cannot */
   totalMinutes: number | null;

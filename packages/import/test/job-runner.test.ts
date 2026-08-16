@@ -135,7 +135,7 @@ describe("running a job", () => {
             title: "Pasted Carbonara",
             servings: 2,
             totalMinutes: 20,
-            ingredientLines: ["1 lb spaghetti"],
+            ingredientLines: [{ text: "1 lb spaghetti", section: null }],
             steps: ["Boil."],
           },
           usage: { model: "m1" },

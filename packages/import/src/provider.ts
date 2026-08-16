@@ -166,7 +166,12 @@ export const RECIPE_JSON_SCHEMA: JsonSchema = {
   additionalProperties: false,
   required: ["title", "servings", "totalMinutes", "ingredientLines", "steps"],
   properties: {
-    title: { type: "string", description: "The recipe's name, as the source gives it." },
+    title: {
+      type: ["string", "null"],
+      // a caption that reads "here are the toast details" names no dish, and a model that
+      // supplies one has invented it — the same fault as inventing an amount (decisions §46)
+      description: "The recipe's name as the source gives it. null if the source names no dish.",
+    },
     servings: {
       type: ["integer", "null"],
       description: "How many people it serves. null if the source does not say.",
@@ -177,9 +182,26 @@ export const RECIPE_JSON_SCHEMA: JsonSchema = {
     },
     ingredientLines: {
       type: "array",
-      items: { type: "string" },
-      description:
-        "Each ingredient exactly as written, one per entry, including amount and unit. Do not reformat, convert, or infer an amount that is not stated.",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["text", "section"],
+        properties: {
+          text: {
+            type: "string",
+            description:
+              "The ingredient exactly as written, including amount and unit. Do not reformat, convert, or infer an amount that is not stated.",
+          },
+          section: {
+            type: ["string", "null"],
+            // §45: the heading is a label on the line. 153 checks in the eval score zero
+            // without it, and a caption's headings are right there in the text.
+            description:
+              "The heading this ingredient sat under, verbatim, e.g. 'For the sauce'. null if the recipe has no sections.",
+          },
+        },
+      },
+      description: "Every ingredient, in order, each with the heading it appeared under.",
     },
     steps: {
       type: "array",
@@ -193,6 +215,10 @@ export const RECIPE_JSON_SCHEMA: JsonSchema = {
 export const EXTRACTION_INSTRUCTIONS = [
   "Extract the recipe from the text below into the given JSON schema.",
   "Copy ingredient lines verbatim, including the amount and unit as written.",
+  "Give each ingredient the heading it appeared under, verbatim, or null if there are none.",
+  "A heading is never itself an ingredient.",
+  "If the source names no dish, the title is null. Do not invent one.",
+  "Temperatures and equipment are not ingredients.",
   "Never invent an amount the text does not state.",
   "If the text contains no recipe, return an empty ingredientLines array.",
 ].join(" ");
@@ -202,10 +228,10 @@ export const EXTRACTION_INSTRUCTIONS = [
 // ---------------------------------------------------------------------------
 
 export interface RecipePayload {
-  title: string;
+  title: string | null;
   servings: number | null;
   totalMinutes: number | null;
-  ingredientLines: string[];
+  ingredientLines: { text: string; section: string | null }[];
   steps: string[];
 }
 
@@ -249,10 +275,15 @@ export function validateRecipePayload(value: unknown): ValidationResult {
   }
 
   const lines = candidate.ingredientLines;
+  const isLine = (line: unknown): boolean =>
+    typeof line === "object" && line !== null &&
+    typeof (line as { text?: unknown }).text === "string" &&
+    ((line as { section?: unknown }).section === null ||
+      typeof (line as { section?: unknown }).section === "string");
   if (!Array.isArray(lines)) {
     errors.push("ingredientLines is not an array");
-  } else if (lines.some((line) => typeof line !== "string")) {
-    errors.push("ingredientLines contains a non-string");
+  } else if (!lines.every(isLine)) {
+    errors.push("ingredientLines contains an entry that is not { text, section }");
   } else if (lines.length === 0) {
     // a recipe with no ingredients is not a recipe. Reported as a validation
     // failure so the cascade escalates rather than saving an empty shell.
@@ -270,10 +301,12 @@ export function validateRecipePayload(value: unknown): ValidationResult {
   return {
     ok: true,
     value: {
-      title: (title as string).trim(),
+      title: typeof title === "string" ? title.trim() : null,
       servings: numberOrNull(candidate.servings),
       totalMinutes: numberOrNull(candidate.totalMinutes),
-      ingredientLines: (lines as string[]).filter((line) => line.trim().length > 0),
+      ingredientLines: (lines as { text: string; section: string | null }[])
+        .filter((line) => line.text.trim().length > 0)
+        .map((line) => ({ text: line.text.trim(), section: line.section })),
       steps: (steps as string[]).map((step) => step.trim()).filter(Boolean),
     },
   };

@@ -111,3 +111,5 @@ export {
   type VisionResult,
   type VisionValidation,
 } from "./vision.js";
+export { createOpenAiCompatibleProvider, providerFromEnv } from "./openai-compatible.js";
+export type { OpenAiCompatibleOptions } from "./openai-compatible.js";

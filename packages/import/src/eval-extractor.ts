@@ -137,7 +137,7 @@ function toUsage(usage: {
  * that hand-checks prose.
  */
 function toEvalRecipe(
-  recipe: { title: string; servings: number | null; totalMinutes: number | null; ingredients: EvalRecipe["ingredients"] },
+  recipe: { title: string | null; servings: number | null; totalMinutes: number | null; ingredients: EvalRecipe["ingredients"] },
   tier: Tier,
 ): EvalRecipe {
   return {

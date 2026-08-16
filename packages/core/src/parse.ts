@@ -290,3 +290,27 @@ function firstCommaOutsideParens(text: string): number {
   }
   return -1;
 }
+
+/**
+ * Parse lines that each know the heading they sat under.
+ *
+ * Kept separate from `parseIngredientList` rather than folded into it: that function takes
+ * strings and is called from a dozen places, and a second parameter meaning "and here are the
+ * headings, positionally" is the kind of API that goes wrong silently. A model returns the pair
+ * together, so it hands the pair over together.
+ */
+export function parseSectionedIngredients(
+  lines: readonly { text: string; section?: string | null }[],
+): ParsedIngredient[] {
+  const parsed = parseIngredientList(lines.map((line) => line.text));
+  /*
+   * `parseIngredientList` drops what it cannot read, so the output can be shorter than the
+   * input and index-by-index would attach the wrong heading. Matched on the raw text instead,
+   * which each parsed line keeps.
+   */
+  const headings = new Map(lines.map((line) => [line.text.trim(), line.section ?? null]));
+  return parsed.map((line) => {
+    const section = headings.get(line.raw.trim());
+    return section === undefined ? line : { ...line, section };
+  });
+}

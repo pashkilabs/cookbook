@@ -27,6 +27,13 @@ export interface ParsedIngredient {
   note: string;
   /** true when the amount was inferred rather than stated — surfaced for review */
   estimated?: boolean;
+  /**
+   * The heading this line sat under — "For the sauce" — or null where the recipe has none.
+   *
+   * A label on the line rather than an entity (decisions §45). Absent when whatever produced the
+   * line had no notion of sections, which is different from a recipe having none.
+   */
+  section?: string | null;
   /** the original text, kept for display and debugging */
   raw: string;
 }
