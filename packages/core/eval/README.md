@@ -39,6 +39,22 @@ the sampler is. So:
 - **A difference inside the spread is not a result.** Before believing a model is better, check
   the gap is bigger than the noise — and say which it is when reporting.
 
+Measured over five runs of `openai/gpt-oss-120b` + `google/gemma-4-31B-it`:
+
+| field | mean | spread |
+|---|---|---|
+| overall | 80.4% | 76.9–82.6 (±2.8) |
+| item | 76.3% | 73.4–77.8 (±2.2) |
+| amount | 86.4% | 82.3–88.4 (±3.1) |
+| servings | 76.1% | 69.0–82.1 (**±6.6**) |
+| sections | 61.3% | 56.0–65.3 (±4.7) |
+| cost | $0.0141 | $0.0116–$0.0164 |
+
+**Seven of thirty-five fixtures changed status between runs** — six captions that scored in some
+runs and skipped in others, and one reel that did the reverse. The same input, the same
+temperature, a different answer. That is the noise floor, and it is why `overall 84.3%` from a
+single run was never a measurement.
+
 ## The baseline
 
 **There is no earlier number to compare against.** A 23/23 figure exists in an old session
