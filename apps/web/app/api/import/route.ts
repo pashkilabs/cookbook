@@ -114,7 +114,8 @@ export async function POST(request: Request) {
       };
 
   if (!outcome.ok) {
-    return Response.json(explain(outcome.failure), { status: 422 });
+    const channel: Channel = url ? "url" : text ? "text" : "images";
+    return Response.json(explain(outcome.failure, channel), { status: 422 });
   }
 
   // a pasted caption is never cached — it has no URL to key on — so it always charges
@@ -149,7 +150,20 @@ export async function POST(request: Request) {
 }
 
 /** Say what happened in words, and never claim a capability that is not built. */
-function explain(failure: { kind: string; [key: string]: unknown }) {
+type Channel = "url" | "text" | "images";
+
+/**
+ * Say what happened in words, in the words of the channel it happened to.
+ *
+ * regression: a photograph came back with "This page publishes no machine-readable recipe. Tiers
+ * 0 and 1 — structured data and microdata — both found nothing." There is no page. The failure
+ * kinds are shared across channels and the prose was written for one of them, which is the same
+ * channel-blindness the refusal reasons had: `not-a-recipe-page` is meaningless about a photo,
+ * and so is advice about microdata.
+ *
+ * Every message below either states the channel it is about or is true of all three.
+ */
+function explain(failure: { kind: string; [key: string]: unknown }, channel: Channel = "url") {
   if (failure.kind === "blocked-platform") {
     const platform = String(failure.platform ?? "That site");
     const route =
@@ -167,18 +181,48 @@ function explain(failure: { kind: string; [key: string]: unknown }) {
   if (failure.kind === "no-recipe-found") {
     return {
       error:
-        "This page publishes no machine-readable recipe. Tiers 0 and 1 — structured data and " +
-        "microdata — both found nothing, and reading the page text itself is not built yet. " +
-        "You can type the recipe in instead.",
+        channel === "images"
+          ? "No recipe could be read from that photograph. A clearer or closer shot of the " +
+            "ingredients often works — or type it in."
+          : channel === "text"
+            ? "No recipe could be read from that text. If it only promises the recipe in a DM, " +
+              "there is nothing to read yet."
+            : "This page publishes no machine-readable recipe. Tiers 0 and 1 — structured data " +
+              "and microdata — both found nothing, and reading the page text itself is not built " +
+              "yet. You can type the recipe in instead.",
       reason: failure.kind,
     };
   }
 
   if (failure.kind === "recipe-incomplete") {
+    const missing = Array.isArray(failure.missing) ? failure.missing.join(", ") : "required fields";
     return {
-      error: `The page had recipe data but not enough of it — missing ${
-        Array.isArray(failure.missing) ? failure.missing.join(", ") : "required fields"
-      }. Reading the page text itself is not built yet.`,
+      error:
+        channel === "url"
+          ? `The page had recipe data but not enough of it — missing ${missing}. Reading the page text itself is not built yet.`
+          : `Some of the recipe came through but not enough of it — missing ${missing}.`,
+      reason: failure.kind,
+    };
+  }
+
+  /*
+   * Nothing was read, so nothing can be said about what was there. Named rather than folded into
+   * "that did not work": one of these is a deployment problem and the other is the picture.
+   */
+  if (failure.kind === "no-usable-images") {
+    const rejected = Array.isArray(failure.rejected) ? failure.rejected : [];
+    const detail = rejected[0] && typeof rejected[0] === "object"
+      ? String((rejected[0] as { detail?: unknown }).detail ?? "")
+      : "";
+    return {
+      error: `That image could not be used${detail ? ` — ${detail}` : ""}. A photo straight from a phone is usually fine; a very large one may need resizing.`,
+      reason: failure.kind,
+    };
+  }
+
+  if (failure.kind === "vision-not-configured") {
+    return {
+      error: "Reading photographs is not switched on for this deployment.",
       reason: failure.kind,
     };
   }
@@ -186,6 +230,7 @@ function explain(failure: { kind: string; [key: string]: unknown }) {
   if (failure.kind === "private-address" || failure.kind === "invalid-url") {
     return { error: "That does not look like a recipe link.", reason: failure.kind };
   }
+  void channel;
 
   if (failure.kind === "fetch-failed" || failure.kind === "not-html") {
     return {
