@@ -192,9 +192,10 @@ export function PasteFlow({ mode }: { mode: "text" | "photos" }) {
         ) : (
           <>
             For a recipe that only exists on paper — a handwritten card, a magazine clipping, a
-            newspaper cutting, a page from a book. Typed or printed text reads well.{" "}
-            <strong>Handwriting is the hardest case there is</strong>, so check every line before
-            you save: a misread ½ is caught here or not at all.
+            newspaper cutting, a page from a book.{" "}
+            <strong>We are still finding out how well this reads a photograph</strong>, so check
+            every line before you save. Printed text should read best; handwriting is the hardest
+            case there is, and a misread ½ is caught here or not at all.
           </>
         )}
       </div>
