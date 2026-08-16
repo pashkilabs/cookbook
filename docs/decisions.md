@@ -2114,6 +2114,70 @@ Fixed symmetrically, which is worth saying plainly because it **is** a change fo
 too: one holding a metric recipe previously read `Tuesday takes 500 g` beside `2 lb needed`, and
 now reads US units throughout. Fixing it in one direction only would have been fixing half of it.
 
+## 48. The workhorse is measured now, and the cheapest model lost
+
+§7's routing table was an August 2026 snapshot with a note to re-benchmark. It has been
+benchmarked, against 29 real fixtures with hand-checked output, and **it recommended the wrong
+model**.
+
+| | tier 0/1 + core parser (the floor) | `openai/gpt-oss-120b` |
+|---|---|---|
+| overall | 48.9% | **84.3%** |
+| item | 50.0% | 80.2% |
+| amount | 54.0% | 90.2% |
+| unit | 53.7% | 85.7% |
+| title | 40.0% | 72.0% |
+| servings | 72.0% | 84.0% |
+| time | 80.0% | **80.0% — a tie** |
+| recall / precision | 54.9% / 65.0% | 91.5% / 97.4% |
+| sections | **0/153** | 118/153 |
+| equipment emitted as food | 8 | 0 |
+
+**Workhorse: `openai/gpt-oss-120b` on Together, $0.15 / $0.60 per 1M.** The whole 29-fixture set
+costs **$0.0123**, all of it on the seventeen captions — the URLs never reach the model — which is
+**$0.00072 per caption, ~$0.72 per thousand imports**. Inside §7's estimate.
+
+### The cheapest option is unusable, and only measurement could say so
+
+`openai/gpt-oss-20b` is a third of the price ($0.05 / $0.20) and scored **15 of 29 fixtures**
+against 120b's 25. On eight captions it emits a valid JSON prefix and then **degenerates into
+whitespace until it hits the token ceiling** — `finish_reason: length`, the object never closed.
+Raising the ceiling to 3000 tokens made it pad to 3000. It does not honour `strict: true`
+reliably on this provider.
+
+It is also not cheaper per useful answer: 14,582 output tokens for 15 scored fixtures against
+18,189 for 25. The padding arrives on the bill.
+
+**This is what the eval bought.** The table named 120b as *escalation* and something else as the
+workhorse; the measurement inverted that, and no amount of reading model cards would have found
+the whitespace defect. Re-benchmark quarterly, per §7 — and re-benchmark by running the eval,
+not by reading a price list.
+
+### Tier 2 is a line-finder, not a quantity-reader
+
+The most useful thing the run said. Restricted to the **180 lines both extractors matched**:
+
+| | parser | model |
+|---|---|---|
+| amount | 177/180 (98.3%) | 178/180 (98.9%) |
+| unit | 176/180 (97.8%) | 177/180 (98.3%) |
+
+Within one percent — because on a shared line **they are the same code**. The model returns
+verbatim text and `packages/core` parses it, so the parser is doing the reading either way.
+
+The 36-point headline gap on `amount` is therefore **entirely about which lines get found**: the
+parser finds 180 of 328, the model finds 314. Prose with an ad, a story and a hashtag block round
+it is where a model earns its money; reading `1 ½ cups` is not.
+
+**So the design holds, and now on evidence rather than instinct: ask the model for verbatim lines
+and let core parse them.** Asking for structured amounts instead would buy at most one percent,
+and would cost the thing that percent is measured against — one parser, one set of regression
+tests, one place a unit bug can live. It would also make the eval measure two parsers rather than
+one extractor.
+
+*Would change if:* a model is measured that reads amounts materially better than core on shared
+lines — which would be an argument for improving core, since every tier benefits.
+
 ## Open: cascade deletions and tombstones
 
 **Not resolved. This waits on the sync engine choice, and exists so the evaluation
