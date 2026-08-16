@@ -71,7 +71,15 @@ export interface EvalIngredient {
  * source genuinely gives none, which is different from an extractor missing it.
  */
 export interface ExpectedRecipe {
-  title: string;
+  /**
+   * null when the source names no dish.
+   *
+   * A caption that says "Here are the toast details" and never names the thing has no title, and
+   * a fixture set that answers `Summer Toasts` teaches an extractor to invent one — the same
+   * disease as teaching it to invent amounts. Absence has to be statable or it becomes a guess
+   * with a hand-checked stamp on it.
+   */
+  title: string | null;
   servings: number | null;
   /** total time in minutes — the base unit for time, so it can be compared */
   totalMinutes: number | null;

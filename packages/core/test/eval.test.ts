@@ -514,3 +514,72 @@ describe("a captured page snapshot", () => {
     expect(validateFixtures([dated])).toEqual([]);
   });
 });
+
+describe("a source that names no dish", () => {
+  it("expects no title, and counts an invented one as wrong", () => {
+    /*
+     * A caption reading "Here are the toast details" never names the thing. A fixture answering
+     * "Summer Toasts" would teach an extractor to invent one — the same disease as teaching it to
+     * invent amounts, and an invented title is indistinguishable from a read one on a review screen.
+     */
+    const untitled = fixture({
+      expected: { outcome: "recipe", recipe: recipe({ title: null }) },
+    });
+    const invents: Extractor = () => ({
+      title: "Summer Toasts",
+      ingredients: [{ amount: 1, unit: "cup", item: "heavy cream" }],
+    });
+    const honest: Extractor = () => ({
+      title: null,
+      ingredients: [{ amount: 1, unit: "cup", item: "heavy cream" }],
+    });
+
+    expect(scoreRecipe(recipeOf(untitled), { title: "Summer Toasts" }).fields[0]?.correct).toBe(false);
+    expect(scoreRecipe(recipeOf(untitled), { title: null }).fields[0]?.correct).toBe(true);
+    void invents;
+    void honest;
+  });
+
+  it("still refuses an empty string, which is an unfilled field rather than a statement", () => {
+    const blank = fixture({
+      id: "blank",
+      expected: { outcome: "recipe", recipe: recipe({ title: "  " }) },
+    });
+    expect(validateFixtures([blank])).toEqual([
+      "blank: expected title is empty — write null if the source names none",
+    ]);
+  });
+});
+
+describe("equipment read as food", () => {
+  /**
+   * A specific failure worth naming rather than burying in the spurious count: `275*` is a smoker
+   * and `400 for 12 minutes` is an oven, and emitting either as an ingredient puts a number on a
+   * shopping list that corresponds to nothing anybody can buy.
+   */
+  it("names an oven setting emitted as an ingredient", async () => {
+    const confused: Extractor = () => ({
+      ingredients: [
+        { amount: 1, unit: "cup", item: "heavy cream" },
+        { amount: 275, unit: null, item: "Set traeger to 275*" },
+        { amount: 400, unit: null, item: "preheat oven" },
+      ],
+    });
+    const report = await runEval([fixture()], confused);
+    expect(report.ingredients.spurious).toBe(2);
+    expect(report.ingredients.equipment).toBe(2);
+    expect(formatReport(report)).toMatch(/EQUIPMENT AS FOOD 2/);
+  });
+
+  it("does not mistake food for a tool", async () => {
+    const fine: Extractor = () => ({
+      ingredients: [
+        { amount: 1, unit: "cup", item: "heavy cream" },
+        { amount: 2, unit: null, item: "grilled peaches" },
+        { amount: 1, unit: "can", item: "fire roasted tomatoes" },
+      ],
+    });
+    const report = await runEval([fixture()], fine);
+    expect(report.ingredients.equipment).toBe(0);
+  });
+});

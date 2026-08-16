@@ -60,6 +60,8 @@ export interface EvalReport {
     expected: number;
     found: number;
     spurious: number;
+    /** spurious lines that are an oven setting or a tool — named because it is a category error */
+    equipment: number;
   };
   /**
    * Fields the extractor never emitted on any scored fixture. Absence scores the
@@ -184,7 +186,7 @@ function summarise(label: string, outcomes: FixtureOutcome[]): EvalReport {
     unit: emptyTally(),
     item: emptyTally(),
   };
-  const ingredients = { expected: 0, found: 0, spurious: 0 };
+  const ingredients = { expected: 0, found: 0, spurious: 0, equipment: 0 };
   const sections = emptyTally();
   const refusals = {
     expected: 0, refused: 0, reasonCorrect: 0,
@@ -248,6 +250,7 @@ function summarise(label: string, outcomes: FixtureOutcome[]): EvalReport {
       if (result.sectionChecked) add(sections, result.sectionCorrect);
     }
     ingredients.spurious += score.spurious.length;
+    ingredients.equipment += score.equipment.length;
     overall.correct += score.correct;
     overall.total += score.total;
   }

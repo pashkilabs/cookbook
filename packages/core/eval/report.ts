@@ -64,6 +64,12 @@ export function formatReport(report: EvalReport): string {
       `   (recall ${percent({ correct: found, total: expected })}, ` +
       `precision ${percent({ correct: found, total: found + spurious })})`,
   );
+  if (report.ingredients.equipment > 0) {
+    out.push(
+      `  EQUIPMENT AS FOOD ${report.ingredients.equipment} — an oven setting or a tool emitted ` +
+        `as an ingredient`,
+    );
+  }
   out.push(`cost         ${formatCost(report.cost)}`);
 
   /*

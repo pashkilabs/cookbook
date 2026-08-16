@@ -44,7 +44,10 @@ export function validateFixtures(fixtures: FixtureSet): string[] {
     }
 
     const expected = fixture.expected.recipe;
-    if (!expected.title.trim()) problems.push(`${where}: expected title is empty`);
+    // null is a statement ("this source names no dish"); "" is an unfilled field
+    if (expected.title !== null && !expected.title.trim()) {
+      problems.push(`${where}: expected title is empty — write null if the source names none`);
+    }
     if (expected.ingredients.length === 0) {
       problems.push(`${where}: expected no ingredients — is the expectation filled in?`);
     }

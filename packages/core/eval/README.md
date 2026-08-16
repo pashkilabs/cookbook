@@ -133,6 +133,16 @@ extractor emitting one has produced a spurious line. Sections are tallied on the
 deliberately kept out of the headline accuracy: a wrong section misgroups a display, a wrong
 amount buys the wrong food, and one percentage covering both hides which moved.
 
+## Two known warts, recorded so they are not fixed by accident
+
+**`2 ears of corn` is `amount: 2, unit: null, item: "ears of corn"`.** `ear` canonicalises to
+`count`, and the validator requires a count be written as `null`, so the noun is stranded in the
+item text. It reads oddly and it is right: a countable-noun model in the parser is real work, and
+it must not arrive through a fixture quietly asserting one exists.
+
+**A source that names no dish expects `title: null`.** The alternative — inventing a plausible
+title — teaches an extractor exactly the habit the amount rules forbid.
+
 ## How scoring works
 
 **Item and unit: exact after normalisation.** Units resolve through

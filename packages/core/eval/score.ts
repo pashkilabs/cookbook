@@ -57,6 +57,23 @@ export interface IngredientResult {
   sectionChecked: boolean;
 }
 
+/**
+ * A produced line that is a setting or a tool rather than food.
+ *
+ * `Set @traegergrills to 275*` and `400 for 12 minutes` are an oven and a smoker, and an
+ * extractor that emits `275` as an amount has read equipment as an ingredient. It lands in the
+ * spurious count either way, but burying it there loses what makes it specific: it is not a
+ * mis-parse of a food, it is a category error, and it puts a number on a shopping list that
+ * corresponds to nothing anybody can buy.
+ */
+const EQUIPMENT = /\b(oven|grill|griddle|smoker|traeger|air fryer|instant pot|slow cooker|stand mixer|food processor|blender|sheet pan|baking dish|skillet|saucepan)\b/i;
+const TEMPERATURE = /(^|\s)\d{2,3}\s*(°|\*|degrees?\b|f\b|c\b)|\bpreheat|\bgas mark\b/i;
+
+export function readsAsEquipment(item: string): boolean {
+  const text = String(item ?? "");
+  return EQUIPMENT.test(text) || TEMPERATURE.test(text);
+}
+
 /** How an extractor answered a fixture whose correct output is a refusal. */
 export interface RefusalScore {
   /** it declined rather than inventing a recipe */
@@ -74,6 +91,8 @@ export interface FixtureScore {
   ingredients: IngredientResult[];
   /** output lines that matched no expected ingredient */
   spurious: EvalIngredient[];
+  /** spurious lines that are a temperature or a tool — a category error, not a mis-parse */
+  equipment: EvalIngredient[];
   correct: number;
   total: number;
   /**
@@ -225,8 +244,15 @@ export function scoreRecipe(
   const fields: FieldResult[] = [
     {
       field: "title",
-      correct: got.title !== null && normaliseTitle(expected.title) === normaliseTitle(got.title),
-      expected: expected.title,
+      /*
+       * A source with no title expects none. Producing one is wrong, and wrong in the direction
+       * that matters — an invented title is indistinguishable from a read one on a review screen.
+       */
+      correct:
+        expected.title === null
+          ? got.title === null
+          : got.title !== null && normaliseTitle(expected.title) === normaliseTitle(got.title),
+      expected: expected.title ?? "none",
       actual: got.title ?? MISSING,
     },
     {
@@ -285,10 +311,15 @@ export function scoreRecipe(
   }
   const total = fields.length + ingredients.length * 3 + spurious.length;
 
+  const spuriousLines = spurious
+    .map((a) => produced[a])
+    .filter((x): x is EvalIngredient => x !== undefined);
+
   return {
     fields,
     ingredients,
-    spurious: spurious.map((a) => produced[a]).filter((x): x is EvalIngredient => x !== undefined),
+    spurious: spuriousLines,
+    equipment: spuriousLines.filter((line) => readsAsEquipment(line.item)),
     correct,
     total,
     emitted: {
