@@ -2222,6 +2222,34 @@ doing vision — the eval, the worker, the import service — passes `createShar
 a rejected image is reported as `no-usable-images` with the byte count rather than folded into
 "no recipe found".
 
+## 50. A substitution key is usually a catalog key and sometimes a bare name, and the gap is reported
+
+Recorded before the first entry rather than discovered at the thirtieth.
+
+The substitution table wants forty to fifty entries covering what a household actually runs out
+of. `SEED_CATALOG` has sixty-five. **They will not line up**: people run out of buttermilk,
+self-raising flour, cornflour, crème fraîche and caster sugar, and several of those are not in the
+catalog at all. Forcing every substitution onto a catalog key would mean either inventing catalog
+entries to hang substitutions from — polluting the shopping list with things nobody buys as a
+line item — or dropping the substitutions that have no key, which are exactly the ones somebody
+searches for at eight o'clock.
+
+So a key is a catalog key **where one exists** and a bare normalised name otherwise, and the
+mismatch is **counted and reported** rather than hidden — the same shape as `metricPackageCoverage`,
+which reports how much of the catalog has metric package sizes instead of pretending the gap is
+not there.
+
+That report is the honest input to catalog expansion: a substitution whose key is a bare name is a
+candidate for the catalog, ranked by something better than a guess about what a household buys.
+Coverage is a measurement, and this project has been repeatedly wrong when it treated one as an
+assumption.
+
+**What follows from it:** the lookup tries the catalog first, so a substitution keyed to
+`buttermilk` and one keyed to a bare `crème fraîche` are found the same way by a caller that only
+has the text of an ingredient line. Nothing outside seeding and tests may import the table
+directly — the same rule `SEED_CATALOG` lives under, and for the same reason: it is data, and a
+correction should not need a release.
+
 ## Open: cascade deletions and tombstones
 
 **Not resolved. This waits on the sync engine choice, and exists so the evaluation
