@@ -79,8 +79,9 @@ export async function POST(request: Request) {
     // named rather than implied: "no picture" and "the image library will not load here" are
     // different facts, and only one of them is a deployment problem
     ...(photoFailure ? { photoFailure } : {}),
-    tier: outcome.tier,
-    fromCache: outcome.fromCache,
+    // a caption has no page and no cache to key on, so it reports neither
+    tier: "tier" in outcome ? outcome.tier : "llm",
+    fromCache: "fromCache" in outcome ? outcome.fromCache : false,
   });
 }
 

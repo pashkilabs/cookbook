@@ -5,10 +5,12 @@ import {
   importFromImages,
   importRecipe,
   providerFromEnv,
+  type ExtractedRecipe,
+  type ImportFailure,
   type ImportOutcome,
   type LlmCascade,
+  type TierAttempt,
 } from "@pashki/import";
-import { createSharpImagePreparer } from "@pashki/import/sharp";
 import { createSupabaseImportCache } from "@pashki/import/supabase";
 import { storeImportedPhoto } from "@pashki/import/photo-storage";
 import { createPlatformClient } from "@pashki/platform-client";
@@ -155,24 +157,33 @@ export async function spendImportQuota(accountId: string) {
  * caps an image at 1.5 MB, so without it every reel is rejected before a call is made — which
  * reads as "vision failed" when nothing was tried (§49).
  */
+export type PasteOutcome =
+  | { ok: true; recipe: ExtractedRecipe; attempts: readonly TierAttempt[] }
+  | { ok: false; failure: ImportFailure; attempts: readonly TierAttempt[] };
+
 export async function attemptPasteImport(
   input: { text: string } | { images: readonly { bytes: Uint8Array; label: string }[] },
-): Promise<ImportOutcome> {
+): Promise<PasteOutcome> {
   const llm = cascadeFromEnv();
-  if (!llm) {
-    return {
-      ok: false,
-      failure: { kind: "vision-not-configured" },
-      attempts: [],
-    } as unknown as ImportOutcome;
-  }
+  if (!llm) return { ok: false, failure: { kind: "vision-not-configured" }, attempts: [] };
 
   if ("images" in input) {
+    /*
+     * sharp is loaded here, not at module scope.
+     *
+     * It is a native addon, and a module-scope import pulls it into every route that touches this
+     * file — which is how five routes returned 500 from the day they shipped, for wanting a bucket
+     * name from a module that imported an image library (CLAUDE.md). Only the screenshot path
+     * needs it, so only the screenshot path pays for it.
+     */
+    const { createSharpImagePreparer } = await import("@pashki/import/sharp");
     const outcome = await importFromImages(input.images, {
       cascade: llm,
       preparer: createSharpImagePreparer(),
     });
-    return outcome as unknown as ImportOutcome;
+    return outcome.ok
+      ? { ok: true, recipe: outcome.recipe, attempts: outcome.attempts }
+      : { ok: false, failure: outcome.failure, attempts: outcome.attempts };
   }
 
   const result = await extractWithLlm({
@@ -186,7 +197,7 @@ export async function attemptPasteImport(
       ok: false,
       failure: { kind: "no-recipe-found", url: "", triedTiers: ["llm"] },
       attempts: result.attempts,
-    } as unknown as ImportOutcome;
+    };
   }
-  return { ok: true, recipe: result.recipe, photo: null, attempts: result.attempts } as unknown as ImportOutcome;
+  return { ok: true, recipe: result.recipe, attempts: result.attempts };
 }
