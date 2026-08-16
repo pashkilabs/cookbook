@@ -234,6 +234,15 @@ models be good enough. Do not add a silent-save path.
   debugging detour because the error was filtered out by a `grep -E "ERROR"` — the CLI
   writes `"Error"` — which is the "silence reads as success" trap arriving through my
   own pipeline rather than through the tool.
+- **A smoke check that calls an endpoint proves the endpoint, and nothing else.** It is
+  not evidence a feature exists and must never be allowed to stand in for one. Two of
+  the last three things built — caption paste and screenshot upload — had **no way in
+  from the product** while their checks were green: the checks called the route, the
+  scripts called the route, and a person opening the app could not find either. The
+  import screen still offered only "One link" and "A whole folder". "Verified against
+  production" was true and meaningless. A feature is reachable from a screen; until it
+  is, say plainly that an endpoint exists and the feature does not.
+
 - **`git status` cannot tell you what has been committed.** It describes the working
   tree and nothing else, so a dirty tree at the end of a session says nothing about
   whether previous sessions landed. Run `git log` before any claim about repository
