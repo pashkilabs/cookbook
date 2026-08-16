@@ -10,7 +10,7 @@
  */
 import { createImportExtractor } from "./src/eval-extractor.js";
 import { providerFromEnv } from "./src/openai-compatible.js";
-import { PLACEHOLDER_CASCADE } from "./src/provider.js";
+import { PLACEHOLDER_CASCADE, RECIPE_JSON_SCHEMA } from "./src/provider.js";
 import { coreParser, FIXTURES, formatReport, runEval } from "@pashki/core/eval";
 import type { Extractor } from "@pashki/core/eval";
 
@@ -54,6 +54,29 @@ if (!provider) {
   const models = process.env.PASHKI_LLM_MODEL
     ? [{ provider: provider.key, model: process.env.PASHKI_LLM_MODEL, region: "us" as const, temperature: 0 }]
     : PLACEHOLDER_CASCADE;
+  /*
+   * One call before the fleet.
+   *
+   * A provider that is down, rate-limited or out of credit would otherwise fail all seventeen
+   * caption fixtures and be reported as seventeen bad extractions. That is the wrong shape
+   * entirely: it is one broken measurement, not seventeen bad answers, and the run must say
+   * "could not measure" rather than produce a number.
+   */
+  try {
+    await provider.extract({
+      model: models[0]!,
+      content: "1 cup flour",
+      instructions: "Extract the recipe.",
+      responseSchema: RECIPE_JSON_SCHEMA,
+    });
+  } catch (error) {
+    console.log("\n" + "─".repeat(72));
+    console.log(`tier 2  COULD NOT MEASURE — ${String((error as Error).message).slice(0, 160)}`);
+    console.log("  The provider answered, so the key and the base URL are right; the call itself");
+    console.log("  did not complete. Nothing has been measured against a model.");
+    process.exit(2);
+  }
+
   const withModel = createImportExtractor({
     skipPhoto: true,
     llm: { provider, models },
