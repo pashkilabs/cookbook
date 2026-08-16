@@ -156,7 +156,7 @@ export function PasteFlow({ mode }: { mode: "text" | "photos" }) {
           </label>
         ) : (
           <label>
-            <span>Screenshots</span>
+            <span>A photograph</span>
             <input
               type="file"
               accept="image/*"
@@ -164,14 +164,18 @@ export function PasteFlow({ mode }: { mode: "text" | "photos" }) {
               onChange={(event) => setFiles([...(event.target.files ?? [])])}
             />
             <span className="meta">
-              Several frames of one reel are fine — the ingredients are often spread across them.
-              Each is resized here before it is sent.
+              One photo is usually enough. Add more if the recipe runs over two pages. Each is
+              resized here before it is sent, so a phone photo is fine as it comes.
             </span>
           </label>
         )}
 
         <button className="button primary" disabled={busy || (mode === "text" ? !text.trim() : files.length === 0)}>
-          {busy ? "Reading…" : mode === "text" ? "Read this recipe" : `Read ${files.length || ""} screenshot${files.length === 1 ? "" : "s"}`}
+          {busy
+            ? "Reading…"
+            : mode === "text"
+              ? "Read this recipe"
+              : `Read ${files.length || ""} photo${files.length === 1 ? "" : "s"}`}
         </button>
         {shrunk && <p className="meta">{shrunk}</p>}
         {error && <p className="error">{error}</p>}
@@ -187,9 +191,10 @@ export function PasteFlow({ mode }: { mode: "text" | "photos" }) {
           </>
         ) : (
           <>
-            For a reel whose recipe is on screen rather than in the caption. This is the least
-            reliable way in — a caption is read far better than a picture of one — so use it when
-            there is no caption to paste. Nothing is saved until you have looked at it.
+            For a recipe that only exists on paper — a handwritten card, a magazine clipping, a
+            newspaper cutting, a page from a book. Typed or printed text reads well.{" "}
+            <strong>Handwriting is the hardest case there is</strong>, so check every line before
+            you save: a misread ½ is caught here or not at all.
           </>
         )}
       </div>
