@@ -201,7 +201,7 @@ export async function attemptPasteImport(
 
   const result = await extractWithLlm({
     content: input.text,
-    sourceUrl: "",
+    sourceUrl: sourceUrlIn(input.text),
     sourceName: null,
     cascade: llm,
   });
@@ -213,4 +213,39 @@ export async function attemptPasteImport(
     };
   }
   return { ok: true, recipe: result.recipe, attempts: result.attempts };
+}
+
+/**
+ * The blog link a caption carries, if it carries one.
+ *
+ * A pasted caption has no URL of its own, so `source_url` was always empty — and a stored
+ * ingredient list with no link back to where it came from is the weakest version of this feature.
+ * Most captions do link their own recipe: the peach posset one ends with
+ * `https://whatmollymade.com/peach-posset/` after four hashtag links.
+ *
+ * **First `http(s)` URL whose host is not a social platform.** Hashtag and profile links are the
+ * caption's own furniture, not its source, and they always outnumber the real one. First candidate
+ * wins rather than last or longest — captions put the blog link before the affiliate links, and
+ * "the first one that is not Instagram" is a rule somebody can predict when it gets it wrong.
+ *
+ * Empty string when there is none, which is what the column held before and means "no source".
+ */
+const SOCIAL_HOSTS = [
+  "instagram.com", "facebook.com", "fb.watch", "tiktok.com", "pinterest.com",
+  "pin.it", "threads.net", "twitter.com", "x.com", "youtube.com", "youtu.be",
+];
+
+export function sourceUrlIn(text: string): string {
+  for (const match of String(text ?? "").matchAll(/\bhttps?:\/\/[^\s<>"'()]+/gi)) {
+    const raw = match[0].replace(/[.,;:!?]+$/, "");
+    let host: string;
+    try {
+      host = new URL(raw).hostname.toLowerCase().replace(/^www\./, "");
+    } catch {
+      continue;
+    }
+    if (SOCIAL_HOSTS.some((social) => host === social || host.endsWith(`.${social}`))) continue;
+    return raw;
+  }
+  return "";
 }
