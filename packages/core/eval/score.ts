@@ -133,6 +133,13 @@ function normaliseExtracted(actual: ExtractedRecipe): NormalisedRecipe {
  */
 export function normaliseTitle(input: string | null | undefined): string {
   return String(input ?? "")
+    /*
+     * regression: `Sautéed` and `Sautéed` are the same word and were not the same string. America's
+     * Test Kitchen serves the decomposed form (`e` + U+0301); a fixture typed by hand carries the
+     * composed one. The report printed two identical titles beside a failure, which is the worst
+     * shape a diff can take — it sends somebody looking for a bug in the extractor.
+     */
+    .normalize("NFC")
     .toLowerCase()
     .replace(/^["'“‘]+|["'”’]+$/g, "")
     .replace(/\.\s*$/, "")
@@ -147,7 +154,8 @@ export function normaliseTitle(input: string | null | undefined): string {
  * eval must not forgive it.
  */
 export function normaliseItem(input: string | null | undefined): string {
-  return lightName(String(input ?? ""));
+  // same reasoning as normaliseTitle: jalapeño and crème fraîche arrive both ways
+  return lightName(String(input ?? "").normalize("NFC"));
 }
 
 /**

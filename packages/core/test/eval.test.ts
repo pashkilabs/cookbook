@@ -4,7 +4,7 @@ import { coreParser } from "../eval/extractors/core-parser.js";
 import { FIXTURES } from "../eval/fixtures/index.js";
 import { formatReport } from "../eval/report.js";
 import { runEval } from "../eval/runner.js";
-import { amountsMatch, itemSimilarity, scoreRecipe } from "../eval/score.js";
+import { amountsMatch, itemSimilarity, normaliseItem, normaliseTitle, scoreRecipe } from "../eval/score.js";
 import { validateFixtures } from "../eval/validate.js";
 
 const recipe = (over: Partial<ExpectedRecipe> = {}): ExpectedRecipe => ({
@@ -280,9 +280,16 @@ describe("the report", () => {
     expect(formatReport(report)).not.toContain("never emitted");
   });
 
-  it("says so loudly while the fixture set is still placeholders", async () => {
-    const text = formatReport(await runEval(FIXTURES, coreParser));
+  it("says so loudly when a fixture set is still placeholders", async () => {
+    // the committed set is real now, so this asserts the warning on a set that is not
+    const placeholders = [fixture({ id: "p1", placeholder: true })];
+    const text = formatReport(await runEval(placeholders, coreParser));
     expect(text).toContain("every fixture is a placeholder");
+  });
+
+  it("no longer warns about the committed set, because it is real", async () => {
+    const text = formatReport(await runEval(FIXTURES, coreParser));
+    expect(text).not.toContain("every fixture is a placeholder");
   });
 });
 
@@ -334,14 +341,21 @@ describe("fixture validation", () => {
 
 describe("the core parser as an extractor", () => {
   it("reads the ingredients out of a pasted caption", async () => {
-    const report = await runEval(FIXTURES, coreParser);
-    expect(report.scored).toBe(2);
-    expect(report.skipped).toBe(1);
+    // a controlled fixture rather than the committed set, so this measures the extractor and
+    // not whatever the corpus happens to contain this week
+    const report = await runEval([fixture()], coreParser);
+    expect(report.scored).toBe(1);
     expect(report.byField.item.correct).toBe(report.byField.item.total);
   });
 
+  it("skips an input carrying no text at all", async () => {
+    const noText = fixture({ id: "no-text", input: { kind: "url", url: "https://example.com/r" } });
+    const report = await runEval([noText], coreParser);
+    expect(report.skipped).toBe(1);
+  });
+
   it("claims no title, servings or time — it only reads ingredient lines", async () => {
-    const report = await runEval(FIXTURES, coreParser);
+    const report = await runEval([fixture()], coreParser);
     expect(report.byField.title.correct).toBe(0);
     expect(report.byField.servings.correct).toBe(0);
     expect(report.byField.totalMinutes.correct).toBe(0);
@@ -581,5 +595,20 @@ describe("equipment read as food", () => {
     });
     const report = await runEval([fixture()], fine);
     expect(report.ingredients.equipment).toBe(0);
+  });
+});
+
+describe("the same word written two ways", () => {
+  it("does not fail a title for its accents being decomposed", () => {
+    /*
+     * regression: America's Test Kitchen serves `Sautéed` as `e` + U+0301; a hand-typed fixture
+     * carries the composed form. The report printed two identical-looking titles beside a
+     * failure, which sends somebody hunting for a bug in the extractor that is not there.
+     */
+    const composed = "Sautéed Mushrooms";
+    const decomposed = "Sautéed Mushrooms";
+    expect(composed).not.toBe(decomposed);
+    expect(normaliseTitle(composed)).toBe(normaliseTitle(decomposed));
+    expect(normaliseItem("jalapeño")).toBe(normaliseItem("jalapeño"));
   });
 });
