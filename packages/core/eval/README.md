@@ -133,6 +133,18 @@ extractor emitting one has produced a spurious line. Sections are tallied on the
 deliberately kept out of the headline accuracy: a wrong section misgroups a display, a wrong
 amount buys the wrong food, and one percentage covering both hides which moved.
 
+## When a total time may be added up
+
+**Add stated durations only where the source presents them as the whole.**
+
+`instagram-texas-twinkies` says "1 hour" then "an additional 20-30 mins" — two components of one
+complete cook, offered as the whole thing, so the total is 90 (upper bound, as for any range).
+`instagram-cinnamon-rolls` scatters five durations through its method — proof, mix, rest, second
+rest, bake — and adding them means deciding what is concurrent and what is not. That is
+reconstruction, not arithmetic, so its total is `null`.
+
+The line is whether the source hands you the parts of a whole or leaves them lying in the prose.
+
 ## Two known warts, recorded so they are not fixed by accident
 
 **`2 ears of corn` is `amount: 2, unit: null, item: "ears of corn"`.** `ear` canonicalises to

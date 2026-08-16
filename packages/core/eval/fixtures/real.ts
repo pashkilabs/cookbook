@@ -427,3 +427,406 @@ export const caption_sheet_pan_crunchwrap: Fixture = {
     },
   },
 };
+
+export const caption_chile_lime_chicken_bowl: Fixture = {
+  id: "caption-chile-lime-chicken-bowl",
+  input: {
+    kind: "caption",
+    text: "Chile Lime Chicken Bowl Ingredients: Pineapple Mango Salsa (Makes 2 servings): 1/2 cup diced mango 1/2 cup diced pineapple 1 tbsp diced jalapeño 2 tbsp diced red onion 1/2 tbsp chopped cilantro 1/4 tsp chile lime seasoning Juice from 1/2 a lime (about 1 tbsp) Chicken Marinade: 2 tbsp plain Greek yogurt 1/2 tsp chopped cilantro 1/2 tsp chile lime seasoning 1/4 tsp garlic powder 1 tbsp lime juice Pepper, to taste 2 boneless, skinless chicken thighs (180g) For Serving: 1/2 cup cilantro lime rice Additional lime juice (optional) Instructions: Prepare the Salsa: In a bowl, mix diced mango, pineapple, jalapeño, red onion, cilantro, chile lime seasoning, and lime juice. Set aside. Marinate the Chicken: In a separate bowl, combine Greek yogurt, cilantro, chile lime seasoning, garlic powder, lime juice, and pepper. Coat the chicken thighs evenly and let marinate for at least 20 minutes. Cook the Chicken: Heat a pan over medium-high heat and spray with olive oil. Cook chicken for 4 minutes per side or until the internal temperature reaches 165°F (75°C). Assemble the Bowl: Serve the cooked chicken with 1/2 cup cilantro lime rice and 1/2 cup pineapple mango salsa. Finish & Enjoy: Top with additional lime juice if desired and serve immediately.\n",
+  },
+  expected: {
+    outcome: "recipe",
+    recipe: {
+      title: "Chile Lime Chicken Bowl",
+      servings: null,
+      totalMinutes: null,
+      ingredients: [
+        { amount: 0.5, unit: "cup", item: "diced mango", section: "Pineapple Mango Salsa" },
+        { amount: 0.5, unit: "cup", item: "diced pineapple", section: "Pineapple Mango Salsa" },
+        { amount: 1, unit: "tbsp", item: "diced jalapeño", section: "Pineapple Mango Salsa" },
+        { amount: 2, unit: "tbsp", item: "diced red onion", section: "Pineapple Mango Salsa" },
+        { amount: 0.5, unit: "tbsp", item: "chopped cilantro", section: "Pineapple Mango Salsa" },
+        { amount: 0.25, unit: "tsp", item: "chile lime seasoning", section: "Pineapple Mango Salsa" },
+        { amount: 0.5, unit: null, item: "lime", section: "Pineapple Mango Salsa" },
+        { amount: 2, unit: "tbsp", item: "plain Greek yogurt", section: "Chicken Marinade" },
+        { amount: 0.5, unit: "tsp", item: "chopped cilantro", section: "Chicken Marinade" },
+        { amount: 0.5, unit: "tsp", item: "chile lime seasoning", section: "Chicken Marinade" },
+        { amount: 0.25, unit: "tsp", item: "garlic powder", section: "Chicken Marinade" },
+        { amount: 1, unit: "tbsp", item: "lime juice", section: "Chicken Marinade" },
+        { amount: null, unit: null, item: "pepper", section: "Chicken Marinade" },
+        { amount: 2, unit: null, item: "boneless, skinless chicken thighs", section: "Chicken Marinade" },
+        { amount: 0.5, unit: "cup", item: "cilantro lime rice", section: "For Serving" },
+        { amount: null, unit: null, item: "lime juice", section: "For Serving" },
+      ],
+    },
+  },
+};
+
+export const caption_homemade_burger_buns: Fixture = {
+  id: "caption-homemade-burger-buns",
+  input: {
+    kind: "caption",
+    text: "Homemade burger buns 1 cup warm water (110 degrees F) 2 tbsp sugar 2 tsp active dry yeast 3 1/2 cups all purpose flour 1 tsp salt 1 egg 1/4 cup neutral oil 400 for 12 minutes Make sure to save this one in @recime.app ! #recimepartner #bakingrecipes #easybaking #baking #burgerbuns\n",
+  },
+  expected: {
+    outcome: "recipe",
+    recipe: {
+      title: "Homemade burger buns",
+      servings: null,
+      totalMinutes: null,
+      ingredients: [
+        { amount: 1, unit: "cup", item: "warm water" },
+        { amount: 2, unit: "tbsp", item: "sugar" },
+        { amount: 2, unit: "tsp", item: "active dry yeast" },
+        { amount: 3.5, unit: "cup", item: "all purpose flour" },
+        { amount: 1, unit: "tsp", item: "salt" },
+        { amount: 1, unit: null, item: "egg" },
+        { amount: 0.25, unit: "cup", item: "neutral oil" },
+      ],
+    },
+  },
+};
+
+export const caption_boursin_sausage_pasta: Fixture = {
+  id: "caption-boursin-sausage-pasta",
+  input: {
+    kind: "caption",
+    text: "Looking for an easy dinner recipe that's packed with flavor? This 4-ingredient Creamy Tomato Pasta with Sausage and Boursin Cheese is the ultimate one-pot meal for busy weeknights! Made with rich tomato basil sauce, creamy garlic and herb Boursin Cheese, Italian sausage, and your favorite pasta, it's like a dreamy combo of vodka sauce and bolognese without the effort. Ready in just 20 minutes, it's perfect for a quick pasta recipe that feels fancy but is so simple to make. PS: If you're vegetarian, skip the sausage, and it's just as creamy and delicious. Trust me, this is going to be your new go-to dinner idea for those busy holiday weeknights!\n🩷 Comment \"cheese please\" to get the full recipe sent straight to your inbox!\n⭐️INGREDIENTS ⭐️\n1 lb Rigatoni Pasta\n1 lb Italian Sausage (@jimmydean)\n1 24oz Jar Tomato Basil Sauce (@carbonefinefood)\n5.3 oz @boursincheese with Garlic & Fine Herbs\n⭐️ INSTRUCTIONS ⭐️\n1️⃣Get a pot of salted water boiling for your pasta. Once boiling, add pasta and cook the pasta al dente as specified time on the box. Once it's done, strain the pasta but reserve a cup of pasta water for later.\n2️⃣ Meanwhile, add sausage to a large sauce pan or braiser heated over medium-high heat. Use a spatula or meat masher to break the sausage up into tiny crumbles.\n3️⃣ Once the sausage is cooked through, it's time to add the Boursin Cheese and the jar of tomato sauce. Turn the heat down to medium and stir the sauce mixture.\n4️⃣ Once melted, add in the al dente pasta and stir to combine. Once all the pasta is coated in the sauce, add half a cup of the reserved pasta water and toss once more.\n5️⃣ Taste and season with salt and pepper if needed before serving. Optional, but you can also serve with parmigiano if you wish.\n🩷 Or get the full recipe through the link on my profile page at this address - https://grilledcheesesocial.com/2024/05/17/4-ingredient-sausage-boursin-cheese-pasta-recipe/\n87w\n",
+  },
+  expected: {
+    outcome: "recipe",
+    recipe: {
+      title: "Creamy Tomato Pasta with Sausage and Boursin Cheese",
+      servings: null,
+      totalMinutes: 20,
+      ingredients: [
+        { amount: 1, unit: "lb", item: "Rigatoni Pasta" },
+        { amount: 1, unit: "lb", item: "Italian Sausage" },
+        { amount: 24, unit: "oz", item: "Jar Tomato Basil Sauce" },
+        { amount: 5.3, unit: "oz", item: "Boursin cheese with Garlic & Fine Herbs" },
+      ],
+    },
+  },
+};
+
+export const caption_one_pot_boursin_pasta: Fixture = {
+  id: "caption-one-pot-boursin-pasta",
+  input: {
+    kind: "caption",
+    text: "@krolls_korner ONE POT BOURSIN PASTA 😍😮‍💨 comment \"recipe\" and I'll dm you the recipe link! Really good with chicken, chicken sausage, fish, steak..everything! 👌🏼\n.\nIngredients\n▢ 4 Tbsp. butter, unsalted (divided)\n▢ 2-3 cloves garlic (finely minced)\n▢ 1 ½ cups uncooked ditalini pasta\n▢ 2 1/2 cups chicken broth (or more as needed )\n▢ ⅓ cup heavy cream (or more as desired)\n▢ salt, black pepper, chili flakes to taste\n▢ 5.3 oz. garlic and fine herbs Boursin cheese (room temp)\n▢ squeeze of fresh lemon juice (1-2 Tbsp.)\n▢ fresh basil, parmesan, and chili flakes for garnish\n.\nhttps://krollskorner.com/ingredient/pasta/one-pot-boursin-pasta/\n.\n#boursin #boursincheese #easyrecipeideas #pastarecipe #krollskorner\n16w\n",
+  },
+  expected: {
+    outcome: "recipe",
+    recipe: {
+      title: "One Pot Boursin Pasta",
+      servings: null,
+      totalMinutes: null,
+      ingredients: [
+        { amount: 4, unit: "tbsp", item: "butter, unsalted" },
+        { amount: 3, unit: "clove", item: "garlic" },
+        { amount: 1.5, unit: "cup", item: "uncooked ditalini pasta" },
+        { amount: 2.5, unit: "cup", item: "chicken broth" },
+        { amount: 0.333, unit: "cup", item: "heavy cream" },
+        { amount: null, unit: null, item: "salt, black pepper, chili flakes" },
+        { amount: 5.3, unit: "oz", item: "garlic and fine herbs Boursin cheese" },
+        { amount: 2, unit: "tbsp", item: "fresh lemon juice" },
+        { amount: null, unit: null, item: "fresh basil, parmesan, and chili flakes for garnish" },
+      ],
+    },
+  },
+};
+
+export const caption_peach_posset: Fixture = {
+  id: "caption-peach-posset",
+  input: {
+    kind: "caption",
+    text: "A peaches and cream dream 😍 🍑 A take on my chai apple possets, these peach possets are sweet, juicy and the perfect summer dessert.\nFull Recipe 👇\n4 medium ripe peaches\n2 cups heavy cream\n1/3 cup sugar\n3 Tbsp lemon juice\n2 tsp vanilla bean paste\nBrown butter peaches: 3 Tbsp unsalted butter, 1 Tbsp brown sugar, pinch of cinnamon\nCut the peaches in half and hollow out the center with a spoon, leaving about 1/4 inch around the edges. Diced the peaches you scooped out, toss with lemon juice, cover and refrigerate.\nHeat the cream and sugar over medium heat until it gently boils. Continue with a gentle boil (stirring often) for 5 full minutes. Remove from the heat and stir in the lmeon juice and vanilla. Strain through a sieve into a measuring cup with a lip.\nPour the cream mixture into the hollowed out peachesand chill for at least 3 hours.\nBefore serving, brown the butter in a small saucepan. Add the reserved diced peaches, brown sugar, and cinnamon and cook for a minute or so on low until just softened. Spoon over the chilled possets. Top with whipped cream, a drizzle of the brown butter from the bottom of the pan, and a sprinkling of brown sugar.\n👉You can also comment 'recipe' and I'll send it to your DMs to save!\nhttps://whatmollymade.com/peach-posset/\n#peachrecipe #summerdessert #peachposset #easydessert\n",
+  },
+  expected: {
+    outcome: "recipe",
+    recipe: {
+      title: "Peach Possets",
+      servings: null,
+      totalMinutes: null,
+      ingredients: [
+        { amount: 4, unit: null, item: "medium ripe peaches" },
+        { amount: 2, unit: "cup", item: "heavy cream" },
+        { amount: 0.333, unit: "cup", item: "sugar" },
+        { amount: 3, unit: "tbsp", item: "lemon juice" },
+        { amount: 2, unit: "tsp", item: "vanilla bean paste" },
+        { amount: 3, unit: "tbsp", item: "unsalted butter", section: "Brown butter peaches" },
+        { amount: 1, unit: "tbsp", item: "brown sugar", section: "Brown butter peaches" },
+        { amount: null, unit: null, item: "cinnamon", section: "Brown butter peaches" },
+      ],
+    },
+  },
+};
+
+export const caption_potato_sausage_soup: Fixture = {
+  id: "caption-potato-sausage-soup",
+  input: {
+    kind: "caption",
+    text: "If we're calling it Augtober, then soup is no longer optional. 🍁\nWho's with me? 🤎\nSoup recipe below! 👇🏼\nCreamy Potato & Sausage Soup\n(I use my instant pot for this but you can use a slow cooker)\nIngredients\n• 1 lb Italian sausage (mild or spicy, your choice)\n• 6 medium russet or gold potatoes, diced into small cubes\n• 1 medium onion, diced\n• 3 cloves garlic, minced\n• 3 medium carrots, diced\n• 3 stalks celery, diced\n• 6 cups chicken broth\n• 1 ½ tsp salt (adjust to taste)\n• ½ tsp black pepper\n• 1 tsp dried thyme (or Italian seasoning)\n• ½ tsp paprika (optional, for warmth)\n• 1 cup heavy cream (or half-and-half for lighter)\n• 2 cups chopped kale or spinach\n• 2 tbsp flour + 2 tbsp butter (optional, for extra thickness)\nInstructions\n1. Cook sausage first: Cook sausage until browned, breaking it up into small pieces. Drain excess grease if needed.\n2. Add veggies & broth: Add potatoes, onion, garlic, carrots, celery, broth, salt, pepper, thyme, and paprika. Stir well.\n3. Slow cook: Put the lid on, set the valve to venting (since it's slow cook mode), and cook on Slow Cook – Normal for 6–7 hours or Slow Cook – High for 3–4 hours, until potatoes are tender.\n4. Make it creamy: About 30 minutes before serving, stir in the heavy cream. If you want it thicker, melt butter in a small pan, whisk in flour, then stir this roux into the soup.\n5. Add greens: Stir in kale or spinach and let it wilt during the last 5–10 minutes of cook time.\n6. Serve: Taste and adjust seasoning if needed. Ladle into bowls and serve warm with crusty bread.\n•\n•\n•\n•\n•\n#homemade #recipe #soup #autumn #simple\n2w\n",
+  },
+  expected: {
+    outcome: "recipe",
+    recipe: {
+      title: "Creamy Potato & Sausage Soup",
+      servings: null,
+      totalMinutes: null,
+      ingredients: [
+        { amount: 1, unit: "lb", item: "Italian sausage" },
+        { amount: 6, unit: null, item: "medium russet or gold potatoes" },
+        { amount: 1, unit: null, item: "medium onion" },
+        { amount: 3, unit: "clove", item: "garlic" },
+        { amount: 3, unit: null, item: "medium carrots" },
+        { amount: 3, unit: null, item: "stalks celery" },
+        { amount: 6, unit: "cup", item: "chicken broth" },
+        { amount: 1.5, unit: "tsp", item: "salt" },
+        { amount: 0.5, unit: "tsp", item: "black pepper" },
+        { amount: 1, unit: "tsp", item: "dried thyme" },
+        { amount: 0.5, unit: "tsp", item: "paprika" },
+        { amount: 1, unit: "cup", item: "heavy cream" },
+        { amount: 2, unit: "cup", item: "chopped kale or spinach" },
+        { amount: 2, unit: "tbsp", item: "flour" },
+        { amount: 2, unit: "tbsp", item: "butter" },
+      ],
+    },
+  },
+};
+
+export const caption_marry_me_sausage_soup: Fixture = {
+  id: "caption-marry-me-sausage-soup",
+  input: {
+    kind: "caption",
+    text: "💍 MARRY ME ITALIAN SAUSAGE SOUP for Valentine's Day and anytime that cozy soup craving hits—THIS is a winner 🏆 and I can't wait to see your remakes! You can use any pasta shape you want and because the pasta cooks in the soup, it's a low effort, easy clean up meal that might just land you a marriage proposal—I guess there's only one way to find out 😏!⁣\n⁣\nMakes 6 servings ⁣\n1/2 cup sundried tomatoes, in oil⁣\n1 lb mild or spicy Italian sausage ⁣\n1/2 white onion, finely diced⁣\n1 red bell pepper, diced⁣\n3 cloves garlic, minced ⁣\n6 cups chicken broth⁣\n2 tsp Italian seasoning⁣\n1 tsp crushed red pepper flakes⁣\n1 tsp kosher salt⁣\n3/4 cup dried pasta of choice (I'm using gluten-free pasta)⁣\n3/4 cup heavy cream or coconut milk⁣\n3 cups spinach⁣\n1/3 cup fresh basil, chopped ⁣\n3/4 cup parmesan cheese, freshly grated⁣\n⁣\nFirst, slice the sundried tomatoes into pieces and set aside. Chop the onion, bell pepper, and mince your onion. Use 2 tb of the oil from the sundried tomato jar and add it to a large pot over medium heat. Once the pot is hot, add the sausage. Mash into smaller pieces and once almost cooked through, add the onion, pepper, and garlic. Stir for 4-5 minutes until the veggies have softened then add in the chicken broth, sun-dried tomatoes, italian seasoning, red pepper flakes, and salt. Stir and bring to a gentle simmer then add in the pasta and let cook for 4-5 minutes, stirring, then reduce heat to low and add the heavy cream, spinach, and basil, stirring until fully incorporated and the spinach has wilted. Let cook for 3-4 more minutes or until the pasta is al dente. Remove from heat and stir in the parmesan cheese. Divide into bowls and serve with more parmesan cheese on top. Enjoy!⁣\nUsing: @shamrockfarmsmilk cream @parmigianoreggiano.na parm @staub_usa pot @thegiadzy gluten-free taccole corte pasta @mezzetta sundried tomatoes\n⁣\nSoup recipes | marry me chicken | valentines day recipes | budget friendly recipes | one pot meals | quick dinners\n26w\n",
+  },
+  expected: {
+    outcome: "recipe",
+    recipe: {
+      title: "Marry Me Italian Sausage Soup",
+      servings: 6,
+      totalMinutes: null,
+      ingredients: [
+        { amount: 0.5, unit: "cup", item: "sundried tomatoes, in oil" },
+        { amount: 1, unit: "lb", item: "mild or spicy Italian sausage" },
+        { amount: 0.5, unit: null, item: "white onion" },
+        { amount: 1, unit: null, item: "red bell pepper" },
+        { amount: 3, unit: "clove", item: "garlic" },
+        { amount: 6, unit: "cup", item: "chicken broth" },
+        { amount: 2, unit: "tsp", item: "Italian seasoning" },
+        { amount: 1, unit: "tsp", item: "crushed red pepper flakes" },
+        { amount: 1, unit: "tsp", item: "kosher salt" },
+        { amount: 0.75, unit: "cup", item: "dried pasta of choice" },
+        { amount: 0.75, unit: "cup", item: "heavy cream or coconut milk" },
+        { amount: 3, unit: "cup", item: "spinach" },
+        { amount: 0.333, unit: "cup", item: "fresh basil" },
+        { amount: 0.75, unit: "cup", item: "parmesan cheese" },
+      ],
+    },
+  },
+};
+
+export const caption_chicken_pad_thai: Fixture = {
+  id: "caption-chicken-pad-thai",
+  input: {
+    kind: "caption",
+    text: "30-MIN SAUCY CHICKEN PAD THAI ✨ one of the best dinners I've made in so long. And no this is not traditional pad thai—it's my take. The problem with most pad thai recipes is that I always feel like they need more sauce! Like why are the noodles so dry? Well not this recipe—the sauce soaks up into the rice noodles so you get that delicious sauce in every bite! Makes 4-6 servings PAD THAI 14 oz rice noodles (stir fry or pad thai noodles) 1 tb olive oil 1 lb boneless skinless chicken thighs, cut into bite size pieces 2 tb low sodium soy sauce 1 cup bean sprouts 1 red bell pepper, seed removed and sliced thin 1 cup shredded carrots 3 cloves garlic, mashed 2 eggs 1 cup green onions, sliced thin (this is ~1 bunch) ½ cup cilantro 1 lime, juiced 1/2 tsp red pepper flakes SAUCE 1/2 cup low sodium soy sauce or tamari 2 tb toasted sesame oil 3 tb fish sauce 1/3 cup coconut sugar 3 tb rice vinegar 1/4 cup creamy natural peanut butter 1 tsp ground ginger GARNISH 1/3 cup chopped peanuts 1 lime, juiced and drizzled on top Cook noodles according to package instructions. Drain and set aside. Heat the olive oil in a large pan over medium heat, and once hot, add the chicken pieces and soy sauce. Cook for about 7-8 minutes, until browned on all sides and almost cooked through. Transfer the chicken from the pan to a plate, leaving the oil and juices from the chicken. Add the bean sprouts, bell pepper, carrots and garlic. Cook until the veggies have softened, about 4 minutes. While those are cooking, make the sauce. Add all sauce ingredients to a blender and blend until smooth and set aside. Once the veggies are done, push them to the side of the pan. Crack both eggs in the pan and scramble them. Combine with the veggies. Add the chicken, drained noodles, green onions, cilantro, lime, pepper flakes, and sauce to the pan. Toss to combine. Plate and top with additional cilantro, chopped peanuts, and a squeeze of lime. Enjoy! q#padthai #easyrecipes #healthydinner See less\n",
+  },
+  expected: {
+    outcome: "recipe",
+    recipe: {
+      title: "30-Min Saucy Chicken Pad Thai",
+      servings: 6,
+      totalMinutes: 30,
+      ingredients: [
+        { amount: 14, unit: "oz", item: "rice noodles", section: "PAD THAI" },
+        { amount: 1, unit: "tbsp", item: "olive oil", section: "PAD THAI" },
+        { amount: 1, unit: "lb", item: "boneless skinless chicken thighs", section: "PAD THAI" },
+        { amount: 2, unit: "tbsp", item: "low sodium soy sauce", section: "PAD THAI" },
+        { amount: 1, unit: "cup", item: "bean sprouts", section: "PAD THAI" },
+        { amount: 1, unit: null, item: "red bell pepper", section: "PAD THAI" },
+        { amount: 1, unit: "cup", item: "shredded carrots", section: "PAD THAI" },
+        { amount: 3, unit: "clove", item: "garlic", section: "PAD THAI" },
+        { amount: 2, unit: null, item: "eggs", section: "PAD THAI" },
+        { amount: 1, unit: "cup", item: "green onions", section: "PAD THAI" },
+        { amount: 0.5, unit: "cup", item: "cilantro", section: "PAD THAI" },
+        { amount: 1, unit: null, item: "lime", section: "PAD THAI" },
+        { amount: 0.5, unit: "tsp", item: "red pepper flakes", section: "PAD THAI" },
+        { amount: 0.5, unit: "cup", item: "low sodium soy sauce or tamari", section: "SAUCE" },
+        { amount: 2, unit: "tbsp", item: "toasted sesame oil", section: "SAUCE" },
+        { amount: 3, unit: "tbsp", item: "fish sauce", section: "SAUCE" },
+        { amount: 0.333, unit: "cup", item: "coconut sugar", section: "SAUCE" },
+        { amount: 3, unit: "tbsp", item: "rice vinegar", section: "SAUCE" },
+        { amount: 0.25, unit: "cup", item: "creamy natural peanut butter", section: "SAUCE" },
+        { amount: 1, unit: "tsp", item: "ground ginger", section: "SAUCE" },
+        { amount: 0.333, unit: "cup", item: "chopped peanuts", section: "GARNISH" },
+        { amount: 1, unit: null, item: "lime", section: "GARNISH" },
+      ],
+    },
+  },
+};
+
+export const caption_lemony_shrimp_orzo: Fixture = {
+  id: "caption-lemony-shrimp-orzo",
+  input: {
+    kind: "caption",
+    text: "ONE PAN CREAMY LEMONY SHRIMP AND ORZO, a new one since I drop salmon recipes often and I've had requests for other seafood meals—here you go, KJ fam!. I love a good one pan meal that has all the comfort vibes and if you do too, this is the one you need to make. The shrimp cooks in lemon and butter and then it gets added to the same pan with the lemony orzo and you have dinner on the table in ~20 minutes from start to finish. This one is a WINNER like omgeeee so good and I cannot wait for you to make it! ⁣ ⁣ Be sure to FOLLOW me @kalejunkie for more dinners like this, SAVE this post and SHARE it with your friends :)⁣ ⁣ Makes 6 servings⁣ SHRIMP:⁣ 2 tb butter⁣ 1 1/2 lbs medium shrimp peeled and deveined, patted dry with a paper towel⁣ 2 tb lemon zest⁣ 2 tb lemon juice⁣ ⁣ ORZO:⁣ 1 tb olive oil⁣ 2 large shallots, very finely diced⁣ 4 cloves garlic, mashed⁣ 2 3/4 cups chicken broth⁣ 1/2 cup white wine of choice⁣ 1 cup orzo⁣ 1 tsp kosher salt⁣ 1 tsp ground black pepper⁣ 1/2 cup freshly grated parmigiano reggiano cheese⁣ 1/2 cup heavy cream (or full fat coconut milk from the can)⁣ 2 tb lemon juice⁣ 1/4 cup parsley, finely chopped⁣ 3 tb fresh fill, finely chopped⁣ ⁣ Melt 2 tb of butter in a large pan over medium heat. Once the pan is hot, add the shrimp, lemon zest and lemon juice and stir until the shrimp is cooked through, about 4 minutes or so. Once cooked, remove the shrimp from the pan. Add the olive oil, shallots and garlic, stirring for 1-2 minutes and scraping down any of the bits stuck to the bottom of the pan. Next, add in the broth, wine, orzo, salt and pepper, stirring again. Bring to a gentle boil, then reduce heat to medium-low, stirring occasionally, until the orzo is cooked though, about 7-8 minutes. Finally, stir in the cheese, heavy cream, lemon juice, parsley and dill mixing again. Add the cooked shrimp back to the pan and coat the shrimp with the orzo. Serve and enjoy with additional herbs and/or extra lemon zest and parmesan cheese. ENJOY! ⁣ ⁣\n",
+  },
+  expected: {
+    outcome: "recipe",
+    recipe: {
+      title: "One Pan Creamy Lemony Shrimp and Orzo",
+      servings: 6,
+      totalMinutes: 20,
+      ingredients: [
+        { amount: 2, unit: "tbsp", item: "butter", section: "SHRIMP" },
+        { amount: 1.5, unit: "lb", item: "medium shrimp", section: "SHRIMP" },
+        { amount: 2, unit: "tbsp", item: "lemon zest", section: "SHRIMP" },
+        { amount: 2, unit: "tbsp", item: "lemon juice", section: "SHRIMP" },
+        { amount: 1, unit: "tbsp", item: "olive oil", section: "ORZO" },
+        { amount: 2, unit: null, item: "large shallots", section: "ORZO" },
+        { amount: 4, unit: "clove", item: "garlic", section: "ORZO" },
+        { amount: 2.75, unit: "cup", item: "chicken broth", section: "ORZO" },
+        { amount: 0.5, unit: "cup", item: "white wine of choice", section: "ORZO" },
+        { amount: 1, unit: "cup", item: "orzo", section: "ORZO" },
+        { amount: 1, unit: "tsp", item: "kosher salt", section: "ORZO" },
+        { amount: 1, unit: "tsp", item: "ground black pepper", section: "ORZO" },
+        { amount: 0.5, unit: "cup", item: "freshly grated parmigiano reggiano cheese", section: "ORZO" },
+        { amount: 0.5, unit: "cup", item: "heavy cream", section: "ORZO" },
+        { amount: 2, unit: "tbsp", item: "lemon juice", section: "ORZO" },
+        { amount: 0.25, unit: "cup", item: "parsley", section: "ORZO" },
+        { amount: 3, unit: "tbsp", item: "fresh fill", section: "ORZO" },
+      ],
+    },
+  },
+};
+
+export const caption_coconut_curry_brothy_rice: Fixture = {
+  id: "caption-coconut-curry-brothy-rice",
+  input: {
+    kind: "caption",
+    text: "PAN SEARED CHICKEN W/COCONUT CURRY BROTHY RICE aka my latest hyper fixation meal and it is easy to make! You simply pan sear chicken thighs and then make the most flavorful coconut curry broth that gets poured directly over warm rice, for the ultimate comfort food experience. All I have to say is that you must—MUST—make this and report back because it is amazing. ⁣ ⁣ SAVE this post, SHARE with friends, and FOLLOW me @kalejunkie for more!!⁣ ⁣ Makes 4 servings⁣ For the chicken:⁣ 2 tsp avocado oil⁣ 4 boneless, skinless chicken thighs⁣ Salt & pepper⁣ 1/4 cup chicken broth⁣ ⁣ For the broth:⁣ 2 tsp avocado oil⁣ 2 tsp ginger, grated or ginger paste⁣ 3 cloves garlic, minced⁣ 2-3 tb red curry paste (depending on your spice preference)⁣ 1 tb Better than Bouillon ⁣ 3/4 cup chicken broth⁣ 1 14 oz can full fat coconut milk⁣ 1 tsp fish sauce⁣ 1 lime, juiced⁣ ⁣ 2 cups cooked jasmine rice (to save time, I buy frozen and then microwave it!)⁣ 2 green onions, sliced⁣ 2 tb cilantro, chopped, for garnish⁣ 2 tsp chili oil for garish (optional) - I used @flybyjing which has peanuts in it :)⁣ Additional lime wedges⁣ ⁣ Pat chicken dry with paper towels and season with salt and pepper. Heat oil in a large skillet over medium heat. Add chicken thighs to the skillet. Cook for 5-7 minutes without moving (VERY IMPORTANT), and then flip only when the chicken easily releases on its own. Cook for 7-10 minutes more. Pour in the chicken broth to deglaze the bottom and sides of pan with the crispy browned bits until they're no longer sticking to the pan. Remove from heat and let chicken cool on a cutting board before slicing. Next, make the sauce. In a saucepan over medium heat, add the avocado oil. Once hot, add the ginger and garlic, stirring for one minute, then adding in the curry, bouillon and broth. Stir for another 2 minutes then add in the coconut milk, fish sauce and lime. Cover, reduce heat to low and let simmer for 5 minutes. Make rice your preferred way. Assemble your bowls with rice on the bottom, 1 sliced chicken breast, and a generous pour of the broth on top. Garnish with green onions, cilantro and chili oil. Serve with lime wedges. ENJOY!⁣ #brothyrice\n",
+  },
+  expected: {
+    outcome: "recipe",
+    recipe: {
+      title: "Pan Seared Chicken w/Coconut Curry Brothy Rice",
+      servings: 4,
+      totalMinutes: null,
+      ingredients: [
+        { amount: 2, unit: "tsp", item: "avocado oil", section: "For the chicken" },
+        { amount: 4, unit: null, item: "boneless, skinless chicken thighs", section: "For the chicken" },
+        { amount: null, unit: null, item: "Salt & pepper", section: "For the chicken" },
+        { amount: 0.25, unit: "cup", item: "chicken broth", section: "For the chicken" },
+        { amount: 2, unit: "tsp", item: "avocado oil", section: "For the broth" },
+        { amount: 2, unit: "tsp", item: "ginger", section: "For the broth" },
+        { amount: 3, unit: "clove", item: "garlic", section: "For the broth" },
+        { amount: 3, unit: "tbsp", item: "red curry paste", section: "For the broth" },
+        { amount: 1, unit: "tbsp", item: "Better than Bouillon", section: "For the broth" },
+        { amount: 0.75, unit: "cup", item: "chicken broth", section: "For the broth" },
+        { amount: 14, unit: "oz", item: "full fat coconut milk", section: "For the broth" },
+        { amount: 1, unit: "tsp", item: "fish sauce", section: "For the broth" },
+        { amount: 1, unit: null, item: "lime", section: "For the broth" },
+        { amount: 2, unit: "cup", item: "cooked jasmine rice" },
+        { amount: 2, unit: null, item: "green onions" },
+        { amount: 2, unit: "tbsp", item: "cilantro" },
+        { amount: 2, unit: "tsp", item: "chili oil" },
+        { amount: null, unit: null, item: "lime wedges" },
+      ],
+    },
+  },
+};
+
+export const caption_pb_cookie_dough_smores_bites: Fixture = {
+  id: "caption-pb-cookie-dough-smores-bites",
+  input: {
+    kind: "caption",
+    text: "PB COOKIE DOUGH S'MORES BITES, one of my fav sweet treats to always have on hand! The base is melted chocolate, then there's a thick layer of edible cookie dough mixed with crushed peanut butter cups, marshmallows, and a little more chocolate. Freeze and pop out a square or two anytime the sweet craving hits! SAVE this post, SHARE with friends and FOLLOW me @kalejunkie for more fun recipes!⁣ ⁣ Comment LINK and I will DM you my ice cube trays—they are super sturdy and have covers so you can stack them easily! 12/10 recommend!⁣ ⁣ Cookie dough layer⁣ 1 3/4 cups almond flour⁣ 1/4 cup maple syrup⁣ 1/4 cup coconut oil, melted and cooled⁣ 2 tsp vanilla extract⁣ 1 cup crushed peanut butter cups (I used the dark chocolate PB cups from Trader Joe's)⁣ ⁣ 1 cup mini marshmallows of choice (I used @mydandies vegan marshmallows)⁣ ⁣ Chocolate base/top⁣ 1 cup mini chocolate chips (I used @enjoylifefoods)⁣ 2 tsp coconut oil⁣ ⁣ First make the cookie dough. In a bowl, mix together the almond flour, maple syrup, coconut oil and vanilla extract. Chop the peanut butter cups and fold them in. Set aside. Next, make the chocolate layer. Add chocolate chips and coconut oil to a bowl and microwave in 2-3, 30-second increments until melted and smooth. Pour a tiny amount into each ice cube cavity (~1/2 tsp). Freeze the tray for 5 minutes. Remove tray from freezer. Fill each cavity 3/4 way with cookie dough, pressing it down firmly. Then add 3-4 mini marshmallows on top, followed by remaining chocolate. Freeze for 2 hours and enjoy. I like storing these in the freezer because they defrost quickly! ENJOY!\n",
+  },
+  expected: {
+    outcome: "recipe",
+    recipe: {
+      title: "PB Cookie Dough S'mores Bites",
+      servings: null,
+      totalMinutes: null,
+      ingredients: [
+        { amount: 1.75, unit: "cup", item: "almond flour", section: "Cookie dough layer" },
+        { amount: 0.25, unit: "cup", item: "maple syrup", section: "Cookie dough layer" },
+        { amount: 0.25, unit: "cup", item: "coconut oil", section: "Cookie dough layer" },
+        { amount: 2, unit: "tsp", item: "vanilla extract", section: "Cookie dough layer" },
+        { amount: 1, unit: "cup", item: "crushed peanut butter cups", section: "Cookie dough layer" },
+        { amount: 1, unit: "cup", item: "mini marshmallows of choice", section: "Cookie dough layer" },
+        { amount: 1, unit: "cup", item: "mini chocolate chips", section: "Chocolate base/top" },
+        { amount: 2, unit: "tsp", item: "coconut oil", section: "Chocolate base/top" },
+      ],
+    },
+  },
+};
+
+export const caption_street_corn_beef_bowls: Fixture = {
+  id: "caption-street-corn-beef-bowls",
+  input: {
+    kind: "caption",
+    text: "A recipe worth trying for sure!! It's delicious 🤤 Save this recipe for later & lemme know if you try it! Ingredients: - 2 lbs ground beef (90/10 or leaner) - 2 pkg taco seasoning\n4 sweet potatoes - 2-3 tbsp avocado oil - 2-3 tbsp kinders the blend seasoning - 1-2 tbsp cumin\n1 bag roasted corn - 1/4 cup plain greek yogurt - 1-2 tbsp of mayo - juice from 1/2 lime - 1-2 tbsp elote seasoning - 1/4 cup cotija cheese - 1-2 tbsp fresh cilantro chopped\n1 avocado for topping - 1/4 cup cotija cheese for topping - fresh cilantro for garnish I don't really measure seasonings when I'm cooking, I just go by how it tastes and add more as I need! Directions:\nStart by chopping your sweet potatoes and seasoning them with avocado oil, kinders the blend & cumin — put onto a parchment lined pan & bake at 425 for 35-45 min (until fork tender and a lil crispy) I swear sometimes it takes even longer\nCook up your ground beef and season with taco seasoning, once cooked set aside on low heat.\nMake your street corn by combining the roasted corn, Greek yogurt, mayo, lime juice, elote seasoning, cotija cheese & cilantro\nAssemble the bowls: baked sweet potatoes, ground beef, street corn, fresh avocado, cotija & cilantro. I could eat this every day! 10/10 no notes 🤌🏼 This would make a great meal prep recipe too! #viralrecipes #highprotein #highproteindinners #highproteinrecipe #streetcornbowls See less\n",
+  },
+  expected: {
+    outcome: "recipe",
+    recipe: {
+      title: null,
+      servings: null,
+      totalMinutes: null,
+      ingredients: [
+        { amount: 2, unit: "lb", item: "ground beef" },
+        { amount: 2, unit: null, item: "pkg taco seasoning" },
+        { amount: 4, unit: null, item: "sweet potatoes" },
+        { amount: 3, unit: "tbsp", item: "avocado oil" },
+        { amount: 3, unit: "tbsp", item: "kinders the blend seasoning" },
+        { amount: 2, unit: "tbsp", item: "cumin" },
+        { amount: 1, unit: null, item: "bag roasted corn" },
+        { amount: 0.25, unit: "cup", item: "plain greek yogurt" },
+        { amount: 2, unit: "tbsp", item: "mayo" },
+        { amount: 0.5, unit: null, item: "lime" },
+        { amount: 2, unit: "tbsp", item: "elote seasoning" },
+        { amount: 0.25, unit: "cup", item: "cotija cheese" },
+        { amount: 2, unit: "tbsp", item: "fresh cilantro" },
+        { amount: 1, unit: null, item: "avocado" },
+        { amount: 0.25, unit: "cup", item: "cotija cheese" },
+        { amount: null, unit: null, item: "fresh cilantro" },
+      ],
+    },
+  },
+};
+
+export const caption_sweet_chilli_crispy_rice_salad: Fixture = {
+  id: "caption-sweet-chilli-crispy-rice-salad",
+  input: {
+    kind: "caption",
+    text: "my viral sweet chilli crispy rice salad because I still get a DM almost every day asking where to find the recipe. This salad has reached over 40 million people and it is probably one of my favourite recipes I've ever made. If you still haven't tried it, let this be your sign. Recipe below 🫶 Serves 4 large bowls Crispy Rice: 450g cooked jasmine rice, cooled 3 tsp soy sauce 1 tbsp chilli crisp oil 1 tbsp sesame oil Salad: 1 to 2 large cucumbers, thinly sliced 1 cup edamame 1 bunch green onions, thinly sliced 1 avocado, chopped Cooked crispy chicken or grilled chicken (I love Fropro protein healthy fried chicken) Chopped peanuts, optional Sweet Chilli Creamy Dressing: ¼ cup Greek yoghurt ¼ cup mayo, I used light 50ml sweet chilli sauce ½ tsp paprika Water to thin Method: Preheat oven to 200°C and line a tray with baking paper. Toss the cooled rice with soy sauce, chilli crisp and sesame oil until coated. Spread evenly on the tray and bake for 30 to 40 minutes, tossing halfway, until golden and crispy. Cook your chicken as instructed. Add cucumber, edamame, green onion, avocado, cooked chicken and crispy rice to a large bowl. Whisk the dressing ingredients until smooth, using water to thin if needed. Taste and adjust. Pour over the salad, toss gently, garnish with sesame seeds or peanuts and enjoy. Macros per serve, approx: 520 cals, 33g protein #crispyricesalad\n",
+  },
+  expected: {
+    outcome: "recipe",
+    recipe: {
+      title: "Sweet Chilli Crispy Rice Salad",
+      servings: 4,
+      totalMinutes: null,
+      ingredients: [
+        { amount: 450, unit: "g", item: "cooked jasmine rice", section: "Crispy Rice" },
+        { amount: 3, unit: "tsp", item: "soy sauce", section: "Crispy Rice" },
+        { amount: 1, unit: "tbsp", item: "chilli crisp oil", section: "Crispy Rice" },
+        { amount: 1, unit: "tbsp", item: "sesame oil", section: "Crispy Rice" },
+        { amount: 2, unit: null, item: "large cucumbers", section: "Salad" },
+        { amount: 1, unit: "cup", item: "edamame", section: "Salad" },
+        { amount: 1, unit: "bunch", item: "green onions", section: "Salad" },
+        { amount: 1, unit: null, item: "avocado", section: "Salad" },
+        { amount: null, unit: null, item: "Cooked crispy chicken or grilled chicken", section: "Salad" },
+        { amount: null, unit: null, item: "Chopped peanuts", section: "Salad" },
+        { amount: 0.25, unit: "cup", item: "Greek yoghurt", section: "Sweet Chilli Creamy Dressing" },
+        { amount: 0.25, unit: "cup", item: "mayo", section: "Sweet Chilli Creamy Dressing" },
+        { amount: 50, unit: "ml", item: "sweet chilli sauce", section: "Sweet Chilli Creamy Dressing" },
+        { amount: 0.5, unit: "tsp", item: "paprika", section: "Sweet Chilli Creamy Dressing" },
+        { amount: null, unit: null, item: "Water to thin", section: "Sweet Chilli Creamy Dressing" },
+      ],
+    },
+  },
+};

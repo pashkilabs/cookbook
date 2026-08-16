@@ -61,9 +61,14 @@ export function validateFixtures(fixtures: FixtureSet): string[] {
         else if (ingredient.amount <= 0) problems.push(`${at} amount is not positive`);
       }
 
-      // a heading is not an ingredient (decisions §45); one written as an expected line
-      // would teach the extractor that emitting it is correct
+      /*
+       * A heading is not an ingredient (§45), and one written as an expected line would teach an
+       * extractor that emitting it is correct. But a section named after its main ingredient is
+       * ordinary — `1 cup orzo` under `ORZO:` is a real line, and the first version of this rule
+       * failed it. A heading mis-parsed as a line has no quantity; a real ingredient does.
+       */
       if (ingredient.section !== undefined && ingredient.section !== null
+          && ingredient.amount === null && ingredient.unit === null
           && normaliseForHeading(ingredient.item) === normaliseForHeading(ingredient.section)) {
         problems.push(`${at} repeats its section as the ingredient — a heading is not a line`);
       }
