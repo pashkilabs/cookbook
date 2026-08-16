@@ -307,6 +307,25 @@ try {
   });
   record("signup accepted", signup.status === 202, `HTTP ${signup.status}`);
 
+  /*
+   * The shape, not just the happy path.
+   *
+   * `householdName` and `displayName` are load-bearing: they become user metadata that
+   * provisioning reads for the household's name and the member's. Defaulting them would create a
+   * household called "Household" and a person with no name on every rating (§5), so the 400 is
+   * the right answer — but nothing checked it, and a client sending only email and password got
+   * a refusal no run would have caught.
+   */
+  const thin = await call("POST", "/api/signup", {
+    body: { email: `thin-${stamp}@pashki.test`, password: `Thin-${stamp}-Aa1!` },
+    auth: false,
+  });
+  record(
+    "signup refuses a request missing the household and the person",
+    thin.status === 400,
+    `HTTP ${thin.status} — ${String(thin.body?.error ?? "").slice(0, 60)}`,
+  );
+
   // confirm without waiting for mail: this checks the app, not the inbox, and the mail path has
   // its own end-to-end verification in docs/deployment.md
   const users = await admin("GET", "/users?per_page=200");
