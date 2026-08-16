@@ -2178,6 +2178,50 @@ one extractor.
 *Would change if:* a model is measured that reads amounts materially better than core on shared
 lines — which would be an argument for improving core, since every tier benefits.
 
+## 49. If a recipe exists as both a caption and a reel, read the caption
+
+Measured, not assumed. Four fixtures were collected precisely to answer this: the same recipe as a
+caption **and** as reel frames, with the expectation held constant, so any difference is the
+vision tier's error rather than a different truth.
+
+| | caption | reel |
+|---|---|---|
+| crispy rice salad — item | 93% | **27%** |
+| crispy rice salad — recall | 100% | **33%** |
+| pad thai — item | 77% | **18%** |
+| cost per fixture | ~$0.0012 | ~$0.0018 |
+
+Where both channels answered, the reel found **about a third** of what the caption found, and
+**cost more** — a downscaled screenshot is still tokens. Several reels produced nothing usable at
+all. §7 called vision the weakest link; this is the number behind the phrase.
+
+**So: caption first, always. The reel path is for the case where no caption carries the recipe** —
+which is a real case, and the next section is the one that proves it is worth having.
+
+### The reel path may answer when the caption withholds
+
+`tiffy.cooks` coconut curry is the only fixture in the set where the two channels have genuinely
+different correct answers. The caption says *"comment CHICKEN and I will dm you the full recipe"* —
+a refusal. The frames show `Garlic powder` and `Then add in hot rice` over a dish the caption
+names.
+
+The vision tier read **3 of 3** of the ingredients the frames legibly show, scored 11/14 checks,
+and **invented no amounts**. So a reel whose caption withholds is worth reading, and the answer is
+a partial recipe with null amounts rather than a refusal. That is the rule §46 records, now with
+evidence behind it.
+
+### Screenshots need the sharp preparer, or nothing is sent at all
+
+Phone captures run **1.5–3.7 MB** and the vision path caps an image at 1.5 MB, so with the
+passthrough preparer **every reel is rejected before a single call is made**. The eval reported it
+as vision failing. Nothing had been tried.
+
+Same class as the provider probe and as the mutation harness reading zero matched tests as a pass:
+**a path that was never exercised must not report as a path that performed badly.** Any caller
+doing vision — the eval, the worker, the import service — passes `createSharpImagePreparer()`, and
+a rejected image is reported as `no-usable-images` with the byte count rather than folded into
+"no recipe found".
+
 ## Open: cascade deletions and tombstones
 
 **Not resolved. This waits on the sync engine choice, and exists so the evaluation

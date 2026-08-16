@@ -102,7 +102,51 @@ if (!provider) {
       new Uint8Array(await readFile(new URL(`../core/eval/intake/screenshots/${path}`, import.meta.url))),
   });
   if (!visionModel) console.log("  (no PASHKI_LLM_VISION_MODEL — reels will skip rather than score)");
+  /*
+   * Repeated, because a model run is a sample and not a measurement.
+   *
+   * At temperature 0 the same command produced different scored/skipped sets between runs — a
+   * mixture-of-experts model is not deterministic just because the sampler is. One run compared
+   * against one earlier run is how a model comes to look better or worse than it is, so the
+   * report gives a mean and a spread, and names any fixture whose status moved.
+   */
+  const runs = Number(process.env.PASHKI_EVAL_RUNS ?? "1");
+  const reports = [];
+  for (let i = 0; i < runs; i += 1) {
+    reports.push(await runEval(FIXTURES, withModel, { label: `${models[0]!.model} run ${i + 1}` }));
+  }
+
   console.log("\n" + "─".repeat(72));
-  const tier2 = await runEval(FIXTURES, withModel, { label: `tier 0/1/2 — ${models[0]!.model}` });
-  console.log(formatReport(tier2).split("skipped —")[0]);
+  if (runs === 1) {
+    console.log(formatReport(reports[0]!).split("skipped —")[0]);
+    console.log("  ONE RUN — a sample, not a measurement. Set PASHKI_EVAL_RUNS=5 for a spread.");
+  } else {
+    const FIELDS = ["title", "servings", "totalMinutes", "amount", "unit", "item"] as const;
+    const pct = (c: number, t: number) => (t ? (c / t) * 100 : 0);
+    const show = (name: string, values: number[]) => {
+      const mean = values.reduce((a, b) => a + b, 0) / values.length;
+      const lo = Math.min(...values), hi = Math.max(...values);
+      console.log(`${name.padEnd(11)} ${mean.toFixed(1).padStart(5)}%   spread ${lo.toFixed(1)}–${hi.toFixed(1)}  (±${((hi - lo) / 2).toFixed(1)})`);
+    };
+    console.log(`eval — ${models[0]!.model}${visionModel ? ` + ${visionModel}` : ""} · ${runs} runs\n`);
+    for (const f of FIELDS) show(f === "totalMinutes" ? "time" : f, reports.map((r) => pct(r.byField[f].correct, r.byField[f].total)));
+    show("overall", reports.map((r) => pct(r.overall.correct, r.overall.total)));
+    show("sections", reports.map((r) => pct(r.sections.correct, r.sections.total)));
+    show("recall", reports.map((r) => pct(r.ingredients.found, r.ingredients.expected)));
+    const costs = reports.map((r) => r.cost.usd);
+    console.log(`cost        $${(costs.reduce((a, b) => a + b, 0) / costs.length).toFixed(4)}   spread $${Math.min(...costs).toFixed(4)}–$${Math.max(...costs).toFixed(4)}`);
+
+    // a fixture that scores in one run and skips in the next is the instability that matters
+    const status = new Map<string, Set<string>>();
+    for (const r of reports) for (const o of r.outcomes) {
+      if (!status.has(o.fixture.id)) status.set(o.fixture.id, new Set());
+      status.get(o.fixture.id)!.add(o.status);
+    }
+    const unstable = [...status].filter(([, s]) => s.size > 1);
+    console.log(`\nfixtures whose status moved between runs: ${unstable.length}`);
+    for (const [id, s] of unstable) console.log(`  ${id} — ${[...s].join(" / ")}`);
+    if (unstable.length) {
+      console.log("\n  A difference inside the spread above is not a result.");
+    }
+  }
 }

@@ -21,6 +21,7 @@ import {
 
 import type { ExtractedRecipe, ExtractorOutput } from "@pashki/core/eval";
 import { isRefusal } from "@pashki/core/eval";
+import { createImportExtractor } from "../src/eval-extractor.js";
 
 /**
  * An extractor may now decline (decisions §46), so its output is a union. These tests are about
@@ -418,5 +419,46 @@ describe("a source that names no dish", () => {
       content: "x", sourceUrl: "", sourceName: null, cascade: cascade(provider),
     });
     expect(result.attempts[0]?.outcome).toBe("invalid-output");
+  });
+});
+
+describe("what the extractor says when there is no recipe", () => {
+  /**
+   * A refusal is an answer; null is "not my kind of input". Conflating them left confabulation
+   * unmeasured on exactly the path most likely to do it — a reel that shows a dish and withholds
+   * the recipe (decisions §46).
+   */
+  it("refuses a page it read and found no recipe in", async () => {
+    const extractor = createImportExtractor({
+      fetcher: createFakeFetcher({ "https://x.test/none": PAGE_WITH_NO_RECIPE }),
+      cache: createFakeCache(),
+      skipPhoto: true,
+    });
+    const out = await extractor({ kind: "url", url: "https://x.test/none", text: PAGE_WITH_NO_RECIPE });
+    expect(out && "refused" in out && out.refused.because).toBe("not-a-recipe-page");
+  });
+
+  it("refuses a platform that never resolves, rather than reporting nothing", async () => {
+    const extractor = createImportExtractor({
+      fetcher: createFakeFetcher({}), cache: createFakeCache(), skipPhoto: true,
+    });
+    const out = await extractor({ kind: "url", url: "https://www.instagram.com/p/C-Xy1z3M-AB/" });
+    expect(out && "refused" in out && out.refused.because).toBe("unresolvable-source");
+  });
+
+  it("still returns null when it could not look at all", async () => {
+    /*
+     * A page that would not fetch is not an answer about the page. Reporting it as a refusal
+     * would score the network as if it were a judgement.
+     */
+    const extractor = createImportExtractor({
+      fetcher: {
+        async page() { throw new Error("offline"); },
+        async bytes() { throw new Error("offline"); },
+      },
+      cache: createFakeCache(), skipPhoto: true,
+    });
+    const out = await extractor({ kind: "url", url: "https://x.test/unreachable" });
+    expect(out).toBeNull();
   });
 });

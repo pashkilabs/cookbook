@@ -23,6 +23,22 @@ later; today the only extractor is core's line parser.
 | `extractors/` | Things that turn an input into a recipe |
 | `run.ts` | The CLI |
 
+## Two baselines, read differently
+
+**The deterministic baseline is reproducible by construction.** Tiers 0 and 1 read captured
+markup with no network and no model, so the same fixtures give the same score every time —
+verified by running it twice and comparing the output byte for byte. A change in that number is
+a change in the code.
+
+**A model baseline is a sample.** At `temperature: 0` the same command produced different
+scored/skipped sets between runs: a mixture-of-experts model is not deterministic just because
+the sampler is. So:
+
+- **A single run is not comparable to a single earlier run.** Set `PASHKI_EVAL_RUNS=5`; the report
+  gives a mean, a spread, and the fixtures whose status moved between runs.
+- **A difference inside the spread is not a result.** Before believing a model is better, check
+  the gap is bigger than the noise — and say which it is when reporting.
+
 ## The baseline
 
 **There is no earlier number to compare against.** A 23/23 figure exists in an old session

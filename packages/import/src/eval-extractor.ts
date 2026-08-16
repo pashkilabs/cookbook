@@ -1,4 +1,10 @@
-import type { Extractor, ExtractedRecipe as EvalRecipe, FixtureInput } from "@pashki/core/eval";
+import type {
+  Extractor,
+  ExtractedRecipe as EvalRecipe,
+  ExtractorOutput,
+  FixtureInput,
+  RefusalReason,
+} from "@pashki/core/eval";
 import type { ImportOptions, Tier } from "./types.js";
 import { importRecipe } from "./pipeline.js";
 import { extractWithLlm } from "./tier2.js";
@@ -41,7 +47,7 @@ export interface ImportExtractorOptions extends ImportOptions {
  *   against something that was never wired up.
  */
 export function createImportExtractor(options: ImportExtractorOptions): Extractor {
-  return async (input: FixtureInput): Promise<EvalRecipe | null> => {
+  return async (input: FixtureInput): Promise<ExtractorOutput | null> => {
     if (input.kind === "screenshot") {
       // tier 3. Null when it cannot be attempted at all, so the harness records a
       // skip rather than scoring a zero against something that was never configured.
@@ -62,7 +68,13 @@ export function createImportExtractor(options: ImportExtractorOptions): Extracto
         cascade: options.llm,
         preparer: options.preparer ?? createPassthroughImagePreparer(),
       });
-      if (!outcome.ok) return null;
+      if (!outcome.ok) {
+        const refusal = refusalFor(outcome.failure);
+        // null still means "not my kind of input"; a refusal means "I read it and there is no
+        // recipe here". Conflating them left confabulation unmeasured on the path most likely
+        // to do it — a reel that shows a dish and withholds the recipe.
+        return refusal ? { refused: { because: refusal } } : null;
+      }
 
       const evaluated = toEvalRecipe(outcome.recipe, "vision");
       const usage = outcome.usage.at(-1);
@@ -92,7 +104,10 @@ export function createImportExtractor(options: ImportExtractorOptions): Extracto
           }
         : options;
       const outcome = await importRecipe(input.url, withSnapshot);
-      if (!outcome.ok) return null;
+      if (!outcome.ok) {
+        const refusal = refusalFor(outcome.failure);
+        return refusal ? { refused: { because: refusal } } : null;
+      }
       return toEvalRecipe(outcome.recipe, outcome.tier);
     }
 
@@ -147,4 +162,34 @@ function toEvalRecipe(
     totalMinutes: recipe.totalMinutes,
     ingredients: recipe.ingredients,
   };
+}
+
+/**
+ * Which failures are a refusal, and which are "I could not look".
+ *
+ * The distinction is the whole point (decisions §46). A page that fetched and carried no recipe
+ * is an answer — *this is not a recipe page* — and the product can say so. A page that would not
+ * fetch is not an answer about the page at all, and reporting it as a refusal would score the
+ * network as if it were a judgement.
+ */
+function refusalFor(failure: { kind: string } | undefined): RefusalReason | null {
+  switch (failure?.kind) {
+    case "no-recipe-found":
+    case "recipe-incomplete":
+      // read, and there was nothing in it
+      return "not-a-recipe-page";
+    case "blocked-platform":
+      // Instagram, TikTok, Facebook — these never resolve server-side (CLAUDE.md)
+      return "unresolvable-source";
+    case "no-usable-images":
+    case "vision-not-configured":
+    case "fetch-failed":
+    case "not-html":
+    case "invalid-url":
+    case "private-address":
+      // nothing was read, so nothing can be concluded about what was there
+      return null;
+    default:
+      return null;
+  }
 }
