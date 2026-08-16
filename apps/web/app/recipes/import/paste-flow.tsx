@@ -30,8 +30,33 @@ const JPEG_QUALITY = 0.8;
  * It also saves the upload, which on a phone is the slow half — and the vision path downscales
  * server-side anyway, so sending 3.7 MB for the server to discard is paying twice.
  */
+/**
+ * Thrown when the browser cannot decode the file at all — which is HEIC, in practice.
+ *
+ * iPhone's default format. Safari decodes it through the system codec; Chrome, Firefox and Edge
+ * cannot, so a photograph taken on a phone and imported on a laptop fails at the first step. It
+ * used to fail as "That did not work", which is the least useful sentence available for the most
+ * common file the person owns.
+ */
+class UndecodableImage extends Error {
+  constructor(readonly file: File) {
+    const heic = /\.hei[cf]$/i.test(file.name) || /hei[cf]/i.test(file.type);
+    super(
+      heic
+        ? `${file.name} is a HEIC, which this browser cannot read. Safari can — or set iPhone to ` +
+          `Settings → Camera → Formats → Most Compatible, which saves JPEG instead.`
+        : `${file.name} could not be read as an image in this browser.`,
+    );
+  }
+}
+
 async function downscale(file: File): Promise<Blob> {
-  const bitmap = await createImageBitmap(file);
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    throw new UndecodableImage(file);
+  }
   const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(bitmap.width * scale);
