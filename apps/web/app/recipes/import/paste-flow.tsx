@@ -94,28 +94,41 @@ async function render(
  * Four thumbnails at 448px is about 100 KB up and ~1,600 tokens — cheap enough to run every time,
  * which it must be, because the failure it prevents is silent and there is nothing to suspect.
  */
-async function detectRotation(bitmap: ImageBitmap): Promise<Turn> {
+type Rotation = { established: true; rotate: Turn } | { established: false; why: string };
+
+async function detectRotation(bitmap: ImageBitmap): Promise<Rotation> {
   const form = new FormData();
   form.append("mode", "orientation");
   for (const turn of [0, 90, 180, 270] as const) {
     const probe = await render(bitmap, { edge: PROBE_EDGE, quality: PROBE_QUALITY, rotate: turn });
-    if (!probe) return 0;
+    if (!probe) return { established: false, why: "this browser could not turn the image" };
     form.append("rotations", probe, `probe-${turn}.jpg`);
   }
 
   try {
     const response = await fetch("/api/import", { method: "POST", body: form });
-    if (!response.ok) return 0;
-    const body = (await response.json()) as { orientation?: { rotate?: number } | null };
-    const rotate = body.orientation?.rotate;
-    return rotate === 90 || rotate === 180 || rotate === 270 ? rotate : 0;
+    if (!response.ok) return { established: false, why: `the check returned ${response.status}` };
+    const body = (await response.json()) as {
+      orientation?: { status?: string; rotate?: number } | null;
+    };
+    const orientation = body.orientation;
+    if (orientation?.status === "unconfigured") {
+      return { established: false, why: "reading photographs is not switched on here" };
+    }
+    if (orientation?.status !== "established") {
+      return { established: false, why: "the writing could not be made out" };
+    }
+    const rotate = orientation.rotate;
+    return {
+      established: true,
+      rotate: rotate === 90 || rotate === 180 || rotate === 270 ? rotate : 0,
+    };
   } catch {
-    // a hint, never a blocker: upload unrotated rather than fail the import over an orientation
-    return 0;
+    return { established: false, why: "the check could not be reached" };
   }
 }
 
-async function downscale(file: File): Promise<{ blob: Blob; rotated: number }> {
+async function downscale(file: File): Promise<{ blob: Blob; rotation: Rotation }> {
   let bitmap: ImageBitmap;
   try {
     bitmap = await createImageBitmap(file);
@@ -123,11 +136,12 @@ async function downscale(file: File): Promise<{ blob: Blob; rotated: number }> {
     throw new UndecodableImage(file);
   }
 
-  const rotate = await detectRotation(bitmap);
+  const rotation = await detectRotation(bitmap);
+  const rotate = rotation.established ? rotation.rotate : 0;
   const blob = await render(bitmap, { edge: MAX_EDGE, quality: JPEG_QUALITY, rotate });
   bitmap.close();
   // no canvas: send it as it is rather than failing the import
-  return { blob: blob ?? file, rotated: rotate };
+  return { blob: blob ?? file, rotation };
 }
 
 const kb = (bytes: number) => `${Math.round(bytes / 1000)} KB`;
@@ -160,17 +174,27 @@ export function PasteFlow({ mode }: { mode: "text" | "photos" }) {
         let before = 0;
         let after = 0;
         let turned = 0;
+        let unestablished = "";
         for (const file of files) {
-          const { blob, rotated } = await downscale(file);
+          const { blob, rotation } = await downscale(file);
           before += file.size;
           after += blob.size;
-          if (rotated) turned += 1;
+          if (rotation.established && rotation.rotate) turned += 1;
+          if (!rotation.established) unestablished = rotation.why;
           form.append("images", blob, file.name.replace(/\.\w+$/, "") + ".jpg");
         }
-        // said out loud, because a silent rotation is indistinguishable from not needing one
+        /*
+         * Three outcomes on one line, because two of them look identical from a chair: a card
+         * that needed no turn and a card nobody checked both upload unrotated. Saying which is
+         * what stops "sent as they are" being read as "these were the right way up".
+         */
         setShrunk(
           `${kb(before)} → ${kb(after)} before upload` +
-            (turned ? ` · turned ${turned} the right way up` : ""),
+            (unestablished
+              ? ` · which way up was not established — ${unestablished}, so they were sent as they are`
+              : turned
+                ? ` · turned ${turned} the right way up`
+                : " · already the right way up"),
         );
         // no Content-Type: the browser sets the multipart boundary itself
         response = await fetch("/api/import", { method: "POST", body: form });

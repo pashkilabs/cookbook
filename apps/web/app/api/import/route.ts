@@ -72,9 +72,16 @@ export async function POST(request: Request) {
       const rotations = await Promise.all(
         turns.map(async (part) => ({ bytes: new Uint8Array(await part.arrayBuffer()) })),
       );
-      // a hint, never a blocker: an unreadable probe means upload unrotated, not fail the import
-      const reading = await detectImageOrientation(rotations).catch(() => null);
-      return Response.json({ orientation: reading }, { headers: { "cache-control": "no-store" } });
+      /*
+       * A hint, never a blocker — but a hint that says which of three things happened. An
+       * unreadable probe and an unconfigured one both mean "upload unrotated", and they are not
+       * the same news: one is a card this model could not read, the other is a feature that is
+       * switched off. Collapsing them to null is what made a sideways card report as upright.
+       */
+      const orientation = await detectImageOrientation(rotations).catch(() => ({
+        status: "unreadable" as const,
+      }));
+      return Response.json({ orientation }, { headers: { "cache-control": "no-store" } });
     }
 
     const parts = form.getAll("images").filter((part): part is File => part instanceof File);

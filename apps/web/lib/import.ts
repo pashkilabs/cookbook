@@ -164,21 +164,36 @@ export type PasteOutcome =
  * `attemptPasteImport` uses a passthrough preparer: **no sharp in this file.** A canvas can turn
  * an image four ways as easily as it can downscale one, and it is already open.
  *
- * Null when vision is unconfigured or the model does not answer the shape — the caller uploads
- * unrotated rather than failing an import over a hint.
+ * **Three outcomes, not two** (CLAUDE.md — silence reads as success). `established` with an
+ * angle, `unconfigured` when there is no vision provider, `unreadable` when the model would not
+ * answer the shape. The first version returned null for both failures and the client turned that
+ * into 0°, so a card lying sideways was reported as *already upright* — over HTTP 200, with
+ * `response.ok` true, so nothing anywhere could tell a working probe from an absent one. A
+ * sideways card came back unrotated and unremarked.
+ *
+ * regression: `apps/web/.env.local` had no PASHKI_LLM_VISION_API_KEY, `next dev` does not read
+ * the shell env file that did, and the whole feature degraded to a no-op that looked like a
+ * decision. "Could not measure" is a different answer from "no rotation needed" and has to be
+ * carried as one.
  */
+export type OrientationOutcome =
+  | ({ status: "established" } & OrientationReading)
+  | { status: "unconfigured" }
+  | { status: "unreadable" };
+
 export async function detectImageOrientation(
   rotations: readonly { bytes: Uint8Array }[],
-): Promise<OrientationReading | null> {
+): Promise<OrientationOutcome> {
   const llm = cascadeFromEnv();
   const model = llm?.visionModels?.[0];
-  if (!llm?.visionProvider || !model) return null;
+  if (!llm?.visionProvider || !model) return { status: "unconfigured" };
 
-  return detectOrientation({
+  const reading = await detectOrientation({
     provider: llm.visionProvider,
     model,
     rotations: rotations.map((r) => ({ bytes: r.bytes, mediaType: "image/jpeg" as const })),
   });
+  return reading ? { status: "established", ...reading } : { status: "unreadable" };
 }
 
 export async function attemptPasteImport(
