@@ -2250,6 +2250,61 @@ has the text of an ingredient line. Nothing outside seeding and tests may import
 directly — the same rule `SEED_CATALOG` lives under, and for the same reason: it is data, and a
 correction should not need a release.
 
+## 51. Substitutions are a table, and the caveat is the feature
+
+§6's rule applied to a new feature. "I have no buttermilk" has a correct answer that needs no
+model: milk plus a tablespoon of acid per cup, stood for ten minutes. Reaching for inference there
+is the same mistake as consulting tier 2 for a page that publishes structured data — measured at
+99.3% and free (§48).
+
+**Forty-six entries in `packages/core`, seed data in the shape of `SEED_CATALOG`** — a table this
+can grow into, not a constant to import. `check-seed-catalog-usage.mjs` guards it for the same
+reason it guards the catalog: it is data, and a correction should not need a release.
+
+### Every option states a ratio and a cost, and the cost is why this is safe to ship
+
+Not a disclaimer — the reason the feature is defensible. Somebody who does not know what they are
+trading should not be told to trade it:
+
+- **buttermilk** is milk plus acid, and costs nothing worth minding
+- **self-raising flour** is plain flour plus 2 tsp baking powder per cup, *and the ratio is
+  load-bearing* — under-measure and it will not rise, over-measure and it tastes metallic
+- **butter for oil is not one for one.** Butter is a fifth water, so it is ¾ of the weight in oil,
+  and the result will not cream with sugar or hold a laminated dough
+
+Two tests enforce it: **no option may carry an empty `cost`, and none an empty `ratio`.** "Use
+yogurt" is not an instruction.
+
+`notFor` names where a substitution is actively wrong rather than merely worse. Greek yogurt
+stands in for sour cream in a sauce and splits in a bake; garlic powder cannot brown, so a dish
+that begins by frying garlic loses its base; dried herbs as a garnish are simply wrong.
+
+### What is in it, and why those
+
+Chosen for **what a household runs out of mid-recipe**, not as a reference. Dairy and baking
+staples dominate, because those are what a recipe wants a cup of and a fridge quietly lacks.
+Spices are mostly absent — running out of paprika is annoying and rarely stops a dish — as is
+anything whose honest answer is "go to the shop".
+
+Coverage against the catalog, per §50: **23 of 46 keyed, 23 bare.** The bare names are the report,
+and they are a better ranked list of catalog gaps than a guess would produce — self-raising flour,
+crème fraîche, cornflour, icing sugar, vanilla extract, yeast, shallots.
+
+### What is deliberately NOT in it
+
+**The tail that needs a model.** "What can I use instead of gochujang" has no table answer, and
+the honest response is silence rather than a guess. This is the free half, and it ships alone
+precisely so the paid half has to justify itself separately — the same argument that keeps tier 0
+ahead of tier 2.
+
+**Dietary rewrites.** Making a recipe gluten-free, dairy-free or nut-free is **a safety feature,
+not a convenience one**, and it is separate work. A substitution table that says "use almond
+flour" to somebody cooking for a nut allergy is dangerous in a way that no amount of caveat text
+fixes. Nothing here should be read as a dietary claim, and the UI must not present it as one.
+
+**Rewriting the recipe.** The UI is read-only: an ingredient offers "no X?" and shows what to use.
+It does not alter amounts, does not re-render the recipe, costs no quota and calls no model.
+
 ## Open: cascade deletions and tombstones
 
 **Not resolved. This waits on the sync engine choice, and exists so the evaluation
