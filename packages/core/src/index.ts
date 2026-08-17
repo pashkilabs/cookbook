@@ -12,3 +12,4 @@ export {
   metricPackageCoverage,
   seedCatalogFor,
 } from "./seed-catalog.js";
+export * from "./substitutions.js";

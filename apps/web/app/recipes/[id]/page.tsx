@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { formatInSystem } from "@pashki/core";
+import { SUBSTITUTIONS, createSubstitutions, formatInSystem } from "@pashki/core";
 import { INGREDIENT_COLUMNS } from "@pashki/db/catalog";
 import { andList, energyForRecipe } from "@/lib/energy";
 import { scaleIngredientAmounts, servingsForScale } from "@/lib/planner";
@@ -11,6 +11,7 @@ import { ShortlistButton } from "../shortlist-button";
 import { RemoveRecipe } from "./remove";
 import { Verdicts } from "./verdicts";
 import { linkify } from "./linkify";
+import { Substitution } from "./substitution";
 
 /**
  * One recipe: what is in it, how to make it, who liked it, and what it looked like.
@@ -132,6 +133,13 @@ export default async function RecipePage({
     scale: plannedScale,
   });
 
+  /*
+   * What to use instead, for the ingredients the table knows. Read here rather than through the
+   * database: substitutions are domain knowledge and not operational data (§51), so they ship in
+   * code and change by commit.
+   */
+  const substitutions = createSubstitutions(SUBSTITUTIONS);
+
   const scores = new Map(ratings.data?.map((r) => [r.family_member_id, r.score]) ?? []);
 
   const weekStart = startOfWeek(todayIso());
@@ -250,6 +258,10 @@ export default async function RecipePage({
                   {measure && <span className="measure">{measure}</span>}
                   <span>{line.item_text}</span>
                   {line.note && <span className="meta"> — {line.note}</span>}
+                  {(() => {
+                    const swap = substitutions.find(line.item_text);
+                    return swap ? <Substitution entry={swap} /> : null;
+                  })()}
                   {line.is_estimated && (
                     <span className="estimated" title="This amount was inferred, not stated">
                       estimated

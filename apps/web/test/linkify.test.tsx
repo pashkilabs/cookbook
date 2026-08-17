@@ -48,3 +48,40 @@ describe("linking the URLs in a step", () => {
     expect(html("Use King Arthur flour")).toBe("Use King Arthur flour");
   });
 });
+
+import { Substitution } from "../app/recipes/[id]/substitution";
+import { SUBSTITUTIONS, createSubstitutions } from "@pashki/core";
+
+/**
+ * The substitution disclosure (decisions §51). Read-only, no model, no quota — and the caveat is
+ * the part that must not be hidden.
+ */
+describe("no buttermilk?", () => {
+  const table = createSubstitutions(SUBSTITUTIONS);
+  const render = (name: string) =>
+    renderToStaticMarkup(<Substitution entry={table.find(name)!} />);
+
+  it("shows what to use, in what ratio, and what it costs", () => {
+    const out = render("buttermilk");
+    expect(out).toContain("no buttermilk?");
+    expect(out).toMatch(/lemon juice|vinegar/i);
+    expect(out).toContain("1 tbsp");
+    expect(out).toMatch(/None worth minding/i);
+  });
+
+  it("puts notFor in the open, not behind a further tap", () => {
+    /*
+     * The most valuable line in the table is the one saying a substitution is actively wrong.
+     * Hiding it a level deeper than the substitution it qualifies would be the same fault as a
+     * calorie total that omits the chorizo: the encouraging half visible, the warning a click away.
+     */
+    const out = render("sour cream");
+    expect(out).toMatch(/Not for .*baking/i);
+    // one <details> only — the warning is inside it, not inside another
+    expect(out.match(/<details/g)).toHaveLength(1);
+  });
+
+  it("names the ratio for the one where the ratio is load-bearing", () => {
+    expect(render("self-raising flour")).toMatch(/2 tsp baking powder/i);
+  });
+});

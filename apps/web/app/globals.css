@@ -320,6 +320,29 @@ section { margin-bottom: var(--s6); }
   background: var(--card);
 }
 
+/*
+ * "no buttermilk?" — closed by default so it never competes with the ingredient it hangs off,
+ * and `notFor` styled as a warning rather than a footnote: a substitution that is wrong in a
+ * bake is the most valuable line in the table.
+ */
+.substitution { margin-top: 0.35rem; font-size: 0.85rem; }
+.substitution > summary {
+  color: var(--accent);
+  cursor: pointer;
+  list-style: none;
+  width: fit-content;
+}
+.substitution > summary::-webkit-details-marker { display: none; }
+.substitution > summary::before { content: "↔ "; }
+.substitution ul { list-style: none; padding: 0.4rem 0 0 1rem; margin: 0; }
+.substitution li { display: block; padding: 0.4rem 0; border-bottom: 1px solid var(--line); }
+.substitution li:last-child { border-bottom: 0; }
+.substitution .ratio,
+.substitution .cost,
+.substitution .notfor { display: block; color: var(--muted); }
+.substitution .ratio { color: var(--fg); }
+.substitution .notfor { color: var(--danger, #a33); font-weight: 500; margin-top: 0.15rem; }
+
 /* An estimate, sitting above the list it was computed from rather than claiming to be a fact. */
 .meta.energy {
   margin: 0 0 var(--s3);

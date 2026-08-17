@@ -16,7 +16,7 @@ const root = new URL("..", import.meta.url).pathname;
  * `seedCatalogFor` and `METRIC_PACKAGES` are the same seed data reached by other names, so they
  * are guarded the same way. Adding an export was not going to be the loophole.
  */
-const NEEDLES = ["SEED_CATALOG", "METRIC_PACKAGES", "seedCatalogFor", "metricPackageCoverage", "SUBSTITUTIONS"];
+const NEEDLES = ["SEED_CATALOG", "METRIC_PACKAGES", "seedCatalogFor", "metricPackageCoverage"];
 const PATTERN = /SEED_CATALOG|METRIC_PACKAGES|seedCatalogFor|metricPackageCoverage/;
 
 /**
@@ -26,8 +26,6 @@ const PATTERN = /SEED_CATALOG|METRIC_PACKAGES|seedCatalogFor|metricPackageCovera
 const ALLOWED = [
   // the definition and its re-export
   "packages/core/src/seed-catalog.ts",
-  // the substitution table declares itself here; §50 puts it under the same rule as the catalog
-  "packages/core/src/substitutions.ts",
   "packages/core/src/index.ts",
   // seeding
   "packages/db/scripts/generate-seed.ts",

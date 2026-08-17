@@ -2257,9 +2257,25 @@ model: milk plus a tablespoon of acid per cup, stood for ten minutes. Reaching f
 is the same mistake as consulting tier 2 for a page that publishes structured data — measured at
 99.3% and free (§48).
 
-**Forty-six entries in `packages/core`, seed data in the shape of `SEED_CATALOG`** — a table this
-can grow into, not a constant to import. `check-seed-catalog-usage.mjs` guards it for the same
-reason it guards the catalog: it is data, and a correction should not need a release.
+**Forty-six entries in `packages/core`, and — unlike the catalog — they stay in code.**
+
+### Operational data belongs in a table; domain knowledge belongs in code
+
+The catalog is in the database because package sizes are **operational**: a pint is 473 ml and a
+metric carton is 500, shops change what they stock, and a correction has to ship without a release
+(§28). None of that is true here. **Buttermilk is milk plus a tablespoon of acid per cup and always
+will be.** The facts do not vary by market, do not go stale, and are not discovered by operations.
+
+And the failure modes point opposite ways. A wrong package size costs somebody a wasted trip. **A
+wrong ratio misleads somebody mid-cook**, with a bowl already committed — which wants a code
+review, a diff and a test, not an `UPDATE` run against production at speed. `SUBSTITUTIONS` is
+therefore *not* guarded by `check-seed-catalog-usage.mjs`; it is read directly, server-side.
+
+An earlier draft of this section had it the other way, on the reasoning that anything data-shaped
+belongs in a table. That is the wrong default and the distinction is worth stating so the next
+data-shaped thing gets the question asked of it: **is this operational, or is it domain
+knowledge?** Operational things change without us and belong in rows. Domain knowledge changes
+when somebody learns something, and that is what a commit is for.
 
 ### Every option states a ratio and a cost, and the cost is why this is safe to ship
 
