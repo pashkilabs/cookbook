@@ -2429,17 +2429,21 @@ fluent invention does not: it reads as a successful import, and nothing in the
 schema, the validator or the screen can tell it from a reading. On a box of
 handwritten family recipes that asymmetry is worth the price difference.
 
-**Cost per card**, two images, probe plus extraction, measured:
+**Cost per card**, two images, probe plus extraction. Token counts measured;
+per-million rates verified against Anthropic's published pricing on 17 Aug 2026:
 
-| | probe in/out | extract in/out |
-|---|---|---|
-| both models | ~3,234 / ~80 | Sonnet 5,831 / 1,059 · Haiku 6,107 / 1,078 |
+| | in | out | rate | cost |
+|---|---|---|---|---|
+| Sonnet 5 | 9,065 | 1,139 | $2 / $10 per MTok | **$0.030** |
+| Haiku 4.5 | 9,341 | 1,158 | $1 / $5 per MTok | **$0.015** |
 
-At $3/$15 per million that is roughly **$0.044 a card** against roughly $0.015 on
-Haiku at $1/$5 — about three times, on a channel used for a card that cannot be
-imported any other way. **Those per-million rates are unconfirmed** and should be
-checked against Anthropic's published pricing before the figure is quoted
-anywhere that matters; the token counts are measured.
+(probe ~3,234 in / ~80 out on both; extraction 5,831/1,059 on Sonnet, 6,107/1,078 on Haiku)
+
+So **about 2x, not 3x.** An earlier draft of this section quoted $3/$15 for Sonnet 5
+from memory and put the ratio at 3x; the published rate is $2/$10 — the
+introductory price announced at launch became the standard one, and the scheduled
+increase did not happen. Three cents a card, on a channel that is the only way a
+handwritten card enters the system at all.
 
 **Haiku's numbers stay on record deliberately.** The comparison is the reason for
 the choice, and the next model swap should be measured against both rather than
@@ -2457,3 +2461,27 @@ writing. The extraction was correct either way, so this is not blocking, but a
 probe that is right about the words and inconsistent about the angle is not
 understood, and it should be measured across the fixture set rather than
 explained away.
+
+
+### §52 addendum — two things the pricing check turned up
+
+**`drawImage` is proven.** The canvas path was listed as unverified through several
+commits, correctly: the geometry had six tests and the paint had never executed.
+It has now — a browser upload of the sideways overton files through the Photograph
+tab reached the review screen with *Grandma Overtons Rolls* and its ingredient
+list. The canvas turns the card upright. Closed, on evidence rather than on the
+absence of a failure.
+
+**`inference_geo` is not being set, and CLAUDE.md requires US-hosted inference.**
+The usage block on every vision call reports `"inference_geo":"not_available"`,
+which means these requests take the global default routing rather than pinned US
+inference. For Claude 4.6 and later, `inference_geo: "us"` is the parameter that
+pins it — and it carries a **1.1x multiplier on every token category**, so the
+verified figure above would become about $0.033 a card.
+
+That is a compliance question before it is a cost one, and it is not settled here:
+whether the rule in CLAUDE.md means the parameter must be set, or whether it was
+written about *where a provider is hosted* rather than about request routing, is a
+question for whoever wrote it. Recorded rather than guessed at, and it should not
+stay open long — every photograph imported until it is resolved goes wherever the
+default sends it.
