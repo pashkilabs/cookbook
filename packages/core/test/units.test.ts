@@ -12,7 +12,11 @@ describe("canonicalUnit", () => {
     expect(canonicalUnit("Tablespoons")).toBe("tbsp");
     expect(canonicalUnit("OZ.")).toBe("oz");
     expect(canonicalUnit("cloves")).toBe("clove");
-    expect(canonicalUnit("jars")).toBe("can");
+    // the written word survives: a jar stays a jar, because "2 jars" is what gets displayed
+    // and what a per-ingredient size is keyed on. Flattening every container to "can" lost both.
+    expect(canonicalUnit("jars")).toBe("jar");
+    expect(canonicalUnit("packages")).toBe("package");
+    expect(canonicalUnit("pkg")).toBe("package");
     expect(canonicalUnit("large")).toBe("count");
   });
 
@@ -114,5 +118,33 @@ describe("unit table", () => {
     for (const [key, def] of Object.entries(UNITS)) {
       expect(def.toBase, key).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("containers resolve per ingredient, never per word", () => {
+  const yeast = {
+    key: "dry-yeast", names: ["dry yeast"], aisle: "Baking", dimension: "weight" as const,
+    packages: [], containers: { package: 7, packet: 7 },
+  };
+  const cakeMix = {
+    key: "cake-mix", names: ["cake mix"], aisle: "Baking", dimension: "weight" as const, packages: [],
+  };
+
+  it("resolves a packet of yeast to 7 g, which is standard across brands", () => {
+    expect(toBaseMeasure(2, "package", yeast)).toEqual({ amount: 14, dimension: "weight" });
+    expect(toBaseMeasure(1, "packet", yeast)).toEqual({ amount: 7, dimension: "weight" });
+  });
+
+  it("leaves a box of cake mix as a count of boxes, because no size is standard", () => {
+    // a box is 13.25 oz for one brand and 15.25 for another, and cake mixes have gone
+    // 18 → 16 → 15 oz over time. "1 box" is buyable; a guessed weight is confidently wrong
+    // on exactly the old family recipes this exists to preserve.
+    expect(toBaseMeasure(1, "box", cakeMix)).toEqual({ amount: 1, dimension: "can" });
+  });
+
+  it("does not let one ingredient's container size leak to another's same word", () => {
+    // "package" is 7 g for yeast and nothing knowable for cake mix — same word, different answer
+    expect(toBaseMeasure(1, "package", cakeMix)).toEqual({ amount: 1, dimension: "can" });
+    expect(toBaseMeasure(1, "package", yeast)).toEqual({ amount: 7, dimension: "weight" });
   });
 });

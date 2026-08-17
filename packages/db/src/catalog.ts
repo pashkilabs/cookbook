@@ -29,6 +29,12 @@ export interface IngredientRow {
   can_size: number | string | null;
 }
 
+export interface IngredientContainerRow {
+  ingredient_id: string;
+  word: string;
+  base_amount: number | string;
+}
+
 export interface GroceryPackageRow {
   ingredient_id: string;
   system: string;
@@ -41,6 +47,7 @@ export interface GroceryPackageRow {
 export const INGREDIENT_COLUMNS =
   "id, key, canonical_name, aliases, aisle, dimension, grams_per_cup, can_size, grams_each, kcal_per_100g, energy_fdc_id";
 export const GROCERY_PACKAGE_COLUMNS = "ingredient_id, system, label, base_amount, sort_order";
+export const INGREDIENT_CONTAINER_COLUMNS = "ingredient_id, word, base_amount";
 
 /**
  * @param system which market's package sizes to use. Sizes differ by market rather than only in
@@ -53,7 +60,20 @@ export function catalogItemsFromRows(
   ingredients: IngredientRow[],
   packages: GroceryPackageRow[],
   system: MeasurementSystem = "us",
+  containers: IngredientContainerRow[] = [],
 ): CatalogItem[] {
+  /*
+   * Assembled the same way `packages` is, because it is the same relationship — a child table
+   * keyed on the ingredient, not a blob on it. `check (base_amount > 0)` and the unique key per
+   * (ingredient_id, word) are the point: this value reaches `toBaseMeasure` and then the shopping
+   * list, where a zero would be a silently wrong quantity rather than an error anyone sees.
+   */
+  const containersByIngredient = new Map<string, Record<string, number>>();
+  for (const row of containers) {
+    const found = containersByIngredient.get(row.ingredient_id) ?? {};
+    found[row.word] = Number(row.base_amount);
+    containersByIngredient.set(row.ingredient_id, found);
+  }
   const byIngredient = new Map<string, GroceryPackageRow[]>();
   const usByIngredient = new Map<string, GroceryPackageRow[]>();
   for (const row of packages) {
@@ -84,6 +104,7 @@ export function catalogItemsFromRows(
     // numerics arrive as strings over PostgREST; absent stays absent rather than becoming 0
     ...(row.grams_per_cup === null ? {} : { gramsPerCup: Number(row.grams_per_cup) }),
     ...(row.can_size === null ? {} : { canSize: Number(row.can_size) }),
+    ...(containersByIngredient.has(row.id) ? { containers: containersByIngredient.get(row.id)! } : {}),
     ...(row.grams_each === null ? {} : { gramsEach: Number(row.grams_each) }),
     ...(row.kcal_per_100g === null ? {} : { kcalPer100g: Number(row.kcal_per_100g) }),
     ...(row.energy_fdc_id === null ? {} : { energyFdcId: row.energy_fdc_id }),

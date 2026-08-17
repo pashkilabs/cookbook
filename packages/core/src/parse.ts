@@ -1,5 +1,5 @@
 import type { ParsedIngredient } from "./types.js";
-import { CONTAINER_WORDS, canonicalUnit } from "./units.js";
+import { CONTAINER_WORDS, canonicalUnit, containerWord } from "./units.js";
 import { expandFractions, readNumber, stripTags } from "./text.js";
 
 const NUMBER = String.raw`\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:[.,]\d+)?`;
@@ -210,7 +210,7 @@ export function parseIngredientLine(raw: string): ParsedIngredient | null {
    * container word is spent. It was left on the front of the food, giving `cans cannellini beans`.
    * Only stripped when a real measure was established, so "2 cans tomatoes" keeps its cans.
    */
-  if (unitWord !== null && canonicalUnit(unitWord) !== "can") {
+  if (unitWord !== null && containerWord(canonicalUnit(unitWord)) === null) {
     const spentContainer = /^([a-zA-Z]+)\s+/.exec(rest);
     if (spentContainer && CONTAINER_WORDS.has((spentContainer[1] ?? "").toLowerCase())) {
       rest = rest.slice(spentContainer[0].length).trim();

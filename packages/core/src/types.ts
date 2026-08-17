@@ -70,6 +70,20 @@ export interface CatalogItem {
   /** base-unit contents of one tin, so "1 can beans" becomes a real weight */
   canSize?: number;
   /**
+   * What one of each *named* container holds, for this ingredient only.
+   *
+   * **Per ingredient, never per word.** A global default per container word is the tempting
+   * version and it is wrong: a "box" is 13.25 oz for Betty Crocker and 15.25 for Duncan Hines,
+   * and cake mixes have gone 18 → 16 → 15 oz over the decades. A default would print a
+   * confidently wrong weight on exactly the handwritten family recipes this exists to preserve.
+   * The same word means 7 g for yeast and 8 oz for cream cheese.
+   *
+   * So a size is only ever asserted where it is genuinely standard across brands — a yeast
+   * packet is 7 g / 2¼ tsp everywhere — and where nothing is known the container stays a
+   * container. "2 packages dry yeast" is correct, buyable, and better than a guessed weight.
+   */
+  containers?: Record<string, number>;
+  /**
    * Weight of one, for things counted rather than measured — an onion, an egg, a lemon.
    *
    * Energy is per 100 g, so "2 onions" is unanswerable without this. Absent means the estimate

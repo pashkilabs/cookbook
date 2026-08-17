@@ -334,6 +334,41 @@ export type Database = {
           },
         ]
       }
+      ingredient_containers: {
+        Row: {
+          base_amount: number
+          created_at: string
+          id: string
+          ingredient_id: string
+          updated_at: string
+          word: string
+        }
+        Insert: {
+          base_amount: number
+          created_at?: string
+          id?: string
+          ingredient_id: string
+          updated_at?: string
+          word: string
+        }
+        Update: {
+          base_amount?: number
+          created_at?: string
+          id?: string
+          ingredient_id?: string
+          updated_at?: string
+          word?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ingredient_containers_ingredient_id_fkey"
+            columns: ["ingredient_id"]
+            isOneToOne: false
+            referencedRelation: "ingredients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ingredients: {
         Row: {
           aisle: string

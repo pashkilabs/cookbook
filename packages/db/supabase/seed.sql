@@ -3,7 +3,7 @@
 -- Written by scripts/generate-seed.ts from SEED_CATALOG in @pashki/core.
 -- Regenerate with: pnpm --filter @pashki/db gen:seed
 --
--- 65 ingredients, 183 package sizes.
+-- 66 ingredients, 185 package sizes, 3 container sizes.
 --
 -- Idempotent: `supabase db reset` runs this after the migrations, and running it
 -- again upserts rather than duplicating. Both tables have the unique constraints
@@ -28,7 +28,7 @@ begin;
 -- its name rather than being stranded under a parked one.
 update public.ingredients
 set canonical_name = 'seed:parking:' || key
-where key in ('heavy-cream', 'half-and-half', 'double-cream', 'single-cream', 'milk', 'semi-skimmed-milk', 'skimmed-milk', 'buttermilk', 'sour-cream', 'yogurt', 'cheddar', 'mozzarella', 'greek-yogurt', 'butter', 'cream-cheese', 'shredded-cheese', 'parmesan', 'feta', 'eggs', 'chicken-breast', 'chicken-thighs', 'ground-beef', 'lean-ground-beef', 'ground-turkey', 'sausage', 'bacon', 'salmon', 'shrimp', 'onion', 'garlic', 'lemon', 'lime', 'potatoes', 'carrots', 'celery', 'bell-pepper', 'spinach', 'tomatoes', 'mushrooms', 'broccoli', 'avocado', 'cilantro', 'parsley', 'basil', 'green-onions', 'olive-oil', 'flour', 'sugar', 'brown-sugar', 'rice', 'pasta', 'canned-tomatoes', 'tomato-paste', 'sun-dried-tomatoes', 'broth', 'coconut-milk', 'beans', 'soy-sauce', 'honey', 'maple-syrup', 'flour-tortillas', 'corn-tortillas', 'tortillas', 'bread', 'frozen-peas');
+where key in ('heavy-cream', 'half-and-half', 'double-cream', 'single-cream', 'milk', 'semi-skimmed-milk', 'skimmed-milk', 'buttermilk', 'sour-cream', 'yogurt', 'cheddar', 'mozzarella', 'greek-yogurt', 'butter', 'cream-cheese', 'shredded-cheese', 'parmesan', 'feta', 'eggs', 'chicken-breast', 'chicken-thighs', 'ground-beef', 'lean-ground-beef', 'ground-turkey', 'sausage', 'bacon', 'salmon', 'shrimp', 'onion', 'garlic', 'lemon', 'lime', 'potatoes', 'carrots', 'celery', 'bell-pepper', 'spinach', 'tomatoes', 'mushrooms', 'broccoli', 'avocado', 'cilantro', 'parsley', 'basil', 'green-onions', 'olive-oil', 'flour', 'sugar', 'brown-sugar', 'rice', 'pasta', 'canned-tomatoes', 'dry-yeast', 'tomato-paste', 'sun-dried-tomatoes', 'broth', 'coconut-milk', 'beans', 'soy-sauce', 'honey', 'maple-syrup', 'flour-tortillas', 'corn-tortillas', 'tortillas', 'bread', 'frozen-peas');
 
 insert into public.ingredients
   (key, canonical_name, aliases, aisle, dimension, grams_per_cup, can_size,
@@ -86,6 +86,7 @@ values
   ('rice', 'jasmine rice', array['basmati rice', 'white rice', 'rice'], 'Pantry', 'weight', 185, null, null, 365, '168877'),
   ('pasta', 'spaghetti', array['rigatoni', 'fettuccine', 'linguine', 'penne', 'pasta'], 'Pantry', 'weight', null, null, null, 371, '169736'),
   ('canned-tomatoes', 'crushed tomatoes', array['diced tomatoes', 'canned tomatoes', 'chopped tomatoes', 'tomato sauce', 'passata'], 'Pantry', 'weight', 240, 425, null, 18, '333281'),
+  ('dry-yeast', 'dry yeast', array['active dry yeast', 'instant yeast', 'yeast'], 'Baking', 'weight', null, null, null, 325, null),
   ('tomato-paste', 'tomato paste', array['tomato puree'], 'Pantry', 'weight', 260, 170, null, null, null),
   ('sun-dried-tomatoes', 'sun dried tomatoes', array['sun-dried tomatoes'], 'Pantry', 'weight', 110, null, null, null, null),
   ('broth', 'chicken broth', array['chicken stock', 'vegetable broth', 'vegetable stock', 'beef broth', 'broth', 'stock'], 'Pantry', 'volume', 240, 429, null, 6, '174536'),
@@ -270,6 +271,8 @@ from (values
   ('canned-tomatoes', 'us', '15 oz can', 425, 0),
   ('canned-tomatoes', 'us', '28 oz can', 794, 1),
   ('canned-tomatoes', 'metric', '400 g tin', 400, 0),
+  ('dry-yeast', 'us', '3-packet strip', 21, 0),
+  ('dry-yeast', 'us', '4 oz jar', 113, 1),
   ('tomato-paste', 'us', '6 oz can', 170, 0),
   ('tomato-paste', 'metric', '200 g tube', 200, 0),
   ('sun-dried-tomatoes', 'us', '8 oz jar', 227, 0),
@@ -305,6 +308,30 @@ on conflict (ingredient_id, system, label) do update set
   base_amount = excluded.base_amount,
   sort_order  = excluded.sort_order,
   updated_at  = now();
+
+insert into public.ingredient_containers (ingredient_id, word, base_amount)
+select i.id, seed.word, seed.base_amount
+from (values
+  ('dry-yeast', 'package', 7),
+  ('dry-yeast', 'packet', 7),
+  ('dry-yeast', 'envelope', 7)
+) as seed(ingredient_key, word, base_amount)
+join public.ingredients i on i.key = seed.ingredient_key
+on conflict (ingredient_id, word) do update set
+  base_amount = excluded.base_amount,
+  updated_at  = now();
+
+delete from public.ingredient_containers ic
+using public.ingredients i
+where ic.ingredient_id = i.id
+  and (i.key, ic.word) not in (
+    select seed.ingredient_key, seed.word
+    from (values
+  ('dry-yeast', 'package', 7),
+  ('dry-yeast', 'packet', 7),
+  ('dry-yeast', 'envelope', 7)
+    ) as seed(ingredient_key, word, base_amount)
+  );
 
 -- A package list that shrank in SEED_CATALOG must shrink here too, or the catalog
 -- would keep offering a size that no longer exists. Anything not in this run's
@@ -469,6 +496,8 @@ where gp.ingredient_id = i.id
   ('canned-tomatoes', 'us', '15 oz can', 425, 0),
   ('canned-tomatoes', 'us', '28 oz can', 794, 1),
   ('canned-tomatoes', 'metric', '400 g tin', 400, 0),
+  ('dry-yeast', 'us', '3-packet strip', 21, 0),
+  ('dry-yeast', 'us', '4 oz jar', 113, 1),
   ('tomato-paste', 'us', '6 oz can', 170, 0),
   ('tomato-paste', 'metric', '200 g tube', 200, 0),
   ('sun-dried-tomatoes', 'us', '8 oz jar', 227, 0),

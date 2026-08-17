@@ -28,6 +28,7 @@ const litOrNull = (value: string | undefined): string => (value === undefined ? 
 
 const rows: string[] = [];
 const packageRows: string[] = [];
+const containerRows: string[] = [];
 
 for (const item of SEED_CATALOG) {
   const [canonical, ...aliases] = item.names;
@@ -51,6 +52,15 @@ for (const item of SEED_CATALOG) {
       `  (${lit(item.key)}, ${lit("us")}, ${lit(size.label)}, ${size.amount}, ${index})`,
     );
   });
+  /*
+   * Container sizes, where this ingredient has one. Almost nothing does, and that is the design:
+   * a size is asserted only where it is standard across brands — a yeast packet is 7 g — because
+   * a default per container word prints a confidently wrong weight on old family recipes.
+   */
+  for (const [word, amount] of Object.entries(item.containers ?? {})) {
+    containerRows.push(`  (${lit(item.key)}, ${lit(word)}, ${amount})`);
+  }
+
   (METRIC_PACKAGES[item.key] ?? []).forEach((size, index) => {
     packageRows.push(
       `  (${lit(item.key)}, ${lit("metric")}, ${lit(size.label)}, ${size.amount}, ${index})`,
@@ -63,7 +73,7 @@ const sql = `-- GENERATED FILE — do not edit.
 -- Written by scripts/generate-seed.ts from SEED_CATALOG in @pashki/core.
 -- Regenerate with: pnpm --filter @pashki/db gen:seed
 --
--- ${SEED_CATALOG.length} ingredients, ${packageRows.length} package sizes.
+-- ${SEED_CATALOG.length} ingredients, ${packageRows.length} package sizes, ${containerRows.length} container sizes.
 --
 -- Idempotent: \`supabase db reset\` runs this after the migrations, and running it
 -- again upserts rather than duplicating. Both tables have the unique constraints
@@ -119,6 +129,26 @@ on conflict (ingredient_id, system, label) do update set
   base_amount = excluded.base_amount,
   sort_order  = excluded.sort_order,
   updated_at  = now();
+
+insert into public.ingredient_containers (ingredient_id, word, base_amount)
+select i.id, seed.word, seed.base_amount
+from (values
+${containerRows.join(",\n")}
+) as seed(ingredient_key, word, base_amount)
+join public.ingredients i on i.key = seed.ingredient_key
+on conflict (ingredient_id, word) do update set
+  base_amount = excluded.base_amount,
+  updated_at  = now();
+
+delete from public.ingredient_containers ic
+using public.ingredients i
+where ic.ingredient_id = i.id
+  and (i.key, ic.word) not in (
+    select seed.ingredient_key, seed.word
+    from (values
+${containerRows.join(",\n")}
+    ) as seed(ingredient_key, word, base_amount)
+  );
 
 -- A package list that shrank in SEED_CATALOG must shrink here too, or the catalog
 -- would keep offering a size that no longer exists. Anything not in this run's

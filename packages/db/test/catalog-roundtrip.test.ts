@@ -4,6 +4,7 @@ import {
   catalogItemsFromRows,
   GROCERY_PACKAGE_COLUMNS,
   INGREDIENT_COLUMNS,
+  INGREDIENT_CONTAINER_COLUMNS,
 } from "../src/catalog.js";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
@@ -43,7 +44,9 @@ async function loadCatalogFromDatabase(admin: SupabaseClient): Promise<CatalogIt
   if (packages.error) throw packages.error;
 
   // the same mapping the app uses, so this test proves the app's catalog and not a copy of it
-  return catalogItemsFromRows(ingredients.data, packages.data);
+  const containers = await admin.from("ingredient_containers").select(INGREDIENT_CONTAINER_COLUMNS);
+  if (containers.error) throw containers.error;
+  return catalogItemsFromRows(ingredients.data, packages.data, "us", containers.data);
 }
 
 
@@ -134,6 +137,27 @@ describe.skipIf(instance === null)("seeded catalog round-trip", () => {
       consolidate(week(), fromSeed, options),
     );
   });
+
+  describe("container sizes survive the round trip", () => {
+    it("carries containers, alongside can_size, for the ingredients that have them", () => {
+      const withContainers = SEED_CATALOG.filter((i) => i.containers !== undefined);
+      // a check that could pass on an empty set has measured nothing
+      expect(withContainers.length).toBeGreaterThan(0);
+
+      for (const item of withContainers) {
+        expect(fromDatabase.find(item.names[0]!)?.containers, item.key).toEqual(item.containers);
+      }
+    });
+
+    it("gives no containers to an ingredient the catalog leaves unsized", () => {
+      // the design, not an omission: a box is 13.25 oz for one brand and 15.25 for another, so
+      // "1 box" stays a box rather than becoming a confidently wrong weight
+      const unsized = SEED_CATALOG.filter((i) => i.containers === undefined);
+      expect(unsized.length).toBeGreaterThan(0);
+      expect(fromDatabase.find(unsized[0]!.names[0]!)?.containers).toBeUndefined();
+    });
+  });
+
 });
 
 describe.skipIf(instance !== null)("seeded catalog round-trip (skipped)", () => {
@@ -182,4 +206,5 @@ describe.skipIf(instance === null)("package sizes per market", () => {
     );
     expect(plural.map((row) => row.canonical_name)).toEqual([]);
   });
+
 });

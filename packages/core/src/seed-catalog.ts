@@ -192,6 +192,16 @@ export const SEED_CATALOG: CatalogItem[] = [
   { key: "canned-tomatoes", names: ["crushed tomatoes", "diced tomatoes", "canned tomatoes", "chopped tomatoes", "tomato sauce", "passata"],
     aisle: "Pantry", dimension: "weight", gramsPerCup: 240, canSize: 425,
     packages: [{ label: "15 oz can", amount: 425 }, { label: "28 oz can", amount: 794 }] , kcalPer100g: 18, energyFdcId: "333281"},
+  /*
+   * The one container size asserted here, because it is the one that is genuinely standard:
+   * a packet of dry yeast is 7 g / 2¼ tsp across brands. Contrast a box of cake mix, which is
+   * 13.25 oz for one brand and 15.25 for another and has been 18, 16 and 15 oz over the years —
+   * so no `containers` entry exists for it and "1 box" stays a box.
+   */
+  { key: "dry-yeast", names: ["dry yeast", "active dry yeast", "instant yeast", "yeast"],
+    aisle: "Baking", dimension: "weight", containers: { package: 7, packet: 7, envelope: 7 },
+    packages: [{ label: "3-packet strip", amount: 21 }, { label: "4 oz jar", amount: 113 }],
+    kcalPer100g: 325 },
   { key: "tomato-paste", names: ["tomato paste", "tomato puree"], aisle: "Pantry", dimension: "weight", gramsPerCup: 260, canSize: 170,
     packages: [{ label: "6 oz can", amount: 170 }] },
   { key: "sun-dried-tomatoes", names: ["sun dried tomatoes", "sun-dried tomatoes"], aisle: "Pantry", dimension: "weight", gramsPerCup: 110,

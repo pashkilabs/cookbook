@@ -21,6 +21,12 @@ export const UNITS: Record<string, UnitDef> = {
   count: { dimension: "count", toBase: 1 },
   clove: { dimension: "clove", toBase: 1 },
   can: { dimension: "can", toBase: 1 },
+  jar: { dimension: "can", toBase: 1 }, package: { dimension: "can", toBase: 1 },
+  box: { dimension: "can", toBase: 1 }, bag: { dimension: "can", toBase: 1 },
+  container: { dimension: "can", toBase: 1 }, bottle: { dimension: "can", toBase: 1 },
+  tub: { dimension: "can", toBase: 1 }, tin: { dimension: "can", toBase: 1 },
+  block: { dimension: "can", toBase: 1 }, carton: { dimension: "can", toBase: 1 },
+  pouch: { dimension: "can", toBase: 1 }, packet: { dimension: "can", toBase: 1 },
   bunch: { dimension: "bunch", toBase: 1 },
 };
 
@@ -60,6 +66,23 @@ export const COUNT_WORDS = new Set([
  * Containers whose contents are usually printed on the tin. When the line
  * gives a size — "1 (14.5 oz) can" — we convert to that real measure.
  */
+/** plural and abbreviation to the written singular — "packages" and "pkg" are both "package" */
+export const CONTAINER_SINGULAR: Record<string, string> = {
+  cans: "can", jars: "jar", packages: "package", pkg: "package", pkgs: "package",
+  boxes: "box", bags: "bag", containers: "container", bottles: "bottle", tubs: "tub",
+  tins: "tin", blocks: "block", cartons: "carton", pouches: "pouch", packets: "packet",
+};
+
+/** the container word this unit is, or null — `canonicalUnit` keeps the word rather than
+ * flattening every container to "can", because the word is what gets displayed and what a
+ * per-ingredient size is keyed on */
+export function containerWord(unit: string | null | undefined): string | null {
+  if (!unit) return null;
+  const k = String(unit).trim().toLowerCase().replace(/\.$/, "");
+  const singular = CONTAINER_SINGULAR[k] ?? k;
+  return CONTAINER_WORDS.has(k) || CONTAINER_WORDS.has(singular) ? singular : null;
+}
+
 export const CONTAINER_WORDS = new Set([
   "can", "cans", "jar", "jars", "package", "packages", "pkg", "pkgs",
   "box", "boxes", "bag", "bags", "container", "containers", "bottle",
@@ -80,7 +103,9 @@ export function canonicalUnit(input: string | null | undefined): string | null {
   const alias = UNIT_ALIASES[k];
   if (alias) return alias;
   if (COUNT_WORDS.has(k)) return "count";
-  if (CONTAINER_WORDS.has(k)) return "can";
+  // the written word survives — "package" stays "package", not "can"
+  const container = containerWord(k);
+  if (container) return container;
   return null;
 }
 
@@ -107,9 +132,19 @@ export function toBaseMeasure(
   let dimension: Dimension = def.dimension;
   let value = amount * def.toBase;
 
-  if (item && item.canSize && dimension === "can") {
-    value *= item.canSize;
-    dimension = item.dimension;
+  /*
+   * A container resolves to a weight only when *this ingredient* says what that container
+   * holds. `containers` is checked first and `canSize` is the "can" entry kept for compatibility;
+   * where neither answers, the measure stays a count of containers, which is what a shopping
+   * list can actually buy.
+   */
+  if (item && dimension === "can") {
+    const word = containerWord(key);
+    const size = (word ? item.containers?.[word] : undefined) ?? (word === "can" ? item.canSize : undefined);
+    if (size) {
+      value *= size;
+      dimension = item.dimension;
+    }
   }
   if (item && item.gramsPerCup && dimension === "volume" && item.dimension === "weight") {
     value = (value / UNITS.cup!.toBase) * item.gramsPerCup;

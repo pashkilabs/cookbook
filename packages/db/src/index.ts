@@ -34,6 +34,8 @@ export const APP_TABLES = [
   "recipe_steps",
   "ingredients",
   "grocery_packages",
+  // reference data, like grocery_packages: readable by every household, writable by none
+  "ingredient_containers",
   "ratings",
   "meal_plans",
   "plan_entries",
