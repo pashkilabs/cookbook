@@ -1,6 +1,6 @@
 import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
-import { attemptImport, attemptPasteImport, spendImportQuota } from "@/lib/import";
+import { attemptImport, attemptPasteImport, detectImageOrientation, spendImportQuota } from "@/lib/import";
 import { draftFrom } from "@/lib/draft";
 
 /**
@@ -52,6 +52,30 @@ export async function POST(request: Request) {
     }
     url = String(form.get("url") ?? "").trim();
     text = String(form.get("text") ?? "").trim();
+
+    /*
+     * The orientation probe, as a mode on this route rather than a route of its own — twelve
+     * serverless functions is the host's limit and a deployment has already been refused for
+     * exceeding it (§37).
+     *
+     * It spends no quota. A household's allowance is for recipes, and a probe is the machinery
+     * asking which way up the paper is: charging for it would bill someone for photographing a
+     * card the way it was lying on the table, which is the thing this exists to stop mattering.
+     * It is behind the same session and household checks as everything else on this route, so it
+     * is not an unmetered endpoint for the internet at large.
+     */
+    if (String(form.get("mode") ?? "") === "orientation") {
+      const turns = form.getAll("rotations").filter((part): part is File => part instanceof File);
+      if (turns.length !== 4) {
+        return Response.json({ error: "orientation needs four rotations" }, { status: 400 });
+      }
+      const rotations = await Promise.all(
+        turns.map(async (part) => ({ bytes: new Uint8Array(await part.arrayBuffer()) })),
+      );
+      // a hint, never a blocker: an unreadable probe means upload unrotated, not fail the import
+      const reading = await detectImageOrientation(rotations).catch(() => null);
+      return Response.json({ orientation: reading }, { headers: { "cache-control": "no-store" } });
+    }
 
     const parts = form.getAll("images").filter((part): part is File => part instanceof File);
     if (parts.length > MAX_IMAGES) {

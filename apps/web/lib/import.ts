@@ -11,6 +11,8 @@ import {
   type LlmCascade,
   type TierAttempt,
   createPassthroughImagePreparer,
+  detectOrientation,
+  type OrientationReading,
 } from "@pashki/import";
 import { createSupabaseImportCache } from "@pashki/import/supabase";
 import { storeImportedPhoto } from "@pashki/import/photo-storage";
@@ -155,6 +157,30 @@ export type PasteOutcome =
   | { ok: true; recipe: ExtractedRecipe; attempts: readonly TierAttempt[] }
   | { ok: false; failure: ImportFailure; attempts: readonly TierAttempt[] };
 
+/**
+ * Which way up is a photographed card? The client renders the four rotations; this asks.
+ *
+ * The rotations arrive from the browser rather than being made here, for the same reason
+ * `attemptPasteImport` uses a passthrough preparer: **no sharp in this file.** A canvas can turn
+ * an image four ways as easily as it can downscale one, and it is already open.
+ *
+ * Null when vision is unconfigured or the model does not answer the shape — the caller uploads
+ * unrotated rather than failing an import over a hint.
+ */
+export async function detectImageOrientation(
+  rotations: readonly { bytes: Uint8Array }[],
+): Promise<OrientationReading | null> {
+  const llm = cascadeFromEnv();
+  const model = llm?.visionModels?.[0];
+  if (!llm?.visionProvider || !model) return null;
+
+  return detectOrientation({
+    provider: llm.visionProvider,
+    model,
+    rotations: rotations.map((r) => ({ bytes: r.bytes, mediaType: "image/jpeg" as const })),
+  });
+}
+
 export async function attemptPasteImport(
   input: { text: string } | { images: readonly { bytes: Uint8Array; label: string }[] },
 ): Promise<PasteOutcome> {
@@ -172,8 +198,12 @@ export async function attemptPasteImport(
      *   resizing        the client does it, and better — it saves the upload too
      *   EXIF stripping  the canvas re-encode drops it entirely; a device identifier
      *                   never reaches a prompt
-     *   orientation     `.rotate()` applies an EXIF tag a screenshot does not carry;
-     *                   screenshots are captured upright
+     *   orientation     **not covered, and it mattered.** `.rotate()` applies an EXIF tag,
+     *                   and a card lying sideways on a table is photographed by an upright
+     *                   camera — EXIF says upright, the writing runs bottom-to-top, and there
+     *                   is nothing in the file to honour. `detectImageOrientation` above is
+     *                   what answers it; the canvas re-encode is what makes asking necessary,
+     *                   since it strips even the tag that would have been wrong.
      *
      * **What is lost, said plainly:** the quality step-down that rescued an image still over the
      * byte ceiling. Without it such an image is *rejected* with a stated reason rather than

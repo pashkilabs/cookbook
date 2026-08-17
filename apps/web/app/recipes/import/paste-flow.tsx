@@ -50,27 +50,86 @@ class UndecodableImage extends Error {
   }
 }
 
-async function downscale(file: File): Promise<Blob> {
+/** small enough to be free, large enough to read a heading — measured at this size */
+const PROBE_EDGE = 448;
+const PROBE_QUALITY = 0.55;
+
+/**
+ * Draw `bitmap` at `edge` and `quality`, turned `rotate` degrees clockwise.
+ *
+ * The turn happens here, on the canvas that was already open for the downscale, which is why the
+ * rotation costs nothing: it is a transform on a draw that was happening anyway, and the bytes
+ * that leave the browser are already the right way up.
+ */
+async function render(
+  bitmap: ImageBitmap,
+  { edge, quality, rotate }: { edge: number; quality: number; rotate: number },
+): Promise<Blob | null> {
+  const turned = rotate === 90 || rotate === 270;
+  const scale = Math.min(1, edge / Math.max(bitmap.width, bitmap.height));
+  const width = Math.round(bitmap.width * scale);
+  const height = Math.round(bitmap.height * scale);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = turned ? height : width;
+  canvas.height = turned ? width : height;
+
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+  context.translate(canvas.width / 2, canvas.height / 2);
+  context.rotate((rotate * Math.PI) / 180);
+  context.drawImage(bitmap, -width / 2, -height / 2, width, height);
+
+  return new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+}
+
+/**
+ * Ask the server which way up this card is, by sending it the same thumbnail four ways.
+ *
+ * **The four is the point, not a fallback.** Asking about one image — "which way does the writing
+ * run?" — was built first and measured: eight probes on a card lying sideways returned eight
+ * confident answers and two correct ones, because a model that cannot read sideways writing
+ * invents readable writing and reports the rotation that fits the invention. Offering all four at
+ * once removes that escape route: the invention is equally available at every rotation, so it
+ * cannot choose between them and has to use the letters. 12/12 measured.
+ *
+ * Four thumbnails at 448px is about 100 KB up and ~1,600 tokens — cheap enough to run every time,
+ * which it must be, because the failure it prevents is silent and there is nothing to suspect.
+ */
+async function detectRotation(bitmap: ImageBitmap): Promise<number> {
+  const form = new FormData();
+  form.append("mode", "orientation");
+  for (const turn of [0, 90, 180, 270]) {
+    const probe = await render(bitmap, { edge: PROBE_EDGE, quality: PROBE_QUALITY, rotate: turn });
+    if (!probe) return 0;
+    form.append("rotations", probe, `probe-${turn}.jpg`);
+  }
+
+  try {
+    const response = await fetch("/api/import", { method: "POST", body: form });
+    if (!response.ok) return 0;
+    const body = (await response.json()) as { orientation?: { rotate?: number } | null };
+    const rotate = body.orientation?.rotate;
+    return rotate === 90 || rotate === 180 || rotate === 270 ? rotate : 0;
+  } catch {
+    // a hint, never a blocker: upload unrotated rather than fail the import over an orientation
+    return 0;
+  }
+}
+
+async function downscale(file: File): Promise<{ blob: Blob; rotated: number }> {
   let bitmap: ImageBitmap;
   try {
     bitmap = await createImageBitmap(file);
   } catch {
     throw new UndecodableImage(file);
   }
-  const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
 
-  const context = canvas.getContext("2d");
-  if (!context) return file; // no canvas: send it as it is rather than failing the import
-  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  const rotate = await detectRotation(bitmap);
+  const blob = await render(bitmap, { edge: MAX_EDGE, quality: JPEG_QUALITY, rotate });
   bitmap.close();
-
-  const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, "image/jpeg", JPEG_QUALITY),
-  );
-  return blob ?? file;
+  // no canvas: send it as it is rather than failing the import
+  return { blob: blob ?? file, rotated: rotate };
 }
 
 const kb = (bytes: number) => `${Math.round(bytes / 1000)} KB`;
@@ -102,13 +161,19 @@ export function PasteFlow({ mode }: { mode: "text" | "photos" }) {
         const form = new FormData();
         let before = 0;
         let after = 0;
+        let turned = 0;
         for (const file of files) {
-          const small = await downscale(file);
+          const { blob, rotated } = await downscale(file);
           before += file.size;
-          after += small.size;
-          form.append("images", small, file.name.replace(/\.\w+$/, "") + ".jpg");
+          after += blob.size;
+          if (rotated) turned += 1;
+          form.append("images", blob, file.name.replace(/\.\w+$/, "") + ".jpg");
         }
-        setShrunk(`${kb(before)} → ${kb(after)} before upload`);
+        // said out loud, because a silent rotation is indistinguishable from not needing one
+        setShrunk(
+          `${kb(before)} → ${kb(after)} before upload` +
+            (turned ? ` · turned ${turned} the right way up` : ""),
+        );
         // no Content-Type: the browser sets the multipart boundary itself
         response = await fetch("/api/import", { method: "POST", body: form });
       }
