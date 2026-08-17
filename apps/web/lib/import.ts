@@ -5,6 +5,7 @@ import {
   importFromImages,
   importRecipe,
   providerFromEnv,
+  visionProviderFromEnv,
   type ExtractedRecipe,
   type ImportFailure,
   type ImportOutcome,
@@ -81,13 +82,32 @@ export function cascadeFromEnv(): LlmCascade | null {
   const model = process.env.PASHKI_LLM_MODEL;
   if (!provider || !model) return null;
 
+  /*
+   * Vision has its own provider as well as its own model.
+   *
+   * regression: this built `visionModels` from the *text* provider, so a deployment configured
+   * with `claude-haiku-4-5` sent that model name to Together's Chat Completions endpoint and got
+   * nothing back. The eval had the Anthropic provider wired and the product did not — the same
+   * class as a smoke check proving an endpoint while the feature had no way in (CLAUDE.md).
+   */
+  const visionProvider = visionProviderFromEnv();
   const vision = process.env.PASHKI_LLM_VISION_MODEL;
   return {
     provider,
     models: [{ provider: provider.key, model, region: "us", temperature: 0 }],
+    ...(visionProvider ? { visionProvider } : {}),
     // a separate list, because the escalation order for images is its own question (§7)
     ...(vision
-      ? { visionModels: [{ provider: provider.key, model: vision, region: "us" as const, temperature: 0 }] }
+      ? {
+          visionModels: [
+            {
+              provider: (visionProvider ?? provider).key,
+              model: vision,
+              region: "us" as const,
+              temperature: 0,
+            },
+          ],
+        }
       : {}),
   };
 }
