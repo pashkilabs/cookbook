@@ -2391,3 +2391,69 @@ considered outcome rather than a compromise arrived at under pressure.
 | Cascade deletions vs tombstones | A device can hold orphaned children forever, silently | Follows the engine choice — see *Open: cascade deletions and tombstones* |
 | Copyright posture on imported photos and prose | Changes what you store and display | Someone who does this professionally |
 | Free tier / trial / paid-only | Affects quota design and cost exposure | You |
+
+## §52 — Vision is Sonnet, chosen on failure mode rather than accuracy
+
+`PASHKI_LLM_VISION_MODEL=claude-sonnet-5`. Text stays on Together's
+`openai/gpt-oss-120b` (§7, §48) — this is a vision-only change.
+
+**The case is the asymmetry of how each model fails, not the accuracy gap.**
+Both numbers below are from the same two images: a fresh full-resolution
+photograph of Grandma Overton's Rolls, front and back, handwritten in cursive,
+lying sideways, one dough with a `(Cinnamon Rolls)` variant on the back.
+
+Haiku 4.5, given the pair sideways, returned `"Peppermint Candy Fudge"` — six
+ingredients, six steps, schema-valid, fluent, and nothing to do with a recipe for
+bread rolls. At a gentler compression it returned `"Peppermint Patties"`. The card
+has a red-and-white striped border; unable to read the writing, it read the
+decoration. With the orientation probe correcting the rotation it recovered the
+recipe and the variant split, but still wrote `1/2 c. milk` where the card says
+`2 c. milk`, and `1 c. flour` where the card says `6 c. flour`.
+
+Sonnet 5, same pair, same probe:
+
+```
+title: "Grandma Overtons Rolls"
+  2 c. milk · 1/2 c. sugar · 1/2 c. shortening · 2 packages dry yeast
+  1/3 c. lukewarm water · 1/2 tsp. sugar · 2 eggs · 6 c. flour · 1 tsp. salt
+  [Cinnamon Rolls] sugar and cinnamon to taste · butter · cream cheese frosting
+```
+
+Both quantities correct. And read *sideways*, before the probe existed, Sonnet
+still got the recipe substantially right — dropping only the numbers it could not
+resolve (`c. milk`, bare `flour`) rather than inventing any.
+
+**That is the choice.** Haiku invents where it cannot read; Sonnet omits. A blank
+field survives the review screen honestly — someone sees a gap and fills it. A
+fluent invention does not: it reads as a successful import, and nothing in the
+schema, the validator or the screen can tell it from a reading. On a box of
+handwritten family recipes that asymmetry is worth the price difference.
+
+**Cost per card**, two images, probe plus extraction, measured:
+
+| | probe in/out | extract in/out |
+|---|---|---|
+| both models | ~3,234 / ~80 | Sonnet 5,831 / 1,059 · Haiku 6,107 / 1,078 |
+
+At $3/$15 per million that is roughly **$0.044 a card** against roughly $0.015 on
+Haiku at $1/$5 — about three times, on a channel used for a card that cannot be
+imported any other way. **Those per-million rates are unconfirmed** and should be
+checked against Anthropic's published pricing before the figure is quoted
+anywhere that matters; the token counts are measured.
+
+**Haiku's numbers stay on record deliberately.** The comparison is the reason for
+the choice, and the next model swap should be measured against both rather than
+against Sonnet alone — §7 says the model is a config value due for
+re-benchmarking, and a benchmark with one data point is not one.
+
+Enabled by 0612325, which stopped defaulting `temperature` on the Anthropic
+provider. Claude 5 answers `temperature is deprecated for this model` with HTTP
+400, so every Sonnet call would have failed outright; that fix was made for
+exactly this upgrade.
+
+**Open:** the orientation probe disagreed between models on the back image —
+Haiku said +270°, Sonnet said +180° — while both transcribed the same line of
+writing. The extraction was correct either way, so this is not blocking, but a
+probe that is right about the words and inconsistent about the angle is not
+understood, and it should be measured across the fixture set rather than
+explained away.
