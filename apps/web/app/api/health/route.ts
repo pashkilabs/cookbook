@@ -13,6 +13,23 @@
  * Deliberately unauthenticated: it is what a smoke test calls before it has a session, and what
  * tells it whether it is testing the commit it thinks it is.
  */
+import { anthropicModelMismatch } from "@pashki/import";
+
+/** the prefix, never the key: enough to see which dialect the id has to belong to */
+const visionKeyKind = (key: string | undefined): "anthropic" | "other" | null =>
+  !key ? null : key.startsWith("sk-ant-") ? "anthropic" : "other";
+
+/**
+ * "ok", "unconfigured", or the reason — imported from the same guard that refuses at
+ * construction, so health cannot drift into disagreeing with the builder about what is wired.
+ */
+function visionWiring(): string {
+  const key = process.env.PASHKI_LLM_VISION_API_KEY;
+  const model = process.env.PASHKI_LLM_VISION_MODEL;
+  if (!key || !model) return "unconfigured";
+  return anthropicModelMismatch(key, model) ?? "ok";
+}
+
 export async function GET() {
   const present = (name: string) => Boolean(process.env[name]);
 
@@ -48,6 +65,24 @@ export async function GET() {
         drainSecretFingerprint: await fingerprint(process.env.PASHKI_DRAIN_SECRET),
         drainSecretLength: process.env.PASHKI_DRAIN_SECRET?.length ?? 0,
         devEntitlement: process.env.PASHKI_DEV_ISSUE_ENTITLEMENT === "true",
+
+        /*
+         * The model ids, as values — the one deliberate exception to booleans-only above.
+         *
+         * A model id is not a secret; it is published pricing. And "is vision configured: true"
+         * is the wrong thing to report, for the same reason `tokenSigner: true` over an
+         * unparseable PEM was: presence is not correctness. `.env.local` carried
+         * `google/gemma-4-31B-it` beside an `sk-ant-` key for an unknown number of days, and
+         * every presence check said yes while every photograph 404'd.
+         *
+         * `visionWiring` is the comparison a boolean cannot make: it names the fault instead of
+         * asserting health, so "what is Vercel actually running" is one curl rather than an
+         * interactive CLI login. Key *kind* is derived from the prefix — never the key.
+         */
+        textModel: process.env.PASHKI_LLM_MODEL ?? null,
+        visionModel: process.env.PASHKI_LLM_VISION_MODEL ?? null,
+        visionKeyKind: visionKeyKind(process.env.PASHKI_LLM_VISION_API_KEY),
+        visionWiring: visionWiring(),
       },
     },
     { headers: { "cache-control": "no-store" } },

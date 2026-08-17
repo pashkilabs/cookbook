@@ -18,6 +18,36 @@ import type { ImageInput, LlmProvider, LlmRequest, LlmResponse } from "./provide
  */
 const ANTHROPIC_VERSION = "2023-06-01";
 
+/**
+ * Anthropic model ids have no slash; Together, Fireworks and Groq ids all do
+ * (`google/gemma-4-31B-it`, `openai/gpt-oss-120b`). That one character is enough to catch a
+ * vision tier wired to the wrong dialect.
+ *
+ * regression: `apps/web/.env.local` carried `PASHKI_LLM_VISION_MODEL=google/gemma-4-31B-it`
+ * beside an `sk-ant-` key, so the local product posted a Together model id to
+ * `api.anthropic.com` and learned about it as **HTTP 404 at import time**. The mismatch is not
+ * the failure — a 404 as first news is. The shared `cascadeFromEnv` closed the *code* site for
+ * this class (a model swap having two places to edit); this closes the *configuration* site,
+ * which a shared builder cannot reach on its own.
+ */
+export function anthropicModelMismatch(apiKey: string, model: string): string | null {
+  if (!apiKey.startsWith("sk-ant-")) return null;
+  if (!model.includes("/")) return null;
+  return (
+    `vision is configured with an Anthropic key (sk-ant-…) and the model id "${model}", ` +
+    `which is not an Anthropic model — ids like this belong to Together or Fireworks. ` +
+    `Set PASHKI_LLM_VISION_MODEL to an Anthropic id (claude-haiku-4-5), or point ` +
+    `PASHKI_LLM_VISION_BASE_URL and PASHKI_LLM_VISION_API_KEY at the provider that owns it.`
+  );
+}
+
+/**
+ * The one model family we have measured as rejecting `temperature`. Not a version test on the
+ * id — an allow-list of what is known, so an unfamiliar model is sent no temperature rather than
+ * guessed at.
+ */
+export const acceptsTemperature = (model: string): boolean => /^claude-(haiku|sonnet|opus)-4/.test(model);
+
 export interface AnthropicOptions {
   apiKey: string;
   /** defaults to the public API; overridable for a gateway or a regional endpoint */
@@ -46,6 +76,10 @@ export function createAnthropicProvider(options: AnthropicOptions): LlmProvider 
     key: options.key ?? "anthropic",
 
     async extract(request: LlmRequest): Promise<LlmResponse> {
+      // refuse before the network, so the message names the fault rather than reporting a 404
+      const mismatch = anthropicModelMismatch(options.apiKey, request.model.model);
+      if (mismatch) throw new Error(mismatch);
+
       /*
        * Images first, then the text. Anthropic's own guidance, and it matters for a photograph of
        * a recipe card: the instruction is read in the light of the picture rather than the other
@@ -75,7 +109,17 @@ export function createAnthropicProvider(options: AnthropicOptions): LlmProvider 
         body: JSON.stringify({
           model: request.model.model,
           max_tokens: request.model.maxOutputTokens ?? 4096,
-          temperature: request.model.temperature ?? 0,
+          /*
+           * Omitted unless asked for, because Claude 5 rejects it outright:
+           * `temperature is deprecated for this model`, HTTP 400, every call.
+           *
+           * regression: this defaulted to 0, so configuring any Claude 5 model for vision 400'd
+           * on every request — a latent fault that fires on exactly the upgrade it blocks. The
+           * default is gone rather than made conditional on a model id, because a version test
+           * would be a guess about ids we have not seen; `acceptsTemperature` below carries the
+           * only case we have measured, and an unknown model simply is not sent one.
+           */
+          ...(request.model.temperature === undefined ? {} : { temperature: request.model.temperature }),
           system: request.instructions,
           messages: [{ role: "user", content }],
           // the forced tool call *is* the structured output: the schema is the tool's input

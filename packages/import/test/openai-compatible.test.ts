@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createOpenAiCompatibleProvider, providerFromEnv } from "../src/openai-compatible.js";
+import { cascadeFromEnv, createOpenAiCompatibleProvider, providerFromEnv } from "../src/openai-compatible.js";
 import { RECIPE_JSON_SCHEMA } from "../src/provider.js";
 import type { ModelConfig } from "../src/provider.js";
 
@@ -87,5 +87,52 @@ describe("building it from the environment", () => {
       PASHKI_LLM_API_KEY: "k", PASHKI_LLM_BASE_URL: "https://x/v1", PASHKI_LLM_PROVIDER: "together",
     });
     expect(provider?.key).toBe("together");
+  });
+});
+
+describe("vision wiring refuses rather than 404s", () => {
+  const base = {
+    PASHKI_LLM_API_KEY: "k",
+    PASHKI_LLM_BASE_URL: "https://api.together.xyz/v1",
+    PASHKI_LLM_MODEL: "openai/gpt-oss-120b",
+  };
+
+  // regression: .env.local paired an sk-ant- key with a Together model id, so every photograph
+  // posted `google/gemma-4-31B-it` to api.anthropic.com and learned about it as HTTP 404
+  it("refuses an Anthropic key paired with a slashed model id, naming the fault", () => {
+    expect(() =>
+      cascadeFromEnv({
+        ...base,
+        PASHKI_LLM_VISION_API_KEY: "sk-ant-api03-xxx",
+        PASHKI_LLM_VISION_MODEL: "google/gemma-4-31B-it",
+      }),
+    ).toThrow(/not an Anthropic model/);
+  });
+
+  it("allows a slashed vision id when the key is not Anthropic", () => {
+    const cascade = cascadeFromEnv({
+      ...base,
+      PASHKI_LLM_VISION_API_KEY: "together-key",
+      PASHKI_LLM_VISION_MODEL: "google/gemma-4-31B-it",
+    });
+    expect(cascade?.visionModels?.[0]?.model).toBe("google/gemma-4-31B-it");
+  });
+
+  // regression: temperature defaulted to 0, and Claude 5 answers `temperature is deprecated for
+  // this model` with HTTP 400 — the fault fires on exactly the upgrade it blocks
+  it("sends no temperature for a Claude 5 vision model, and 0 for Haiku 4.5", () => {
+    const five = cascadeFromEnv({
+      ...base,
+      PASHKI_LLM_VISION_API_KEY: "sk-ant-api03-xxx",
+      PASHKI_LLM_VISION_MODEL: "claude-sonnet-5",
+    });
+    expect(five?.visionModels?.[0]).not.toHaveProperty("temperature");
+
+    const four = cascadeFromEnv({
+      ...base,
+      PASHKI_LLM_VISION_API_KEY: "sk-ant-api03-xxx",
+      PASHKI_LLM_VISION_MODEL: "claude-haiku-4-5",
+    });
+    expect(four?.visionModels?.[0]?.temperature).toBe(0);
   });
 });

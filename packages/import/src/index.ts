@@ -113,6 +113,7 @@ export {
   type VisionValidation,
 } from "./vision.js";
 export { cascadeFromEnv, createOpenAiCompatibleProvider, providerFromEnv } from "./openai-compatible.js";
+export { acceptsTemperature, anthropicModelMismatch } from "./anthropic.js";
 export type { OpenAiCompatibleOptions } from "./openai-compatible.js";
 export { createAnthropicProvider, visionProviderFromEnv } from "./anthropic.js";
 export type { AnthropicOptions } from "./anthropic.js";

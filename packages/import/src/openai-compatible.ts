@@ -1,5 +1,5 @@
 import type { ImageInput, LlmProvider, LlmRequest, LlmResponse } from "./provider.js";
-import { visionProviderFromEnv } from "./anthropic.js";
+import { acceptsTemperature, anthropicModelMismatch, visionProviderFromEnv } from "./anthropic.js";
 
 /**
  * One provider, speaking the Chat Completions dialect with strict JSON schema.
@@ -200,6 +200,17 @@ export function cascadeFromEnv(
   const visionProvider = visionProviderFromEnv(env);
   const vision = env.PASHKI_LLM_VISION_MODEL;
 
+  /*
+   * Refuse at construction rather than at import time. A key and a model id that disagree is a
+   * deployment fault, and the useful moment to say so is boot — not the first photograph a
+   * household uploads, which learns about it as "no recipe could be read".
+   */
+  const visionKey = env.PASHKI_LLM_VISION_API_KEY;
+  if (visionKey && vision) {
+    const mismatch = anthropicModelMismatch(visionKey, vision);
+    if (mismatch) throw new Error(mismatch);
+  }
+
   return {
     provider,
     models: [{ provider: provider.key, model, region: "us", temperature: 0 }],
@@ -207,7 +218,13 @@ export function cascadeFromEnv(
     ...(vision
       ? {
           visionModels: [
-            { provider: (visionProvider ?? provider).key, model: vision, region: "us" as const, temperature: 0 },
+            {
+              provider: (visionProvider ?? provider).key,
+              model: vision,
+              region: "us" as const,
+              // omitted for anything that rejects it — Claude 5 400s on temperature at all
+              ...(acceptsTemperature(vision) ? { temperature: 0 } : {}),
+            },
           ],
         }
       : {}),
