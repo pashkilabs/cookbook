@@ -217,10 +217,16 @@ export function PasteFlow({ mode }: { mode: "text" | "photos" }) {
         ) : (
           <>
             For a recipe that only exists on paper — a handwritten card, a magazine clipping, a
-            newspaper cutting, a page from a book. Printed pages read well.{" "}
+            newspaper cutting, a page from a book. Printed and handwritten pages both read well.{" "}
             <strong>A screenshot of a reel does not</strong>: paste its caption instead, which is
-            read far better than a picture of one. Handwriting is the hardest case there is, so
-            check every line before you save — a misread ½ is caught here or not at all.
+            read far better than a picture of one.
+            <br />
+            <br />
+            <strong>Check every line before you save.</strong> The one mistake it makes reliably is
+            converting a quantity it thinks it understands — a card reading{" "}
+            <em>2 squares unsweetened chocolate&nbsp;(2&nbsp;oz.)</em> comes back as{" "}
+            <em>½ cup</em>, which is the same amount and not what you wrote. Read your own card
+            against what it says; nothing is saved until you do.
           </>
         )}
       </div>

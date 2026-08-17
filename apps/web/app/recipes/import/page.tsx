@@ -16,17 +16,7 @@ export default async function ImportPage({
 
   const params = await searchParams;
   const many = params.many === "1";
-  /*
-   * Hidden again until the channel is measured.
-   *
-   * It shipped on one finding — printed pages read — and production has no vision provider
-   * configured, so every attempt meets "Reading photographs is not switched on for this
-   * deployment". A visible feature over a dead end is worse than an invisible one. It returns
-   * when the seventeen-card run says what it reads and what it gets wrong.
-   */
-  const photographs = process.env.NODE_ENV !== "production";
-  const tab =
-    params.tab === "text" ? "text" : params.tab === "photos" && photographs ? "photos" : null;
+  const tab = params.tab === "text" ? "text" : params.tab === "photos" ? "photos" : null;
 
   return (
     <main>
@@ -55,11 +45,9 @@ export default async function ImportPage({
         <Link className={`chip${tab === "text" ? " on" : ""}`} href="/recipes/import?tab=text">
           Paste text
         </Link>
-        {photographs && (
-          <Link className={`chip${tab === "photos" ? " on" : ""}`} href="/recipes/import?tab=photos">
-            Photograph
-          </Link>
-        )}
+        <Link className={`chip${tab === "photos" ? " on" : ""}`} href="/recipes/import?tab=photos">
+          Photograph
+        </Link>
       </div>
 
       {tab === "text" ? (
