@@ -4,8 +4,7 @@ import {
   extractWithLlm,
   importFromImages,
   importRecipe,
-  providerFromEnv,
-  visionProviderFromEnv,
+  cascadeFromEnv,
   type ExtractedRecipe,
   type ImportFailure,
   type ImportOutcome,
@@ -77,40 +76,14 @@ export interface ImportAttemptResult {
  * Read from the environment **server-side only**. `check-server-only.mjs` fails the build if this
  * module reaches a `"use client"` file, which is what keeps the key out of a browser bundle.
  */
-export function cascadeFromEnv(): LlmCascade | null {
-  const provider = providerFromEnv();
-  const model = process.env.PASHKI_LLM_MODEL;
-  if (!provider || !model) return null;
-
-  /*
-   * Vision has its own provider as well as its own model.
-   *
-   * regression: this built `visionModels` from the *text* provider, so a deployment configured
-   * with `claude-haiku-4-5` sent that model name to Together's Chat Completions endpoint and got
-   * nothing back. The eval had the Anthropic provider wired and the product did not — the same
-   * class as a smoke check proving an endpoint while the feature had no way in (CLAUDE.md).
-   */
-  const visionProvider = visionProviderFromEnv();
-  const vision = process.env.PASHKI_LLM_VISION_MODEL;
-  return {
-    provider,
-    models: [{ provider: provider.key, model, region: "us", temperature: 0 }],
-    ...(visionProvider ? { visionProvider } : {}),
-    // a separate list, because the escalation order for images is its own question (§7)
-    ...(vision
-      ? {
-          visionModels: [
-            {
-              provider: (visionProvider ?? provider).key,
-              model: vision,
-              region: "us" as const,
-              temperature: 0,
-            },
-          ],
-        }
-      : {}),
-  };
-}
+/**
+ * One builder, shared with the eval (`packages/import`).
+ *
+ * It used to be built here as well, and the two drifted: the eval knew about the Anthropic vision
+ * provider and this did not, so production sent an Anthropic model name to Together. A model swap
+ * has one site now.
+ */
+export { cascadeFromEnv };
 
 export async function attemptImport(url: string, familyId: string): Promise<ImportAttemptResult> {
   const admin = serviceRole();

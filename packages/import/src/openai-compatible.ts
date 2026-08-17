@@ -1,4 +1,5 @@
 import type { ImageInput, LlmProvider, LlmRequest, LlmResponse } from "./provider.js";
+import { visionProviderFromEnv } from "./anthropic.js";
 
 /**
  * One provider, speaking the Chat Completions dialect with strict JSON schema.
@@ -175,4 +176,40 @@ export function providerFromEnv(env: Record<string, string | undefined> = proces
       ? { pricing: { inputPerMillion, outputPerMillion } }
       : {}),
   });
+}
+
+/**
+ * The whole cascade from the environment — one builder, so a model swap has one site.
+ *
+ * regression: the eval and the web app each built their own, and wiring Anthropic into the eval
+ * left the product sending `claude-haiku-4-5` to Together's Chat Completions endpoint. A card read
+ * perfectly in the measurement and returned nothing in the app, which is the divergence this
+ * removes: **the path that is measured and the path that ships are now the same code.**
+ *
+ * Null when text is unconfigured, so a deployment without a key is degraded rather than broken.
+ * Vision is optional on top: `visionProviderFromEnv` speaks a different wire protocol (§7), and
+ * its absence means screenshots are refused rather than guessed at.
+ */
+export function cascadeFromEnv(
+  env: Record<string, string | undefined> = process.env,
+): import("./provider.js").LlmCascade | null {
+  const provider = providerFromEnv(env);
+  const model = env.PASHKI_LLM_MODEL;
+  if (!provider || !model) return null;
+
+  const visionProvider = visionProviderFromEnv(env);
+  const vision = env.PASHKI_LLM_VISION_MODEL;
+
+  return {
+    provider,
+    models: [{ provider: provider.key, model, region: "us", temperature: 0 }],
+    ...(visionProvider ? { visionProvider } : {}),
+    ...(vision
+      ? {
+          visionModels: [
+            { provider: (visionProvider ?? provider).key, model: vision, region: "us" as const, temperature: 0 },
+          ],
+        }
+      : {}),
+  };
 }

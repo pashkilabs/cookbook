@@ -246,6 +246,16 @@ models be good enough. Do not add a silent-save path.
   production" was true and meaningless. A feature is reachable from a screen; until it
   is, say plainly that an endpoint exists and the feature does not.
 
+- **A model swap has two sites, and one of them is the one nobody exercises.** The eval
+  and the product built their cascades in different places, so wiring the Anthropic
+  provider into `eval.mts` — and watching a card read perfectly — verified nothing about
+  the app. Production went on sending `claude-haiku-4-5` to Together's Chat Completions
+  endpoint and getting nothing back. Same class as an endpoint with no way in from the
+  product: the measurement path and the shipping path diverged, and only going through
+  the product found it. **Verifying a provider through the eval is not verifying it.**
+  Closed by making both call one builder, which is the fix that removes the second site
+  rather than watching it.
+
 - **When a guess about a shape is wrong, print the shape.** A heading came back as an
   ingredient from a real card. The first fix compared the line's text to its section
   and missed a `(9x13)` column label appended to it; the second required the line to

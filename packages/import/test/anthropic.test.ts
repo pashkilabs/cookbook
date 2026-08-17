@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createAnthropicProvider, visionProviderFromEnv } from "../src/anthropic.js";
+import { cascadeFromEnv } from "../src/openai-compatible.js";
 import { RECIPE_JSON_SCHEMA } from "../src/provider.js";
 import type { ModelConfig } from "../src/provider.js";
 
@@ -87,5 +88,39 @@ describe("configuring vision separately from text", () => {
 
   it("builds from its own variables", () => {
     expect(visionProviderFromEnv({ PASHKI_LLM_VISION_API_KEY: "k" })?.key).toBe("anthropic");
+  });
+});
+
+describe("one builder for the product and the eval", () => {
+  it("gives vision its own provider, not the text one", () => {
+    /*
+     * regression: the eval and the web app each built a cascade, and only the eval knew about
+     * the Anthropic vision provider — so production sent an Anthropic model name to Together's
+     * Chat Completions endpoint and got nothing. A model swap has one site now.
+     */
+    const cascade = cascadeFromEnv({
+      PASHKI_LLM_BASE_URL: "https://api.together.xyz/v1",
+      PASHKI_LLM_API_KEY: "together-key",
+      PASHKI_LLM_MODEL: "openai/gpt-oss-120b",
+      PASHKI_LLM_VISION_API_KEY: "anthropic-key",
+      PASHKI_LLM_VISION_MODEL: "claude-haiku-4-5",
+    })!;
+    expect(cascade.provider.key).toBe("openai-compatible");
+    expect(cascade.visionProvider?.key).toBe("anthropic");
+    // and the vision model is attributed to the vision provider, not the text one
+    expect(cascade.visionModels?.[0]?.provider).toBe("anthropic");
+    expect(cascade.visionModels?.[0]?.model).toBe("claude-haiku-4-5");
+  });
+
+  it("leaves vision unconfigured when only text has a key", () => {
+    const cascade = cascadeFromEnv({
+      PASHKI_LLM_BASE_URL: "https://x/v1", PASHKI_LLM_API_KEY: "k", PASHKI_LLM_MODEL: "m",
+    })!;
+    expect(cascade.visionModels).toBeUndefined();
+    expect(cascade.visionProvider).toBeUndefined();
+  });
+
+  it("is null when text is unconfigured, so a deployment is degraded and not broken", () => {
+    expect(cascadeFromEnv({})).toBeNull();
   });
 });

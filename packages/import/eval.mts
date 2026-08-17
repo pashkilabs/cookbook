@@ -88,6 +88,7 @@ if (!provider) {
    * Vision has its own provider as well as its own model (§7): Anthropic speaks /v1/messages and
    * a forced tool call, Together speaks Chat Completions. The text workhorse is untouched.
    */
+  // the same builder the product uses, so the measured path and the shipping path are one
   const visionProvider = visionProviderFromEnv();
   const visionModel = process.env.PASHKI_LLM_VISION_MODEL;
   const withModel = createImportExtractor({
