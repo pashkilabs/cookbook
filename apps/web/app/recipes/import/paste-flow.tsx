@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { RecipeReview, type Draft } from "./recipe-review";
+import { canvasPlan, type Turn } from "./rotation";
 
 /**
  * The two channels a link cannot reach.
@@ -63,22 +64,19 @@ const PROBE_QUALITY = 0.55;
  */
 async function render(
   bitmap: ImageBitmap,
-  { edge, quality, rotate }: { edge: number; quality: number; rotate: number },
+  { edge, quality, rotate }: { edge: number; quality: number; rotate: Turn },
 ): Promise<Blob | null> {
-  const turned = rotate === 90 || rotate === 270;
-  const scale = Math.min(1, edge / Math.max(bitmap.width, bitmap.height));
-  const width = Math.round(bitmap.width * scale);
-  const height = Math.round(bitmap.height * scale);
+  const plan = canvasPlan({ width: bitmap.width, height: bitmap.height, edge, rotate });
 
   const canvas = document.createElement("canvas");
-  canvas.width = turned ? height : width;
-  canvas.height = turned ? width : height;
+  canvas.width = plan.canvasWidth;
+  canvas.height = plan.canvasHeight;
 
   const context = canvas.getContext("2d");
   if (!context) return null;
   context.translate(canvas.width / 2, canvas.height / 2);
-  context.rotate((rotate * Math.PI) / 180);
-  context.drawImage(bitmap, -width / 2, -height / 2, width, height);
+  context.rotate(plan.radians);
+  context.drawImage(bitmap, plan.offsetX, plan.offsetY, plan.drawWidth, plan.drawHeight);
 
   return new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
 }
@@ -96,10 +94,10 @@ async function render(
  * Four thumbnails at 448px is about 100 KB up and ~1,600 tokens — cheap enough to run every time,
  * which it must be, because the failure it prevents is silent and there is nothing to suspect.
  */
-async function detectRotation(bitmap: ImageBitmap): Promise<number> {
+async function detectRotation(bitmap: ImageBitmap): Promise<Turn> {
   const form = new FormData();
   form.append("mode", "orientation");
-  for (const turn of [0, 90, 180, 270]) {
+  for (const turn of [0, 90, 180, 270] as const) {
     const probe = await render(bitmap, { edge: PROBE_EDGE, quality: PROBE_QUALITY, rotate: turn });
     if (!probe) return 0;
     form.append("rotations", probe, `probe-${turn}.jpg`);
