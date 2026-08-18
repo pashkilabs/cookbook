@@ -22,6 +22,9 @@ export interface Draft {
   sourceUrl: string;
   ingredients: string;
   steps: string;
+  /** empty string is "not sure", which is a real answer rather than a missing one */
+  course: string;
+  cuisine: string;
 }
 
 export interface Photo {
@@ -83,6 +86,37 @@ export function RecipeReview({
         onSave(draft, photoFile);
       }}
     >
+      {/*
+        * Inferred at import, corrected here — not a tagging screen. A screen nobody visits
+        * collects nothing, and this is the one screen every import already passes through.
+        * Blank is a real answer: the extractor returns null rather than guessing, and an
+        * unset course is better than a confident wrong one.
+        */}
+      <div className="row">
+        <label>
+          <span>Course</span>
+          <select
+            value={draft.course ?? ""}
+            onChange={(event) => setDraft((current) => ({ ...current, course: event.target.value }))}
+          >
+            <option value="">Not sure</option>
+            {["breakfast", "starter", "main", "side", "dessert", "drink", "snack"].map((course) => (
+              <option key={course} value={course}>
+                {course[0]!.toUpperCase() + course.slice(1)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Cuisine</span>
+          <input
+            value={draft.cuisine ?? ""}
+            placeholder="Italian, Thai, …"
+            onChange={(event) => setDraft((current) => ({ ...current, cuisine: event.target.value }))}
+          />
+        </label>
+      </div>
+
       <label>
         <span>A photo of the finished dish (optional)</span>
         <input

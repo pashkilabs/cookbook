@@ -624,6 +624,7 @@ export type Database = {
           meal_plan_id: string
           recipe_id: string
           scale: number
+          slot: string
           updated_at: string
         }
         Insert: {
@@ -636,6 +637,7 @@ export type Database = {
           meal_plan_id: string
           recipe_id: string
           scale?: number
+          slot?: string
           updated_at?: string
         }
         Update: {
@@ -648,6 +650,7 @@ export type Database = {
           meal_plan_id?: string
           recipe_id?: string
           scale?: number
+          slot?: string
           updated_at?: string
         }
         Relationships: [
@@ -824,8 +827,10 @@ export type Database = {
       }
       recipes: {
         Row: {
+          course: string | null
           created_at: string
           created_by: string | null
+          cuisine: string | null
           deleted_at: string | null
           family_id: string
           id: string
@@ -841,8 +846,10 @@ export type Database = {
           visibility: string
         }
         Insert: {
+          course?: string | null
           created_at?: string
           created_by?: string | null
+          cuisine?: string | null
           deleted_at?: string | null
           family_id: string
           id?: string
@@ -858,8 +865,10 @@ export type Database = {
           visibility?: string
         }
         Update: {
+          course?: string | null
           created_at?: string
           created_by?: string | null
+          cuisine?: string | null
           deleted_at?: string | null
           family_id?: string
           id?: string

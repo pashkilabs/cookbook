@@ -60,6 +60,15 @@ export interface ExtractedRecipe {
   /** total time in minutes — a number can be scaled, "1 hr 20" cannot */
   totalMinutes: number | null;
   ingredients: ParsedIngredient[];
+  /**
+   * What the dish is, inferred at import and corrected on the review screen. Null when unknown.
+   *
+   * **Role on the plate is deliberately absent.** It is a property of a recipe's *use* — a lentil
+   * soup is the protein on Monday and a side on Sunday — so one stored answer would be wrong often
+   * enough that the filter stops being trusted.
+   */
+  course?: string | null;
+  cuisine?: string | null;
   /** ordered method steps, as the source wrote them */
   steps: string[];
   /** resolved absolute URL, or null when the page offered none we could use */

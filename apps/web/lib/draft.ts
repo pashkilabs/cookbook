@@ -23,5 +23,7 @@ export function draftFrom(recipe: ExtractedRecipe) {
       )
       .join("\n"),
     steps: recipe.steps.join("\n"),
+    course: recipe.course ?? "",
+    cuisine: recipe.cuisine ?? "",
   };
 }

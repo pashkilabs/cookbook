@@ -18,6 +18,8 @@ export interface RecipeInput {
   sourceName?: unknown;
   ingredients?: unknown;
   steps?: unknown;
+  course?: unknown;
+  cuisine?: unknown;
 }
 
 export interface PreparedRecipe {
@@ -34,11 +36,17 @@ export interface PreparedRecipe {
     isEstimated: boolean;
   }>;
   steps: Array<{ position: number; text: string }>;
+  /** null when unknown — the extractor returns null rather than guessing, and blank stays blank */
+  course: string | null;
+  cuisine: string | null;
 }
 
 export type PreparationResult =
   | { ok: true; recipe: PreparedRecipe }
   | { ok: false; error: string };
+
+/** the closed list the recipes.course CHECK enforces */
+const COURSES = new Set(["breakfast", "starter", "main", "side", "dessert", "drink", "snack"]);
 
 export function prepareRecipe(input: RecipeInput): PreparationResult {
   const title = asText(input.title, 200);
@@ -58,6 +66,10 @@ export function prepareRecipe(input: RecipeInput): PreparationResult {
       title,
       servings,
       timeMinutes,
+      // an unrecognised course becomes null rather than failing the save: the column's CHECK
+      // would reject it anyway, and losing a whole recipe over a label is the wrong trade
+      course: COURSES.has(String(input.course)) ? String(input.course) : null,
+      cuisine: asText(input.cuisine, 40) || null,
       sourceName: asText(input.sourceName, 200),
       ingredients: parsed.map((ingredient, index) => ({
         position: index,

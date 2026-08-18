@@ -88,6 +88,8 @@ export async function createRecipeFrom(
       time_minutes: recipe.timeMinutes,
       source_name: recipe.sourceName,
       source_url: sourceUrl,
+      course: recipe.course,
+      cuisine: recipe.cuisine,
       times_made: 0,
       status: "active",
       visibility: "private",

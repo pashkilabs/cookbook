@@ -174,7 +174,7 @@ export type JsonSchema = Record<string, unknown>;
 export const RECIPE_JSON_SCHEMA: JsonSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["title", "servings", "totalMinutes", "ingredientLines", "steps"],
+  required: ["title", "servings", "totalMinutes", "ingredientLines", "steps", "course", "cuisine"],
   properties: {
     title: {
       type: ["string", "null"],
@@ -218,6 +218,15 @@ export const RECIPE_JSON_SCHEMA: JsonSchema = {
       items: { type: "string" },
       description: "The method, one instruction per entry, in order.",
     },
+    course: {
+      type: ["string", "null"],
+      enum: ["breakfast", "starter", "main", "side", "dessert", "drink", "snack", null],
+      description: "Which course this dish is, or null if it is not clear.",
+    },
+    cuisine: {
+      type: ["string", "null"],
+      description: "The cuisine, as a short common name — Italian, Thai, Mexican — or null.",
+    },
   },
 };
 
@@ -239,6 +248,12 @@ export const EXTRACTION_INSTRUCTIONS = [
   "the ingredients, or a run of lines each starting with an emoji. Split it into its steps.",
   "Copy each step's wording; do not summarise, renumber, or drop the emoji's sentence.",
   "If the text truly gives no method, return an empty steps array rather than inventing one.",
+  // free from a model already reading the recipe: "MARRY ME ITALIAN SAUSAGE SOUP" gives both.
+  // Null rather than a guess, for the same reason an amount is never invented — a wrong label
+  // that looks confident is worse than an absent one, and the review screen is where it is fixed.
+  "Say which course the dish is and which cuisine it belongs to.",
+  "Both are null unless the text says so or the dish is unmistakable. Do not guess from a single",
+  "ingredient — olive oil does not make a recipe Italian.",
 ].join(" ");
 
 // ---------------------------------------------------------------------------
@@ -251,6 +266,8 @@ export interface RecipePayload {
   totalMinutes: number | null;
   ingredientLines: { text: string; section: string | null }[];
   steps: string[];
+  course: string | null;
+  cuisine: string | null;
 }
 
 export type ValidationResult =
@@ -331,8 +348,23 @@ export function validateRecipePayload(value: unknown): ValidationResult {
         .filter((line) => line.text.trim().length > 0)
         .map((line) => ({ text: line.text.trim(), section: line.section })),
       steps: (steps as string[]).map((step) => step.trim()).filter(Boolean),
+      // an unrecognised course is dropped rather than rejected: a model offering "brunch" has
+      // still read the recipe correctly, and failing the whole extraction over a label would
+      // escalate to a pricier model to fix a field the review screen can set in one tap
+      course: COURSES.has(String(candidate.course)) ? String(candidate.course) : null,
+      cuisine: trimmedOrNull(candidate.cuisine),
     },
   };
+}
+
+/** the closed list the column's CHECK enforces — kept here so a bad label never reaches it */
+const COURSES = new Set(["breakfast", "starter", "main", "side", "dessert", "drink", "snack"]);
+
+function trimmedOrNull(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  // 40 is the column's limit; a model writing a sentence has not answered the question
+  return trimmed.length > 0 && trimmed.length <= 40 ? trimmed : null;
 }
 
 function numberOrNull(value: unknown): number | null {
