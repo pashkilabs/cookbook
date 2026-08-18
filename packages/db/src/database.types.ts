@@ -827,6 +827,7 @@ export type Database = {
       }
       recipes: {
         Row: {
+          classified_at: string | null
           course: string | null
           created_at: string
           created_by: string | null
@@ -848,6 +849,7 @@ export type Database = {
           visibility: string
         }
         Insert: {
+          classified_at?: string | null
           course?: string | null
           created_at?: string
           created_by?: string | null
@@ -869,6 +871,7 @@ export type Database = {
           visibility?: string
         }
         Update: {
+          classified_at?: string | null
           course?: string | null
           created_at?: string
           created_by?: string | null

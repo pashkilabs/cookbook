@@ -20,7 +20,9 @@ for (const family of families.data ?? []) {
     .select("id, title")
     .eq("family_id", family.id)
     .is("deleted_at", null)
-    .is("course", null)
+    // the cursor is the *attempt*, not the answer: a marinade correctly classified as no course
+    // stays null forever, and inferring "unfinished" from a null result re-ran it every time
+    .is("classified_at", null)
     .order("title");
   if (!recipes?.length) { console.log(`${family.name}: nothing to classify`); continue; }
   console.log(`\n${family.name}: ${recipes.length} to classify`);
@@ -39,8 +41,14 @@ for (const family of families.data ?? []) {
         steps: (steps.data ?? []).map((s: any) => s.text),
       },
     });
-    if (!cls) { console.log(`  ${recipe.title}: model returned nothing, left alone`); continue; }
-    const patch = { course: cls.course, dish_form: cls.dishForm, principal_protein: cls.principalProtein };
+    if (!cls) { console.log(`  ${recipe.title}: model returned nothing, left unstamped to retry`); continue; }
+    // stamped whatever the answer, so a correct null is finished work rather than a retry
+    const patch = {
+      course: cls.course,
+      dish_form: cls.dishForm,
+      principal_protein: cls.principalProtein,
+      classified_at: new Date().toISOString(),
+    };
     if (!dryRun) {
       const { error } = await admin.from("recipes").update(patch).eq("id", recipe.id);
       if (error) { console.log(`  ${recipe.title}: WRITE FAILED ${error.message}`); continue; }
