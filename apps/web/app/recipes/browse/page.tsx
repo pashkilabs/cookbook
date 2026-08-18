@@ -122,7 +122,17 @@ export default async function BrowsePage({
   const protein = MAIN_FILTERS.find((f) => f.key === rawProtein) ?? null;
   if (protein && protein.key !== "kid") query = query.eq("principal_protein", protein.key);
 
-  const { data: rows } = await query;
+  const { data: rows, error } = await query;
+  /*
+   * The error is read, not discarded.
+   *
+   * regression: this destructured only `data`, so a query against columns that did not exist on
+   * the deployed database returned null and rendered as "Nothing here yet" — a broken screen
+   * wearing an empty one's clothes. The whole browse flow shipped ahead of its migration and
+   * looked like a data problem for a day. `?? []` on an unchecked result is how a failure
+   * becomes a silence.
+   */
+  if (error) throw new Error(`browse query failed: ${error.message}`);
   let recipes = rows ?? [];
 
   /*

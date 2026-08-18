@@ -35,6 +35,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       title: recipe.title,
       servings: recipe.servings,
       time_minutes: recipe.timeMinutes,
+      // correctable here because the review screen only exists at import, and no already-saved
+      // recipe will pass through it again — a wrong course would otherwise be permanent on the
+      // field the browse picker rests on
+      course: recipe.course,
+      cuisine: recipe.cuisine,
+      dish_form: recipe.dishForm,
+      principal_protein: recipe.principalProtein,
       source_name: recipe.sourceName,
     })
     .eq("id", id)

@@ -2524,3 +2524,49 @@ about *where a provider hosts its models* — a property of choosing Together at
 their documentation would have to answer — or about *per-request routing*, which is what
 `inference_geo` controls. Those are different claims and only the second is testable from
 here. Until that is settled, treat the text tier as unverified rather than compliant.
+
+## §54 — Cuisine is excluded from the backfill, by measurement
+
+The backfill classifies recipes already saved: it reads title, ingredient lines and
+steps from the database and writes `course`, `dish_form` and `principal_protein`.
+**It does not write `cuisine`,** and that is a measurement rather than an oversight.
+
+Scored against the same expectations, twice, on the same eighteen captions:
+
+| | from the caption | from the stored recipe |
+|---|---|---|
+| course | 18/18 | **17/17 right** |
+| cuisine | 18/18 — **17 of them correct declines** | **14/17, 3 wrong, 0 declines** |
+| protein | 15/18 | 14/17 |
+
+Course survives losing the prose entirely. Cuisine does not, and it fails in the
+one direction that matters: reading a caption it declined seventeen times out of
+eighteen and was *right* to, because the text named no cuisine. Reading only
+ingredients it **stopped declining altogether** and began guessing — Mexican for a
+cornflake chicken wrap, Mexican for street corn beef bowls, Italian for a Boursin
+pasta. None of those are stated anywhere in the recipe.
+
+The prose was what let the model say "I don't know". Removing it did not make the
+field less accurate so much as remove its ability to abstain, which is worse: a
+null shows as absent and a person adds one, while a wrong cuisine shows as a chip
+that lies and is unfalsifiable to somebody browsing. **A confident wrong answer is
+worse than an empty field**, and this is the clearest case of it the project has
+measured.
+
+Cuisine is still inferred at import, where the prose exists and it scores 18/18. It
+is also editable — the edit screen carries all four fields now, which is what makes
+running a backfill safe at all, since the review screen only exists at import and
+no already-saved recipe will pass through it again.
+
+**What would reverse this:** re-fetching each recipe's `source_url` and classifying
+from the page rather than from stored rows. That restores the prose and probably
+the declines, at the cost of a fetch per recipe and a re-entry into the cache path.
+Worth doing if cuisine turns out to matter to browsing; not worth it to populate a
+chip nobody has asked for yet.
+
+One caveat on the numbers: seventeen fixtures were scored, not eighteen. The
+`instagram-texas-twinkies` caption contains 28 U+FFFD replacement characters — the
+emoji were destroyed at transcription — and extraction returns nothing from it. It
+dropped out of the run silently, which is why `scripts/check-fixture-text.mjs` now
+fails on U+FFFD: a damaged input scoring as a missing result is the same class as
+a test that never runs.

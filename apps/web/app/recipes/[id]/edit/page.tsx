@@ -25,7 +25,7 @@ export default async function EditRecipePage({ params }: { params: Promise<{ id:
 
   const { data: recipe } = await supabase
     .from("recipes")
-    .select("id, title, servings, time_minutes, source_name")
+    .select("id, title, servings, time_minutes, source_name, course, cuisine, dish_form, principal_protein")
     .eq("id", id)
     .eq("family_id", family.id)
     .is("deleted_at", null)
@@ -69,6 +69,10 @@ export default async function EditRecipePage({ params }: { params: Promise<{ id:
           servings: recipe.servings === null ? "" : String(recipe.servings),
           timeMinutes: recipe.time_minutes === null ? "" : String(recipe.time_minutes),
           sourceName: recipe.source_name ?? "",
+          course: recipe.course ?? "",
+          cuisine: recipe.cuisine ?? "",
+          dishForm: recipe.dish_form ?? "",
+          principalProtein: recipe.principal_protein ?? "",
           ingredients: lines.join("\n"),
           steps: (steps.data ?? []).map((step) => step.text).join("\n"),
         }}

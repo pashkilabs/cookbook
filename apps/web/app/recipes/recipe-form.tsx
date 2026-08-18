@@ -21,6 +21,10 @@ import { parseIngredientList, formatAsWritten } from "@pashki/core";
 export interface RecipeFormValues {
   title: string;
   servings: string;
+  course: string;
+  cuisine: string;
+  dishForm: string;
+  principalProtein: string;
   timeMinutes: string;
   sourceName: string;
   ingredients: string;
@@ -30,6 +34,10 @@ export interface RecipeFormValues {
 const EMPTY: RecipeFormValues = {
   title: "",
   servings: "",
+  course: "",
+  cuisine: "",
+  dishForm: "",
+  principalProtein: "",
   timeMinutes: "",
   sourceName: "",
   ingredients: "",
@@ -48,7 +56,7 @@ export function RecipeForm(
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const set = (field: keyof RecipeFormValues) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+  const set = (field: keyof RecipeFormValues) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setValues((current) => ({ ...current, [field]: event.target.value }));
 
   const preview = parseIngredientList(
@@ -90,6 +98,41 @@ export function RecipeForm(
         <div>
           <label htmlFor="servings">Serves</label>
           <input id="servings" type="number" min="1" value={values.servings} onChange={set("servings")} />
+        </div>
+
+        {/*
+          * What the dish is — inferred at import, and correctable here.
+          *
+          * This is what makes the backfill safe to run. Course was only editable on the review
+          * screen, which no already-saved recipe will ever pass through again, so a wrong course
+          * would have been permanent on the field the whole browse picker rests on.
+          */}
+        <div className="row">
+          <label htmlFor="course">Course</label>
+          <select id="course" value={values.course} onChange={set("course")}>
+            <option value="">Not sure</option>
+            {["breakfast", "starter", "main", "side", "dessert", "drink", "snack"].map((c) => (
+              <option key={c} value={c}>{c[0]!.toUpperCase() + c.slice(1)}</option>
+            ))}
+          </select>
+          <label htmlFor="cuisine">Cuisine</label>
+          <input id="cuisine" value={values.cuisine} placeholder="Italian, Thai, …" onChange={set("cuisine")} />
+        </div>
+        <div className="row">
+          <label htmlFor="dishForm">Form</label>
+          <select id="dishForm" value={values.dishForm} onChange={set("dishForm")}>
+            <option value="">Not one of these</option>
+            {["soup", "salad", "sandwich", "bake", "stew", "bowl"].map((f) => (
+              <option key={f} value={f}>{f[0]!.toUpperCase() + f.slice(1)}</option>
+            ))}
+          </select>
+          <label htmlFor="principalProtein">Protein</label>
+          <select id="principalProtein" value={values.principalProtein} onChange={set("principalProtein")}>
+            <option value="">None or unclear</option>
+            {["chicken", "beef", "pork", "lamb", "fish", "seafood", "egg", "vegetarian", "vegan"].map((p) => (
+              <option key={p} value={p}>{p[0]!.toUpperCase() + p.slice(1)}</option>
+            ))}
+          </select>
         </div>
         <div>
           <label htmlFor="time">Minutes</label>

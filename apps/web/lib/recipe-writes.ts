@@ -90,6 +90,8 @@ export async function createRecipeFrom(
       source_url: sourceUrl,
       course: recipe.course,
       cuisine: recipe.cuisine,
+      dish_form: recipe.dishForm,
+      principal_protein: recipe.principalProtein,
       times_made: 0,
       status: "active",
       visibility: "private",

@@ -20,6 +20,8 @@ export interface RecipeInput {
   steps?: unknown;
   course?: unknown;
   cuisine?: unknown;
+  dishForm?: unknown;
+  principalProtein?: unknown;
 }
 
 export interface PreparedRecipe {
@@ -39,6 +41,8 @@ export interface PreparedRecipe {
   /** null when unknown — the extractor returns null rather than guessing, and blank stays blank */
   course: string | null;
   cuisine: string | null;
+  dishForm: string | null;
+  principalProtein: string | null;
 }
 
 export type PreparationResult =
@@ -47,6 +51,10 @@ export type PreparationResult =
 
 /** the closed list the recipes.course CHECK enforces */
 const COURSES = new Set(["breakfast", "starter", "main", "side", "dessert", "drink", "snack"]);
+const DISH_FORMS = new Set(["soup", "salad", "sandwich", "bake", "stew", "bowl"]);
+const PROTEINS = new Set([
+  "chicken", "beef", "pork", "lamb", "fish", "seafood", "egg", "vegetarian", "vegan",
+]);
 
 export function prepareRecipe(input: RecipeInput): PreparationResult {
   const title = asText(input.title, 200);
@@ -70,6 +78,10 @@ export function prepareRecipe(input: RecipeInput): PreparationResult {
       // would reject it anyway, and losing a whole recipe over a label is the wrong trade
       course: COURSES.has(String(input.course)) ? String(input.course) : null,
       cuisine: asText(input.cuisine, 40) || null,
+      dishForm: DISH_FORMS.has(String(input.dishForm)) ? String(input.dishForm) : null,
+      principalProtein: PROTEINS.has(String(input.principalProtein))
+        ? String(input.principalProtein)
+        : null,
       sourceName: asText(input.sourceName, 200),
       ingredients: parsed.map((ingredient, index) => ({
         position: index,
