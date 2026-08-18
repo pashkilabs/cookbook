@@ -2609,3 +2609,20 @@ review and edit screens are what carry the rest.
 
 **Related:** §54 for why cuisine is excluded from the backfill entirely, which is
 the same failure — losing the ability to decline — measured rather than assumed.
+
+## §55 — Protein chips are a Mains-only axis, and that is a known gap
+
+The second-level chips render only under Mains, so a recipe with a protein whose
+course is something else — a chicken side, a pork starter — has that protein stored
+and no way to filter by it. Measured on the corpus: chicken and pork both appear on
+non-main recipes today.
+
+Left as it is deliberately. The sketch puts the protein axis under Mains and
+nowhere else, and putting chips under every course is a change nobody has asked
+for — it would also make Desserts and Drinks carry a row that is almost always
+empty. Recorded so that whoever meets a chicken side and wonders why it is
+unreachable finds the answer here rather than assuming a bug.
+
+**What would reverse it:** a household saying they look for sides by protein. The
+chips already derive from data, so the change is where the row renders rather than
+what it contains.
