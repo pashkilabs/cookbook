@@ -592,3 +592,47 @@ label.servings input {
   text-align: center; font-variant-numeric: tabular-nums;
 }
 label.servings .meta { font-size: 0.75rem; color: var(--muted); }
+
+/*
+ * The browse grid.
+ *
+ * Photo-first by design, and most recipes have no photograph — the upload control is days old and
+ * the backlog fills only as someone cooks. So the placeholder is designed rather than defaulted:
+ * serif initials on a warm ground read as a cookbook index, and the grid ships now instead of
+ * waiting on pictures that arrive one dinner at a time.
+ */
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: 1rem;
+}
+
+.tile {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid var(--line, #e2d9cc);
+  border-radius: 0.75rem;
+  background: var(--card, #fff);
+  color: inherit;
+  text-decoration: none;
+  font-family: Georgia, "Times New Roman", serif;
+  align-content: start;
+}
+
+.tile:hover,
+.tile:focus-visible {
+  border-color: var(--ink, #4a3f33);
+}
+
+.tile img {
+  width: 100%;
+  display: block;
+}
+
+@media (prefers-color-scheme: dark) {
+  .tile {
+    --tile: #2a241d;
+    --tile-ink: #b9a992;
+  }
+}
