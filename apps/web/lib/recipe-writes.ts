@@ -192,6 +192,19 @@ export async function attachRecipePhoto(
   // decides whose kitchen it shows, and those are different questions (CLAUDE.md)
   if (!owned.data) return { ok: false, error: "no such recipe", status: 404 };
 
+  /*
+   * The entitlement gate runs *before* the upload, not after.
+   *
+   * `photos_insert_in_household` requires `household_can_write`, and so does the storage policy.
+   * With the object written first, a lapsed household uploaded bytes and was then refused the
+   * row — leaving an orphan for the reaper on every attempt. The upload is the expensive,
+   * irreversible half; refusing early costs one cheap query and leaves nothing to collect.
+   */
+  const writable = await supabase.rpc("household_can_write_recipes");
+  if (writable.data === false) {
+    return { ok: false, error: "this household has no active subscription", status: 403 };
+  }
+
   const { storeImportedPhoto } = await import("@pashki/import/photo-storage");
   const stored = await storeImportedPhoto({ familyId, bytes }, { supabase });
   if (!stored.ok) {

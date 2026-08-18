@@ -342,13 +342,26 @@ describe.skipIf(instance === null)("recipe photo storage", () => {
       expect(await canRead(outsider, path)).toBe(true);
     });
 
-    it("cannot upload either", async () => {
+    // was "cannot upload either" — a true assertion about a policy nobody had written yet.
+    // The add-photo control needed it, and until then every object had been written by the
+    // import service as service_role, which bypasses RLS, so no client path had ever existed.
+    it("can upload into its own household's folder", async () => {
       const { error } = await member.storage
         .from(RECIPE_PHOTO_BUCKET)
         .upload(`${familyId}/client-${stamp}.jpg`, await photoBytes(100, 100), {
           contentType: "image/jpeg",
         });
-      // camera upload is a Phase 3 concern and will need a policy written deliberately
+      expect(error).toBeNull();
+    });
+
+    it("cannot upload into another household's folder", async () => {
+      const { error } = await member.storage
+        .from(RECIPE_PHOTO_BUCKET)
+        .upload(`${crypto.randomUUID()}/stolen-${stamp}.jpg`, await photoBytes(100, 100), {
+          contentType: "image/jpeg",
+        });
+      // the path is the claim: the first segment names the household, and a policy that
+      // only checked the bucket would let anyone signed in write into any folder
       expect(error).not.toBeNull();
     });
   });

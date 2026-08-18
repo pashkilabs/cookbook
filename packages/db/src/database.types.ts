@@ -1031,6 +1031,7 @@ export type Database = {
         }
         Returns: Json
       }
+      household_can_write_recipes: { Args: never; Returns: boolean }
       import_claim_next_job: {
         Args: { p_lease_seconds?: number; p_worker: string }
         Returns: {

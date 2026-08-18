@@ -180,6 +180,18 @@ models be good enough. Do not add a silent-save path.
   finished restarting. Two rules follow. A check reports three outcomes, not two —
   passed, failed, and could-not-measure, with different exit codes. And a skip that
   infrastructure timing could have caused gets retried before it is believed.
+- **Supabase Storage refuses with the *identical* wording a table refuses with.**
+  `new row violates row-level security policy` names the mechanism, not the location —
+  so an upload blocked by `storage.objects` reads exactly like one blocked by the table
+  you were writing to. `public.photos` had a correct INSERT policy and correct column
+  grants the whole time; `storage.objects` had one policy, `SELECT`, and RLS denies by
+  default. **Check `pg_policy` on `storage.objects` as well as on the table.** The reason
+  it was missing at all is the more general lesson: every object until then had been
+  written by the import service as `service_role`, which bypasses RLS, so no
+  `authenticated` write path had ever had to exist. **A permission nothing has exercised
+  is a permission you do not have** — same class as the migration-ordering hazard, code
+  shipped ahead of its database permission.
+
 - **Storage rows cannot be deleted with SQL.** A `storage.protect_delete()` trigger
   refuses direct deletes from `storage.buckets` and `storage.objects` to stop objects
   being orphaned, so cleanup goes through the Storage API — `.remove()` for objects,
