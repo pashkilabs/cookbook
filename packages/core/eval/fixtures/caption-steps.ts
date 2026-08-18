@@ -191,6 +191,32 @@ export const CAPTION_CLASS_EXPECTATIONS: CaptionClassExpectation[] = [
   { fixture: "instagram-peach-posset", course: ["dessert"], cuisine: null,
     why: "a posset is British, but the caption does not say so and the rule is not to guess" },
   { fixture: "facebook-chicken-pad-thai", course: ["main"], cuisine: "thai" },
+
+  // the twelve written after the first six scored 6/6, because three tuning passes over six
+  // fixtures is close to fitting the test — general rules are a defence, not evidence
+  { fixture: "facebook-chile-lime-chicken-bowl", course: ["main"], cuisine: null,
+    why: "chile lime and a mango salsa suggest Mexican, but the caption names nothing and the rule is not to guess" },
+  { fixture: "facebook-homemade-burger-buns", course: ["side"], cuisine: null,
+    why: "a bun is not a meal and not a dessert; side is the only honest slot on our list" },
+  { fixture: "facebook-street-corn-beef-bowls", course: ["main"], cuisine: null,
+    why: "street corn is Mexican-influenced, not a Mexican dish; a beef bowl is a main" },
+  { fixture: "facebook-sweet-chilli-crispy-rice-salad", course: ["main", "side"], cuisine: null,
+    why: "a salad served as the meal or beside it — genuinely both, and Thai-influenced rather than Thai" },
+  { fixture: "instagram-boursin-sausage-pasta", course: ["main"], cuisine: null,
+    why: "the caption calls it a dinner; Boursin is French but the dish is not" },
+  { fixture: "instagram-coconut-curry-brothy-rice", course: ["main"], cuisine: null,
+    why: "coconut curry spans several cuisines and the caption commits to none" },
+  { fixture: "instagram-one-pot-boursin-pasta", course: ["main"], cuisine: null },
+  { fixture: "instagram-pb-cookie-dough-smores-bites", course: ["dessert"], cuisine: null,
+    why: "the caption says sweet treat; a sweet baked thing is never a snack on our list" },
+  { fixture: "instagram-potato-sausage-soup", course: ["main"], cuisine: null,
+    why: "the soup-is-a-main rule, on a caption that says nothing about origin" },
+  { fixture: "instagram-sheet-pan-crunchwrap", course: ["main"], cuisine: null,
+    why: "a Taco Bell item is Tex-Mex-adjacent American fast food, and the caption claims no cuisine" },
+  { fixture: "instagram-summer-toast-board", course: ["starter"], cuisine: null,
+    why: "the caption says it is what she would start the night with — the source saying so is the rule" },
+  { fixture: "instagram-texas-twinkies", course: ["starter", "snack"], cuisine: null,
+    why: "a Super Bowl jalapeno popper: savoury, small, eaten between meals or as a starter" },
 ];
 
 /** genuine variants of one answer, not broader categories */
