@@ -2485,3 +2485,42 @@ written about *where a provider is hosted* rather than about request routing, is
 question for whoever wrote it. Recorded rather than guessed at, and it should not
 stay open long — every photograph imported until it is resolved goes wherever the
 default sends it.
+
+## §53 — US-hosted inference: enforced on vision, a known gap on text
+
+CLAUDE.md has said "US-hosted inference only" for months. Nothing was enforcing it,
+and every request was going wherever the default sent it. Measured, not assumed:
+an Anthropic call with no `inference_geo` returns `usage.inference_geo: "global"`.
+
+**Anthropic — enforceable and verifiable, now both.** The request takes
+`inference_geo: "us"`; the response reports what was actually used. Setting it returns
+`"us"`, omitting it returns `"global"`, and a model older than Claude 4.6 returns
+`"not_available"` because the parameter does not exist there — which is why every call
+looked like `"not_available"` while vision was on Haiku 4.5, and why moving to Sonnet 5
+(§52) is what made this fixable at all.
+
+So the provider now sends it whenever `ModelConfig.region` is `"us"` — a field that has
+always said "us" and never reached the wire — and **throws if the answer comes back from
+anywhere else**. That is the rare constraint that can be checked against the response
+rather than trusted, and this project's whole pattern says to check it: a rule nothing
+verifies is a rule that reads as satisfied. Costs a 1.1x multiplier on every token
+category, taking a card from $0.030 to about $0.033.
+
+**Together — cannot be verified, and this is recorded as a gap rather than solved.**
+The OpenAI-compatible Chat Completions API exposes no region parameter, and the response
+carries no region field: `choices, created, id, model, object, prompt, system_fingerprint,
+usage` and nothing geographic in any of them. So for the text tier there is no request to
+make and no answer to check.
+
+**What that means, said plainly.** For captions and page text — which is most imports —
+the rule is a documented intention and not a guarantee. It is not enough to write
+"US-hosted inference only" and leave it; either the text tier moves to a provider that can
+state and prove its region, or the rule is scoped in writing to the tier that can honour
+it. CLAUDE.md now says which half is which, so the line cannot be read as satisfied for
+text.
+
+**Open, and it belongs with someone who can decide it:** whether the rule was written
+about *where a provider hosts its models* — a property of choosing Together at all, which
+their documentation would have to answer — or about *per-request routing*, which is what
+`inference_geo` controls. Those are different claims and only the second is testable from
+here. Until that is settled, treat the text tier as unverified rather than compliant.

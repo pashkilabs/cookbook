@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { cascadeFromEnv, createOpenAiCompatibleProvider, providerFromEnv } from "../src/openai-compatible.js";
+import { createAnthropicProvider } from "../src/anthropic.js";
 import { RECIPE_JSON_SCHEMA } from "../src/provider.js";
 import type { ModelConfig } from "../src/provider.js";
 
@@ -134,5 +135,45 @@ describe("vision wiring refuses rather than 404s", () => {
       PASHKI_LLM_VISION_MODEL: "claude-haiku-4-5",
     });
     expect(four?.visionModels?.[0]?.temperature).toBe(0);
+  });
+});
+
+describe("US-hosted inference is asked for and checked", () => {
+  const MODEL = { provider: "anthropic", model: "claude-sonnet-5", region: "us" as const };
+  const respond = (usage: Record<string, unknown>) =>
+    (async () =>
+      new Response(JSON.stringify({ content: [{ type: "tool_use", input: { ok: true } }], usage }), {
+        status: 200,
+      })) as unknown as typeof globalThis.fetch;
+
+  it("sends inference_geo us, because the rule was documented and unenforced", async () => {
+    let sent: any = null;
+    const provider = createAnthropicProvider({
+      apiKey: "k",
+      fetch: (async (_url: string, init: any) => {
+        sent = JSON.parse(init.body);
+        return new Response(
+          JSON.stringify({ content: [{ type: "tool_use", input: {} }], usage: { inference_geo: "us" } }),
+          { status: 200 },
+        );
+      }) as unknown as typeof globalThis.fetch,
+    });
+    await provider.extract({ model: MODEL, instructions: "i", content: "c", responseSchema: {} });
+    expect(sent.inference_geo).toBe("us");
+  });
+
+  // regression: every call reported inference_geo "global" while CLAUDE.md required US-hosted
+  it("refuses an answer that came back from somewhere else", async () => {
+    const provider = createAnthropicProvider({ apiKey: "k", fetch: respond({ inference_geo: "global" }) });
+    await expect(
+      provider.extract({ model: MODEL, instructions: "i", content: "c", responseSchema: {} }),
+    ).rejects.toThrow(/not "us"/);
+  });
+
+  it("names the cause when the model is too old for the parameter", async () => {
+    const provider = createAnthropicProvider({ apiKey: "k", fetch: respond({ inference_geo: "not_available" }) });
+    await expect(
+      provider.extract({ model: MODEL, instructions: "i", content: "c", responseSchema: {} }),
+    ).rejects.toThrow(/Claude 4\.6 or later/);
   });
 });

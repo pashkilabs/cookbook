@@ -105,7 +105,13 @@ Keys must never reach a client bundle.
 ratings. Personal data stays in Postgres. This is what keeps the compliance
 surface small — don't erode it for convenience.
 
-**US-hosted inference only.** See `docs/decisions.md` for the routing table.
+**US-hosted inference only** — *enforced on vision, unverifiable on text.* Anthropic
+takes `inference_geo: "us"` and **echoes it back in `usage`**, so the provider sends it
+and refuses any answer that returns "global"; that half is checked rather than trusted.
+Together's OpenAI-compatible API exposes no region parameter and returns no region field,
+so the text tier's routing cannot be verified from a response and the rule is a
+**documented intention there, not a guarantee** (decisions §53). Do not read this line as
+satisfied for text.
 
 **The app never touches platform tables directly.** No queries against `accounts`,
 `families`, `family_members`, `devices`, `subscriptions` or `entitlements` from app
@@ -237,6 +243,13 @@ models be good enough. Do not add a silent-save path.
   debugging detour because the error was filtered out by a `grep -E "ERROR"` — the CLI
   writes `"Error"` — which is the "silence reads as success" trap arriving through my
   own pipeline rather than through the tool.
+
+  **The same mistake wearing a second suit: `echo $?` after a pipe reports the *last*
+  command, not the one you care about.** `pnpm check:parity | tail -12; echo "EXIT=$?"`
+  printed `EXIT=0` for a run that had exited 1 and printed `DIFFERENCES (database): 2 of
+  15 checks disagree` two lines above — the zero was `tail` succeeding. Redirect to a file
+  and check the code, or use `PIPESTATUS`. One rule, two shapes: **a pipeline can hide the
+  result you are measuring, whether by filtering the text or by replacing the status.**
 - **A smoke check that calls an endpoint proves the endpoint, and nothing else.** It is
   not evidence a feature exists and must never be allowed to stand in for one. Two of
   the last three things built — caption paste and screenshot upload — had **no way in

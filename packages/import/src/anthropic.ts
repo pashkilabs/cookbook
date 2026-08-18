@@ -110,6 +110,20 @@ export function createAnthropicProvider(options: AnthropicOptions): LlmProvider 
           model: request.model.model,
           max_tokens: request.model.maxOutputTokens ?? 4096,
           /*
+           * US-hosted inference, which CLAUDE.md requires and nothing was enforcing.
+           *
+           * Without this the response reports `inference_geo: "global"` — measured, not assumed —
+           * so the rule was documented and every request went wherever the default sent it. The
+           * response echoes what was actually used, which makes this the rare constraint that can
+           * be **verified from the answer rather than trusted**: `usage.inference_geo` comes back
+           * "us" when it is honoured, "global" when it is not, and "not_available" on models older
+           * than Claude 4.6 that do not support the parameter at all.
+           *
+           * Costs a 1.1x multiplier on every token category. That is the price of the rule, and
+           * `region` on ModelConfig has always said "us" — it just never reached the wire.
+           */
+          ...(request.model.region === "us" ? { inference_geo: "us" } : {}),
+          /*
            * Omitted unless asked for, because Claude 5 rejects it outright:
            * `temperature is deprecated for this model`, HTTP 400, every call.
            *
@@ -144,8 +158,24 @@ export function createAnthropicProvider(options: AnthropicOptions): LlmProvider 
 
       const body = (await response.json()) as {
         content?: Array<{ type?: string; name?: string; input?: unknown }>;
-        usage?: { input_tokens?: number; output_tokens?: number };
+        usage?: { input_tokens?: number; output_tokens?: number; inference_geo?: string };
       };
+
+      /*
+       * Refuse an answer that came back from the wrong place.
+       *
+       * Asking for "us" and being served globally is exactly the shape this project keeps
+       * paying for — a rule that reads as satisfied because nothing checks the answer. The
+       * response says where it ran, so the check is free. "not_available" is a model too old
+       * for the parameter, which is a configuration fault rather than a routing one.
+       */
+      const geo = body.usage?.inference_geo;
+      if (request.model.region === "us" && geo !== undefined && geo !== "us") {
+        throw new Error(
+          `${request.model.model} ran with inference_geo "${geo}", not "us" — CLAUDE.md requires ` +
+            `US-hosted inference. ${geo === "not_available" ? "This model predates the parameter; use Claude 4.6 or later." : ""}`,
+        );
+      }
 
       /*
        * The tool call, not the prose. A model that answers in text rather than calling the tool
