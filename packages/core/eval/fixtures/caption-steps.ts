@@ -251,3 +251,64 @@ export function scoreCuisine(expected: string | null, actual: unknown): ClassVer
   if (got === null) return "declined";
   return got === expected ? "right" : "wrong";
 }
+
+
+/**
+ * Dish form and principal protein, hand-checked before the first run.
+ *
+ * **Form is expected to be null far more often than not** — most dishes are not a soup or a
+ * salad, and a model reaching for "bowl" on every plated dish would make the browse chip
+ * meaningless. So a decline here is usually the right answer, which is why the three-outcome
+ * split matters even more than it did for course.
+ *
+ * Protein is the axis the browse sketch actually leans on — Chx / Beef / Fish under Mains — and
+ * is the one that has to be good. Form is two rows and can ship without its chips.
+ */
+export interface CaptionAxisExpectation {
+  fixture: string;
+  /** null where the dish is none of the listed shapes */
+  dishForm: string | null;
+  /** null where no protein is at the centre — a dessert, a bread */
+  principalProtein: string | null;
+  why?: string;
+}
+
+export const CAPTION_AXIS_EXPECTATIONS: CaptionAxisExpectation[] = [
+  { fixture: "instagram-cinnamon-rolls", dishForm: null, principalProtein: null,
+    why: "a sweet bread has no protein at its centre" },
+  { fixture: "caption-cornflake-chicken-wrap", dishForm: "sandwich", principalProtein: "chicken",
+    why: "a wrap is a sandwich by form" },
+  { fixture: "instagram-lemony-shrimp-orzo", dishForm: null, principalProtein: "seafood",
+    why: "shrimp is seafood rather than fish; a one-pan orzo is no listed form" },
+  { fixture: "instagram-marry-me-sausage-soup", dishForm: "soup", principalProtein: "pork",
+    why: "Italian sausage is pork — the soup a person would name by its sausage" },
+  { fixture: "instagram-peach-posset", dishForm: null, principalProtein: null },
+  { fixture: "facebook-chicken-pad-thai", dishForm: null, principalProtein: "chicken" },
+  { fixture: "facebook-chile-lime-chicken-bowl", dishForm: "bowl", principalProtein: "chicken" },
+  { fixture: "facebook-homemade-burger-buns", dishForm: null, principalProtein: null,
+    why: "bread: no protein, and a bun is not one of the listed forms" },
+  { fixture: "facebook-street-corn-beef-bowls", dishForm: "bowl", principalProtein: "beef" },
+  { fixture: "facebook-sweet-chilli-crispy-rice-salad", dishForm: "salad", principalProtein: null,
+    why: "the caption calls it a salad; no protein is at its centre" },
+  { fixture: "instagram-boursin-sausage-pasta", dishForm: null, principalProtein: "pork" },
+  { fixture: "instagram-coconut-curry-brothy-rice", dishForm: null, principalProtein: "chicken",
+    why: "pan-seared chicken thighs over rice — brothy is not stew" },
+  { fixture: "instagram-one-pot-boursin-pasta", dishForm: null, principalProtein: null,
+    why: "the caption names no protein; the additions are suggestions" },
+  { fixture: "instagram-pb-cookie-dough-smores-bites", dishForm: null, principalProtein: null },
+  { fixture: "instagram-potato-sausage-soup", dishForm: "soup", principalProtein: "pork" },
+  { fixture: "instagram-sheet-pan-crunchwrap", dishForm: null, principalProtein: "beef",
+    why: "a crunchwrap is built on seasoned ground beef; it is not a sandwich by our list" },
+  { fixture: "instagram-summer-toast-board", dishForm: null, principalProtein: null },
+  { fixture: "instagram-texas-twinkies", dishForm: null, principalProtein: "beef",
+    why: "leftover brisket wrapped in bacon — brisket is what it is built on" },
+];
+
+/** the same three outcomes: a decline and a wrong answer are different news */
+export function scoreAxis(expected: string | null, actual: unknown): ClassVerdict {
+  const got = typeof actual === "string" && actual.trim() ? actual.trim().toLowerCase() : null;
+  // where the answer is genuinely none, declining IS right and naming one is wrong
+  if (expected === null) return got === null ? "right" : "wrong";
+  if (got === null) return "declined";
+  return got === expected ? "right" : "wrong";
+}

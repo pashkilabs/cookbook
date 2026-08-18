@@ -174,7 +174,7 @@ export type JsonSchema = Record<string, unknown>;
 export const RECIPE_JSON_SCHEMA: JsonSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["title", "servings", "totalMinutes", "ingredientLines", "steps", "course", "cuisine"],
+  required: ["title", "servings", "totalMinutes", "ingredientLines", "steps", "course", "cuisine", "dishForm", "principalProtein"],
   properties: {
     title: {
       type: ["string", "null"],
@@ -227,6 +227,16 @@ export const RECIPE_JSON_SCHEMA: JsonSchema = {
       type: ["string", "null"],
       description: "The cuisine, as a short common name — Italian, Thai, Mexican — or null.",
     },
+    dishForm: {
+      type: ["string", "null"],
+      enum: ["soup", "salad", "sandwich", "bake", "stew", "bowl", null],
+      description: "What shape the dish takes, or null — most dishes are none of these.",
+    },
+    principalProtein: {
+      type: ["string", "null"],
+      enum: ["chicken", "beef", "pork", "lamb", "fish", "seafood", "egg", "vegetarian", "vegan", null],
+      description: "The protein the dish is built around, or null.",
+    },
   },
 };
 
@@ -265,6 +275,24 @@ export const EXTRACTION_INSTRUCTIONS = [
   "Cuisine is the opposite: null unless the text names it or the dish is unmistakably of one",
   "tradition. Do not guess from a single ingredient — olive oil does not make a recipe Italian —",
   "and never answer with a region: Thai, not Asian.",
+  /*
+   * dishForm is orthogonal to course, which is the whole reason it is a separate field: a soup
+   * is a main AND a soup. Most dishes are none of these forms, so null is the common answer and
+   * the instruction says so — a model reaching for "bowl" on every plated dish would make the
+   * browse chip meaningless.
+   */
+  "Say the dish's form only if it is plainly one of the listed shapes — a soup is a soup even",
+  "when it is the main course. Most dishes are none of them; answer null rather than reaching.",
+  /*
+   * "Use vegetarian when there is no meat or fish" was my instruction and it was wrong: it made
+   * every dessert, bread and toast board vegetarian, because absence of meat is not the same as
+   * a plant protein at the centre. Null is the answer for a dish built on no protein at all.
+   */
+  "Say the principal protein the dish is built around, from its ingredients: the one a person",
+  "would name if asked what they were eating. Sausage, bacon and ham are pork.",
+  "Answer vegetarian or vegan only when beans, lentils, tofu or another plant protein is what the",
+  "dish is built on. A dessert, a bread, a salad of vegetables or a dish whose protein is only a",
+  "serving suggestion has none — answer null. Absence of meat is not vegetarian.",
 ].join(" ");
 
 // ---------------------------------------------------------------------------
@@ -279,6 +307,8 @@ export interface RecipePayload {
   steps: string[];
   course: string | null;
   cuisine: string | null;
+  dishForm: string | null;
+  principalProtein: string | null;
 }
 
 export type ValidationResult =
@@ -364,12 +394,20 @@ export function validateRecipePayload(value: unknown): ValidationResult {
       // escalate to a pricier model to fix a field the review screen can set in one tap
       course: COURSES.has(String(candidate.course)) ? String(candidate.course) : null,
       cuisine: trimmedOrNull(candidate.cuisine),
+      dishForm: DISH_FORMS.has(String(candidate.dishForm)) ? String(candidate.dishForm) : null,
+      principalProtein: PROTEINS.has(String(candidate.principalProtein))
+        ? String(candidate.principalProtein)
+        : null,
     },
   };
 }
 
 /** the closed list the column's CHECK enforces — kept here so a bad label never reaches it */
 const COURSES = new Set(["breakfast", "starter", "main", "side", "dessert", "drink", "snack"]);
+const DISH_FORMS = new Set(["soup", "salad", "sandwich", "bake", "stew", "bowl"]);
+const PROTEINS = new Set([
+  "chicken", "beef", "pork", "lamb", "fish", "seafood", "egg", "vegetarian", "vegan",
+]);
 
 function trimmedOrNull(value: unknown): string | null {
   if (typeof value !== "string") return null;

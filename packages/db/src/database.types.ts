@@ -832,9 +832,11 @@ export type Database = {
           created_by: string | null
           cuisine: string | null
           deleted_at: string | null
+          dish_form: string | null
           family_id: string
           id: string
           make_again: boolean | null
+          principal_protein: string | null
           servings: number | null
           source_name: string | null
           source_url: string | null
@@ -851,9 +853,11 @@ export type Database = {
           created_by?: string | null
           cuisine?: string | null
           deleted_at?: string | null
+          dish_form?: string | null
           family_id: string
           id?: string
           make_again?: boolean | null
+          principal_protein?: string | null
           servings?: number | null
           source_name?: string | null
           source_url?: string | null
@@ -870,9 +874,11 @@ export type Database = {
           created_by?: string | null
           cuisine?: string | null
           deleted_at?: string | null
+          dish_form?: string | null
           family_id?: string
           id?: string
           make_again?: boolean | null
+          principal_protein?: string | null
           servings?: number | null
           source_name?: string | null
           source_url?: string | null

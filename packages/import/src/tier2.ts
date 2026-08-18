@@ -122,6 +122,8 @@ export async function extractWithLlm(input: Tier2Input): Promise<Tier2Result> {
         steps: validated.value.steps,
         course: validated.value.course,
         cuisine: validated.value.cuisine,
+        dishForm: validated.value.dishForm,
+        principalProtein: validated.value.principalProtein,
         // a model is never asked for an image URL: it would invent a plausible one,
         // and a wrong image is worse than none. Images come from the page's markup.
         imageUrl: null,

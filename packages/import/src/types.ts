@@ -69,6 +69,9 @@ export interface ExtractedRecipe {
    */
   course?: string | null;
   cuisine?: string | null;
+  /** orthogonal to course: a soup is a main AND a soup */
+  dishForm?: string | null;
+  principalProtein?: string | null;
   /** ordered method steps, as the source wrote them */
   steps: string[];
   /** resolved absolute URL, or null when the page offered none we could use */
