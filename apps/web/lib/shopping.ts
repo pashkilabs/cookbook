@@ -1,3 +1,4 @@
+import { maybeRow, rows } from "./rows";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   consolidate,
@@ -165,14 +166,17 @@ export async function buildShoppingWeek(
   const leftovers = significantLeftovers(lines);
 
   // Candidates are the household's other recipes — the ones not already planned this week.
-  const { data: candidateRows } = await supabase
+  const candidateRows = rows(
+    await supabase
     .from("recipes")
     .select("id, title, recipe_ingredients(item_text)")
     .eq("family_id", familyId)
     .is("deleted_at", null)
     .eq("status", "active")
     .not("id", "in", `(${recipeIds.join(",")})`)
-    .limit(200);
+    .limit(200),
+    "candidateRows",
+  );
 
   const candidates = (candidateRows ?? []).map((row) => ({
     id: row.id as string,

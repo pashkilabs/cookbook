@@ -1,4 +1,5 @@
 import { userClient } from "@/lib/supabase-server";
+import { maybeRow, rows } from "@/lib/rows";
 import { platformStore } from "@/lib/platform";
 import { admin } from "@/lib/import-jobs";
 import { createRecipeFrom } from "@/lib/recipe-writes";
@@ -19,13 +20,16 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
   // Ownership is established by reading through the caller's own session — RLS answers the
   // question — before anything touches the service role below.
-  const { data: job } = await supabase
+  const job = maybeRow(
+    await supabase
     .from("import_jobs")
     .select("id, status, result_json")
     .eq("id", id)
     .eq("family_id", familyId)
     .is("deleted_at", null)
-    .maybeSingle();
+    .maybeSingle(),
+    "job",
+  );
 
   if (!job) return Response.json({ error: "no such import" }, { status: 404 });
   if (job.status !== "review") {
@@ -78,13 +82,16 @@ export async function DELETE(_request: Request, context: { params: Promise<{ id:
   if ("response" in scope) return scope.response;
   const { supabase, familyId } = scope;
 
-  const { data: job } = await supabase
+  const job = maybeRow(
+    await supabase
     .from("import_jobs")
     .select("id, status, result_json")
     .eq("id", id)
     .eq("family_id", familyId)
     .is("deleted_at", null)
-    .maybeSingle();
+    .maybeSingle(),
+    "job",
+  );
 
   if (!job) return Response.json({ error: "no such import" }, { status: 404 });
 

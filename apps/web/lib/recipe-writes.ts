@@ -1,3 +1,4 @@
+import { maybeRow, rows } from "./rows";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { prepareRecipe, type PreparedRecipe } from "./recipe-input";
 import { refusal } from "./refusal";
@@ -269,12 +270,15 @@ export async function classifyIfUnclassified(
   const cascade = cascadeFromEnv();
   if (!cascade) return;
 
-  const { data: recipe } = await supabase
+  const recipe = maybeRow(
+    await supabase
     .from("recipes")
     .select("id, title, course, cuisine, dish_form, principal_protein, classified_at")
     .eq("id", recipeId)
     .is("deleted_at", null)
-    .maybeSingle();
+    .maybeSingle(),
+    "recipe",
+  );
   if (!recipe || recipe.classified_at) return;
   // nothing to overwrite is the precondition, not just "unstamped"
   if (recipe.course || recipe.cuisine || recipe.dish_form || recipe.principal_protein) return;

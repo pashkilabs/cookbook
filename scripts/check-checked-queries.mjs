@@ -11,21 +11,21 @@
  * Each was written by someone who knew the rule, so this is not a fourth reminder — `lib/rows.ts`
  * makes the checked version the easy one and this stops the unchecked one coming back.
  *
- * **Scoped to what is converted.** Routes and lib still use the bare form; a guard that fired on
- * them would be a red gate nobody could clear, and that is how guards get disabled. Widen the
- * scope in the same change that converts the next slice, never before it.
+ * **Landed with its conversion, never before it.** A guard firing on unconverted sites is a red
+ * gate nobody can clear, and that is how guards get disabled. Each scope was converted and
+ * guarded in one commit: render paths first, then routes, then lib.
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-const SCOPE = "apps/web/app";
+const SCOPES = ["apps/web/app", "apps/web/lib"];
 const offenders = [];
 
-(function walk(dir) {
+for (const SCOPE of SCOPES) (function walk(dir) {
   for (const name of readdirSync(dir)) {
     const path = join(dir, name);
     if (statSync(path).isDirectory()) walk(path);
-    else if (path.endsWith("page.tsx")) check(path);
+    else if (/(page\.tsx|route\.ts)$/.test(path) || path.startsWith("apps/web/lib")) check(path);
   }
 })(SCOPE);
 
@@ -44,10 +44,10 @@ function check(path) {
 }
 
 if (offenders.length > 0) {
-  console.error("these render paths discard a query's error, so a failure renders as empty:");
+  console.error("these queries discard a query's error, so a failure looks like an empty result:");
   for (const at of offenders) console.error(`  ${at}`);
   console.error("\nUse rows() or maybeRow() from @/lib/rows — they return the data or throw.");
   process.exit(1);
 }
 
-console.log(`every page checks its queries (${SCOPE}/**/page.tsx).`);
+console.log(`every page, route and lib query is checked (${SCOPES.join(", ")}).`);

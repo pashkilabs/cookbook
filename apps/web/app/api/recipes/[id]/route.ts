@@ -1,4 +1,5 @@
 import { userClient } from "@/lib/supabase-server";
+import { maybeRow, rows } from "@/lib/rows";
 import { platformStore } from "@/lib/platform";
 import { prepareRecipe } from "@/lib/recipe-input";
 import { statusFor, writeChildren , classifyIfUnclassified } from "@/lib/recipe-writes";
@@ -120,11 +121,14 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     .eq("id", id);
   await classifyIfUnclassified(supabase, id);
 
-  const { data: after } = await supabase
+  const after = maybeRow(
+    await supabase
     .from("recipes")
     .select("course, cuisine, dish_form, principal_protein")
     .eq("id", id)
-    .maybeSingle();
+    .maybeSingle(),
+    "after",
+  );
   return Response.json({ ok: true, classification: after ?? null });
 }
 

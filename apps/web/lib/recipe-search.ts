@@ -1,3 +1,4 @@
+import { maybeRow, rows } from "./rows";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
@@ -133,12 +134,15 @@ export async function keepWholeFamilyLikes(
 ): Promise<SearchHit[]> {
   if (hits.length === 0) return hits;
 
-  const { data } = await supabase
+  const data = rows(
+    await supabase
     .from("ratings")
     .select("recipe_id, score")
     .eq("family_id", familyId)
     .in("recipe_id", hits.map((hit) => hit.recipe.id))
-    .is("deleted_at", null);
+    .is("deleted_at", null),
+    "data",
+  );
 
   const scores = new Map<string, number[]>();
   for (const rating of data ?? []) {
