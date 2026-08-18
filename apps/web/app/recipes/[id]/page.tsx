@@ -81,6 +81,9 @@ export default async function RecipePage({
       .from("photos")
       .select("storage_path, source, width, height")
       .eq("recipe_id", id)
+      // the hero is a photograph of the food. A card is provenance and renders by the source
+      // line instead — a page whose picture is an index card tells you nothing about dinner (§56)
+      .neq("source", "source")
       .eq("upload_state", "stored")
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
@@ -92,6 +95,34 @@ export default async function RecipePage({
 
   // The bucket is private, so a URL has to be signed. Signed as the person viewing, so the
   // storage policy is what authorises it — the same reasoning as reading the rows.
+  /*
+   * Fetched separately from the hero rather than filtered out of one query: they are different
+   * kinds with opposite publishing rules, and one query returning "whichever came back first"
+   * is how a card would end up as a recipe's face.
+   */
+  let sourcePhotoUrl: string | null = null;
+  {
+    const card = maybeRow(
+      await supabase
+        .from("photos")
+        .select("storage_path")
+        .eq("recipe_id", id)
+        .eq("source", "source")
+        .eq("upload_state", "stored")
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      "source photo",
+    );
+    if (card?.storage_path) {
+      const signed = await supabase.storage
+        .from("recipe-photos")
+        .createSignedUrl(card.storage_path as string, 600);
+      sourcePhotoUrl = signed.data?.signedUrl ?? null;
+    }
+  }
+
   let photoUrl: string | null = null;
   if (photo.data?.storage_path) {
     const signed = await supabase.storage
@@ -305,6 +336,25 @@ export default async function RecipePage({
             {recipe.source_name || new URL(recipe.source_url).hostname.replace(/^www\./, "")}
           </a>
         </p>
+      )}
+
+      {/*
+        * The card this was read from — provenance, beside the source line rather than at the top.
+        *
+        * It answers "is this really what Grandma wrote", which is a different question from
+        * "what does it look like", and it is the question a handwritten card raises. A collapsed
+        * disclosure because most visits are somebody cooking, who wants the method; the card is
+        * for the visit where a quantity looks wrong.
+        *
+        * Never published, whatever this recipe's visibility (§56): a photograph of a printed page
+        * carries someone else's copyright, and the policies enforce that independently of this.
+        */}
+      {sourcePhotoUrl && (
+        <details style={{ marginBottom: "1.5rem" }}>
+          <summary className="meta">The card this came from</summary>
+          {/* eslint-disable-next-line @next/next/no-img-element -- a signed URL expires */}
+          <img src={sourcePhotoUrl} alt="" className="photo" style={{ marginTop: "0.75rem" }} />
+        </details>
       )}
 
       <section>

@@ -215,6 +215,9 @@ export default async function BrowsePage({
       .from("photos")
       .select("recipe_id, storage_path")
       .eq("family_id", family.id)
+      // never a card: a grid of index cards where dish photographs should be reads as a filing
+      // cabinet, and is useless to somebody scanning for what to eat (§56)
+      .neq("source", "source")
       .is("deleted_at", null)
       .in(
         "recipe_id",

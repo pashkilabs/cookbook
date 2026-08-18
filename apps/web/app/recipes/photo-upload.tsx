@@ -16,10 +16,10 @@ import { canvasPlan } from "./import/rotation";
  * regardless of how the recipe arrived, which is the distinction the storage policies and §17's
  * publishing rule both turn on.
  *
- * **Not the card.** A photograph of a recipe card is provenance rather than a picture of food,
- * and §17 makes published recipes world-readable — a copyrighted printed page must not go on one.
- * That is `source = 'source'`, deliberately separate, and until it exists the import Photograph
- * path still discards its card image.
+ * **The card is a different kind.** A photograph *of* a recipe card is provenance rather than a
+ * picture of food, so it is stored as `source = 'source'` and is never published whatever the
+ * recipe's visibility — §17 makes published recipes world-readable and a copyrighted printed page
+ * must not go on one (§56). `uploadRecipePhoto` takes which kind it is holding.
  *
  * Downscaled with the same `canvasPlan` the orientation work uses, for the same reasons: it saves
  * the upload on a phone, and `canvas.toBlob` re-encodes from raw pixels, which strips EXIF
@@ -57,9 +57,14 @@ async function downscale(file: File): Promise<Blob> {
   return blob ?? file;
 }
 
-export async function uploadRecipePhoto(recipeId: string, file: File): Promise<string | null> {
+export async function uploadRecipePhoto(
+  recipeId: string,
+  file: File,
+  source: "camera" | "source" = "camera",
+): Promise<string | null> {
   const form = new FormData();
   form.append("recipeId", recipeId);
+  form.append("source", source);
   form.append("photo", await downscale(file), "photo.jpg");
   const response = await fetch("/api/recipes", { method: "POST", body: form });
   if (response.ok) return null;

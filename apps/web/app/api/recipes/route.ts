@@ -46,11 +46,14 @@ export async function POST(request: Request) {
         { status: 413 },
       );
     }
+    // "source" means a photograph of the recipe itself — the card it was read from
+    const kind = String(form.get("source") ?? "") === "source" ? "source" : "camera";
     const attached = await attachRecipePhoto(
       supabase,
       family.id,
       recipeId,
       new Uint8Array(await file.arrayBuffer()),
+      kind,
     );
     return attached.ok
       ? Response.json({ ok: true })

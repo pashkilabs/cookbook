@@ -156,6 +156,16 @@ export function PasteFlow({ mode }: { mode: "text" | "photos" }) {
   const [shrunk, setShrunk] = useState<string | null>(null);
   const router = useRouter();
 
+  /*
+   * The photographs the person uploaded, kept until the recipe exists to hang them on.
+   *
+   * Reading a card used to consume it: extraction ran and the image was discarded, so for a card
+   * in someone's grandmother's hand the only record of the original was gone. Saved as `source` —
+   * provenance rather than the recipe's face, and never published whatever the recipe's
+   * visibility (§56).
+   */
+  const [cardsToKeep, setCardsToKeep] = useState<File[]>([]);
+
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
@@ -197,6 +207,9 @@ export function PasteFlow({ mode }: { mode: "text" | "photos" }) {
                 ? ` · turned ${turned} the right way up`
                 : " · already the right way up"),
         );
+        // held for the save: reading a card used to consume it, and for a handwritten original
+        // the photograph is the only record there is
+        setCardsToKeep(files);
         // no Content-Type: the browser sets the multipart boundary itself
         response = await fetch("/api/import", { method: "POST", body: form });
       }
@@ -235,6 +248,13 @@ export function PasteFlow({ mode }: { mode: "text" | "photos" }) {
      * reported and not fatal — the recipe is the point, and unwinding a saved recipe over a
      * picture would be the wrong trade (the same one recipe-writes.ts makes for imports).
      */
+    // the card first: it is the thing that would otherwise be lost, where a dish photograph can
+    // still be added later from the recipe page
+    for (const card of cardsToKeep) {
+      const kept = await uploadRecipePhoto(body.id, card, "source").catch(() => "upload failed");
+      if (kept) console.warn(`[pashki] card not kept for ${body.id}: ${kept}`);
+    }
+
     if (photoFile) {
       const failed = await uploadRecipePhoto(body.id, photoFile).catch((thrown) =>
         thrown instanceof Error ? thrown.message : "that photo did not upload.",

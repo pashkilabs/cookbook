@@ -186,6 +186,12 @@ export async function attachRecipePhoto(
   familyId: string,
   recipeId: string,
   bytes: Uint8Array,
+  /*
+   * 'camera' is the household's photograph of the food; 'source' is a photograph *of* the
+   * recipe — the card it was read from. They behave oppositely on a published recipe (§56):
+   * a dish photo follows the recipe's visibility, a card is never published at all.
+   */
+  source: "camera" | "source" = "camera",
 ): Promise<{ ok: true; storagePath: string } | { ok: false; error: string; status: number }> {
   const owned = await supabase
     .from("recipes")
@@ -229,6 +235,9 @@ export async function attachRecipePhoto(
     .from("photos")
     .update({ deleted_at: new Date().toISOString() })
     .eq("recipe_id", recipeId)
+    // scoped to the kind: a recipe holds one dish photograph AND one card, and attaching
+    // either must not tombstone the other
+    .eq("source", source)
     .is("deleted_at", null);
   if (tombstoned.error) return { ok: false, error: tombstoned.error.message, status: 500 };
 
