@@ -159,3 +159,71 @@ function readPhoto(value: unknown, familyId: string) {
     height: Number.isInteger(photo.height) ? (photo.height as number) : null,
   };
 }
+
+/**
+ * Attach a photograph the household took, to a recipe that already exists.
+ *
+ * `source` is `camera`, not `import` — the household's own picture rather than the original
+ * site's, which is the distinction 090700's storage policies and §17's publishing rule both
+ * turn on. An imported image stays off a published page while the copyright question is open;
+ * one a household took itself does not have that problem.
+ *
+ * **Not the card.** A photograph *of a recipe card* is provenance rather than a picture of the
+ * food, and publishing one would put a copyrighted printed page on a world-readable URL. That is
+ * `source = 'source'` and it is deliberately not built here — so the import Photograph path still
+ * discards its card image, which is a known gap rather than an oversight.
+ *
+ * One photo per recipe: attaching a second replaces the first, because "the photo of this recipe"
+ * is what every screen asks for and a list is a different feature.
+ */
+export async function attachRecipePhoto(
+  supabase: SupabaseClient,
+  familyId: string,
+  recipeId: string,
+  bytes: Uint8Array,
+): Promise<{ ok: true; storagePath: string } | { ok: false; error: string; status: number }> {
+  const owned = await supabase
+    .from("recipes")
+    .select("id")
+    .eq("id", recipeId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  // filtered here as well as by RLS: a policy decides what may leave the database, a screen
+  // decides whose kitchen it shows, and those are different questions (CLAUDE.md)
+  if (!owned.data) return { ok: false, error: "no such recipe", status: 404 };
+
+  const { storeImportedPhoto } = await import("@pashki/import/photo-storage");
+  const stored = await storeImportedPhoto({ familyId, bytes }, { supabase });
+  if (!stored.ok) {
+    return { ok: false, error: `${stored.failure.kind}: ${stored.failure.detail}`, status: 422 };
+  }
+
+  /*
+   * Tombstone then insert, not an upsert.
+   *
+   * `photos` is unique on `id` and `storage_path` and **not on `recipe_id`**, so
+   * `onConflict: "recipe_id"` is a runtime error rather than a replace — Postgres wants a
+   * constraint matching the target and there is none. Tombstoning is also what this schema means
+   * by deletion everywhere else: clients hold no DELETE, every removal is an UPDATE setting
+   * `deleted_at`, and the reaper collects the orphaned object later.
+   */
+  const tombstoned = await supabase
+    .from("photos")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("recipe_id", recipeId)
+    .is("deleted_at", null);
+  if (tombstoned.error) return { ok: false, error: tombstoned.error.message, status: 500 };
+
+  const { error } = await supabase.from("photos").insert({
+    family_id: familyId,
+    recipe_id: recipeId,
+    storage_path: stored.storagePath,
+    source: "camera",
+    upload_state: "stored",
+    width: stored.width,
+    height: stored.height,
+  });
+  if (error) return { ok: false, error: error.message, status: 500 };
+
+  return { ok: true, storagePath: stored.storagePath };
+}

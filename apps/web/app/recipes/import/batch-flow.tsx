@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { uploadRecipePhoto } from "../photo-upload";
 import { RecipeReview, type Draft, type Photo } from "./recipe-review";
 
 /**
@@ -125,7 +126,7 @@ export function BatchFlow() {
     void drain();
   }
 
-  async function accept(job: Job, edited: Draft) {
+  async function accept(job: Job, edited: Draft, photoFile: File | null) {
     setSaving((current) => ({ ...current, [job.id]: null }));
     const response = await fetch(`/api/import/jobs/${job.id}`, {
       method: "POST",
@@ -140,6 +141,17 @@ export function BatchFlow() {
       }));
       return;
     }
+    // after the recipe exists, because a photo needs an id to hang on; a failure is reported
+    // against this job and does not unwind the save
+    if (photoFile) {
+      const failed = await uploadRecipePhoto(body.id, photoFile).catch((thrown) =>
+        thrown instanceof Error ? thrown.message : "that photo did not upload.",
+      );
+      if (failed) {
+        setSaving((current) => ({ ...current, [job.id]: `Saved, but the photo did not: ${failed}` }));
+      }
+    }
+
     // the others stay exactly where they were
     setJobs((current) => current.filter((other) => other.id !== job.id));
     setOpen(null);
@@ -242,7 +254,7 @@ export function BatchFlow() {
                     fromCache={job.fromCache}
                     error={saving[job.id] ?? null}
                     saveLabel="Keep this one"
-                    onSave={(edited) => void accept(job, edited)}
+                    onSave={(edited, photoFile) => void accept(job, edited, photoFile)}
                     onDiscard={() => void discard(job)}
                   />
                 </div>

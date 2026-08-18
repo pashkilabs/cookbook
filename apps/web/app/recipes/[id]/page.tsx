@@ -10,6 +10,7 @@ import { startOfWeek, todayIso } from "@/lib/week";
 import { ShortlistButton } from "../shortlist-button";
 import { RemoveRecipe } from "./remove";
 import { Verdicts } from "./verdicts";
+import { PhotoUpload } from "../photo-upload";
 import { linkify } from "./linkify";
 import { Substitution } from "./substitution";
 
@@ -173,6 +174,10 @@ export default async function RecipePage({
           height={photo.data?.height ?? undefined}
         />
       )}
+
+      {/* the placement Stephen was reaching for: an existing recipe with no picture had no way
+          to get one, on any screen. Labelled by what it does to the recipe you can see. */}
+      <PhotoUpload recipeId={recipe.id} label={photoUrl ? "Replace the photo" : "Add a photo"} />
 
       <div className="bar" style={{ marginBottom: "1.5rem" }}>
         <div>

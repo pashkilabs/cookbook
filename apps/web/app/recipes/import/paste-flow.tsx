@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { uploadRecipePhoto } from "../photo-upload";
 import { RecipeReview, type Draft } from "./recipe-review";
 import { canvasPlan, type Turn } from "./rotation";
 
@@ -215,7 +216,7 @@ export function PasteFlow({ mode }: { mode: "text" | "photos" }) {
     }
   }
 
-  async function save(edited: Draft) {
+  async function save(edited: Draft, photoFile: File | null) {
     setBusy(true);
     setError(null);
     const response = await fetch("/api/recipes", {
@@ -229,6 +230,22 @@ export function PasteFlow({ mode }: { mode: "text" | "photos" }) {
       setBusy(false);
       return;
     }
+    /*
+     * After the recipe exists, because a photo needs an id to hang on. A failure here is
+     * reported and not fatal — the recipe is the point, and unwinding a saved recipe over a
+     * picture would be the wrong trade (the same one recipe-writes.ts makes for imports).
+     */
+    if (photoFile) {
+      const failed = await uploadRecipePhoto(body.id, photoFile).catch((thrown) =>
+        thrown instanceof Error ? thrown.message : "that photo did not upload.",
+      );
+      if (failed) {
+        setError(`Recipe saved, but the photo did not upload: ${failed}`);
+        setBusy(false);
+        return;
+      }
+    }
+
     router.push(`/recipes/${body.id}`);
     router.refresh();
   }

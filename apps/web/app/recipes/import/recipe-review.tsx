@@ -38,7 +38,7 @@ interface RecipeReviewProps {
   error?: string | null;
   saveLabel?: string;
   discardLabel?: string;
-  onSave: (draft: Draft) => void;
+  onSave: (draft: Draft, photoFile: File | null) => void;
   onDiscard: () => void;
 }
 
@@ -54,6 +54,15 @@ export function RecipeReview({
   onDiscard,
 }: RecipeReviewProps) {
   const [draft, setDraft] = useState(initial);
+  /*
+   * Chosen here, uploaded after save — the recipe has no id until it exists, and a photo needs
+   * one to hang on. Held rather than uploaded eagerly so a discarded review leaves no orphan.
+   *
+   * One control for all three import paths, because this component is all three: a link, a
+   * caption and a photograph all review through here, and building it anywhere else would have
+   * been building it three times.
+   */
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
 
   const set =
     (field: keyof Draft) =>
@@ -71,9 +80,23 @@ export function RecipeReview({
       style={{ maxWidth: "none" }}
       onSubmit={(event) => {
         event.preventDefault();
-        onSave(draft);
+        onSave(draft, photoFile);
       }}
     >
+      <label>
+        <span>A photo of the finished dish (optional)</span>
+        <input
+          type="file"
+          accept="image/*"
+          onChange={(event) => setPhotoFile(event.target.files?.[0] ?? null)}
+        />
+        <span className="meta">
+          {photoFile
+            ? `${photoFile.name} — added when you save.`
+            : "Yours, not the source's. Added when you save, and you can add one later instead."}
+        </span>
+      </label>
+
       <div className="notice">
         Read from{" "}
         <a href={draft.sourceUrl} target="_blank" rel="noreferrer noopener">
