@@ -180,6 +180,17 @@ models be good enough. Do not add a silent-save path.
   finished restarting. Two rules follow. A check reports three outcomes, not two —
   passed, failed, and could-not-measure, with different exit codes. And a skip that
   infrastructure timing could have caused gets retried before it is believed.
+- **A permission nothing has exercised is a permission you do not have.** Every object
+  in the photo bucket had been written by the import service as `service_role`, which
+  **bypasses RLS entirely** — so `storage.objects` having no INSERT policy at all was
+  invisible for months. Nothing was wrong until a client tried, and then everything was.
+  The same family as *an endpoint answering is not a feature*: **a path that has only
+  ever run with elevated privilege has not tested its permissions**, it has tested that
+  privilege can skip them. So when a feature gives a client a write that only the service
+  role has ever done, treat the policy as absent until something has actually written as
+  that client — and put that write in a test, because it is the only thing that
+  distinguishes "permitted" from "never asked".
+
 - **Supabase Storage refuses with the *identical* wording a table refuses with.**
   `new row violates row-level security policy` names the mechanism, not the location —
   so an upload blocked by `storage.objects` reads exactly like one blocked by the table
