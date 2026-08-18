@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { SUBSTITUTIONS, createSubstitutions, formatInSystem } from "@pashki/core";
+import { SUBSTITUTIONS, createSubstitutions, formatInSystem, stripLeadingDecoration } from "@pashki/core";
 import { INGREDIENT_COLUMNS } from "@pashki/db/catalog";
 import { andList, energyForRecipe } from "@/lib/energy";
 import { scaleIngredientAmounts, servingsForScale } from "@/lib/planner";
@@ -296,9 +296,9 @@ export default async function RecipePage({
         <h2>Method</h2>
         {steps.data?.length ? (
           <ol className="steps">
-            {/* linked at render time, never stored as markup — see ./linkify */}
+            {/* linked and de-decorated at render time; the stored text stays as the source wrote it */}
             {steps.data.map((step) => (
-              <li key={step.id}>{linkify(step.text)}</li>
+              <li key={step.id}>{linkify(stripLeadingDecoration(step.text))}</li>
             ))}
           </ol>
         ) : (

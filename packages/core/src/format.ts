@@ -248,3 +248,28 @@ export function formatInSystem(
   }
   return formatMeasure(measure.amount, measure.dimension, system);
 }
+
+/**
+ * Drop decoration from the *start* of a step, for display only.
+ *
+ * A caption whose every instruction begins `💕Start by seasoning…` is using the emoji as a
+ * bullet. Cook mode should not show it before every line, and neither should the recipe page.
+ *
+ * **Stored text is untouched.** The same reasoning that keeps a source's `fresh fill` typo as
+ * written: what the source said is the record, and a leading emoji is presentation. Strip at
+ * render, so the decision is reversible and the original is never lost.
+ *
+ * **Leading only.** A mid-sentence emoji may be carrying real meaning — "🔥 high heat", or a
+ * chilli marking a spicy variation — and removing it would be editing the method rather than
+ * formatting it. So this anchors at the start, takes any run of decoration and the whitespace
+ * after it, and stops at the first character that could be words.
+ */
+const LEADING_DECORATION =
+  /^(?:[\s‍️•▪●□▸‣⁃∙*+·–—-]|\p{Extended_Pictographic})+/u;
+
+export function stripLeadingDecoration(step: string): string {
+  const text = String(step ?? "");
+  const stripped = text.replace(LEADING_DECORATION, "");
+  // a step that is *only* decoration keeps its text rather than becoming empty
+  return stripped.trim() === "" ? text.trim() : stripped;
+}
