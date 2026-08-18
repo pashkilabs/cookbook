@@ -31,13 +31,23 @@ const TOP_LEVEL = [
   { key: "lunch", label: "Lunch", field: "course" },
 ] as const;
 
-/** the second level under Mains — three proteins the sketch names, plus a computed one */
-const MAIN_FILTERS = [
-  { key: "chicken", label: "Chicken" },
-  { key: "beef", label: "Beef" },
-  { key: "fish", label: "Fish" },
-  { key: "kid", label: "Kid-friendly" },
+/**
+ * The second level under Mains, **derived from the household's data rather than a constant.**
+ *
+ * The sketch names Chicken, Beef and Fish, and hard-coding those three was wrong: the classifier
+ * produces nine values, and pork alone was correct on eleven recipes that the UI then made
+ * unreachable. Lamb, seafood, egg, vegetarian and vegan were all classified and invisible.
+ *
+ * So a chip appears only where this household has recipes with that protein — the same rule as
+ * cuisine and for the same reason. A Lamb chip on a household with no lamb reads as broken, and
+ * the row grows as their collection does. `PROTEIN_ORDER` fixes the sequence so the chips do not
+ * reshuffle as recipes arrive; it does not decide which appear.
+ */
+const PROTEIN_ORDER = [
+  "chicken", "beef", "pork", "lamb", "fish", "seafood", "egg", "vegetarian", "vegan",
 ] as const;
+
+const proteinLabel = (key: string) => key[0]!.toUpperCase() + key.slice(1);
 
 /**
  * A tile for a recipe with no photograph.
@@ -119,8 +129,44 @@ export default async function BrowsePage({
     .eq(chosen.field, chosen.key)
     .order("title");
 
-  const protein = MAIN_FILTERS.find((f) => f.key === rawProtein) ?? null;
-  if (protein && protein.key !== "kid") query = query.eq("principal_protein", protein.key);
+  const protein =
+    rawProtein === "kid" || PROTEIN_ORDER.includes(rawProtein as (typeof PROTEIN_ORDER)[number])
+      ? rawProtein!
+      : null;
+  if (protein && protein !== "kid") query = query.eq("principal_protein", protein);
+
+  /*
+   * Which chips this household can actually use, asked of its own recipes.
+   *
+   * A separate query rather than derived from `rows`, because `rows` is already filtered by the
+   * chosen protein — deriving from it would leave exactly one chip standing the moment you tapped
+   * one, and no way back to the others.
+   *
+   * Kid-friendly is appended unconditionally where a household has any child at all: it is
+   * computed from ratings rather than stored, so there is no column to count, and a household
+   * with children has somewhere for it to lead even if nothing qualifies yet.
+   */
+  let available: string[] = [];
+  if (chosen.key === "main") {
+    const [{ data: proteinRows }, { count: children }] = await Promise.all([
+      supabase
+        .from("recipes")
+        .select("principal_protein")
+        .eq("family_id", family.id)
+        .is("deleted_at", null)
+        .eq("course", "main")
+        .not("principal_protein", "is", null),
+      supabase
+        .from("family_members")
+        .select("id", { count: "exact", head: true })
+        .eq("family_id", family.id)
+        .is("deleted_at", null)
+        .eq("is_child", true),
+    ]);
+    const held = new Set((proteinRows ?? []).map((r) => r.principal_protein as string));
+    available = PROTEIN_ORDER.filter((key) => held.has(key));
+    if ((children ?? 0) > 0) available.push("kid");
+  }
 
   const { data: rows, error } = await query;
   /*
@@ -145,7 +191,7 @@ export default async function BrowsePage({
    * **At least one child rating 4+, and none below.** The stricter reading — every child has
    * rated it — is blank for months, and an empty chip reads as broken rather than as honest.
    */
-  if (protein?.key === "kid" && recipes.length > 0) {
+  if (protein === "kid" && recipes.length > 0) {
     const { data: ratings } = await supabase
       .from("ratings")
       .select("recipe_id, score, family_members!inner(is_child)")
@@ -193,19 +239,17 @@ export default async function BrowsePage({
       </p>
       <h1>{chosen.label}</h1>
 
-      {chosen.key === "main" && (
+      {chosen.key === "main" && available.length > 0 && (
         <div className="tabs">
-          {MAIN_FILTERS.map((filter) => (
+          {available.map((key) => (
             <Link
-              key={filter.key}
-              className={`chip${protein?.key === filter.key ? " on" : ""}`}
+              key={key}
+              className={`chip${protein === key ? " on" : ""}`}
               href={
-                protein?.key === filter.key
-                  ? "/recipes/browse?in=main"
-                  : `/recipes/browse?in=main&protein=${filter.key}`
+                protein === key ? "/recipes/browse?in=main" : `/recipes/browse?in=main&protein=${key}`
               }
             >
-              {filter.label}
+              {key === "kid" ? "Kid-friendly" : proteinLabel(key)}
             </Link>
           ))}
         </div>
