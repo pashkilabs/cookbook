@@ -180,6 +180,16 @@ models be good enough. Do not add a silent-save path.
   finished restarting. Two rules follow. A check reports three outcomes, not two —
   passed, failed, and could-not-measure, with different exit codes. And a skip that
   infrastructure timing could have caused gets retried before it is believed.
+- **A version stamp only works if somebody turns it.** `EXTRACTOR_VERSION` exists precisely
+  so a fixed extractor expires cached answers written by the broken one — and it sat at `1`
+  through two changes that altered the payload, so every cached URL kept serving recipes with
+  an empty method. Its own doc says *"forgetting to bump costs every household a wrong recipe
+  forever. When unsure, bump."* The mechanism was right and unused, which is a **different
+  failure from a missing mechanism and reads identically from the outside**: the cache returns
+  a confident, well-formed, stale answer. So when a change alters what an extractor produces,
+  bumping is part of the change, not a follow-up — and record what each version *means*, since
+  a bare integer gives the next reader nothing to compare against.
+
 - **A permission nothing has exercised is a permission you do not have.** Every object
   in the photo bucket had been written by the import service as `service_role`, which
   **bypasses RLS entirely** — so `storage.objects` having no INSERT policy at all was

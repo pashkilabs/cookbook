@@ -55,7 +55,20 @@
  *     as stale, which is correct: they were written by the extractor as it stood before the
  *     `fetchUrl` and image-reference corrections.
  */
-export const EXTRACTOR_VERSION = 1;
+/*
+ * What each version means, so the next change can see whether it needs a bump.
+ *
+ *   1  the original stamped extractor
+ *   2  the method is asked for (steps went 0/35 to 35/35 on the caption set), and course and
+ *      cuisine are inferred. Entries written at 1 carry an empty steps array and neither
+ *      classification field — a wrong recipe, served confidently, exactly what the stamp exists
+ *      to expire.
+ *
+ * This sat at 1 through both changes. The stamp worked; nobody turned it. Recording the meanings
+ * rather than only the number is the cheap half of not repeating that — a bare integer gives a
+ * later reader nothing to compare their change against.
+ */
+export const EXTRACTOR_VERSION = 2;
 
 /** How long an entry is served before the page is read again. */
 export const CACHE_MAX_AGE_DAYS = 30;
