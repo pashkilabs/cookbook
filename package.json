@@ -11,7 +11,7 @@
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
     "build": "turbo run build",
-    "check:boundaries": "node scripts/check-seed-catalog-usage.mjs && node scripts/check-platform-tables.mjs && node scripts/check-server-only.mjs && node scripts/check-native-imports.mjs && node scripts/check-tests-run.mjs && node scripts/check-fixture-text.mjs",
+    "check:boundaries": "node scripts/check-seed-catalog-usage.mjs && node scripts/check-platform-tables.mjs && node scripts/check-server-only.mjs && node scripts/check-native-imports.mjs && node scripts/check-tests-run.mjs && node scripts/check-fixture-text.mjs && node scripts/check-routes-reachable.mjs",
     "check": "pnpm check:boundaries && pnpm typecheck && pnpm test",
     "smoke": "node scripts/smoke.mjs",
     "smoke:local": "node scripts/smoke.mjs http://127.0.0.1:3000 --local"

@@ -20,16 +20,8 @@ import { platformStore } from "@/lib/platform";
  * **Protein ships at 15/18**, corrected on the review screen. It is the axis under Mains and the
  * one the sketch leans on.
  */
-const TOP_LEVEL = [
-  { key: "starter", label: "Appetizers", field: "course" },
-  { key: "soup", label: "Soup", field: "dish_form" },
-  { key: "salad", label: "Salad", field: "dish_form" },
-  { key: "main", label: "Mains", field: "course" },
-  { key: "dessert", label: "Desserts", field: "course" },
-  { key: "drink", label: "Drinks", field: "course" },
-  { key: "breakfast", label: "Breakfast/Brunch", field: "course" },
-  { key: "lunch", label: "Lunch", field: "course" },
-] as const;
+import { TOP_LEVEL } from "./top-level";
+
 
 /**
  * The second level under Mains, **derived from the household's data rather than a constant.**

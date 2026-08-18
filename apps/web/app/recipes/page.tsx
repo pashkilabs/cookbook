@@ -6,6 +6,7 @@ import { keepWholeFamilyLikes, searchRecipes } from "@/lib/recipe-search";
 import { startOfWeek, todayIso } from "@/lib/week";
 import { ShortlistButton } from "./shortlist-button";
 import { Filters, FILTERS, type FilterKey } from "./filters";
+import { BrowseTiles } from "./browse/tiles";
 import { SignOutButton } from "./sign-out";
 
 /**
@@ -23,9 +24,9 @@ import { SignOutButton } from "./sign-out";
 export default async function RecipesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; filter?: string }>;
+  searchParams: Promise<{ q?: string; filter?: string; all?: string }>;
 }) {
-  const { q: rawQuery, filter: rawFilter } = await searchParams;
+  const { q: rawQuery, filter: rawFilter, all } = await searchParams;
   const q = (rawQuery ?? "").trim();
   const filter = FILTERS.some((option) => option.key === rawFilter)
     ? (rawFilter as FilterKey)
@@ -124,6 +125,21 @@ export default async function RecipesPage({
           <SignOutButton />
         </div>
       </div>
+
+      {/*
+        * Browse is the way in, and the flat list is behind it.
+        *
+        * The complaint was that a flat list is hard to navigate at volume, so adding a second
+        * door beside the cluttered thing would not have answered it — the grouping has to be
+        * what you land on. Searching or filtering still goes straight to the list, because
+        * that is what a person doing either has already told you they want.
+        *
+        * regression: browse shipped with nothing linking to it and was found only by typing the
+        * URL. That is the fourth feature to ship unreachable here — after caption paste, the
+        * screenshot upload and the photo control — and each was found by a person going looking
+        * rather than by anything automated. A route no navigation reaches is not shipped.
+        */}
+      <BrowseTiles />
 
       <Filters q={q} filter={filter} />
 
