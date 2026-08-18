@@ -251,9 +251,20 @@ export const EXTRACTION_INSTRUCTIONS = [
   // free from a model already reading the recipe: "MARRY ME ITALIAN SAUSAGE SOUP" gives both.
   // Null rather than a guess, for the same reason an amount is never invented — a wrong label
   // that looks confident is worse than an absent one, and the review screen is where it is fixed.
-  "Say which course the dish is and which cuisine it belongs to.",
-  "Both are null unless the text says so or the dish is unmistakable. Do not guess from a single",
-  "ingredient — olive oil does not make a recipe Italian.",
+  /*
+   * Two fields, two rules, because one caution rule governing both broke both: course declined
+   * on obvious mains (a chicken wrap, a shrimp orzo) *and* called a soup a snack. Measured as
+   * three outcomes — right, declined, wrong — because averaging a decline with a wrong answer
+   * moves the prompt one way while the other error gets worse and nothing shows it.
+   */
+  "Say which course the dish is. Course is almost always answerable from the dish itself:",
+  "anything substantial enough to be the centre of a meal is a main, including soups, stews,",
+  "pasta, curries, wraps and bowls. A sweet baked thing is a dessert or a breakfast, never a",
+  "snack. Use snack only for something small and savoury eaten between meals, and",
+  "starter or side only when the source says so. Answer null only if you genuinely cannot tell.",
+  "Cuisine is the opposite: null unless the text names it or the dish is unmistakably of one",
+  "tradition. Do not guess from a single ingredient — olive oil does not make a recipe Italian —",
+  "and never answer with a region: Thai, not Asian.",
 ].join(" ");
 
 // ---------------------------------------------------------------------------

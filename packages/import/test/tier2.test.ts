@@ -72,6 +72,8 @@ const cascade = (provider: LlmProvider, models = PLACEHOLDER_CASCADE) => ({ prov
 describe("schema validation decides escalation", () => {
   it("accepts a well-formed payload", () => {
     const result = validateRecipePayload(goodPayload);
+    // scoped to one sentence: the guard is against *asking politely* for JSON-only output, and
+    // an unscoped .* fired on "into the given JSON schema" plus an unrelated later "only"
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.ingredientLines).toHaveLength(3);
   });
@@ -115,7 +117,7 @@ describe("the cascade", () => {
     const request = provider.requests[0]!;
     expect(request.responseSchema).toBe(RECIPE_JSON_SCHEMA);
     // the instructions must not be where the JSON requirement lives
-    expect(request.instructions).not.toMatch(/\bJSON\b.*\bonly\b/i);
+    expect(request.instructions).not.toMatch(/\bJSON\b[^.]*\bonly\b/i);
   });
 
   it("parses ingredient lines through core, not through the model", async () => {

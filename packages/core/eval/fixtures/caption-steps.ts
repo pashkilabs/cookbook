@@ -151,3 +151,77 @@ export function scoreSteps(fragments: readonly string[], steps: readonly string[
 
   return { matched, expected: fragments.length, missing, returned: steps.length };
 }
+
+/**
+ * What a caption's course and cuisine should come back as.
+ *
+ * **Null is scored separately from wrong**, because they are different failures and the prompt
+ * moves in opposite directions for each. A model declining on an obvious main needs *less*
+ * caution; a model calling a soup a snack needs *more*. One number averaging them would move the
+ * prompt one way while the other error got worse, and nothing would show it.
+ *
+ * **Course accepts a set, not a value.** Cinnamon rolls are genuinely breakfast and genuinely
+ * dessert; forcing one would measure my opinion rather than the model's accuracy. The set is
+ * small and hand-chosen — it is not a licence for a vague answer.
+ *
+ * **Cuisine is exact after normalisation, with an alias map for genuine variants.** Casing and
+ * hyphenation are noise; `italian-american` and `italian` are the same answer for a filter,
+ * because someone filtering Italian wants that soup. A *broader* answer is a miss, not a match:
+ * "Asian" for a Thai dish is a worse answer rather than an equivalent one, and scoring it as a
+ * pass would let the field decay into uselessness while the number stayed green.
+ */
+export interface CaptionClassExpectation {
+  fixture: string;
+  /** every course that would be a correct answer; empty means the source does not say */
+  course: string[];
+  /** null where the text does not say and the dish is not unmistakable */
+  cuisine: string | null;
+  why?: string;
+}
+
+export const CAPTION_CLASS_EXPECTATIONS: CaptionClassExpectation[] = [
+  { fixture: "instagram-cinnamon-rolls", course: ["dessert", "breakfast"], cuisine: null,
+    why: "genuinely both; the caption names no cuisine" },
+  { fixture: "caption-cornflake-chicken-wrap", course: ["main"], cuisine: null,
+    why: "a chicken wrap with a method and a calorie count is a main by any reading" },
+  { fixture: "instagram-lemony-shrimp-orzo", course: ["main"], cuisine: null,
+    why: "orzo alone does not make it Italian — the prompt's own rule" },
+  { fixture: "instagram-marry-me-sausage-soup", course: ["main"], cuisine: "italian",
+    why: "the title says Italian; a soup with pasta and 6 cups of broth is not a snack" },
+  { fixture: "instagram-peach-posset", course: ["dessert"], cuisine: null,
+    why: "a posset is British, but the caption does not say so and the rule is not to guess" },
+  { fixture: "facebook-chicken-pad-thai", course: ["main"], cuisine: "thai" },
+];
+
+/** genuine variants of one answer, not broader categories */
+const CUISINE_ALIASES: Record<string, string> = {
+  "italian-american": "italian",
+  "italian american": "italian",
+  "tex-mex": "mexican",
+  "tex mex": "mexican",
+  american: "american",
+  british: "british",
+};
+
+export const normaliseCuisine = (value: string | null | undefined): string | null => {
+  if (typeof value !== "string") return null;
+  const key = value.toLowerCase().replace(/[^a-z\s-]/g, "").replace(/\s+/g, " ").trim();
+  if (!key) return null;
+  return CUISINE_ALIASES[key] ?? key;
+};
+
+export type ClassVerdict = "right" | "declined" | "wrong";
+
+/** three outcomes, never two: a decline and a wrong answer are different news */
+export function scoreCourse(expected: readonly string[], actual: unknown): ClassVerdict {
+  if (actual === null || actual === undefined || actual === "") return "declined";
+  return expected.includes(String(actual)) ? "right" : "wrong";
+}
+
+export function scoreCuisine(expected: string | null, actual: unknown): ClassVerdict {
+  const got = normaliseCuisine(typeof actual === "string" ? actual : null);
+  // where the source says nothing, declining IS the right answer and naming one is wrong
+  if (expected === null) return got === null ? "right" : "wrong";
+  if (got === null) return "declined";
+  return got === expected ? "right" : "wrong";
+}

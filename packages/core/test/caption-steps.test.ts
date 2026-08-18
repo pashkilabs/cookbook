@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CAPTION_STEP_EXPECTATIONS, scoreSteps } from "../eval/fixtures/caption-steps.js";
+import { CAPTION_STEP_EXPECTATIONS, scoreCourse, scoreCuisine, scoreSteps } from "../eval/fixtures/caption-steps.js";
 
 describe("scoring a method by presence and order", () => {
   const fragments = ["melt the butter", "add the shrimp", "serve and enjoy"];
@@ -61,5 +61,34 @@ describe("the four caption step expectations", () => {
       // a fragment repeated within one recipe cannot identify a step
       expect(unique.size, expectation.fixture).toBe(expectation.fragments.length);
     }
+  });
+});
+
+describe("scoring course and cuisine as three outcomes", () => {
+  it("separates a decline from a wrong answer, because the prompt moves opposite ways", () => {
+    expect(scoreCourse(["main"], null)).toBe("declined");
+    expect(scoreCourse(["main"], "snack")).toBe("wrong");
+    expect(scoreCourse(["main"], "main")).toBe("right");
+  });
+
+  it("accepts any of a genuinely ambiguous dish's courses", () => {
+    // cinnamon rolls are breakfast and dessert; forcing one measures my opinion, not the model
+    expect(scoreCourse(["dessert", "breakfast"], "breakfast")).toBe("right");
+    expect(scoreCourse(["dessert", "breakfast"], "snack")).toBe("wrong");
+  });
+
+  it("treats casing and hyphenation as noise, and genuine variants as the same answer", () => {
+    expect(scoreCuisine("italian", "Italian")).toBe("right");
+    expect(scoreCuisine("italian", "Italian-American")).toBe("right");
+    expect(scoreCuisine("mexican", "Tex-Mex")).toBe("right");
+  });
+
+  it("scores a broader answer as a miss — Asian for a Thai dish is worse, not equivalent", () => {
+    expect(scoreCuisine("thai", "Asian")).toBe("wrong");
+  });
+
+  it("counts naming a cuisine the source never gave as wrong, not as a bonus", () => {
+    expect(scoreCuisine(null, "Italian")).toBe("wrong");
+    expect(scoreCuisine(null, null)).toBe("right");
   });
 });
