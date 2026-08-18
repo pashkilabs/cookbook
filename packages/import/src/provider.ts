@@ -291,8 +291,14 @@ export const EXTRACTION_INSTRUCTIONS = [
   "Say the principal protein the dish is built around, from its ingredients: the one a person",
   "would name if asked what they were eating. Sausage, bacon and ham are pork.",
   "Answer vegetarian or vegan only when beans, lentils, tofu or another plant protein is what the",
-  "dish is built on. A dessert, a bread, a salad of vegetables or a dish whose protein is only a",
-  "serving suggestion has none — answer null. Absence of meat is not vegetarian.",
+  "dish is built on. A dessert, a bread or a salad of vegetables has none — answer null.",
+  "Absence of meat is not vegetarian.",
+  // the one remaining pattern: "really good with chicken, steak, fish..." read as the centre.
+  // Requiring the protein to be an ingredient with an amount is the sharpest available test.
+  "Count only a protein that appears in the ingredient list with an amount. A protein named in",
+  "the prose as an option or an accompaniment — good with chicken, add shrimp if you like, serve",
+  "over steak — is not what the dish is built on. If the ingredient list has no protein, the",
+  "answer is null however many are suggested around it.",
 ].join(" ");
 
 // ---------------------------------------------------------------------------
