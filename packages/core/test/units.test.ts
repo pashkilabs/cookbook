@@ -148,3 +148,19 @@ describe("containers resolve per ingredient, never per word", () => {
     expect(toBaseMeasure(1, "package", yeast)).toEqual({ amount: 7, dimension: "weight" });
   });
 });
+
+describe("tablespoon abbreviations", () => {
+  // regression: "3 tb fresh dill" from a real Instagram caption parsed with unit null and
+  // "tb fresh dill" as the item — `tbs` was registered and `tb` was not, so every `tb` line
+  // in that caption lost its unit and swept the abbreviation into the ingredient name
+  it("reads tb, tbs, tbl and tablespoon as the same unit", () => {
+    for (const written of ["tb", "tbs", "tbsps", "tbl", "tablespoon", "tablespoons"]) {
+      expect(canonicalUnit(written), written).toBe("tbsp");
+    }
+  });
+
+  it("still keeps T a tablespoon and t a teaspoon", () => {
+    expect(canonicalUnit("T")).toBe("tbsp");
+    expect(canonicalUnit("t")).toBe("tsp");
+  });
+});

@@ -231,6 +231,14 @@ export const EXTRACTION_INSTRUCTIONS = [
   "Temperatures and equipment are not ingredients.",
   "Never invent an amount the text does not state.",
   "If the text contains no recipe, return an empty ingredientLines array.",
+  // regression: eight instructions, every one about ingredients, and `steps` came back empty
+  // from every caption tested — including one with a "DIRECTIONS:" heading and a numbered list.
+  // The model was doing exactly what it was told. A schema field is not a request.
+  "Also extract the method, one instruction per entry, in order, in steps.",
+  "The method may carry no heading and no numbers at all — it is often a plain paragraph after",
+  "the ingredients, or a run of lines each starting with an emoji. Split it into its steps.",
+  "Copy each step's wording; do not summarise, renumber, or drop the emoji's sentence.",
+  "If the text truly gives no method, return an empty steps array rather than inventing one.",
 ].join(" ");
 
 // ---------------------------------------------------------------------------

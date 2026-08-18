@@ -267,6 +267,16 @@ models be good enough. Do not add a silent-save path.
   test that passes while the real input is unchanged is the same class as a test that
   never runs — it is counted.
 
+- **A schema field is not a request, and a field nobody scores stays empty forever.**
+  `steps` was in the extraction schema with a description, and `EXTRACTION_INSTRUCTIONS`
+  was eight sentences every one of which was about ingredients. Every caption came back
+  with `"steps":[]` — including one with a `DIRECTIONS:` heading and a numbered list. The
+  model was doing exactly what it was told. The eval could not see it because the fixtures
+  score ingredient fields, so the field was never asked for *and* never measured, which is
+  **"silence reads as success" one level up**: not a check that could not distinguish no
+  result from a pass, but a capability nothing ever exercised. Ask for every field the
+  schema declares, and score every field you ask for — an unscored field is an unrun test.
+
 - **`git status` cannot tell you what has been committed.** It describes the working
   tree and nothing else, so a dirty tree at the end of a session says nothing about
   whether previous sessions landed. Run `git log` before any claim about repository

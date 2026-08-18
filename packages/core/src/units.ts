@@ -33,7 +33,7 @@ export const UNITS: Record<string, UnitDef> = {
 /** Spellings that map onto a real unit. */
 const UNIT_ALIASES: Record<string, string> = {
   t: "tsp", tsps: "tsp", teaspoon: "tsp", teaspoons: "tsp",
-  tbs: "tbsp", tbsps: "tbsp", tablespoon: "tbsp", tablespoons: "tbsp",
+  tb: "tbsp", tbs: "tbsp", tbsps: "tbsp", tbl: "tbsp", tablespoon: "tbsp", tablespoons: "tbsp",
   c: "cup", cups: "cup",
   "fl oz": "floz", floz: "floz", "fluid ounce": "floz", "fluid ounces": "floz",
   pt: "pint", pints: "pint",
