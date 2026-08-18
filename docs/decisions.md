@@ -2626,3 +2626,47 @@ unreachable finds the answer here rather than assuming a bug.
 **What would reverse it:** a household saying they look for sides by protein. The
 chips already derive from data, so the change is where the row renders rather than
 what it contains.
+
+## §56 — A source photograph is provenance, not the recipe's face
+
+`photos.source = 'source'` is a photograph **of** the recipe — a handwritten card, a
+page from a book — as distinct from `camera`, the household's photograph of the
+food. Added because photographing a card read it and then discarded the image, and
+for a card in someone's grandmother's hand that photograph is the only record of
+the original: the handwriting, what was crossed out, the splash of vanilla. The
+extraction cannot be re-checked against anything once it is gone.
+
+**Never published, whatever the recipe's visibility.** §17 makes published recipes
+world-readable and a photograph of a printed page carries someone else's copyright,
+so a source photograph is visible to its household and to nobody else — the exact
+inverse of a dish photograph, which follows the recipe. That asymmetry is the
+design rather than an edge case.
+
+Enforced in two places that must agree, and asserted in `assert_rls_invariants` so
+neither can drift: the storage predicate and the `photos` row policy both allow-list
+`source = 'camera'`. An allow-list rather than an exclusion, so a *future* value is
+private by construction. All three loosenings are mutation-tested — an exclusion
+instead of an allow-list, no restriction at all, and a loosened row policy — with a
+control proving the invariant passes on the real definitions.
+
+**Where it appears: on the recipe, as provenance. Never in the grid.**
+
+The browse grid is photographs of food. A grid of cookbook pages and index cards
+where dish photographs should be is the failure mode — it would make the whole
+screen read as a filing cabinet, and it is exactly what a person scanning for
+"what shall we eat" cannot use. So the grid asks for `camera` only, and a recipe
+with only a source photograph keeps its serif-initial tile.
+
+On the recipe page a source photograph belongs near the source line — beside
+"Read from the original" — under something like *"the card this came from"*. It
+answers "is this really what Grandma wrote", which is a different question from
+"what does it look like", and it is the question a card raises.
+
+**Found while building this, before it shipped:** `photos_select_public_any` read
+`deleted_at is null and recipe_is_public(recipe_id)` and said nothing about source.
+The storage predicate was already an allow-list so the *bytes* were safe, but the
+**row** was not, and a row carries `storage_path`. Any signed-in member of any
+other household could read the path of a card attached to a published recipe. A
+leaked path is not a leaked photograph, and it is still the wrong answer to who may
+know a thing exists. The assertion caught it; the shape of the WHERE clause had
+been carrying the guarantee alone.
