@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { userClient } from "@/lib/supabase-server";
+import { maybeRow, rows } from "@/lib/rows";
 import { platformStore } from "@/lib/platform";
 
 /**
@@ -160,7 +161,7 @@ export default async function BrowsePage({
     if ((children ?? 0) > 0) available.push("kid");
   }
 
-  const { data: rows, error } = await query;
+  const found = await query;
   /*
    * The error is read, not discarded.
    *
@@ -170,8 +171,7 @@ export default async function BrowsePage({
    * looked like a data problem for a day. `?? []` on an unchecked result is how a failure
    * becomes a silence.
    */
-  if (error) throw new Error(`browse query failed: ${error.message}`);
-  let recipes = rows ?? [];
+  let recipes = rows(found, `browse ${chosen.key}`);
 
   /*
    * Kid-friendly is computed, never stored.
@@ -184,7 +184,8 @@ export default async function BrowsePage({
    * rated it — is blank for months, and an empty chip reads as broken rather than as honest.
    */
   if (protein === "kid" && recipes.length > 0) {
-    const { data: ratings } = await supabase
+    const ratings = rows(
+    await supabase
       .from("ratings")
       .select("recipe_id, score, family_members!inner(is_child)")
       .eq("family_id", family.id)
@@ -192,7 +193,9 @@ export default async function BrowsePage({
       .in(
         "recipe_id",
         recipes.map((r) => r.id),
-      );
+      ),
+    "ratings",
+  );
 
     const liked = new Set<string>();
     const disliked = new Set<string>();
@@ -207,7 +210,8 @@ export default async function BrowsePage({
 
   const photoFor = new Map<string, string>();
   if (recipes.length > 0) {
-    const { data: photos } = await supabase
+    const photos = rows(
+    await supabase
       .from("photos")
       .select("recipe_id, storage_path")
       .eq("family_id", family.id)
@@ -215,7 +219,9 @@ export default async function BrowsePage({
       .in(
         "recipe_id",
         recipes.map((r) => r.id),
-      );
+      ),
+    "photos",
+  );
     for (const row of photos ?? []) {
       const signed = await supabase.storage
         .from("recipe-photos")

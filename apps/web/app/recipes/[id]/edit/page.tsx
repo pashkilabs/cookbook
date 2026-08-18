@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { formatAsWritten } from "@pashki/core";
 import { userClient } from "@/lib/supabase-server";
+import { maybeRow, rows } from "@/lib/rows";
 import { platformStore } from "@/lib/platform";
 import { ReclassifyButton } from "../../reclassify";
 import { RecipeForm } from "../../recipe-form";
@@ -24,13 +25,16 @@ export default async function EditRecipePage({ params }: { params: Promise<{ id:
   const family = await platformStore().findFamilyForAccount(auth.user.id);
   if (!family) redirect("/recipes");
 
-  const { data: recipe } = await supabase
+  const recipe = maybeRow(
+    await supabase
     .from("recipes")
     .select("id, title, servings, time_minutes, source_name, course, cuisine, dish_form, principal_protein")
     .eq("id", id)
     .eq("family_id", family.id)
     .is("deleted_at", null)
-    .maybeSingle();
+    .maybeSingle(),
+    "recipe",
+  );
   if (!recipe) notFound();
 
   const [ingredients, steps] = await Promise.all([

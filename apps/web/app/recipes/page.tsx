@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { userClient } from "@/lib/supabase-server";
+import { maybeRow, rows } from "@/lib/rows";
 import { platformStore } from "@/lib/platform";
 import { keepWholeFamilyLikes, searchRecipes } from "@/lib/recipe-search";
 import { startOfWeek, todayIso } from "@/lib/week";
@@ -63,12 +64,15 @@ export default async function RecipesPage({
 
   // which of these are already wanted this week, so the button starts in the right state
   const weekStart = startOfWeek(todayIso());
-  const { data: shortlisted } = await supabase
+  const shortlisted = rows(
+    await supabase
     .from("shortlist_entries")
     .select("recipe_id")
     .eq("family_id", family.id)
     .eq("week_start", weekStart)
-    .is("deleted_at", null);
+    .is("deleted_at", null),
+    "shortlisted",
+  );
   const onThisWeek = new Set((shortlisted ?? []).map((row) => row.recipe_id));
 
   /*
@@ -81,12 +85,15 @@ export default async function RecipesPage({
    */
   const photoFor = new Map<string, string>();
   if (hits.length > 0) {
-    const { data: photos } = await supabase
+    const photos = rows(
+    await supabase
       .from("photos")
       .select("recipe_id, storage_path")
       .eq("family_id", family.id)
       .in("recipe_id", hits.map(({ recipe }) => recipe.id))
-      .is("deleted_at", null);
+      .is("deleted_at", null),
+    "photos",
+  );
 
     const paths = [...new Set((photos ?? []).map((row) => row.storage_path as string))];
     if (paths.length > 0) {

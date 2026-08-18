@@ -5,6 +5,7 @@ import { INGREDIENT_COLUMNS } from "@pashki/db/catalog";
 import { andList, energyForRecipe } from "@/lib/energy";
 import { scaleIngredientAmounts, servingsForScale } from "@/lib/planner";
 import { userClient } from "@/lib/supabase-server";
+import { maybeRow, rows } from "@/lib/rows";
 import { platformStore } from "@/lib/platform";
 import { startOfWeek, todayIso } from "@/lib/week";
 import { ShortlistButton } from "../shortlist-button";
@@ -43,13 +44,16 @@ export default async function RecipePage({
   const family = await platformStore().findFamilyForAccount(auth.user.id);
   if (!family) redirect("/recipes");
 
-  const { data: recipe } = await supabase
+  const recipe = maybeRow(
+    await supabase
     .from("recipes")
     .select("id, title, source_name, source_url, servings, time_minutes, times_made, make_again, visibility")
     .eq("id", id)
     .eq("family_id", family.id)
     .is("deleted_at", null)
-    .maybeSingle();
+    .maybeSingle(),
+    "recipe",
+  );
 
   // an id belonging to another household lands here too, which is the point
   if (!recipe) notFound();
@@ -107,14 +111,17 @@ export default async function RecipePage({
   let plannedScale = 1;
   let plannedServings: number | null = null;
   if (planned) {
-    const { data: entry } = await supabase
+    const entry = maybeRow(
+    await supabase
       .from("plan_entries")
       .select("scale, date")
       .eq("id", planned)
       .eq("family_id", family.id)
       .eq("recipe_id", id)
       .is("deleted_at", null)
-      .maybeSingle();
+      .maybeSingle(),
+    "entry",
+  );
     if (entry) {
       plannedScale = Number(entry.scale) || 1;
       plannedServings = servingsForScale(plannedScale, recipe.servings);
@@ -144,14 +151,17 @@ export default async function RecipePage({
   const scores = new Map(ratings.data?.map((r) => [r.family_member_id, r.score]) ?? []);
 
   const weekStart = startOfWeek(todayIso());
-  const { data: shortlisted } = await supabase
+  const shortlisted = maybeRow(
+    await supabase
     .from("shortlist_entries")
     .select("id")
     .eq("family_id", family.id)
     .eq("week_start", weekStart)
     .eq("recipe_id", recipe.id)
     .is("deleted_at", null)
-    .maybeSingle();
+    .maybeSingle(),
+    "shortlisted",
+  );
 
   return (
     <main>
