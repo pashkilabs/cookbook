@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
-import { cascadeFromEnv } from "./src/openai-compatible.js";
-import { classifyRecipe, CLASSIFICATION_COLUMNS } from "./src/classify.js";
+import { cascadeFromEnv } from "../src/openai-compatible.js";
+import { classifyRecipe, CLASSIFICATION_COLUMNS } from "../src/classify.js";
 
 const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
   auth: { autoRefreshToken: false, persistSession: false },
@@ -30,14 +30,18 @@ for (const family of families.data ?? []) {
   for (const recipe of recipes) {
     // scoped to this recipe and this family — one recipe per prompt, never batched across households
     const [ings, steps] = await Promise.all([
-      admin.from("recipe_ingredients").select("raw_text, position").eq("recipe_id", recipe.id).is("deleted_at", null).order("position"),
+      admin.from("recipe_ingredients").select("amount, unit, item_text, note, position").eq("recipe_id", recipe.id).is("deleted_at", null).order("position"),
       admin.from("recipe_steps").select("text, position").eq("recipe_id", recipe.id).is("deleted_at", null).order("position"),
     ]);
     const cls = await classifyRecipe({
       provider: cascade.provider, model: cascade.models[0]!,
       recipe: {
         title: recipe.title as string,
-        ingredients: (ings.data ?? []).map((i: any) => i.raw_text ?? ""),
+        // regression: this selected raw_text, which does not exist — PostgREST errored, `?? []`
+        // swallowed it, and every recipe was classified from its title and steps with no
+        // ingredients at all. A chicken traybake showing no protein was never a model failure.
+        ingredients: (ings.data ?? []).map((i: any) =>
+          [i.amount ?? "", i.unit ?? "", i.item_text, i.note ? `, ${i.note}` : ""].join(" ").trim()),
         steps: (steps.data ?? []).map((s: any) => s.text),
       },
     });

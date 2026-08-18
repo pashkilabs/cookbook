@@ -280,7 +280,7 @@ export async function classifyIfUnclassified(
   if (recipe.course || recipe.cuisine || recipe.dish_form || recipe.principal_protein) return;
 
   const [ings, steps] = await Promise.all([
-    supabase.from("recipe_ingredients").select("raw_text").eq("recipe_id", recipeId).is("deleted_at", null).order("position"),
+    supabase.from("recipe_ingredients").select("amount, unit, item_text, note").eq("recipe_id", recipeId).is("deleted_at", null).order("position"),
     supabase.from("recipe_steps").select("text").eq("recipe_id", recipeId).is("deleted_at", null).order("position"),
   ]);
 
@@ -290,7 +290,10 @@ export async function classifyIfUnclassified(
       model: cascade.models[0]!,
       recipe: {
         title: recipe.title as string,
-        ingredients: (ings.data ?? []).map((row) => (row.raw_text as string) ?? ""),
+        ingredients: (ings.data ?? []).map((row) =>
+          [row.amount ?? "", row.unit ?? "", row.item_text, row.note ? `, ${row.note}` : ""]
+            .join(" ")
+            .trim()),
         steps: (steps.data ?? []).map((row) => row.text as string),
       },
     });
