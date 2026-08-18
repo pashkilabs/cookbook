@@ -244,3 +244,70 @@ export async function attachRecipePhoto(
 
   return { ok: true, storagePath: stored.storagePath };
 }
+
+/**
+ * Classify a recipe nobody classified — on save, and only when there is nothing to overwrite.
+ *
+ * **Why on save rather than on demand.** Someone typing a recipe in has just done the work of
+ * entering it; asking them to find a second control to make it findable is the same failure four
+ * features have already hit here. A recipe added by hand was invisible to browse entirely.
+ *
+ * **Why it is not wasteful.** It runs only when all four fields are empty, which is the same
+ * `classified_at is null` cursor the backfill uses — so a person who set the fields themselves
+ * pays nothing, and neither does a re-save.
+ *
+ * **Why a failure is silent.** The recipe is the point. A model that is down, rate-limited or
+ * unconfigured must not stop somebody saving their grandmother's rolls; the row simply stays
+ * unstamped and the backfill picks it up later, which is what an unstamped row means.
+ */
+export async function classifyIfUnclassified(
+  supabase: SupabaseClient,
+  recipeId: string,
+): Promise<void> {
+  const { cascadeFromEnv } = await import("@pashki/import");
+  const { classifyRecipe } = await import("@pashki/import");
+  const cascade = cascadeFromEnv();
+  if (!cascade) return;
+
+  const { data: recipe } = await supabase
+    .from("recipes")
+    .select("id, title, course, cuisine, dish_form, principal_protein, classified_at")
+    .eq("id", recipeId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!recipe || recipe.classified_at) return;
+  // nothing to overwrite is the precondition, not just "unstamped"
+  if (recipe.course || recipe.cuisine || recipe.dish_form || recipe.principal_protein) return;
+
+  const [ings, steps] = await Promise.all([
+    supabase.from("recipe_ingredients").select("raw_text").eq("recipe_id", recipeId).is("deleted_at", null).order("position"),
+    supabase.from("recipe_steps").select("text").eq("recipe_id", recipeId).is("deleted_at", null).order("position"),
+  ]);
+
+  try {
+    const cls = await classifyRecipe({
+      provider: cascade.provider,
+      model: cascade.models[0]!,
+      recipe: {
+        title: recipe.title as string,
+        ingredients: (ings.data ?? []).map((row) => (row.raw_text as string) ?? ""),
+        steps: (steps.data ?? []).map((row) => row.text as string),
+      },
+    });
+    if (!cls) return;
+    await supabase
+      .from("recipes")
+      // cuisine included here and not in the backfill: this reads the same stored shape, but a
+      // hand-typed recipe has no prose anywhere, so there is no better moment to ask (§54)
+      .update({
+        course: cls.course,
+        dish_form: cls.dishForm,
+        principal_protein: cls.principalProtein,
+        classified_at: new Date().toISOString(),
+      })
+      .eq("id", recipeId);
+  } catch (thrown) {
+    // unstamped is exactly what "not yet classified" means; the backfill will find it
+    console.warn(`[pashki] could not classify ${recipeId}: ${String(thrown)}`);
+  }
+}

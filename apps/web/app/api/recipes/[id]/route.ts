@@ -1,7 +1,7 @@
 import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
 import { prepareRecipe } from "@/lib/recipe-input";
-import { statusFor, writeChildren } from "@/lib/recipe-writes";
+import { statusFor, writeChildren , classifyIfUnclassified } from "@/lib/recipe-writes";
 import { refusal } from "@/lib/refusal";
 
 /**
@@ -81,6 +81,51 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if (failure) return Response.json({ error: failure }, { status: 400 });
 
   return Response.json({ id });
+}
+
+/**
+ * Re-classify, only when asked.
+ *
+ * **Never automatic on edit.** Somebody may have corrected a field by hand, and a model
+ * overwriting that is worse than the field being stale — a person who fixes "beef" on a mushroom
+ * pasta and watches it come back beef will stop fixing anything. So this is a button, and it
+ * clears `classified_at` first so the same guarded path the backfill uses does the work.
+ */
+export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
+  const supabase = await userClient();
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return Response.json({ error: "sign in first" }, { status: 401 });
+
+  const family = await platformStore().findFamilyForAccount(auth.user.id);
+  if (!family) return Response.json({ error: "this account has no household" }, { status: 403 });
+
+  // filtered here as well as by RLS: a policy says what may leave the database, a screen says
+  // whose kitchen it shows, and those are different questions
+  const owned = await supabase
+    .from("recipes")
+    .select("id")
+    .eq("id", id)
+    .eq("family_id", family.id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!owned.data) return Response.json({ error: "no such recipe" }, { status: 404 });
+
+  // asked for explicitly, so the existing values are cleared rather than protected — that is
+  // what the button means
+  await supabase
+    .from("recipes")
+    // classified_at too, or the guarded path returns early and the button does nothing
+    .update({ course: null, cuisine: null, dish_form: null, principal_protein: null, classified_at: null })
+    .eq("id", id);
+  await classifyIfUnclassified(supabase, id);
+
+  const { data: after } = await supabase
+    .from("recipes")
+    .select("course, cuisine, dish_form, principal_protein")
+    .eq("id", id)
+    .maybeSingle();
+  return Response.json({ ok: true, classification: after ?? null });
 }
 
 export async function DELETE(_request: Request, context: { params: Promise<{ id: string }> }) {

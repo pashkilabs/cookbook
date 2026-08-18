@@ -1,6 +1,6 @@
 import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
-import { createRecipeFrom, attachRecipePhoto } from "@/lib/recipe-writes";
+import { createRecipeFrom, attachRecipePhoto, classifyIfUnclassified } from "@/lib/recipe-writes";
 
 /**
  * Create a recipe from what somebody typed — or from a review they just approved.
@@ -66,5 +66,10 @@ export async function POST(request: Request) {
 
   const created = await createRecipeFrom(supabase, family.id, body as Record<string, unknown>);
   if (!created.ok) return Response.json({ error: created.error }, { status: created.status });
+
+  // a recipe typed in by hand was invisible to browse; classified on save, only when the fields
+  // are empty, and never at the cost of the save itself
+  await classifyIfUnclassified(supabase, created.id);
+
   return Response.json({ id: created.id });
 }

@@ -2570,3 +2570,42 @@ emoji were destroyed at transcription — and extraction returns nothing from it
 dropped out of the run silently, which is why `scripts/check-fixture-text.mjs` now
 fails on U+FFFD: a damaged input scoring as a missing result is the same class as
 a test that never runs.
+
+## §54a — Protein is set from a serving suggestion, and this is not being tuned again
+
+Recorded here rather than only in a commit, because it is a limitation someone will
+meet in the product and wonder about.
+
+`principal_protein` is asked for as "the protein the dish is built around". It is
+set from a *serving suggestion* often enough to be wrong:
+
+- **One Pot Boursin Pasta → chicken.** The caption reads "really good with chicken,
+  chicken sausage, fish, steak..". There is no chicken in the recipe.
+- **Creamy mushroom pasta → beef.** There is no beef anywhere in it — an invented
+  protein rather than a near miss, and the one the measured rate did not predict.
+
+The instruction already exists and is explicit: *"Count only a protein that appears
+in the ingredient list with an amount. A protein named in the prose as an option or
+an accompaniment — good with chicken, add shrimp if you like, serve over steak — is
+not what the dish is built on."* It took partially. It did not take reliably.
+
+**It is not being tuned again, and that is the decision.** The eighteen caption
+fixtures have now been scored three times and tuned against twice. There is no
+held-out set left, so another pass would be fitting the scorer rather than
+improving the field — and a number that only goes up because it is being tuned
+against itself is worse than a lower honest one.
+
+So the edit screen carries it. All four fields are editable there, and a
+"work these out again" button re-runs classification when a person asks — never
+automatically on save, because someone who corrects "beef" on a mushroom pasta and
+watches a model put it back will stop correcting anything.
+
+**What would reverse this:** a held-out set large enough to tune against without
+fitting — thirty or so captions and stored recipes whose answers are hand-checked
+and which have never been scored. Then the serving-suggestion pattern is worth one
+more attempt, measured on fixtures the prompt has never seen. Until that exists,
+the honest position is that protein is right about four times in five and the
+review and edit screens are what carry the rest.
+
+**Related:** §54 for why cuisine is excluded from the backfill entirely, which is
+the same failure — losing the ability to decline — measured rather than assumed.

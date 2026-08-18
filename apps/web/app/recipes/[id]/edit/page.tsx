@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { formatAsWritten } from "@pashki/core";
 import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
+import { ReclassifyButton } from "../../reclassify";
 import { RecipeForm } from "../../recipe-form";
 
 /**
@@ -77,6 +78,7 @@ export default async function EditRecipePage({ params }: { params: Promise<{ id:
           steps: (steps.data ?? []).map((step) => step.text).join("\n"),
         }}
       />
+      <ReclassifyButton recipeId={id} />
     </main>
   );
 }
