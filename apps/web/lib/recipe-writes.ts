@@ -93,10 +93,30 @@ export async function createRecipeFrom(
       cuisine: recipe.cuisine,
       dish_form: recipe.dishForm,
       principal_protein: recipe.principalProtein,
+      /*
+       * Stamped here, because this path *is* an attempt.
+       *
+       * regression: an imported recipe arrived with course and protein already filled from the
+       * extraction and `classified_at` null — a row saying "classified" and "never attempted" at
+       * once, which is the exact distinction the column was added to make. Two things followed:
+       * `classifyIfUnclassified` returned early forever on every imported recipe, and the
+       * backfill re-classified every one of them on every run, paying again for answers it had.
+       */
+      classified_at: new Date().toISOString(),
       times_made: 0,
       status: "active",
       visibility: "private",
       make_again: null,
+      /*
+       * Always null, on all 45 recipes, and read by nothing.
+       *
+       * The same shape as classified_at above — written by one path, displayed by none — but the
+       * opposite conclusion: that one was load-bearing and this is not. Nothing asks who added a
+       * recipe, and a household is the unit here rather than a person, so filling it would be
+       * inventing a requirement. Left explicit rather than dropped, because the column is there
+       * and a silent omission reads as an oversight. If "who added this" ever matters, this is
+       * where it goes, and `auth.user.id` is in scope at every call site.
+       */
       created_by: null,
     })
     .select("id")

@@ -47,7 +47,7 @@ export default async function RecipePage({
   const recipe = maybeRow(
     await supabase
     .from("recipes")
-    .select("id, title, source_name, source_url, servings, time_minutes, times_made, make_again, visibility")
+    .select("id, title, source_name, source_url, servings, time_minutes, times_made, make_again, visibility, course, cuisine, dish_form, principal_protein")
     .eq("id", id)
     .eq("family_id", family.id)
     .is("deleted_at", null)
@@ -329,6 +329,26 @@ export default async function RecipePage({
         * a method hid its own provenance — the copyright posture is unresolved (§open) and a link
         * back to the source is the least this can do meanwhile.
         */}
+      {/*
+        * What the browse screen sorts by, shown where a person can see it.
+        *
+        * These were written on every import and displayed nowhere, so a wrong course was
+        * invisible unless somebody opened the edit screen — and "work these out again" appeared
+        * to do nothing because the page it refreshed never showed its result. A field nobody can
+        * see is a field nobody can correct.
+        *
+        * Quiet metadata rather than a feature: this is how the recipe is filed, not what it is.
+        */}
+      {(recipe.course || recipe.cuisine || recipe.dish_form || recipe.principal_protein) && (
+        <p className="meta" style={{ marginBottom: "0.75rem" }}>
+          {[recipe.course, recipe.cuisine, recipe.dish_form, recipe.principal_protein]
+            .filter(Boolean)
+            .map((value) => String(value)[0]!.toUpperCase() + String(value).slice(1))
+            .join(" · ")}{" "}
+          <a href={`/recipes/${recipe.id}/edit`}>edit</a>
+        </p>
+      )}
+
       {recipe.source_url && (
         <p className="meta" style={{ marginBottom: "1.5rem" }}>
           From{" "}
