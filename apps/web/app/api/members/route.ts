@@ -35,7 +35,7 @@ export async function POST(request: Request) {
   const client = await caller();
   if (!client) return Response.json({ error: "sign in first" }, { status: 401 });
 
-  let body: { displayName?: unknown; colour?: unknown };
+  let body: { displayName?: unknown; colour?: unknown; birthYear?: unknown };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -46,6 +46,7 @@ export async function POST(request: Request) {
     const member = await client.addChild({
       displayName: typeof body.displayName === "string" ? body.displayName : "",
       ...(typeof body.colour === "string" ? { colour: body.colour } : {}),
+      ...(birthYearFrom(body.birthYear) === undefined ? {} : { birthYear: birthYearFrom(body.birthYear) }),
     });
     return Response.json({ member });
   } catch (error) {
@@ -53,11 +54,25 @@ export async function POST(request: Request) {
   }
 }
 
+/**
+ * A year, or nothing. Empty means "not answered" and clears it, which is a real answer —
+ * a household may have recorded it and want it gone.
+ *
+ * The range mirrors the column's CHECK so a typo is refused here rather than as a 500 from
+ * Postgres. 1900 catches a dropped digit; the upper bound is generous on purpose.
+ */
+function birthYearFrom(value: unknown): number | null | undefined {
+  if (value === null || value === "") return null;
+  const year = typeof value === "number" ? value : Number(value);
+  if (!Number.isInteger(year) || year < 1900 || year > 2200) return undefined;
+  return year;
+}
+
 export async function PATCH(request: Request) {
   const client = await caller();
   if (!client) return Response.json({ error: "sign in first" }, { status: 401 });
 
-  let body: { id?: unknown; displayName?: unknown; colour?: unknown };
+  let body: { id?: unknown; displayName?: unknown; colour?: unknown; birthYear?: unknown };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -71,6 +86,7 @@ export async function PATCH(request: Request) {
     const member = await client.updateMember(body.id, {
       ...(typeof body.displayName === "string" ? { displayName: body.displayName } : {}),
       ...(typeof body.colour === "string" ? { colour: body.colour } : {}),
+      ...("birthYear" in body ? { birthYear: birthYearFrom(body.birthYear) ?? null } : {}),
     });
     return Response.json({ member });
   } catch (error) {

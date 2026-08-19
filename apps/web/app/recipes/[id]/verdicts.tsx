@@ -1,6 +1,23 @@
 "use client";
 
 import { useState } from "react";
+
+/**
+ * Years, not an age, because a stored age is stale within twelve months.
+ *
+ * Computed from the year alone, so it can be out by one until a birthday — which is the right
+ * trade: asking for a full date of birth to be a year more precise is more of a child's personal
+ * data than this needs (§58).
+ *
+ * It is here because a five-point scale is not readable without it. A 3 from a seven-year-old and
+ * a 3 from a fourteen-year-old are not the same 3, and the person planning the week is the one
+ * who has to tell them apart.
+ */
+function ageFrom(birthYear: number | null): number | null {
+  if (birthYear === null) return null;
+  const age = new Date().getFullYear() - birthYear;
+  return age >= 0 && age < 120 ? age : null;
+}
 import { browserClient } from "@/lib/supabase-browser";
 import { refusal } from "@/lib/refusal";
 
@@ -19,6 +36,8 @@ import { refusal } from "@/lib/refusal";
 export interface MemberVerdict {
   id: string;
   displayName: string;
+  /** a year, not an age — see `ageFrom` */
+  birthYear: number | null;
   isChild: boolean;
   score: number | null;
 }
@@ -101,6 +120,7 @@ export function Verdicts(props: {
           <li key={member.id}>
             <span className="who">
               {member.displayName}
+              {ageFrom(member.birthYear) !== null && `, ${ageFrom(member.birthYear)}`}
               {member.isChild && <span className="meta"> · child</span>}
             </span>
             <span className="scale">

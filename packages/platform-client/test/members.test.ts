@@ -26,8 +26,8 @@ const store = () =>
       { id: "fam-2", name: "Two", ownerAccountId: "account-2", measurementSystem: "metric" },
     ],
     members: [
-      { id: "mem-1", familyId: "fam-1", accountId: "account-1", displayName: "Adult One", colour: null, isChild: false },
-      { id: "mem-2", familyId: "fam-2", accountId: "account-2", displayName: "Adult Two", colour: null, isChild: false },
+      { id: "mem-1", familyId: "fam-1", accountId: "account-1", displayName: "Adult One", colour: null, isChild: false, birthYear: null },
+      { id: "mem-2", familyId: "fam-2", accountId: "account-2", displayName: "Adult Two", colour: null, isChild: false, birthYear: null },
     ],
   });
 const clientFor = (accountId: string, s = store()) =>

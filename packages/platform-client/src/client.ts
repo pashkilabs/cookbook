@@ -142,9 +142,25 @@ export function createPlatformClient(options: PlatformClientOptions): PlatformCl
    *
    * The colour defaults to whichever nobody is using, so adding a child is one field.
    */
+/**
+ * A year, refused here rather than at the column.
+ *
+ * The CHECK would reject it anyway, but as a 500 from Postgres — the seam is where a household's
+ * typo becomes a sentence rather than a stack trace.
+ */
+function assertYear(year: number | null): number | null {
+  if (year === null) return null;
+  if (!Number.isInteger(year) || year < 1900 || year > 2200) {
+    throw new Error(`${year} is not a year somebody was born in`);
+  }
+  return year;
+}
+
   async function addChild(input: {
     displayName: string;
     colour?: string | null;
+    /** optional; unanswered stays unanswered rather than becoming a guess */
+    birthYear?: number | null;
   }): Promise<FamilyMember> {
     const family = await ownFamily();
     const displayName = (input.displayName ?? "").trim();
@@ -165,13 +181,14 @@ export function createPlatformClient(options: PlatformClientOptions): PlatformCl
       displayName,
       colour,
       isChild: true,
+      ...(input.birthYear === undefined ? {} : { birthYear: assertYear(input.birthYear) }),
       accountId: null,
     });
   }
 
   async function updateMember(
     memberId: string,
-    changes: { displayName?: string; colour?: string | null },
+    changes: { displayName?: string; colour?: string | null; birthYear?: number | null },
   ): Promise<FamilyMember> {
     const family = await ownFamily();
 
@@ -189,6 +206,7 @@ export function createPlatformClient(options: PlatformClientOptions): PlatformCl
       memberId,
       ...(displayName === undefined ? {} : { displayName }),
       ...(changes.colour === undefined ? {} : { colour: changes.colour }),
+      ...(changes.birthYear === undefined ? {} : { birthYear: assertYear(changes.birthYear) }),
     });
     if (!updated) throw new Error("no such member in this household");
     return updated;

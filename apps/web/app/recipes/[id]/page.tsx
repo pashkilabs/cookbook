@@ -410,6 +410,7 @@ export default async function RecipePage({
         members={members.map((member) => ({
           id: member.id,
           displayName: member.displayName,
+          birthYear: member.birthYear,
           isChild: member.isChild,
           score: scores.get(member.id) ?? null,
         }))}

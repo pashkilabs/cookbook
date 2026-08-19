@@ -77,6 +77,7 @@ export default async function HouseholdPage() {
           displayName: member.displayName,
           colour: member.colour,
           isChild: member.isChild,
+          birthYear: member.birthYear,
           isYou: member.id === me?.id,
         }))}
       />

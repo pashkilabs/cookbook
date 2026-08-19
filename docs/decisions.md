@@ -2714,3 +2714,52 @@ and testing a column. Slightly more code and one more call.
 Worth it. The seam is what makes app #2 mechanical, and a single query is not worth
 eroding it — particularly one whose whole purpose is reading a *household's* private
 judgement about its children.
+
+## §58 — A child's year of birth: a year, and a policy question
+
+`family_members.birth_year`, nullable. Stephen's suggestion and a good one: **an age
+is stale within twelve months and a year is a fact**, so the age is computed where it
+is shown rather than stored and left to rot.
+
+It exists because a five-point scale is not readable without it. A 3 from a
+seven-year-old and a 3 from a fourteen-year-old are not the same 3, and the person
+planning the week is the one who has to tell them apart. So the ratings row reads
+"Ada, 7".
+
+**It does not replace `is_child`.** That stays the flag anything filtering reads.
+Whether a fourteen-year-old counts as a child for taste purposes is a household's
+judgement rather than a threshold to encode, and a birthday must not silently change
+what a filter returns.
+
+**Year, not date.** A full date of birth would make the age exact rather than
+out-by-one until a birthday, and that precision is not worth holding more of a
+child's personal data than the feature needs.
+
+### The non-obvious part: which surface actually leaves the server
+
+The first version of the privacy test asserted that `getSession` does not carry the
+year. It failed — and the **test** was wrong, not the code.
+
+`getSession` is the seam's own server-side API and returns whole members by design.
+What crosses HTTP is the **token payload**, and that has carried its own rule all
+along: *"display names only. No emails, no ratings, nothing a leaked token would turn
+into a privacy incident."* A child's year of birth is exactly what that sentence is
+about.
+
+So the year is mapped out of the token and mutation-tested there — put it back and a
+named test fails. Had the assertion stayed on `getSession` it would have protected a
+surface that never leaves the process while the one that does went unguarded, which
+is worse than no test: a green check over the wrong boundary.
+
+Two more promises are asserted in the migration rather than stated: `anon` cannot
+read the column, and `family_members` still cascades from `families`, so deleting an
+account takes a child's year of birth with it. The cascade is the one that would
+otherwise rot silently — nothing else would notice if the foreign key changed.
+
+### Open, and not a database question
+
+**This is the first column in the schema that is a child's personal data** rather
+than a household's record of a preference. What notice and consent that requires
+before outside families arrive is a question for someone who does this
+professionally — the same place `decisions.md` already sends the copyright posture.
+It is not settled by the migration, and shipping the column does not settle it.

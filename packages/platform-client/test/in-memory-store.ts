@@ -213,6 +213,7 @@ export function createInMemoryStore(seed: Seed = {}, clock: Clock = () => new Da
           displayName: input.displayName,
           colour: null,
           isChild: false,
+          birthYear: null,
         };
         members.push(member);
       }
@@ -317,6 +318,7 @@ export function createInMemoryStore(seed: Seed = {}, clock: Clock = () => new Da
         displayName: input.displayName,
         colour: null,
         isChild: false,
+        birthYear: null,
       };
       members.push(member);
       return { account, family, member, created: existing === undefined };

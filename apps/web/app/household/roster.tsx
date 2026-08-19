@@ -24,6 +24,8 @@ export interface RosterMember {
   displayName: string;
   colour: string | null;
   isChild: boolean;
+  /** a year, not an age: an age is stale within twelve months */
+  birthYear: number | null;
   isYou: boolean;
 }
 
@@ -44,6 +46,14 @@ export function Roster({
 }) {
   const router = useRouter();
   const [name, setName] = useState("");
+  /*
+   * A year rather than an age, and optional.
+   *
+   * An age is stale within twelve months and needs somebody to remember; a year is a fact. It is
+   * what makes a five-point rating readable across a spread of ages — a 3 from a seven-year-old
+   * and a 3 from a fourteen-year-old are not the same 3.
+   */
+  const [year, setYear] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
@@ -87,6 +97,7 @@ export function Roster({
               <strong>{member.displayName}</strong>
               <span className="meta">
                 {member.isYou ? "you" : member.isChild ? "child" : "adult"}
+                {member.birthYear !== null && ` · born ${member.birthYear}`}
               </span>
             </span>
 
@@ -135,6 +146,8 @@ export function Roster({
                 </button>
                 <RenameButton member={member} busy={busy} onRename={(value) =>
                   send("PATCH", { id: member.id, displayName: value })} />
+                <YearField member={member} onSave={(birthYear) =>
+                  send("PATCH", { id: member.id, birthYear })} />
                 {!member.isYou && (
                   <button type="button" className="quiet" onClick={() => setConfirming(member.id)}>
                     Remove
@@ -151,7 +164,10 @@ export function Roster({
         style={{ maxWidth: "none" }}
         onSubmit={async (event) => {
           event.preventDefault();
-          if (await send("POST", { displayName: name })) setName("");
+          if (await send("POST", { displayName: name, birthYear: year || null })) {
+            setName("");
+            setYear("");
+          }
         }}
       >
         <div>
@@ -164,6 +180,14 @@ export function Roster({
               value={name}
               maxLength={60}
               onChange={(event) => setName(event.target.value)}
+            />
+            <input
+              aria-label="Year of birth, optional"
+              placeholder="Born (optional)"
+              inputMode="numeric"
+              value={year}
+              onChange={(event) => setYear(event.target.value.replace(/\D/g, "").slice(0, 4))}
+              style={{ flex: "0 0 9rem" }}
             />
             <button type="submit" disabled={busy || !name.trim()} style={{ flex: "0 0 auto" }}>
               {busy ? "Adding…" : "Add"}
@@ -277,6 +301,39 @@ function RenameButton({
       <button type="button" className="quiet" onClick={() => setOpen(false)}>
         Cancel
       </button>
+    </span>
+  );
+}
+
+/**
+ * Edit a year of birth in place. Blank clears it — a household may have recorded one and want it
+ * gone, and refusing to accept "unanswered" would make the field a trap.
+ */
+function YearField({
+  member,
+  onSave,
+}: {
+  member: RosterMember;
+  onSave: (birthYear: number | null) => Promise<boolean>;
+}) {
+  const [value, setValue] = useState(member.birthYear === null ? "" : String(member.birthYear));
+  const dirty = value !== (member.birthYear === null ? "" : String(member.birthYear));
+
+  return (
+    <span className="row" style={{ gap: "0.35rem" }}>
+      <input
+        aria-label={`Year ${member.displayName} was born`}
+        placeholder="Born"
+        inputMode="numeric"
+        value={value}
+        onChange={(event) => setValue(event.target.value.replace(/\D/g, "").slice(0, 4))}
+        style={{ flex: "0 0 6rem" }}
+      />
+      {dirty && (
+        <button type="button" className="button quiet" onClick={() => onSave(value ? Number(value) : null)}>
+          Save
+        </button>
+      )}
     </span>
   );
 }
