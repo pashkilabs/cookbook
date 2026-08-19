@@ -115,34 +115,81 @@ export function warningsFor(
 }
 
 /**
- * The general-knowledge note for a recipe, or nothing.
+ * The general-knowledge note for a recipe — from the cache, or computed once and kept.
  *
- * Null-safe by design: no cascade configured, no notes — the page renders without them rather
- * than failing, because a recipe is readable whether or not a model is reachable.
+ * **Why a column and not a memo.** This was a model call on every page view where nothing had
+ * been rated: the only cost here that scales with *reading* rather than importing. A memo would
+ * die with the serverless instance and miss on almost every view while appearing to work in
+ * development, and `import_cache` is keyed by URL and shared across households — the wrong key
+ * and the wrong scope for something per-recipe.
+ *
+ * **Invalidated by its only input.** `palate_key` fingerprints the ingredient lines the note was
+ * computed from, so an edit recomputes and nothing else does. Derived from the input rather than
+ * bumped by hand, because a stamp only works if something turns it — and nobody turned
+ * EXTRACTOR_VERSION for two releases.
+ *
+ * Null-safe throughout: no cascade, no notes, and a cache write that fails is a warning rather
+ * than a failed page. A recipe is readable whether or not a model is reachable.
  */
 export async function palateNotesFor(
-  recipe: { title: string | null },
+  supabase: SupabaseClient,
+  recipe: { id: string; title: string | null; palate_notes?: unknown; palate_key?: string | null },
   ingredients: ReadonlyArray<{ item_text?: string | null; amount?: number | null; unit?: string | null }>,
 ): Promise<import("@pashki/import").PalateNote[]> {
+  const lines = ingredients.map((row) =>
+    [row.amount ?? "", row.unit ?? "", row.item_text ?? ""].join(" ").trim(),
+  );
+  const key = fingerprint(lines);
+
+  if (recipe.palate_key === key && Array.isArray(recipe.palate_notes)) {
+    return recipe.palate_notes as import("@pashki/import").PalateNote[];
+  }
+
   const { cascadeFromEnv, palateNotes } = await import("@pashki/import");
   const cascade = cascadeFromEnv();
   if (!cascade || !recipe.title) return [];
 
+  let notes: import("@pashki/import").PalateNote[];
   try {
-    return await palateNotes({
+    notes = await palateNotes({
       provider: cascade.provider,
       model: cascade.models[0]!,
-      recipe: {
-        title: recipe.title,
-        ingredients: ingredients.map((row) =>
-          [row.amount ?? "", row.unit ?? "", row.item_text ?? ""].join(" ").trim(),
-        ),
-      },
-      // no band here: the note is about the dish, and which child is looking is not this page's
-      // question. A year of birth never leaves the platform (§58).
+      recipe: { title: recipe.title, ingredients: lines },
+      // no band: the note is about the dish, and a year of birth never leaves the platform (§58)
       band: null,
     });
   } catch {
     return [];
   }
+
+  /*
+   * An empty result is cached too.
+   *
+   * A plain roast chicken has nothing demanding about it, and that answer costs the same call as
+   * any other. Treating empty as "not yet computed" would re-ask forever for exactly the recipes
+   * the model has already considered and passed.
+   */
+  const { error } = await supabase
+    .from("recipes")
+    .update({ palate_notes: notes, palate_key: key })
+    .eq("id", recipe.id);
+  if (error) console.warn(`[pashki] palate notes not cached for ${recipe.id}: ${error.message}`);
+
+  return notes;
+}
+
+/**
+ * A stable fingerprint of the ingredient lines.
+ *
+ * Not cryptographic — this decides whether to spend a fraction of a cent, not whether to trust
+ * anything. Order matters, because reordering ingredients is an edit and the cheap thing to do
+ * with an edit is recompute.
+ */
+function fingerprint(lines: readonly string[]): string {
+  let hash = 5381;
+  const joined = lines.join("\u0000").toLowerCase();
+  for (let index = 0; index < joined.length; index += 1) {
+    hash = ((hash * 33) ^ joined.charCodeAt(index)) >>> 0;
+  }
+  return `${lines.length}:${hash.toString(36)}`;
 }

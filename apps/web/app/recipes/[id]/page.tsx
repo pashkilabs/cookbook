@@ -49,7 +49,7 @@ export default async function RecipePage({
   const recipe = maybeRow(
     await supabase
     .from("recipes")
-    .select("id, title, source_name, source_url, servings, time_minutes, times_made, make_again, visibility, course, cuisine, dish_form, principal_protein")
+    .select("id, title, source_name, source_url, servings, time_minutes, times_made, make_again, visibility, course, cuisine, dish_form, principal_protein, palate_notes, palate_key")
     .eq("id", id)
     .eq("family_id", family.id)
     .is("deleted_at", null)
@@ -214,7 +214,7 @@ export default async function RecipePage({
    */
   const palate =
     (ratings.data ?? []).length === 0
-      ? await palateNotesFor(recipe, ingredients.data ?? [])
+      ? await palateNotesFor(supabase, recipe, ingredients.data ?? [])
       : [];
 
   return (

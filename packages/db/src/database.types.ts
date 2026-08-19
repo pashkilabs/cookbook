@@ -840,6 +840,8 @@ export type Database = {
           family_id: string
           id: string
           make_again: boolean | null
+          palate_key: string | null
+          palate_notes: Json | null
           principal_protein: string | null
           servings: number | null
           source_name: string | null
@@ -862,6 +864,8 @@ export type Database = {
           family_id: string
           id?: string
           make_again?: boolean | null
+          palate_key?: string | null
+          palate_notes?: Json | null
           principal_protein?: string | null
           servings?: number | null
           source_name?: string | null
@@ -884,6 +888,8 @@ export type Database = {
           family_id?: string
           id?: string
           make_again?: boolean | null
+          palate_key?: string | null
+          palate_notes?: Json | null
           principal_protein?: string | null
           servings?: number | null
           source_name?: string | null
@@ -1052,6 +1058,7 @@ export type Database = {
         }
         Returns: Json
       }
+      applied_migration_versions: { Args: never; Returns: string[] }
       household_can_write_recipes: { Args: never; Returns: boolean }
       import_claim_next_job: {
         Args: { p_lease_seconds?: number; p_worker: string }
