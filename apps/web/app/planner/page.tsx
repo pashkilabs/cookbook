@@ -13,6 +13,7 @@ import {
   weekdayName,
 } from "@/lib/week";
 import { PlannerWeek } from "./planner-week";
+import { childTastes, warningsFor } from "@/lib/tastes";
 
 /**
  * A week, seven days, and whatever is waiting for one.
@@ -53,7 +54,7 @@ export default async function PlannerPage({
       .order("date"),
     supabase
       .from("shortlist_entries")
-      .select("id, recipe_id, recipes!inner(id, title, servings, time_minutes)")
+      .select("id, recipe_id, recipes!inner(id, title, servings, time_minutes, cuisine, principal_protein, dish_form)")
       .eq("family_id", family.id)
       .eq("week_start", weekStart)
       .is("deleted_at", null)
@@ -71,6 +72,27 @@ export default async function PlannerPage({
     id: row.id as string,
     recipe: row.recipes as unknown as { id: string; title: string; servings: number | null; time_minutes: number | null },
   }));
+
+  /*
+   * Only the warnings, not the ratings.
+   *
+   * `childTastes` reads every child's scores; what crosses to the client is a display name, a
+   * dimension value and a count — enough for the sentence and nothing more. A child's rating of
+   * a recipe is the household's business, and it does not need to be in a page's props to warn
+   * somebody about fish.
+   */
+  const tastes = await childTastes(supabase, auth.user.id, family.id);
+  const warnings: Record<string, Array<{ displayName: string; value: string; count: number }>> = {};
+  for (const { id, recipe } of waiting) {
+    const found = warningsFor(tastes, recipe as never);
+    if (found.length > 0) {
+      warnings[recipe.id] = found.map((w) => ({
+        displayName: w.displayName,
+        value: w.reading.value,
+        count: w.reading.count,
+      }));
+    }
+  }
 
   return (
     <main>
@@ -104,12 +126,15 @@ export default async function PlannerPage({
         </p>
       )}
 
+      {/* computed here, on the server, so no child's ratings cross to the browser — only the
+          sentence a person reads */}
       <PlannerWeek
         weekStart={weekStart}
         today={todayIso()}
         days={days.map((date) => ({ date, weekday: weekdayName(date), label: dayAndMonth(date) }))}
         placed={placed}
         waiting={waiting}
+        warnings={warnings}
       />
 
 

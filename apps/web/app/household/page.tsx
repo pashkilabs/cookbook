@@ -5,6 +5,8 @@ import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
 import { MEMBER_COLOURS, invitationState } from "@pashki/platform-client";
 import { Roster } from "./roster";
+import { childTastes } from "@/lib/tastes";
+import { evidence } from "@pashki/core";
 
 /**
  * Who is in the household.
@@ -37,6 +39,16 @@ export default async function HouseholdPage() {
     platformStore().listInvitations(family.id),
   ]);
   const me = members.find((member) => member.accountId === auth.user!.id);
+
+  /*
+   * What the children have said, shown with its counts.
+   *
+   * The empty and thin states render rather than vanishing — "Ada has rated 2 recipes, too few
+   * to say anything yet" is a different message from an absent section, and somebody wondering
+   * whether the feature works can tell them apart. A silent absence is indistinguishable from a
+   * passing check.
+   */
+  const tastes = await childTastes(supabase, auth.user.id, family.id);
 
   return (
     <main>
@@ -81,6 +93,48 @@ export default async function HouseholdPage() {
           isYou: member.id === me?.id,
         }))}
       />
+
+      {tastes.length > 0 && (
+        <section style={{ marginTop: "2rem" }}>
+          <h2>What they have said</h2>
+          <p className="subtitle">
+            From ratings only — what each child has actually said about food they have eaten, with
+            how many ratings it stands on.
+          </p>
+          {tastes.map((child) => (
+            <div key={child.memberId} style={{ marginBottom: "1.25rem" }}>
+              <strong>{child.displayName}</strong>{" "}
+              <span className="meta">{evidence(child.totalRatings)}</span>
+              {/* the thin and empty states render: an absent section and "not enough yet" are
+                  different messages, and only one of them says the feature is working */}
+              {child.summary.state !== "pattern" ? (
+                <p className="meta">{child.summary.message}</p>
+              ) : (
+                <ul className="meta">
+                  {child.readings
+                    .filter((reading) => reading.state === "pattern")
+                    .map((reading) => (
+                      <li key={`${reading.dimension}-${reading.value}`}>
+                        {reading.leaning === "likes"
+                          ? "rates "
+                          : reading.leaning === "avoids"
+                            ? "rates "
+                            : "is split on "}
+                        {reading.value}
+                        {reading.leaning === "likes"
+                          ? " highly"
+                          : reading.leaning === "avoids"
+                            ? " low"
+                            : ""}{" "}
+                        — {evidence(reading.count)}, average {reading.mean}
+                      </li>
+                    ))}
+                </ul>
+              )}
+            </div>
+          ))}
+        </section>
+      )}
     </main>
   );
 }

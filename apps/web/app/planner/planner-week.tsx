@@ -30,6 +30,14 @@ export function PlannerWeek(props: {
   days: Array<{ date: string; weekday: string; label: string }>;
   placed: Array<{ id: string; date: string; scale: number; recipe: Recipe }>;
   waiting: Array<{ id: string; recipe: Recipe }>;
+  /**
+   * What this household's children have consistently rated low, for the recipes waiting.
+   *
+   * Shown at the moment a meal is being planned rather than after, because that is when it can
+   * change a decision. Never blocking: it is an observation about the ratings, and a household
+   * knows things the ratings do not.
+   */
+  warnings: Record<string, Array<{ displayName: string; value: string; count: number }>>;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -148,6 +156,16 @@ export function PlannerWeek(props: {
             {props.waiting.map(({ id, recipe }) => (
               <li key={id}>
                 <Link href={`/recipes/${recipe.id}`}>{recipe.title}</Link>
+                {/*
+                  * Worded as what was rated, not as what a child is like: "Ada has rated 8 fish
+                  * dishes low" is a fact somebody can weigh, where "Ada does not like fish" is a
+                  * claim about a person made by a database. The count is always shown.
+                  */}
+                {(props.warnings[recipe.id] ?? []).map((warning) => (
+                  <span key={`${warning.displayName}-${warning.value}`} className="meta warning">
+                    {warning.displayName} has rated {warning.count} {warning.value} recipes low
+                  </span>
+                ))}
                 <span className="days">
                   {props.days.map((day) => (
                     <button
