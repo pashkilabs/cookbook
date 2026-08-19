@@ -55,7 +55,16 @@ async function schemaState(): Promise<string> {
     );
     if (!response.ok) return `unknown: could not read applied migrations (${response.status})`;
     const applied = (await response.json()) as string[];
-    return applied.includes(REQUIRED_MIGRATION)
+    /*
+     * By timestamp prefix, not by whole string: `schema_migrations.version` holds the numeric
+     * stamp — 20260820120000 — and not the filename. The constant keeps the readable name
+     * because "MISSING 20260820120000" tells nobody which change is absent.
+     *
+     * regression: comparing whole strings reported MISSING for a migration that was applied,
+     * which is a guard that cries wolf — and a guard nobody believes is worse than none.
+     */
+    const required = REQUIRED_MIGRATION.split("_")[0]!;
+    return applied.some((version) => version === required)
       ? "ok"
       : `MISSING ${REQUIRED_MIGRATION} — run: pnpm --filter @pashki/db db:push`;
   } catch (thrown) {
