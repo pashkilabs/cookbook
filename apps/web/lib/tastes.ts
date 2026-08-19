@@ -193,3 +193,46 @@ function fingerprint(lines: readonly string[]): string {
   }
   return `${lines.length}:${hash.toString(36)}`;
 }
+
+
+/**
+ * Keep only the recipes a child rated 4 or 5, with none rating them lower.
+ *
+ * The practical rule rather than the strict one (§ the kid-friendly decision): "every child has
+ * rated it" is blank for months and an empty chip reads as broken, where "somebody likes it and
+ * nobody objects" is usable from the first few ratings.
+ *
+ * Computed rather than stored — it is a household's judgement, it differs per household, and a
+ * column would go stale the moment a child changed their mind. Through the seam for the people,
+ * directly for the ratings.
+ */
+export async function keepKidFriendly<T extends { recipe: { id: string } }>(
+  supabase: SupabaseClient,
+  accountId: string,
+  familyId: string,
+  hits: readonly T[],
+): Promise<T[]> {
+  if (hits.length === 0) return [];
+  const members = await platformClient(accountId).listMembers();
+  const childIds = members.filter((member) => member.isChild).map((member) => member.id);
+  if (childIds.length === 0) return [];
+
+  const rated = rows(
+    await supabase
+      .from("ratings")
+      .select("recipe_id, score")
+      .eq("family_id", familyId)
+      .is("deleted_at", null)
+      .in("family_member_id", childIds)
+      .in("recipe_id", hits.map((hit) => hit.recipe.id)),
+    "kid-friendly ratings",
+  );
+
+  const liked = new Set<string>();
+  const disliked = new Set<string>();
+  for (const row of rated) {
+    if ((row.score as number) >= 4) liked.add(row.recipe_id as string);
+    else disliked.add(row.recipe_id as string);
+  }
+  return hits.filter((hit) => liked.has(hit.recipe.id) && !disliked.has(hit.recipe.id));
+}

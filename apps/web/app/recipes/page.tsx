@@ -7,7 +7,8 @@ import { keepWholeFamilyLikes, searchRecipes } from "@/lib/recipe-search";
 import { startOfWeek, addWeeks, todayIso } from "@/lib/week";
 import { ShortlistButton } from "./shortlist-button";
 import { Filters, FILTERS, type FilterKey } from "./filters";
-import { BrowseTiles } from "./browse/tiles";
+import { COURSES, PROTEINS } from "./drill-down";
+import { keepKidFriendly } from "@/lib/tastes";
 import { SignOutButton } from "./sign-out";
 
 /**
@@ -25,9 +26,11 @@ import { SignOutButton } from "./sign-out";
 export default async function RecipesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; filter?: string; all?: string }>;
+  searchParams: Promise<{ q?: string; filter?: string; in?: string; protein?: string }>;
 }) {
-  const { q: rawQuery, filter: rawFilter, all } = await searchParams;
+  const { q: rawQuery, filter: rawFilter, in: rawCourse, protein: rawProtein } = await searchParams;
+  const chosen = COURSES.find((entry) => entry.key === rawCourse) ?? null;
+  const protein = PROTEINS.includes(rawProtein as (typeof PROTEINS)[number]) ? rawProtein! : null;
   const q = (rawQuery ?? "").trim();
   const filter = FILTERS.some((option) => option.key === rawFilter)
     ? (rawFilter as FilterKey)
@@ -59,7 +62,9 @@ export default async function RecipesPage({
   const hits =
     filter === "family-likes"
       ? await keepWholeFamilyLikes(supabase, family.id, found.hits)
-      : found.hits;
+      : filter === "kid-friendly"
+        ? await keepKidFriendly(supabase, auth.user.id, family.id, found.hits)
+        : found.hits;
   const error = found.error;
 
   // which of these are already wanted this week, so the button starts in the right state
@@ -67,6 +72,30 @@ export default async function RecipesPage({
   // both weeks, because shortlisting only ever reached this one and the planner's waiting list
   // is week-scoped — so a recipe was stranded here while next week showed empty
   const nextWeekStart = addWeeks(weekStart, 1);
+  /*
+   * Narrow the hits by course, dish form and protein, and work out which protein chips this
+   * household can even use — a chip that leads to an empty list reads as broken.
+   *
+   * Filtered here rather than in the query because `searchRecipes` already ran and its ranking is
+   * what orders the list; re-querying would throw that away to save a pass over at most a few
+   * hundred rows.
+   */
+  const narrowed = hits.filter(({ recipe }) => {
+    const row = recipe as unknown as Record<string, string | null>;
+    if (chosen && row[chosen.field] !== chosen.key) return false;
+    if (protein && row.principal_protein !== protein) return false;
+    return true;
+  });
+  const proteinsAvailable = chosen
+    ? PROTEINS.filter((key) =>
+        hits.some(
+          ({ recipe }) =>
+            (recipe as unknown as Record<string, string | null>)[chosen.field] === chosen.key &&
+            (recipe as unknown as Record<string, string | null>).principal_protein === key,
+        ),
+      )
+    : [];
+
   const shortlisted = rows(
     await supabase
     .from("shortlist_entries")
@@ -102,7 +131,7 @@ export default async function RecipesPage({
       // never a card: a grid of index cards where dish photographs should be reads as a filing
       // cabinet, and is useless to somebody scanning for what to eat (§56)
       .neq("source", "source")
-      .in("recipe_id", hits.map(({ recipe }) => recipe.id))
+      .in("recipe_id", narrowed.map(({ recipe }) => recipe.id))
       .is("deleted_at", null),
     "photos",
   );
@@ -145,22 +174,13 @@ export default async function RecipesPage({
         </div>
       </div>
 
-      {/*
-        * Browse is the way in, and the flat list is behind it.
-        *
-        * The complaint was that a flat list is hard to navigate at volume, so adding a second
-        * door beside the cluttered thing would not have answered it — the grouping has to be
-        * what you land on. Searching or filtering still goes straight to the list, because
-        * that is what a person doing either has already told you they want.
-        *
-        * regression: browse shipped with nothing linking to it and was found only by typing the
-        * URL. That is the fourth feature to ship unreachable here — after caption paste, the
-        * screenshot upload and the photo control — and each was found by a person going looking
-        * rather than by anything automated. A route no navigation reaches is not shipped.
-        */}
-      <BrowseTiles />
-
-      <Filters q={q} filter={filter} />
+            <Filters
+        q={q}
+        filter={filter}
+        course={chosen?.key ?? null}
+        protein={protein}
+        proteinsAvailable={proteinsAvailable}
+      />
 
       {error && <p className="error">Could not read recipes: {error}</p>}
 
@@ -200,7 +220,7 @@ export default async function RecipesPage({
       )}
 
       <div className="recipes">
-      {hits.map(({ recipe, matchedIngredient }) => (
+      {narrowed.map(({ recipe, matchedIngredient }) => (
         <Link className="card" key={recipe.id} href={`/recipes/${recipe.id}`}>
           {photoFor.has(recipe.id) ? (
             // eslint-disable-next-line @next/next/no-img-element -- signed URLs expire; the

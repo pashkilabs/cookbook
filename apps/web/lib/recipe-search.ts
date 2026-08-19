@@ -35,14 +35,17 @@ export interface SearchHit {
 }
 
 const COLUMNS =
-  "id, title, source_name, servings, time_minutes, times_made, make_again, visibility";
+  // one literal, not a concatenation: PostgREST infers the row type from the string and a `+`
+  // collapses it to GenericStringError[]. The classification columns are here because the list
+  // drills down by course, dish form and protein now that browse is gone.
+  "id, title, source_name, servings, time_minutes, times_made, make_again, visibility, course, dish_form, principal_protein";
 
 export interface SearchOptions {
   supabase: SupabaseClient;
   familyId: string;
   /** already trimmed; empty means "no search, just the filters" */
   query: string;
-  filter: "make-again" | "untried" | "family-likes" | null;
+  filter: "make-again" | "untried" | "family-likes" | "kid-friendly" | null;
 }
 
 export async function searchRecipes(options: SearchOptions): Promise<{
