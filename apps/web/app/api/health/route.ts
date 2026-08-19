@@ -14,6 +14,7 @@
  * tells it whether it is testing the commit it thinks it is.
  */
 import { anthropicModelMismatch } from "@pashki/import";
+import { REQUIRED_MIGRATION } from "@/lib/schema-version";
 
 /** the prefix, never the key: enough to see which dialect the id has to belong to */
 const visionKeyKind = (key: string | undefined): "anthropic" | "other" | null =>
@@ -28,6 +29,38 @@ function visionWiring(): string {
   const model = process.env.PASHKI_LLM_VISION_MODEL;
   if (!key || !model) return "unconfigured";
   return anthropicModelMismatch(key, model) ?? "ok";
+}
+
+/**
+ * "ok", or the migration this build needs and the database does not have.
+ *
+ * Read through the service role because `supabase_migrations` is not a client-readable schema.
+ * A failure to check is reported as `unknown` rather than as `ok`: a check that cannot run must
+ * never look like one that passed.
+ */
+async function schemaState(): Promise<string> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return "unknown: no service role to ask with";
+
+  try {
+    const response = await fetch(
+      `${url}/rest/v1/rpc/applied_migration_versions`,
+      {
+        method: "POST",
+        headers: { apikey: key, authorization: `Bearer ${key}`, "content-type": "application/json" },
+        body: "{}",
+        cache: "no-store",
+      },
+    );
+    if (!response.ok) return `unknown: could not read applied migrations (${response.status})`;
+    const applied = (await response.json()) as string[];
+    return applied.includes(REQUIRED_MIGRATION)
+      ? "ok"
+      : `MISSING ${REQUIRED_MIGRATION} — run: pnpm --filter @pashki/db db:push`;
+  } catch (thrown) {
+    return `unknown: ${thrown instanceof Error ? thrown.message : "could not check"}`;
+  }
 }
 
 export async function GET() {
@@ -83,6 +116,16 @@ export async function GET() {
         visionModel: process.env.PASHKI_LLM_VISION_MODEL ?? null,
         visionKeyKind: visionKeyKind(process.env.PASHKI_LLM_VISION_API_KEY),
         visionWiring: visionWiring(),
+
+        /*
+         * Whether the database has caught up with this build.
+         *
+         * `git push` deploys automatically and `db:push` is remembered by a person, and that
+         * asymmetry has put code in production ahead of its schema four times — each surfacing as
+         * a server-side exception on a page rather than as anything a deploy noticed. This names
+         * the missing migration, so the fix is one command rather than a diagnosis.
+         */
+        schema: await schemaState(),
       },
     },
     { headers: { "cache-control": "no-store" } },

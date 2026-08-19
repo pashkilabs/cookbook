@@ -419,3 +419,15 @@ no framework — so it runs identically in Next.js, Expo and the worker.
 
 If a task requires one of these to be settled, stop and say so rather than
 guessing.
+
+- **`git push` deploys; `db:push` is remembered by a person, and that asymmetry has now
+  shipped code ahead of its schema four times.** The recipe list, browse, the photo upload
+  path and `/household` each reached production querying a column the database did not
+  have, and each surfaced as a **server-side exception on a page** — not as a failed
+  build, not as a failed test, not as anything a deploy noticed. A rule that has failed
+  four times against people who know it is not a rule; it is a missing mechanism.
+  `/api/health` now reports `schema`, comparing `REQUIRED_MIGRATION` against what the
+  database has applied, and **names the missing migration and the command that fixes it**
+  so the answer is one curl rather than a diagnosis. It reports `unknown` when it cannot
+  check, never `ok` — a check that cannot run must not look like one that passed. Bump
+  `REQUIRED_MIGRATION` in the same commit as any migration application code depends on.
