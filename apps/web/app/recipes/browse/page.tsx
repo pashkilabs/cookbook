@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { userClient } from "@/lib/supabase-server";
 import { maybeRow, rows } from "@/lib/rows";
-import { platformStore } from "@/lib/platform";
+import { platformClient, platformStore } from "@/lib/platform";
 
 /**
  * Browse, the way the sketch draws it: one list mixing courses, dish forms and a meal time.
@@ -140,25 +140,28 @@ export default async function BrowsePage({
    * with children has somewhere for it to lead even if nothing qualifies yet.
    */
   let available: string[] = [];
+  let childIds: string[] = [];
   if (chosen.key === "main") {
-    const [{ data: proteinRows }, { count: children }] = await Promise.all([
-      supabase
-        .from("recipes")
-        .select("principal_protein")
-        .eq("family_id", family.id)
-        .is("deleted_at", null)
-        .eq("course", "main")
-        .not("principal_protein", "is", null),
-      supabase
-        .from("family_members")
-        .select("id", { count: "exact", head: true })
-        .eq("family_id", family.id)
-        .is("deleted_at", null)
-        .eq("is_child", true),
+    const [proteinRows, members] = await Promise.all([
+      rows(
+        await supabase
+          .from("recipes")
+          .select("principal_protein")
+          .eq("family_id", family.id)
+          .is("deleted_at", null)
+          .eq("course", "main")
+          .not("principal_protein", "is", null),
+        "protein chips",
+      ),
+      // through the seam: "which members of this household are children" is a platform question,
+      // and app code querying family_members directly is the breach the seam exists to prevent.
+      // listMembers already carries isChild, so nothing had to be added to it.
+      platformClient(auth.user.id).listMembers(),
     ]);
-    const held = new Set((proteinRows ?? []).map((r) => r.principal_protein as string));
+    const held = new Set(proteinRows.map((r) => r.principal_protein as string));
     available = PROTEIN_ORDER.filter((key) => held.has(key));
-    if ((children ?? 0) > 0) available.push("kid");
+    childIds = members.filter((member) => member.isChild).map((member) => member.id);
+    if (childIds.length > 0) available.push("kid");
   }
 
   const found = await query;
@@ -183,11 +186,20 @@ export default async function BrowsePage({
    * **At least one child rating 4+, and none below.** The stricter reading — every child has
    * rated it — is blank for months, and an empty chip reads as broken rather than as honest.
    */
-  if (protein === "kid" && recipes.length > 0) {
+  if (protein === "kid" && recipes.length > 0 && childIds.length > 0) {
     const ratings = rows(
     await supabase
       .from("ratings")
-      .select("recipe_id, score, family_members!inner(is_child)")
+      /*
+       * Filtered by member id rather than joined to family_members.
+       *
+       * The join did the filtering in SQL — `family_members!inner(is_child)` — which is app code
+       * reaching into a platform table. Asking the seam first costs one extra round trip and moves
+       * the "is this a child" test out of the query; the seam is what makes extracting a platform
+       * for app #2 mechanical rather than surgical, and one query is not worth eroding it.
+       */
+      .select("recipe_id, score")
+      .in("family_member_id", childIds)
       .eq("family_id", family.id)
       .is("deleted_at", null)
       .in(
@@ -200,8 +212,7 @@ export default async function BrowsePage({
     const liked = new Set<string>();
     const disliked = new Set<string>();
     for (const row of ratings ?? []) {
-      const member = row.family_members as unknown as { is_child?: boolean } | null;
-      if (!member?.is_child) continue;
+      // every row is a child's already — the seam decided that, not this query
       if ((row.score as number) >= 4) liked.add(row.recipe_id as string);
       else disliked.add(row.recipe_id as string);
     }

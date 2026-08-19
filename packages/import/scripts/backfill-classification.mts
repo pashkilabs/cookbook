@@ -12,8 +12,29 @@ const dryRun = process.argv.includes("--dry-run");
 const WRITES = CLASSIFICATION_COLUMNS.filter((c) => c !== "cuisine");
 console.log(`writes: ${WRITES.join(", ")}${dryRun ? "  (DRY RUN)" : ""}`);
 
-const families = await admin.from("families").select("id, name").is("deleted_at", null);
-for (const family of families.data ?? []) {
+/*
+ * Households derived from the recipes themselves, not from `families`.
+ *
+ * The seam applies to scripts. A maintenance script holding the service role is *more* reason
+ * to keep it out of platform tables, not less — service_role bypasses RLS, so a script is the
+ * one caller for which nothing else would stop it, and "it is only a script" is how a boundary
+ * becomes advisory. Extracting a platform for app #2 has to be mechanical, and a script that
+ * reads `families` is one more place to find and rewrite.
+ *
+ * It also turned out not to need them: the question is "which households have unclassified
+ * recipes", and `recipes` answers that. Grouping by family_id keeps the per-household scoping
+ * this needs — one household's recipes never reach another's prompt — without asking the
+ * platform anything.
+ */
+const scoped = await admin
+  .from("recipes")
+  .select("family_id")
+  .is("deleted_at", null)
+  .is("classified_at", null);
+if (scoped.error) throw scoped.error;
+const familyIds = [...new Set((scoped.data ?? []).map((row) => row.family_id as string))];
+
+for (const family of familyIds.map((id) => ({ id, name: id.slice(0, 8) }))) {
   // the is-null predicate IS the cursor: re-running picks up only what is still unclassified
   const { data: recipes } = await admin
     .from("recipes")

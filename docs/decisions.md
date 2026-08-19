@@ -2670,3 +2670,47 @@ other household could read the path of a card attached to a published recipe. A
 leaked path is not a leaked photograph, and it is still the wrong answer to who may
 know a thing exists. The assertion caught it; the shape of the WHERE clause had
 been carrying the guarantee alone.
+
+## §57 — The seam applies to scripts, and more so
+
+`check-platform-tables.mjs` caught a hand-run maintenance script reading `families`.
+The tempting answer was an exemption: it is not app code, it holds the service role,
+it runs once. The decision is the opposite.
+
+**A script holding the service role is more reason to keep it out of platform
+tables, not less.** `service_role` bypasses RLS, so a script is the one caller for
+which nothing else would stop it — every other path meets a policy on the way. And
+"it is only a script" is precisely how a boundary becomes advisory: the exemption is
+never the last one.
+
+The boundary's purpose is that extracting a real platform for app #2 is mechanical
+rather than surgical (CLAUDE.md). A script reading `families` is one more site to
+find and rewrite, and the least likely to be found, because nothing exercises it in
+CI and nobody opens it between runs.
+
+It also turned out not to need the table. The question was "which households have
+unclassified recipes", and `recipes` answers it — grouping by `family_id` keeps the
+per-household scoping the job requires, so one household's recipes never reach
+another's prompt, without asking the platform anything.
+
+**Where a script genuinely needs a platform fact**, the answer is the same as for
+app code: widen the seam, deliberately. `packages/db` remains exempt because it owns
+the schema.
+
+---
+
+## §57a — Kid-friendly asks the seam, not the table
+
+The same guard caught the browse screen's `family_members!inner(is_child)` join,
+which had been red since it shipped. That join was doing its filtering in SQL, which
+is app code reaching into a platform table for a question the seam already answers:
+`listMembers` has carried `isChild` all along, so nothing had to be added.
+
+**What it costs**, since the join was load-bearing: one extra round trip, and the
+"is this a child" test moves out of the query into the page. The ratings query now
+filters `family_member_id in (…)` against ids the seam returned, rather than joining
+and testing a column. Slightly more code and one more call.
+
+Worth it. The seam is what makes app #2 mechanical, and a single query is not worth
+eroding it — particularly one whose whole purpose is reading a *household's* private
+judgement about its children.
