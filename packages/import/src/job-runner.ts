@@ -18,7 +18,7 @@ import { missingFields } from "./recipe.js";
  * it could duplicate is quota and stored photo objects, and both are guarded below.
  */
 
-export type ClaimableKind = "url" | "text" | "screenshot" | "video";
+export type ClaimableKind = "url" | "text" | "screenshot" | "video" | "classify";
 
 export interface ImportJob {
   id: string;
@@ -51,8 +51,16 @@ export type JobResult =
 
 export interface FinishJobInput {
   jobId: string;
-  status: "review" | "failed";
-  result: JobResult;
+  /**
+   * `done` is the classify path: it produces no draft, so there is nothing to review.
+   *
+   * The existing two assume a reviewable result — `review` means a draft is waiting for a
+   * person, and a job that finishes with nothing for anyone to look at would sit in that state
+   * forever, indistinguishable from one nobody had got to.
+   */
+  status: "review" | "failed" | "done";
+  /** absent for a classify job: it produces no draft, and a fabricated one would be a lie */
+  result: JobResult | null;
   /** one line for logs and admin; the typed failure is in `result` */
   errorSummary: string | null;
   /**
@@ -73,7 +81,7 @@ export interface FinishJobInput {
  * spending it in another.
  */
 export type FinishOutcome = {
-  recorded: "review" | "failed";
+  recorded: "review" | "failed" | "done";
   charged: boolean;
   /** set when a success was refused for want of allowance */
   quota?: "exceeded" | "no-entitlement" | null;
@@ -120,13 +128,24 @@ export interface JobRunnerOptions {
     bytes: Uint8Array;
     photoId: string;
   }) => Promise<StoredPhotoRef | null>;
+
+  /**
+   * Classify a household's unclassified recipes. Injected for the same reason `storePhoto` is:
+   * the runner would otherwise need a database client and the model cascade, and it has neither.
+   *
+   * Returns how many it classified, which is all a classify job has to report — there is no
+   * draft, and "nothing left to do" is a success rather than an empty result.
+   */
+  classifyHousehold?: (familyId: string) => Promise<{ classified: number }>;
 }
 
 export type JobOutcome =
   /** nothing claimable */
   | { status: "idle" }
   | { status: "review"; job: ImportJob; result: Extract<JobResult, { ok: true }> }
-  | { status: "failed"; job: ImportJob; failure: ImportFailure };
+  | { status: "failed"; job: ImportJob; failure: ImportFailure }
+  /** classify: no draft to hand back, only how many recipes it filed */
+  | { status: "done"; job: ImportJob; classified: number };
 
 /**
  * Claim one job and run it. Returns `idle` when the queue is empty.
@@ -179,6 +198,35 @@ export async function runNextJob(options: JobRunnerOptions): Promise<JobOutcome>
     }
     return { status: "review", job, result };
   };
+
+  /*
+   * Classification: no draft, no charge, no review.
+   *
+   * A household's allowance is for importing recipes and these are already owned — charging
+   * would bill somebody for a schema change made after they saved them, and would let a
+   * household with two hundred recipes have its month consumed by a migration (§54).
+   *
+   * It finishes `done` rather than `review` because there is nothing for a person to look at.
+   * Finishing it `review` would leave every classify job sitting in a queue of drafts that do
+   * not exist, which is a worse lie than failing.
+   */
+  if (job.kind === "classify") {
+    if (!options.classifyHousehold) {
+      return fail(
+        { kind: "unsupported-job-kind", jobKind: job.kind },
+        "this worker cannot classify",
+      );
+    }
+    const { classified } = await options.classifyHousehold(job.familyId);
+    await options.queue.finish({
+      jobId: job.id,
+      status: "done",
+      result: null,
+      errorSummary: null,
+      charge: false,
+    });
+    return { status: "done", job, classified };
+  }
 
   if (job.kind === "screenshot" || job.kind === "video") {
     // tier 3 takes images rather than a path in input_ref, and video is Phase 4.

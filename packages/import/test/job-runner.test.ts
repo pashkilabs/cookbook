@@ -173,7 +173,8 @@ describe("typed terminal states", () => {
       },
     });
     // a UI can branch on that; it could not branch on a message
-    if (recorded.result.ok) return;
+    expect(recorded.result).not.toBeNull();
+    if (!recorded.result || recorded.result.ok) return;
     expect(recorded.result.failure.kind).toBe("blocked-platform");
   });
 
@@ -351,5 +352,52 @@ describe("draining", () => {
     const queue = fakeQueue(Array.from({ length: 10 }, (_, i) => job({ id: `j${i}` })));
     const outcomes = await drainQueue({ ...options({ queue }), queue, maxJobs: 4 });
     expect(outcomes).toHaveLength(4);
+  });
+});
+
+describe("a classify job", () => {
+  const job = { id: "j1", familyId: "f1", kind: "classify" as const, inputRef: "", attempts: 0 };
+  const runnerFor = (extra: Record<string, unknown>) => ({
+    queue: {
+      claim: async () => job,
+      finish: async (input: FinishJobInput) => {
+        finished = input;
+        return { recorded: input.status, charged: false, quota: null } as FinishOutcome;
+      },
+    },
+    worker: "test",
+    imports: {} as never,
+    ...extra,
+  });
+  let finished: FinishJobInput | null = null;
+
+  it("finishes done, not review — there is no draft for anyone to look at", async () => {
+    finished = null;
+    const outcome = await runNextJob(
+      runnerFor({ classifyHousehold: async () => ({ classified: 3 }) }) as never,
+    );
+    expect(finished?.status).toBe("done");
+    expect(outcome).toMatchObject({ status: "done", classified: 3 });
+  });
+
+  // §54: the allowance is for importing recipes, and these are already owned — charging would
+  // bill a household for a schema change made after they saved them
+  it("never charges the household", async () => {
+    finished = null;
+    await runNextJob(runnerFor({ classifyHousehold: async () => ({ classified: 1 }) }) as never);
+    expect(finished?.charge).toBe(false);
+  });
+
+  it("hands back no result, rather than fabricating one", async () => {
+    finished = null;
+    await runNextJob(runnerFor({ classifyHousehold: async () => ({ classified: 0 }) }) as never);
+    expect(finished?.result).toBeNull();
+  });
+
+  it("fails typed when the worker cannot classify, rather than leaving it queued forever", async () => {
+    finished = null;
+    const outcome = await runNextJob(runnerFor({}) as never);
+    expect(outcome.status).toBe("failed");
+    expect(finished?.status).toBe("failed");
   });
 });
