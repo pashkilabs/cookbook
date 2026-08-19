@@ -95,6 +95,10 @@ export default async function BrowsePage({
   if (!chosen) {
     return (
       <main className="stack">
+        {/* the way out: the tiles led in and nothing led back, which made browse a dead end */}
+        <p className="meta">
+          <Link href="/recipes">← All recipes</Link>
+        </p>
         <h1>Browse</h1>
         <div className="tiles">
           {TOP_LEVEL.map((entry) => (

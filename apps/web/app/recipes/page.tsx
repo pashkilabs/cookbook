@@ -4,7 +4,7 @@ import { userClient } from "@/lib/supabase-server";
 import { maybeRow, rows } from "@/lib/rows";
 import { platformStore } from "@/lib/platform";
 import { keepWholeFamilyLikes, searchRecipes } from "@/lib/recipe-search";
-import { startOfWeek, todayIso } from "@/lib/week";
+import { startOfWeek, addWeeks, todayIso } from "@/lib/week";
 import { ShortlistButton } from "./shortlist-button";
 import { Filters, FILTERS, type FilterKey } from "./filters";
 import { BrowseTiles } from "./browse/tiles";
@@ -64,16 +64,25 @@ export default async function RecipesPage({
 
   // which of these are already wanted this week, so the button starts in the right state
   const weekStart = startOfWeek(todayIso());
+  // both weeks, because shortlisting only ever reached this one and the planner's waiting list
+  // is week-scoped — so a recipe was stranded here while next week showed empty
+  const nextWeekStart = addWeeks(weekStart, 1);
   const shortlisted = rows(
     await supabase
     .from("shortlist_entries")
-    .select("recipe_id")
+    .select("recipe_id, week_start")
     .eq("family_id", family.id)
-    .eq("week_start", weekStart)
+    .in("week_start", [weekStart, nextWeekStart])
     .is("deleted_at", null),
     "shortlisted",
   );
-  const onThisWeek = new Set((shortlisted ?? []).map((row) => row.recipe_id));
+  // one set per week: a recipe on next week's list must not light up this week's button
+  const onThisWeek = new Set(
+    shortlisted.filter((row) => row.week_start === weekStart).map((row) => row.recipe_id),
+  );
+  const onNextWeek = new Set(
+    shortlisted.filter((row) => row.week_start === nextWeekStart).map((row) => row.recipe_id),
+  );
 
   /*
    * The photographs, so the list is something a person recognises rather than a wall of titles.
@@ -226,7 +235,9 @@ export default async function RecipesPage({
             <ShortlistButton
               recipeId={recipe.id}
               weekStart={weekStart}
+              nextWeekStart={nextWeekStart}
               shortlisted={onThisWeek.has(recipe.id)}
+              shortlistedNext={onNextWeek.has(recipe.id)}
             />
           </div>
           </div>

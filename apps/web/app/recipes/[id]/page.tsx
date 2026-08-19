@@ -7,7 +7,7 @@ import { scaleIngredientAmounts, servingsForScale } from "@/lib/planner";
 import { userClient } from "@/lib/supabase-server";
 import { maybeRow, rows } from "@/lib/rows";
 import { platformStore } from "@/lib/platform";
-import { startOfWeek, todayIso } from "@/lib/week";
+import { startOfWeek, addWeeks, todayIso } from "@/lib/week";
 import { ShortlistButton } from "../shortlist-button";
 import { RemoveRecipe } from "./remove";
 import { Verdicts } from "./verdicts";
@@ -182,15 +182,23 @@ export default async function RecipePage({
   const scores = new Map(ratings.data?.map((r) => [r.family_member_id, r.score]) ?? []);
 
   const weekStart = startOfWeek(todayIso());
-  const shortlisted = maybeRow(
+  // both weeks, because shortlisting only ever reached this one and the planner's waiting list
+  // is week-scoped — so a recipe was stranded here while next week showed empty
+  const nextWeekStart = addWeeks(weekStart, 1);
+  /*
+   * Both weeks, as rows rather than one row.
+   *
+   * `maybeSingle()` over two weeks throws the moment a recipe is on both lists — which is a
+   * thing somebody may legitimately want — so this reads them and answers each button separately.
+   */
+  const shortlistRows = rows(
     await supabase
     .from("shortlist_entries")
-    .select("id")
+    .select("week_start")
     .eq("family_id", family.id)
-    .eq("week_start", weekStart)
+    .in("week_start", [weekStart, nextWeekStart])
     .eq("recipe_id", recipe.id)
-    .is("deleted_at", null)
-    .maybeSingle(),
+    .is("deleted_at", null),
     "shortlisted",
   );
 
@@ -239,7 +247,9 @@ export default async function RecipePage({
           <ShortlistButton
             recipeId={recipe.id}
             weekStart={weekStart}
-            shortlisted={shortlisted !== null}
+            nextWeekStart={nextWeekStart}
+            shortlisted={shortlistRows.some((row) => row.week_start === weekStart)}
+            shortlistedNext={shortlistRows.some((row) => row.week_start === nextWeekStart)}
           />
           <Link className="button" href={`/recipes/${recipe.id}/edit`}>
             Edit
