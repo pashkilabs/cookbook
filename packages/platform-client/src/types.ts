@@ -49,6 +49,18 @@ export interface FamilyMember {
   displayName: string;
   colour: string | null;
   isChild: boolean;
+  /**
+   * Optional year of birth. A year rather than an age, because an age is stale within twelve
+   * months and a year is a fact; the age is computed where it is shown.
+   *
+   * **Display, not a filter.** `isChild` stays the flag anything filtering reads — whether a
+   * fourteen-year-old counts as a child for taste purposes is a household's judgement, and a
+   * birthday must not silently change what a filter returns.
+   *
+   * A child's personal data: it lives on a platform table, never reaches a prompt, and goes with
+   * the household when an account is deleted.
+   */
+  birthYear: number | null;
 }
 
 export interface AddMemberInput {
@@ -56,6 +68,8 @@ export interface AddMemberInput {
   displayName: string;
   colour: string | null;
   isChild: boolean;
+  /** optional; an unanswered question stays unanswered rather than becoming a guess */
+  birthYear?: number | null;
   /** null for a child, and for an adult who has not accepted an invitation yet */
   accountId?: string | null;
 }
@@ -212,6 +226,14 @@ export interface TokenPayload {
   v: 1;
   familyId: string;
   accountId: string;
+  /**
+   * Display names only — no emails, no ratings, and **no birth years**.
+   *
+   * This summary crosses HTTP and lives in a session, so the standing rule is that nothing here
+   * would become a privacy incident if a token leaked. A child's year of birth is precisely
+   * that, so it stays on `listMembers`, which is server-side and inside the seam. A caller that
+   * needs it asks for it; it does not ride along.
+   */
   members: Array<Pick<FamilyMember, "id" | "displayName" | "isChild">>;
   entitlements: Record<string, { tier: Tier; quota: Quota }>;
   issuedAt: string;

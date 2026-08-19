@@ -156,6 +156,7 @@ export type Database = {
       family_members: {
         Row: {
           account_id: string | null
+          birth_year: number | null
           colour: string | null
           created_at: string
           deleted_at: string | null
@@ -167,6 +168,7 @@ export type Database = {
         }
         Insert: {
           account_id?: string | null
+          birth_year?: number | null
           colour?: string | null
           created_at?: string
           deleted_at?: string | null
@@ -178,6 +180,7 @@ export type Database = {
         }
         Update: {
           account_id?: string | null
+          birth_year?: number | null
           colour?: string | null
           created_at?: string
           deleted_at?: string | null

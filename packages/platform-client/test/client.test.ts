@@ -71,6 +71,7 @@ describe("getSession", () => {
           displayName: "Ada",
           colour: null,
           isChild: false,
+          birthYear: null,
         },
         ...(seed.members ?? []),
       ],
@@ -304,5 +305,32 @@ describe("quota period rollover", () => {
   it("leaves a counter with no deadline alone", async () => {
     const { client } = setup(standardSeed({ imports: { limit: 10, used: 10, resetsAt: null } }));
     expect((await client.consumeQuota("recipes", 1)).status).toBe("exceeded");
+  });
+});
+
+describe("a child's year of birth", () => {
+  /*
+   * The boundary is the **token**, not getSession.
+   *
+   * getSession is the seam's own server-side API and returns whole members by design. What
+   * crosses HTTP is the token payload, whose standing rule is that a leak must not become a
+   * privacy incident — "display names only. No emails, no ratings." A child's year of birth is
+   * exactly what that sentence is about.
+   */
+  it("never reaches the token, which is the thing that leaves the server", async () => {
+    const { client } = setup();
+    const result = await client.getEntitlement("recipes");
+    const payload = decodeUnverified(result!.token!.token);
+    expect(payload?.members.length).toBeGreaterThan(0);
+    for (const member of payload!.members) {
+      expect(member).not.toHaveProperty("birthYear");
+    }
+  });
+
+  it("is there for a server-side caller that asks the seam directly", async () => {
+    const { client } = setup();
+    const session = await client.getSession();
+    const child = session.members.find((member) => member.isChild);
+    expect(child?.birthYear).toBe(2018);
   });
 });

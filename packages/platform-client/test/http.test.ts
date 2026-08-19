@@ -52,6 +52,7 @@ function twoHouseholdStore() {
         displayName: "Zed",
         colour: null,
         isChild: false,
+        birthYear: null,
       },
     ],
     entitlements: [

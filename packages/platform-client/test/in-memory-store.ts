@@ -92,6 +92,7 @@ export function createInMemoryStore(seed: Seed = {}, clock: Clock = () => new Da
         displayName: input.displayName,
         colour: input.colour,
         isChild: input.isChild,
+      birthYear: input.birthYear ?? null,
       };
       members.push(member);
       return member;
@@ -357,6 +358,7 @@ export function standardSeed(
         displayName: "Ada",
         colour: "#f00",
         isChild: false,
+        birthYear: null,
       },
       {
         id: "mem-2",
@@ -365,6 +367,8 @@ export function standardSeed(
         displayName: "Bo",
         colour: null,
         isChild: true,
+        // a child with a year, so the age computation has something real to read
+        birthYear: 2018,
       },
     ],
     entitlements: [

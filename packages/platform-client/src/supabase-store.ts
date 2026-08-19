@@ -46,6 +46,7 @@ function toMember(row: {
   display_name: string;
   colour: string | null;
   is_child: boolean;
+  birth_year: number | null;
 }): FamilyMember {
   return {
     id: row.id,
@@ -54,6 +55,7 @@ function toMember(row: {
     displayName: row.display_name,
     colour: row.colour,
     isChild: row.is_child,
+    birthYear: row.birth_year ?? null,
   };
 }
 
@@ -141,7 +143,7 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
     async listMembers(familyId: string): Promise<FamilyMember[]> {
       const { data, error } = await supabase
         .from("family_members")
-        .select("id, family_id, account_id, display_name, colour, is_child")
+        .select("id, family_id, account_id, display_name, colour, is_child, birth_year")
         .eq("family_id", familyId)
         .is("deleted_at", null)
         .order("created_at", { ascending: true });
@@ -153,6 +155,7 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
         displayName: row.display_name,
         colour: row.colour,
         isChild: row.is_child,
+        birthYear: row.birth_year ?? null,
       }));
     },
 
@@ -165,8 +168,9 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
           display_name: input.displayName,
           colour: input.colour,
           is_child: input.isChild,
+          birth_year: input.birthYear ?? null,
         })
-        .select("id, family_id, account_id, display_name, colour, is_child")
+        .select("id, family_id, account_id, display_name, colour, is_child, birth_year")
         .single();
       if (error) throw error;
       return toMember(data);
@@ -210,7 +214,7 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
         .eq("id", input.memberId)
         .eq("family_id", input.familyId)
         .is("deleted_at", null)
-        .select("id, family_id, account_id, display_name, colour, is_child")
+        .select("id, family_id, account_id, display_name, colour, is_child, birth_year")
         .maybeSingle();
       if (error) throw error;
       return data ? toMember(data) : null;
@@ -452,7 +456,7 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
           colour: null,
           is_child: false,
         })
-        .select("id, family_id, account_id, display_name, colour, is_child")
+        .select("id, family_id, account_id, display_name, colour, is_child, birth_year")
         .single();
       if (member.error) throw member.error;
 
@@ -464,6 +468,7 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
           familyId: member.data.family_id,
           accountId: member.data.account_id,
           displayName: member.data.display_name,
+          birthYear: member.data.birth_year ?? null,
           colour: member.data.colour,
           isChild: member.data.is_child,
         },
