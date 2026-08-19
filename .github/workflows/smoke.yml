@@ -20,21 +20,26 @@ concurrency:
   group: smoke-production
   cancel-in-progress: true
 
+# Two jobs, deliberately, and the split is the whole point of this shape.
+#
+# A deployment that never arrived is not a test failure, and the Actions list shows *job names*
+# rather than error text — so with one job both read as "smoke failed" and somebody opens the log
+# to find out which. That cost a session's diagnosis for a webhook that did not fire, outside this
+# repository entirely.
+#
+# Split, the list says which: `deployed` red means the commit never started serving and nothing was
+# tested; `smoke` red means the deployment arrived and a check failed. Different causes, different
+# people, different next actions.
+#
+# It still fails. A commit that never deployed means production is behind and the thing that was
+# pushed is not running — going green would be "silence reads as success" at the deployment layer,
+# and a webhook that had stopped firing would hide indefinitely.
 jobs:
-  smoke:
+  deployed:
+    name: deployed (did the build arrive?)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 12
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.12.0
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
       - name: Wait for this commit to be serving
         id: wait
         env:
@@ -51,8 +56,25 @@ jobs:
             echo "attempt $attempt: serving '${serving:-none}', want ${GITHUB_SHA}"
             sleep 10
           done
-          echo "::error::the deployment never started serving ${GITHUB_SHA}; nothing was smoke-tested"
+          echo "::error::${GITHUB_SHA} never started serving after 10 minutes. NOTHING WAS TESTED — this is not a code failure."
+          echo "::error::If this commit is absent from Vercel's deployment list rather than failed, the Git integration did not fire. That has happened before and looks identical from here."
           exit 1
+
+  smoke:
+    name: smoke (do the deployed routes work?)
+    needs: deployed
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
 
       - name: Smoke
         env:
