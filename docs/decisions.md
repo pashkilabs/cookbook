@@ -2763,3 +2763,64 @@ than a household's record of a preference. What notice and consent that requires
 before outside families arrive is a question for someone who does this
 professionally — the same place `decisions.md` already sends the copyright posture.
 It is not settled by the migration, and shipping the column does not settle it.
+
+## §59 — What a child might find difficult: reasons from a model, not a score from a table
+
+The general-knowledge half of the taste feature — what children *generally* find
+demanding — is a model reading the recipe's ingredients and writing a sentence. It
+is deliberately not a lookup table and deliberately not a number.
+
+### Why not a table
+
+The evidence supports **directional principles only**. Children prefer higher
+sweetness than adults and are more sensitive to bitterness, and both moderate
+through adolescence; preference is also shaped by exposure, familiarity and culture
+well beyond taste sensitivity. There is no weighted average by age in that, and a
+table would have to invent the coefficients — then present them with the authority
+of something measured. **False precision is worse here than none**, because a number
+looks like a finding.
+
+### Why not a score
+
+"Kid-friendliness: 3/10" is unarguable and unexaminable — nobody can tell whether it
+is wrong. *"Strong bitter notes from the broccoli rabe; children are more
+bitter-sensitive than adults"* can be judged by the person reading it, who knows
+their own child and may know that child eats broccoli rabe quite happily.
+
+Same rule the household observations follow: **something a person can weigh beats a
+verdict they can only accept or ignore.** It is also the rule §54a arrived at from
+the other direction — a rate says how often something is wrong and nothing about how
+wrong.
+
+### Age, coarsely
+
+`birth_year` places a child in one of three bands — younger child, older child,
+adolescent — because the literature puts the changeover in sensitivity at mid to
+late adolescence and offers nothing sharper. The band is passed to the model **as a
+word**, never as a year and never as an age: a year of birth is a child's personal
+data and does not leave the platform (§58), and the prompt carries recipe content
+only.
+
+Where no year is recorded — most of the time — the age is omitted entirely rather
+than guessed.
+
+### Never merged with an observation
+
+"Ada rated this low" is a fact about a child. "Children often find this bitter" is a
+generalisation about children. Separate blocks, separate wording, never one
+sentence. Confusing the two is the only real risk in this feature (§57a), and it is
+the reason the fallback is not gated behind the household having data: the two
+answer different questions, and the general one is most useful exactly when the
+specific one is silent — a recipe nobody has tried, which is when somebody is
+deciding whether to cook it.
+
+### Sources
+
+So a future reader knows this rests on evidence rather than folklore:
+
+- **Mennella & Bobowski (2015)** on sweet and bitter preference across childhood.
+- Longitudinal work on **taste sensitivity trajectories in children aged 4–6**.
+
+Both support the direction and neither supports a coefficient. If a later reader
+finds work that does quantify this by age, that is what would justify replacing the
+model with a table — and nothing less would.

@@ -121,3 +121,6 @@ export type { Orientation, OrientationReading } from "./orientation.js";
 export type { OpenAiCompatibleOptions } from "./openai-compatible.js";
 export { createAnthropicProvider, visionProviderFromEnv } from "./anthropic.js";
 export type { AnthropicOptions } from "./anthropic.js";
+
+export { palateNotes, ageBand, PALATE_JSON_SCHEMA, PALATE_INSTRUCTIONS } from "./palate.js";
+export type { PalateNote } from "./palate.js";
