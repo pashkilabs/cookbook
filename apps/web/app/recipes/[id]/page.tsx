@@ -12,6 +12,8 @@ import { ShortlistButton } from "../shortlist-button";
 import { RemoveRecipe } from "./remove";
 import { Verdicts } from "./verdicts";
 import { PhotoUpload } from "../photo-upload";
+import { PalateNotes } from "./palate";
+import { palateNotesFor } from "@/lib/tastes";
 import { linkify } from "./linkify";
 import { Substitution } from "./substitution";
 
@@ -202,6 +204,19 @@ export default async function RecipePage({
     "shortlisted",
   );
 
+  /*
+   * Only when nobody in the household has rated it.
+   *
+   * Not a gate on the *feature* — §59 keeps the two ungated in principle — but a gate on this
+   * render: where a child has actually said something about this dish, that is the better answer
+   * and a generalisation beside it is noise. The fallback earns its place precisely where the
+   * household is silent, which is a recipe nobody has tried.
+   */
+  const palate =
+    (ratings.data ?? []).length === 0
+      ? await palateNotesFor(recipe, ingredients.data ?? [])
+      : [];
+
   return (
     <main>
       <p className="subtitle" style={{ marginBottom: "0.75rem" }}>
@@ -226,6 +241,9 @@ export default async function RecipePage({
 
       {/* the placement Stephen was reaching for: an existing recipe with no picture had no way
           to get one, on any screen. Labelled by what it does to the recipe you can see. */}
+      {/* the general-knowledge half, kept apart from any observation (§57a) */}
+      <PalateNotes notes={palate} />
+
       <PhotoUpload recipeId={recipe.id} label={photoUrl ? "Replace the photo" : "Add a photo"} />
 
       <div className="bar" style={{ marginBottom: "1.5rem" }}>

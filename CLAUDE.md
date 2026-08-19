@@ -431,3 +431,18 @@ guessing.
   so the answer is one curl rather than a diagnosis. It reports `unknown` when it cannot
   check, never `ok` — a check that cannot run must not look like one that passed. Bump
   `REQUIRED_MIGRATION` in the same commit as any migration application code depends on.
+
+- **Verifying that A works and that B works is not verifying that A hands off to B.** Asked
+  whether future weeks could be planned, I checked two things: the planner navigates weeks
+  (it does) and the shortlist is week-scoped (it is). Both true, and I reported the feature
+  working. It was not. "Make this week" hard-coded today's Monday at both call sites, so a
+  recipe shortlisted from anywhere landed in *this* week while the planner's waiting list
+  filtered to the week being viewed — **each half correct, the join broken, and no order of
+  operations that worked.** The same session I even noticed the hard-coded line and filed it
+  as a small separate bug rather than as the whole of the reported problem.
+  So: when somebody reports that a journey does not work, **trace the journey**, in order,
+  across whatever boundary it crosses — a week, a household, a deploy — rather than
+  auditing its components. A component test cannot see a handoff, and a handoff is where
+  two people'"'"'s correct work meets. Same family as *an endpoint answering is not a feature*
+  and *a permission nothing has exercised is a permission you do not have*: all three are
+  the gap between a part being right and the path through it being walked.

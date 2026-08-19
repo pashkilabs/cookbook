@@ -113,3 +113,36 @@ export function warningsFor(
   }
   return out;
 }
+
+/**
+ * The general-knowledge note for a recipe, or nothing.
+ *
+ * Null-safe by design: no cascade configured, no notes — the page renders without them rather
+ * than failing, because a recipe is readable whether or not a model is reachable.
+ */
+export async function palateNotesFor(
+  recipe: { title: string | null },
+  ingredients: ReadonlyArray<{ item_text?: string | null; amount?: number | null; unit?: string | null }>,
+): Promise<import("@pashki/import").PalateNote[]> {
+  const { cascadeFromEnv, palateNotes } = await import("@pashki/import");
+  const cascade = cascadeFromEnv();
+  if (!cascade || !recipe.title) return [];
+
+  try {
+    return await palateNotes({
+      provider: cascade.provider,
+      model: cascade.models[0]!,
+      recipe: {
+        title: recipe.title,
+        ingredients: ingredients.map((row) =>
+          [row.amount ?? "", row.unit ?? "", row.item_text ?? ""].join(" ").trim(),
+        ),
+      },
+      // no band here: the note is about the dish, and which child is looking is not this page's
+      // question. A year of birth never leaves the platform (§58).
+      band: null,
+    });
+  } catch {
+    return [];
+  }
+}
