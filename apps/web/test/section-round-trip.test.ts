@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseIngredientList } from "@pashki/core";
-import { draftFrom } from "../lib/draft";
+import { draftFrom, ingredientsAsText } from "../lib/draft";
 import { prepareRecipe } from "../lib/recipe-input";
 
 /**
@@ -95,5 +95,64 @@ describe("a recipe imported with headings keeps them all the way to the insert",
     expect(prepared.ok).toBe(true);
     if (!prepared.ok) return;
     expect(prepared.recipe.ingredients.every((line) => line.section === null)).toBe(true);
+  });
+});
+
+/**
+ * The second door.
+ *
+ * regression: the walk above proved the IMPORT path and I called `section` safe on it. The edit
+ * screen was a second door to the same insert — it rebuilt the textarea inline, emitted no
+ * heading lines, and the save re-parses that textarea, so opening any recipe in the editor and
+ * saving erased every heading it declared. A route with two doors needs both tested; so does a
+ * value with two writers.
+ */
+describe("editing a recipe does not erase the headings it declared", () => {
+  // the rows as the edit screen reads them back out of the database
+  const stored = [
+    { amount: 200, unit: "g", item: "dark chocolate", note: null, section: "Brownie Layer" },
+    { amount: 2, unit: null, item: "eggs", note: null, section: "Brownie Layer" },
+    { amount: 100, unit: "g", item: "butter", note: null, section: "For the frosting" },
+  ];
+
+  it("puts the headings back into the textarea the editor shows", () => {
+    expect(ingredientsAsText(stored).split("\n")).toEqual([
+      "Brownie Layer:",
+      "200 g dark chocolate",
+      "2 eggs",
+      "For the frosting:",
+      "100 g butter",
+    ]);
+  });
+
+  it("survives an edit that changes nothing", () => {
+    const prepared = prepareRecipe({
+      title: "Brownies",
+      servings: "9",
+      timeMinutes: "45",
+      sourceName: "",
+      ingredients: ingredientsAsText(stored),
+      steps: "Melt the chocolate.",
+      course: "dessert",
+      cuisine: "",
+    });
+    expect(prepared.ok).toBe(true);
+    if (!prepared.ok) return;
+    expect(prepared.recipe.ingredients.map((line) => [line.itemText, line.section])).toEqual([
+      ["dark chocolate", "Brownie Layer"],
+      ["eggs", "Brownie Layer"],
+      ["butter", "For the frosting"],
+    ]);
+  });
+
+  it("renders both doors identically, because they are one function now", () => {
+    const viaImport = draftFrom(extracted).ingredients;
+    const viaEdit = ingredientsAsText(
+      extracted.ingredients.map((line) => ({
+        amount: line.amount, unit: line.unit, item: line.item,
+        note: line.note, section: line.section ?? null,
+      })),
+    );
+    expect(viaEdit).toBe(viaImport);
   });
 });

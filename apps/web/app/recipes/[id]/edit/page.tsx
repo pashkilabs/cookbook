@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { formatAsWritten } from "@pashki/core";
+import { ingredientsAsText } from "@/lib/draft";
 import { userClient } from "@/lib/supabase-server";
 import { maybeRow, rows } from "@/lib/rows";
 import { platformStore } from "@/lib/platform";
@@ -40,7 +40,7 @@ export default async function EditRecipePage({ params }: { params: Promise<{ id:
   const [ingredients, steps] = await Promise.all([
     supabase
       .from("recipe_ingredients")
-      .select("position, amount, unit, item_text, note")
+      .select("position, amount, unit, item_text, note, section")
       .eq("recipe_id", id)
       .is("deleted_at", null)
       .order("position"),
@@ -52,10 +52,23 @@ export default async function EditRecipePage({ params }: { params: Promise<{ id:
       .order("position"),
   ]);
 
-  const lines = (ingredients.data ?? []).map((line) => {
-    const measure = formatAsWritten(line.amount === null ? null : Number(line.amount), line.unit);
-    return [measure, line.item_text].filter(Boolean).join(" ") + (line.note ? `, ${line.note}` : "");
-  });
+  /*
+   * Through the shared renderer, headings and all.
+   *
+   * regression: this rebuilt the text inline and emitted no heading lines, so opening a recipe
+   * in the editor and saving erased every section it declared — the save re-parses this textarea
+   * and anything not in it is gone. The import path had been walked end to end and pronounced
+   * safe; this was a second door to the same insert.
+   */
+  const lines = ingredientsAsText(
+    (ingredients.data ?? []).map((line) => ({
+      amount: line.amount === null ? null : Number(line.amount),
+      unit: line.unit,
+      item: line.item_text,
+      note: line.note,
+      section: line.section,
+    })),
+  ).split("\n");
 
   return (
     <main>
