@@ -124,3 +124,6 @@ export type { AnthropicOptions } from "./anthropic.js";
 
 export { palateNotes, ageBand, PALATE_JSON_SCHEMA, PALATE_INSTRUCTIONS } from "./palate.js";
 export type { PalateNote } from "./palate.js";
+
+export { inferComponents, componentsPrompt, coversExactly, COMPONENTS_JSON_SCHEMA, COMPONENTS_INSTRUCTIONS } from "./components.js";
+export type { RecipeComponent } from "./components.js";
