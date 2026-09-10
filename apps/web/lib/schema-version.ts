@@ -25,4 +25,4 @@
  * Bump it when a migration is added that application code depends on. Bumping unnecessarily costs
  * a check; forgetting costs a page that 500s for whoever opens it.
  */
-export const REQUIRED_MIGRATION = "20260909090000_ingredient_section";
+export const REQUIRED_MIGRATION = "20260910090000_stored_components";

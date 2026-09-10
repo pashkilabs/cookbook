@@ -236,3 +236,89 @@ export async function keepKidFriendly<T extends { recipe: { id: string } }>(
   }
   return hits.filter((hit) => liked.has(hit.recipe.id) && !disliked.has(hit.recipe.id));
 }
+
+/**
+ * The components of a recipe — from the cache, or read three times and agreed once.
+ *
+ * **Stored, not inferred live.** Inference scored 11, 12 and 19 of thirty on identical input, so
+ * a household visiting the same recipe twice would see it split two different ways. That is
+ * incoherent whatever the accuracy, and a blend built on a shifting partition would be a
+ * different dish each time somebody looked.
+ *
+ * **Best-of-three at write is legitimate where best-of-three at read is not.** Three calls spent
+ * once buy one stable answer; one call spent repeatedly buys a different answer every time. The
+ * reading the other two most agree with is kept, along with how much they agreed — a low
+ * agreement is not a wrong answer, it is a partition nobody should build on yet.
+ *
+ * Keyed on the ingredient lines, like the palate note, so an edit recomputes and nothing else
+ * does. Storing also makes the number improvable: a stored partition can be recomputed when
+ * detection improves, where a live one can only be re-rolled.
+ */
+export async function componentsFor(
+  supabase: SupabaseClient,
+  recipe: {
+    id: string;
+    title: string | null;
+    components?: unknown;
+    components_key?: string | null;
+    components_agreement?: number | null;
+  },
+  ingredients: ReadonlyArray<{ item_text?: string | null; amount?: number | null; unit?: string | null; section?: string | null }>,
+): Promise<{ components: import("@pashki/import").RecipeComponent[]; agreement: number } | null> {
+  const lines = ingredients.map((row) =>
+    [row.amount ?? "", row.unit ?? "", row.item_text ?? ""].join(" ").trim(),
+  );
+  const key = fingerprint(lines);
+
+  if (recipe.components_key === key && Array.isArray(recipe.components)) {
+    return {
+      components: recipe.components as import("@pashki/import").RecipeComponent[],
+      // a stored row with no agreement predates the column; 0 rather than 1, because unknown
+      // confidence must not read as certainty
+      agreement: typeof recipe.components_agreement === "number" ? recipe.components_agreement : 0,
+    };
+  }
+
+  const { cascadeFromEnv, inferComponents } = await import("@pashki/import");
+  const { consensusPartition } = await import("@pashki/core");
+  const cascade = cascadeFromEnv();
+  if (!cascade || !recipe.title || lines.length === 0) return null;
+
+  // a declared heading is the strongest evidence a recipe gives about its own components, and
+  // took `right` from ~14 to 25 of thirty when supplied
+  const sections = ingredients.map((row) => row.section ?? null);
+  const hasSections = sections.some(Boolean);
+
+  const readings: Array<import("@pashki/import").RecipeComponent[] | null> = [];
+  for (let run = 0; run < 3; run += 1) {
+    try {
+      readings.push(
+        await inferComponents({
+          provider: cascade.provider,
+          model: cascade.models[0]!,
+          recipe: { title: recipe.title, ingredients: lines },
+          ...(hasSections ? { sections } : {}),
+        }),
+      );
+    } catch {
+      // a provider failure is not a reading — dropped rather than counted as disagreement
+      readings.push(null);
+    }
+  }
+
+  const agreed = consensusPartition(readings);
+  if (!agreed) return null;
+
+  const { error } = await supabase
+    .from("recipes")
+    .update({
+      components: agreed.chosen,
+      components_key: key,
+      components_agreement: agreed.readings === 1 ? 0 : agreed.agreement,
+    })
+    .eq("id", recipe.id);
+  if (error) console.warn(`[pashki] components not cached for ${recipe.id}: ${error.message}`);
+
+  // one surviving reading is not consensus, however internally consistent it looks
+  return { components: agreed.chosen, agreement: agreed.readings === 1 ? 0 : agreed.agreement };
+}
