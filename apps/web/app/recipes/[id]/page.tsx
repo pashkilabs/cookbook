@@ -63,7 +63,7 @@ export default async function RecipePage({
   const [ingredients, steps, ratings, members, photo, catalogRows] = await Promise.all([
     supabase
       .from("recipe_ingredients")
-      .select("id, position, amount, unit, item_text, note, is_estimated")
+      .select("id, position, amount, unit, item_text, note, is_estimated, section")
       .eq("recipe_id", id)
       .is("deleted_at", null)
       .order("position"),
@@ -315,8 +315,30 @@ export default async function RecipePage({
         )}
 
         {ingredients.data?.length ? (
-          <ul className="ingredients">
-            {scaleIngredientAmounts(ingredients.data, plannedScale).map((line) => {
+          (() => {
+            const lines = scaleIngredientAmounts(ingredients.data, plannedScale);
+
+            /*
+             * The recipe's own headings, in the order it wrote them.
+             *
+             * `section` has been persisted since §60 step 1 and no screen selected it, so a
+             * recipe imported with "For the sauce:" rendered as one flat list with the heading
+             * silently gone. Storing a column and never showing it is the same shape as an
+             * endpoint with no way in from the product: every test passed, and the feature was
+             * not there.
+             *
+             * A recipe with no headings — still most of them — takes the single-list branch and
+             * looks exactly as it did.
+             */
+            const groups: Array<{ heading: string | null; lines: typeof lines }> = [];
+            for (const line of lines) {
+              const heading = line.section ?? null;
+              const last = groups[groups.length - 1];
+              if (last && last.heading === heading) last.lines.push(line);
+              else groups.push({ heading, lines: [line] });
+            }
+
+            const renderLine = (line: (typeof lines)[number]) => {
               /*
                * In the household's units (§47). Read-only, so it converts — the editor and the
                * import review must not, because they re-parse what they show and would rewrite
@@ -343,8 +365,19 @@ export default async function RecipePage({
                   )}
                 </li>
               );
-            })}
-          </ul>
+            };
+
+            return groups.length === 1 && groups[0]!.heading === null ? (
+              <ul className="ingredients">{groups[0]!.lines.map(renderLine)}</ul>
+            ) : (
+              groups.map((group, at) => (
+                <div key={group.heading ?? `unheaded-${at}`}>
+                  {group.heading && <h3 className="ingredient-heading">{group.heading}</h3>}
+                  <ul className="ingredients">{group.lines.map(renderLine)}</ul>
+                </div>
+              ))
+            );
+          })()
         ) : (
           <p className="meta">No ingredients recorded.</p>
         )}

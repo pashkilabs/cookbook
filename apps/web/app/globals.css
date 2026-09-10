@@ -353,6 +353,24 @@ section { margin-bottom: var(--s6); }
 }
 .meta.energy strong { color: var(--fg); font-variant-numeric: tabular-nums; }
 
+/*
+ * A recipe's own heading — "For the sauce:" — as it wrote it.
+ *
+ * Quieter than an <h2>: it is the recipe's structure showing through, not a new section of the
+ * page. Sized between the body and the section heading so a long ingredient list gains shape
+ * without gaining hierarchy.
+ */
+.ingredient-heading {
+  margin: var(--s4) 0 var(--s2);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.ingredient-heading:first-child { margin-top: 0; }
+div:first-of-type > .ingredient-heading { margin-top: 0; }
+
 ul.ingredients { list-style: none; padding: 0; margin: 0; }
 ul.ingredients li {
   display: flex;
