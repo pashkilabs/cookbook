@@ -32,6 +32,8 @@ export const APP_TABLES = [
   "recipes",
   "recipe_ingredients",
   "recipe_steps",
+  // which part of which recipe became which lines of a blend (§60 step 4)
+  "recipe_derivations",
   "ingredients",
   "grocery_packages",
   // reference data, like grocery_packages: readable by every household, writable by none
@@ -41,7 +43,6 @@ export const APP_TABLES = [
   "plan_entries",
   "shortlist_entries",
   "pantry_items",
-  "shopping_ticks",
   "shopping_ticks",
   "photos",
   "import_jobs",
@@ -88,6 +89,7 @@ export const HOUSEHOLD_TABLES = [
   "shopping_ticks",
   "photos",
   "import_jobs",
+  "recipe_derivations",
 ] as const satisfies readonly AppTable[];
 
 export type HouseholdTable = (typeof HOUSEHOLD_TABLES)[number];
