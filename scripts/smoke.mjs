@@ -767,6 +767,26 @@ try {
     if (sauceId) madeRecipes.push(sauceId);
     record("a second recipe to blend with", second.status === 200 && Boolean(sauceId), `HTTP ${second.status}`);
 
+    /*
+     * The split action — three model calls behind one request.
+     *
+     * 200 and 503 are both correct answers: the reader found parts, or the reader was busy and
+     * said so. **500 is not**, because it means no handler ran — and this route has a duration
+     * cap it must finish inside, which is the specific thing that would fail here and nowhere
+     * else. Checking the shape rather than the outcome is the point: the model's answer is not
+     * this file's business, but "did the function survive its own timeout" is.
+     */
+    if (sauceId) {
+      const started = Date.now();
+      const split = await call("POST", `/api/recipes/${sauceId}`, { body: { split: true } });
+      const took = Math.round((Date.now() - started) / 1000);
+      record(
+        "splitting a recipe answers rather than dying inside its timeout",
+        split.status === 200 || split.status === 503,
+        `HTTP ${split.status} in ${took}s${split.status === 200 ? `, ${split.body?.parts} part(s) from ${split.body?.readings} reading(s)` : ""}`,
+      );
+    }
+
     if (sauceId) {
       const blended = await call("POST", "/api/recipes", {
         body: {

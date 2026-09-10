@@ -39,6 +39,25 @@ import { acceptsTemperature, anthropicModelMismatch, visionProviderFromEnv } fro
  * The key is read from the environment by the caller and passed in. `check-server-only.mjs` fails
  * the build if this module reaches a `"use client"` file or `apps/mobile`.
  */
+/**
+ * A request timeout must be shorter than the function that holds it.
+ *
+ * This was 60_000 — the same as the serverless duration cap the routes calling it run under.
+ * A call that actually used its full timeout would therefore be killed by the platform *at the
+ * same moment* it gave up, so nothing downstream ever ran: no fallback, no write, no record of
+ * what happened. The work is paid for and the outcome is unobservable, which is the worst of
+ * both — and it only shows up when the provider is slow, which is exactly when it matters.
+ *
+ * Forty-five leaves fifteen seconds for the code that has to run afterwards: taking the
+ * consensus, writing the partition, answering. Against observed call times of twelve to forty
+ * seconds it is not tight.
+ *
+ * **The rule, not the number:** whenever a timeout sits inside something with its own deadline,
+ * the inner one has to finish first with room for the work that follows it. Two equal deadlines
+ * is a race whose loser is always the error handling.
+ */
+const DEFAULT_TIMEOUT_MS = 45_000;
+
 export interface OpenAiCompatibleOptions {
   /** e.g. `https://api.openai.com/v1`. No trailing slash. */
   baseUrl: string;
@@ -47,7 +66,7 @@ export interface OpenAiCompatibleOptions {
   key?: string;
   /** injected so tests need no network and production needs no globals */
   fetch?: typeof globalThis.fetch;
-  /** per request, in milliseconds */
+  /** per request, in milliseconds. See `DEFAULT_TIMEOUT_MS` for why the default is what it is. */
   timeoutMs?: number;
   /** $ per million tokens, so the eval can report cost per fixture */
   pricing?: { inputPerMillion: number; outputPerMillion: number };
@@ -97,7 +116,7 @@ export function createOpenAiCompatibleProvider(options: OpenAiCompatibleOptions)
             json_schema: { name: "recipe", strict: true, schema: request.responseSchema },
           },
         }),
-        signal: AbortSignal.timeout(options.timeoutMs ?? 60_000),
+        signal: AbortSignal.timeout(options.timeoutMs ?? DEFAULT_TIMEOUT_MS),
       });
 
       if (!response.ok) {
