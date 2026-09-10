@@ -31,3 +31,8 @@ export type { CompatibilityWarning } from "./collagen.js";
 
 export { compatibilityReport, COMPONENT_TRUST, READINGS_NEEDED } from "./compatibility.js";
 export type { CompatibilityReport, ComponentClaims } from "./compatibility.js";
+
+export { fingerprint } from "./fingerprint.js";
+
+export { composeBlend, partIsIntact, servingsDisagreement } from "./blend.js";
+export type { BlendLine, BlendPart, ComposedBlend, ComposedPart } from "./blend.js";

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { readTastes, tasteSummary, type RatingObservation, type TasteReading } from "@pashki/core";
+import { fingerprint, readTastes, tasteSummary, type RatingObservation, type TasteReading } from "@pashki/core";
 import { rows } from "./rows";
 import { platformClient } from "./platform";
 
@@ -215,14 +215,8 @@ export function promptKey(
   ]);
 }
 
-function fingerprint(lines: readonly string[]): string {
-  let hash = 5381;
-  const joined = lines.join("\u0000").toLowerCase();
-  for (let index = 0; index < joined.length; index += 1) {
-    hash = ((hash * 33) ^ joined.charCodeAt(index)) >>> 0;
-  }
-  return `${lines.length}:${hash.toString(36)}`;
-}
+// `fingerprint` comes from core, so a blend's lineage key and a cache key are one function
+// rather than two implementations that agree until somebody edits one of them
 
 
 /**
