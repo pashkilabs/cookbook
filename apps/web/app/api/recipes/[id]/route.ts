@@ -5,6 +5,19 @@ import { prepareRecipe } from "@/lib/recipe-input";
 import { statusFor, writeChildren , classifyIfUnclassified } from "@/lib/recipe-writes";
 import { refusal } from "@/lib/refusal";
 
+/*
+ * Splitting a recipe is three model calls and this route has to outlive them.
+ *
+ * The platform's default cap is well under that, so without this the request is killed before
+ * `componentsFor` writes — the calls are paid for and nothing is stored, which reads to the
+ * person as "it did not work" and to the provider as three requests that mattered. Sixty is the
+ * value the photo reaper already runs at in production, so it is known to be allowed here.
+ *
+ * The three readings run in parallel, which is what makes sixty enough: the worst case is one
+ * sixty-second timeout rather than three in series.
+ */
+export const maxDuration = 60;
+
 /**
  * Edit or remove one recipe.
  *

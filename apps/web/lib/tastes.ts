@@ -332,24 +332,39 @@ export async function componentsFor(
   const { cascadeFromEnv, inferComponents } = await import("@pashki/import");
   const { consensusPartition } = await import("@pashki/core");
   const cascade = cascadeFromEnv();
-  if (!cascade || !recipe.title || lines.length === 0) return null;
+  // captured before the guard: narrowing a property does not survive into a closure, and the
+  // three readings below are closures now that they run together
+  const title = recipe.title;
+  if (!cascade || !title || lines.length === 0) return null;
 
-  const readings: Array<import("@pashki/import").RecipeComponent[] | null> = [];
-  for (let run = 0; run < 3; run += 1) {
-    try {
-      readings.push(
-        await inferComponents({
+  /*
+   * The three readings run at once, not one after another.
+   *
+   * They are independent by construction — the whole point is three separate looks at the same
+   * prompt — so waiting for one before starting the next only ever bought a longer wall clock.
+   * At the twelve to thirty seconds a call has been taking, sequential is a minute and a half
+   * and parallel is the slowest single call.
+   *
+   * That is not only a comfort. This runs inside a serverless function with a duration cap, and
+   * three sixty-second timeouts in series is up to three minutes: the platform would kill the
+   * request before the write, so the work was paid for and nothing was stored. Parallel puts
+   * the worst case at one timeout.
+   */
+  const readings = await Promise.all(
+    Array.from({ length: 3 }, async () => {
+      try {
+        return await inferComponents({
           provider: cascade.provider,
           model: cascade.models[0]!,
-          recipe: { title: recipe.title, ingredients: lines },
+          recipe: { title, ingredients: lines },
           ...(hasSections ? { sections } : {}),
-        }),
-      );
-    } catch {
-      // a provider failure is not a reading — dropped rather than counted as disagreement
-      readings.push(null);
-    }
-  }
+        });
+      } catch {
+        // a provider failure is not a reading — dropped rather than counted as disagreement
+        return null;
+      }
+    }),
+  );
 
   const agreed = consensusPartition(readings);
   if (!agreed) return null;
