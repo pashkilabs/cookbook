@@ -73,3 +73,95 @@ describe("choosing the reading the others agree with", () => {
     expect(consensusPartition([])).toBeNull();
   });
 });
+
+describe("the three defects review found after the first version shipped", () => {
+  /*
+   * The first version's own comment claimed symmetry stopped an over-split reading winning. It
+   * did not, and the counter-example is the commonest thing an unstable model does: two readings
+   * disagree about one boundary, a third carries BOTH, and the hedge agrees with each of them
+   * more than they agree with each other. It won, and it won with a HIGHER stored confidence than
+   * the two that concurred — so no downstream threshold could have caught it.
+   *
+   * The original test only checked partitionAgreement(sixWay, A) < 0.6 and its symmetry. It never
+   * put an over-split reading through consensusPartition, and never used two coarse readings that
+   * disagreed with each other, which is the only arrangement where the failure appears.
+   */
+  it("regression: keeps the count two readings voted for, not the hedge that spans both", () => {
+    const X = [{ from: 0, to: 4 }, { from: 5, to: 9 }];
+    const Y = [{ from: 0, to: 1 }, { from: 2, to: 9 }];
+    const bothBoundaries = [{ from: 0, to: 1 }, { from: 2, to: 4 }, { from: 5, to: 9 }];
+
+    // the hedge still out-scores each coarse reading pairwise — that is the trap
+    expect(partitionAgreement(X, bothBoundaries)).toBeGreaterThan(partitionAgreement(X, Y));
+    expect(partitionAgreement(Y, bothBoundaries)).toBeGreaterThan(partitionAgreement(X, Y));
+
+    const result = consensusPartition([X, Y, bothBoundaries])!;
+    expect(result.chosen).toHaveLength(2);
+    expect(result.agreedOnCount).toBe(2);
+  });
+
+  it("regression: the same trap at four components against a five-component hedge", () => {
+    const X = [{ from: 0, to: 0 }, { from: 1, to: 2 }, { from: 3, to: 4 }, { from: 5, to: 9 }];
+    const Y = [{ from: 0, to: 0 }, { from: 1, to: 2 }, { from: 3, to: 6 }, { from: 7, to: 9 }];
+    const hedge = [
+      { from: 0, to: 0 }, { from: 1, to: 2 }, { from: 3, to: 4 }, { from: 5, to: 6 }, { from: 7, to: 9 },
+    ];
+    expect(consensusPartition([X, Y, hedge])!.chosen).toHaveLength(4);
+  });
+
+  // under-splitting is the safer failure, so a tie on votes goes to the smaller count
+  it("breaks a tie on component count toward fewer, never toward more", () => {
+    const two = [{ from: 0, to: 4 }, { from: 5, to: 9 }];
+    const three = [{ from: 0, to: 2 }, { from: 3, to: 5 }, { from: 6, to: 9 }];
+    expect(consensusPartition([two, three])!.chosen).toHaveLength(2);
+  });
+
+  /*
+   * The assignment was greedy: an earlier small component claimed the partner a later large one
+   * overlapped far more, and the `taken` set starved it permanently. That understated agreement,
+   * so a recipe whose runs DID agree was recorded as unstable.
+   */
+  it("regression: a small component no longer starves a large one of its partner", () => {
+    expect(
+      partitionAgreement([{ from: 0, to: 1 }, { from: 2, to: 9 }],
+                         [{ from: 0, to: 1 }, { from: 2, to: 3 }, { from: 4, to: 9 }]),
+    ).toBeCloseTo(0.7292, 3);
+    expect(
+      partitionAgreement([{ from: 0, to: 0 }, { from: 1, to: 8 }], [{ from: 0, to: 8 }]),
+    ).toBeCloseTo(0.6667, 3);
+  });
+
+  /*
+   * Greedy was order-dependent, so the score depended on the order a run happened to LIST its
+   * components — which is not a difference in reading at all. Nothing normalised it: coversExactly
+   * accepts an unsorted array and the model's order is passed straight through.
+   */
+  it("regression: listing the same partition in a different order scores the same", () => {
+    const whole = [{ from: 0, to: 8 }];
+    const smallFirst = [{ from: 0, to: 0 }, { from: 1, to: 8 }];
+    const largeFirst = [{ from: 1, to: 8 }, { from: 0, to: 0 }];
+    expect(partitionAgreement(smallFirst, whole)).toBe(partitionAgreement(largeFirst, whole));
+  });
+
+  it("regression: a reordered reading does not change which partition is stored", () => {
+    const A = [{ from: 0, to: 0 }, { from: 1, to: 1 }, { from: 2, to: 8 }];
+    const B = [{ from: 0, to: 0 }, { from: 1, to: 2 }, { from: 3, to: 8 }];
+    const C = [{ from: 0, to: 0 }, { from: 1, to: 6 }, { from: 7, to: 8 }];
+    const forward = consensusPartition([A, B, C])!;
+    const reversed = consensusPartition([[...A].reverse(), B, C])!;
+    expect(reversed.chosen.map((c) => `${c.from}-${c.to}`).sort())
+      .toEqual(forward.chosen.map((c) => `${c.from}-${c.to}`).sort());
+  });
+
+  /*
+   * A run lost to a provider error is dropped as a non-vote, so two surviving runs that concur
+   * stored the same 1.0 as three would — the fewer runs answered, the more confident the row
+   * looked. The count has to travel with the number or it cannot be read honestly.
+   */
+  it("regression: reports how many readings survived, not just how much they agreed", () => {
+    const A = [{ from: 0, to: 4 }, { from: 5, to: 9 }];
+    expect(consensusPartition([A, A, null])!.readings).toBe(2);
+    expect(consensusPartition([A, A, A])!.readings).toBe(3);
+    expect(consensusPartition([A, null, null])!.readings).toBe(1);
+  });
+});

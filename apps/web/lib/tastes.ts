@@ -139,7 +139,7 @@ export async function palateNotesFor(
   const lines = ingredients.map((row) =>
     [row.amount ?? "", row.unit ?? "", row.item_text ?? ""].join(" ").trim(),
   );
-  const key = fingerprint(lines);
+  const key = promptKey(recipe.title, lines);
 
   if (recipe.palate_key === key && Array.isArray(recipe.palate_notes)) {
     return recipe.palate_notes as import("@pashki/import").PalateNote[];
@@ -185,6 +185,36 @@ export async function palateNotesFor(
  * anything. Order matters, because reordering ingredients is an edit and the cheap thing to do
  * with an edit is recompute.
  */
+/**
+ * The key for a cached model answer: every input the prompt carries, and nothing else.
+ *
+ * regression: this fingerprinted amount/unit/item_text alone, while the title went to both
+ * prompts and the declared sections went to `inferComponents` — and sections are the single
+ * strongest input there, worth `right` 14 → 25 of thirty. So typing "For the sauce:" into a
+ * recipe left the key **byte-identical** and served the partition computed without it, forever.
+ *
+ * That is the EXTRACTOR_VERSION trap wearing an input-derived key: a stale answer that is
+ * confident, well-formed, and indistinguishable from a fresh one. Deriving the key from the
+ * input is what removes the human step — but only if it is derived from *all* of it. So the rule
+ * is: an input reaches the model through this function, or it does not reach the model.
+ *
+ * Sections are joined with a separator that cannot occur in text, so a section named "x" on a
+ * line "y" is not the same key as no section on "x\u0001y".
+ */
+export function promptKey(
+  title: string | null,
+  lines: readonly string[],
+  sections?: ReadonlyArray<string | null>,
+): string {
+  // mirrors `hasSections` at the call site: sections are only *sent* when one of them exists, so
+  // a recipe with none must key identically whether the caller passed an array of nulls or nothing
+  const sent = sections?.some(Boolean) ? sections : undefined;
+  return fingerprint([
+    title ?? "",
+    ...lines.map((line, at) => (sent ? `${sent[at] ?? ""}\u0001${line}` : line)),
+  ]);
+}
+
 function fingerprint(lines: readonly string[]): string {
   let hash = 5381;
   const joined = lines.join("\u0000").toLowerCase();
@@ -262,20 +292,46 @@ export async function componentsFor(
     components?: unknown;
     components_key?: string | null;
     components_agreement?: number | null;
+    components_readings?: number | null;
   },
   ingredients: ReadonlyArray<{ item_text?: string | null; amount?: number | null; unit?: string | null; section?: string | null }>,
-): Promise<{ components: import("@pashki/import").RecipeComponent[]; agreement: number } | null> {
+): Promise<{
+  components: import("@pashki/import").RecipeComponent[];
+  agreement: number;
+  /** how many of the three runs returned a usable partition — two agreeing is not three */
+  readings: number;
+} | null> {
   const lines = ingredients.map((row) =>
     [row.amount ?? "", row.unit ?? "", row.item_text ?? ""].join(" ").trim(),
   );
-  const key = fingerprint(lines);
+  // a declared heading is the strongest evidence a recipe gives about its own components, and
+  // took `right` from ~14 to 25 of thirty when supplied
+  const sections = ingredients.map((row) => row.section ?? null);
+  const hasSections = sections.some(Boolean);
+  const key = promptKey(recipe.title, lines, sections);
 
-  if (recipe.components_key === key && Array.isArray(recipe.components)) {
+  /*
+   * A partition built on fewer than three readings is provisional, and is recomputed.
+   *
+   * Observed rather than theorised: Together returned 503 for two calls in three across a
+   * multi-hour window, so best-of-three degrades to best-of-one exactly when the provider is
+   * unwell — and the key then matches forever, freezing an outage's guess into the row
+   * permanently. `git push` deploys and nothing reconsiders a cache.
+   *
+   * This costs nothing in the case that worries: a recipe the model *declines* three times
+   * writes no row at all (`consensusPartition` returns null above the write), so it already
+   * re-spends on every view and this does not make it worse. Only rows that stored something
+   * on one or two readings are revisited — which is to say, only outages.
+   */
+  const settled = (recipe.components_readings ?? 0) >= 3;
+  if (recipe.components_key === key && Array.isArray(recipe.components) && settled) {
     return {
       components: recipe.components as import("@pashki/import").RecipeComponent[],
       // a stored row with no agreement predates the column; 0 rather than 1, because unknown
       // confidence must not read as certainty
       agreement: typeof recipe.components_agreement === "number" ? recipe.components_agreement : 0,
+      // a row written before the column existed reports 0 readings rather than a guess
+      readings: typeof recipe.components_readings === "number" ? recipe.components_readings : 0,
     };
   }
 
@@ -283,11 +339,6 @@ export async function componentsFor(
   const { consensusPartition } = await import("@pashki/core");
   const cascade = cascadeFromEnv();
   if (!cascade || !recipe.title || lines.length === 0) return null;
-
-  // a declared heading is the strongest evidence a recipe gives about its own components, and
-  // took `right` from ~14 to 25 of thirty when supplied
-  const sections = ingredients.map((row) => row.section ?? null);
-  const hasSections = sections.some(Boolean);
 
   const readings: Array<import("@pashki/import").RecipeComponent[] | null> = [];
   for (let run = 0; run < 3; run += 1) {
@@ -309,16 +360,28 @@ export async function componentsFor(
   const agreed = consensusPartition(readings);
   if (!agreed) return null;
 
+  /*
+   * How many readings there were is stored, not just how much they agreed.
+   *
+   * A run lost to a provider error is dropped as a non-vote, so without this a recipe read
+   * successfully twice stores the same 1.0 as one read three times — the fewer runs answered,
+   * the more confident the row looks. That is the failure running in the unsafe direction, and
+   * any later "do not blend below 0.6" rule would wave through exactly the rows built on the
+   * least evidence.
+   */
+  const confidence = agreed.readings === 1 ? 0 : agreed.agreement;
   const { error } = await supabase
     .from("recipes")
     .update({
       components: agreed.chosen,
       components_key: key,
-      components_agreement: agreed.readings === 1 ? 0 : agreed.agreement,
+      components_agreement: confidence,
+      components_readings: agreed.readings,
+      components_agreed_on_count: agreed.agreedOnCount,
     })
     .eq("id", recipe.id);
   if (error) console.warn(`[pashki] components not cached for ${recipe.id}: ${error.message}`);
 
   // one surviving reading is not consensus, however internally consistent it looks
-  return { components: agreed.chosen, agreement: agreed.readings === 1 ? 0 : agreed.agreement };
+  return { components: agreed.chosen, agreement: confidence, readings: agreed.readings };
 }

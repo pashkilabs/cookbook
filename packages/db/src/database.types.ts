@@ -835,8 +835,10 @@ export type Database = {
         Row: {
           classified_at: string | null
           components: Json | null
+          components_agreed_on_count: number | null
           components_agreement: number | null
           components_key: string | null
+          components_readings: number | null
           course: string | null
           created_at: string
           created_by: string | null
@@ -862,8 +864,10 @@ export type Database = {
         Insert: {
           classified_at?: string | null
           components?: Json | null
+          components_agreed_on_count?: number | null
           components_agreement?: number | null
           components_key?: string | null
+          components_readings?: number | null
           course?: string | null
           created_at?: string
           created_by?: string | null
@@ -889,8 +893,10 @@ export type Database = {
         Update: {
           classified_at?: string | null
           components?: Json | null
+          components_agreed_on_count?: number | null
           components_agreement?: number | null
           components_key?: string | null
+          components_readings?: number | null
           course?: string | null
           created_at?: string
           created_by?: string | null

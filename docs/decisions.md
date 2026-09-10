@@ -3018,3 +3018,84 @@ than assumed, or a blend leaks one household's recipe into another.
 **Snapshot, not live.** A blend does not change when its sources are edited. The
 alternative is a recipe that silently changes under somebody who has already shopped
 for it — the same reasoning that keeps a source photograph a photograph.
+
+### Step 3 as built: one warning, and a corpus that argued against the obvious design
+
+The obvious design was a rule over `recipes.time_minutes`: a collagen-rich cut with a
+short total time is a cut that will be tough. The corpus refused it.
+
+`time_minutes` is **prep + cook** (`recipe.ts` sums `prepTime` and `cookTime` when
+`totalTime` is absent), which makes it wrong in exactly the direction that fires a
+warning. Of the three recipes in production carrying a collagen-rich cut:
+
+| recipe | `time_minutes` | longest interval its steps name |
+|---|---|---|
+| Braised Short Ribs | *null* | 3 hours |
+| GUINNESS SMOKED BABY BACK RIBS | **20** | 2 hours |
+| Smoked Traeger Pulled Pork | 610 | 3–5 hours |
+
+A column-reading rule announces that a rib recipe needs longer cooking to somebody
+already smoking it for two hours. That is the worst available failure: confidently
+wrong about something the reader can see for themselves.
+
+So the time comes from **the longest single interval any step names**, which is also
+the mechanism's own quantity — collagen wants one sustained stretch, and five minutes
+plus ten plus fifteen is not half an hour of anything. 47 of the 66 recipes with steps
+name at least one duration.
+
+**Every ambiguity resolves toward silence.** A range takes its upper bound; no duration
+named is *not measurable* rather than *short*; pressure cooking silences it outright,
+because 45 minutes under pressure does the work of hours and this cannot model that;
+poultry is absent from the cut table entirely, since fast-cooked thigh is not a
+mistake and would be nothing but noise.
+
+**The measurement, with the denominator that matters.** It fires on **none** of the 68
+production recipes — but 65 of them could never fire, carrying no such cut, so the
+honest denominator is **three**. "No false positives in three" is a weak claim stated
+plainly, not a strong one dressed as 0/68. A control confirms the zero is a result
+rather than a broken probe: chuck dropped into a six-minute stir-fry fires.
+
+It cannot show a **true** positive here at all, because real published recipes braise
+their chuck. The case it exists for is a blend, and blends do not exist yet — so the
+true positives are constructed in tests, and that is a stated limit.
+
+**A known false negative, kept.** "Marinate overnight" counts as a long interval, so a
+marinade silences the warning for the dish it marinates — measured on the rib recipe,
+whose 480 minutes are a marinade. Separating them needs the technique extraction
+removed from the sequence above for want of a corpus. The error runs toward silence,
+which is the direction to be wrong in.
+
+### The direction tier is designed and not shipped
+
+Salt suppresses bitterness and acid cuts richness, and those support a sentence each.
+What they need first is an ingredient-to-property lookup — which line is the acid,
+which is the fat — and the matcher this repository already has turns `almond milk`
+into `whole milk` and `onion powder` into `onion`. A directional warning built on it
+would be confidently wrong about the *ingredient* before it ever reached the
+interaction. **Fix the matcher, then ship the tier.**
+
+### The gate: 0.7, three readings, and why it reports rather than censors
+
+A warning about components nobody should build on yet is worse than no warning. Two
+conditions, and the second matters more than the first:
+
+**`COMPONENT_TRUST = 0.7`** — the same number the eval already uses to decide a
+component matches its hand-labelled one. Two different numbers for "is this the same
+partition" would be two incompatible notions of sameness in one codebase, and the
+looser one would win by being whichever a feature happened to call.
+
+**`READINGS_NEEDED = 3`.** With one reading there is nothing to compare against, so
+agreement reports 1.0 — perfect agreement with itself. A gate on agreement alone
+therefore **passes most easily exactly where the evidence is thinnest**, which is
+inverted. This is what `components_readings` is for; before it was stored, two
+surviving runs and three surviving runs both wrote 1.0 and were indistinguishable
+afterwards.
+
+**The gate reports, it does not censor.** A mechanism warning reads an ingredient line
+and a duration in a step — neither produced by the component inference — and is as
+true of a badly split recipe as a well split one. Gating it would suppress a sound
+claim on account of an unrelated weakness. So `compatibilityReport` returns the
+mechanism warnings regardless and states separately whether anything *partition-shaped*
+was allowed to be said, with the reason. An empty list under a passed gate and an empty
+list under a failed one are different answers and must render differently — the same
+rule as `too-few` in the taste readings.
