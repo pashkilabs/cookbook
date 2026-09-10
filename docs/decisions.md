@@ -2824,3 +2824,152 @@ So a future reader knows this rests on evidence rather than folklore:
 Both support the direction and neither supports a coefficient. If a later reader
 finds work that does quantify this by age, that is what would justify replacing the
 model with a table — and nothing less would.
+
+## §60 — Recipe blending: components, and what grounds a judgement that two work together
+
+Break a dish into components — protein, carbohydrate, sauce, vegetable, garnish —
+so a household can take the sauce they love from one recipe and pair it with a
+protein cooked another way. This is the largest feature proposed and the one most
+able to produce plausible nonsense, so most of this entry is about what it will
+**not** do.
+
+### The sequence
+
+1. Persist `section`. Overdue on its own.
+2. Component inference, measured against hand-labelled recipes.
+3. Compatibility as warnings only.
+4. Blending with **no quantity changes**.
+5. — Technique is **not scheduled**. See below.
+6. Rebalancing quantities, only if step 4 produces evidence that people trust it.
+
+### Rejected: food pairing by shared flavour compounds
+
+This is the one a future reader will reach for first, because it looks like the
+science of exactly this problem. It does not support what we would build on it.
+
+[Ahn et al. 2011](https://www.nature.com/articles/srep00196) found Western cuisines
+tend toward ingredients sharing volatile compounds — and East Asian cuisines tend to
+**avoid** them, so there is no universal rule to encode. A
+[test in Turkish cuisine](https://www.sciencedirect.com/science/article/abs/pii/S1878450X23001373)
+found food-pairing-index values **not significantly correlated with user ratings**:
+the metric does not predict whether people like the dish. The original result is
+[fragile to a handful of ingredients](https://www.technologyreview.com/2011/11/29/189470/flavour-networks-shatter-food-pairing-hypothesis/)
+— remove them and the significance disappears — and is confounded by how often an
+ingredient is simply used.
+
+The authors' own caveat is the sharpest: the flavour of a dish owes as much to the
+mode of preparation as to the choice of ingredients.
+
+**So no compound-sharing score.** Encoding it would be folklore with a citation
+attached, which is worse than folklore because the citation makes it unarguable.
+
+### Grounded: technique suited to the cut
+
+This is physical chemistry rather than correlation, and it is where compatibility
+should rest. Collagen begins unravelling near **60 °C / 140 °F** and requires
+sustained **70–90 °C / 158–194 °F** for hours to convert to gelatin. Searing does
+not break collagen down; only low, slow, moist heat does.
+
+That grounds a real judgement — a collagen-rich cut seared and served rare is wrong,
+and the reason is a temperature and a protein rather than a preference. Reverse
+searing is the same shape: it exists to bring a **thick** cut evenly to temperature,
+so on a thin one it is worse than a plain sear because there is no interior to
+protect.
+
+Note this answers a narrower question than "do these two things go together". It
+answers "is this technique right for this cut", which has a mechanism behind it.
+
+### Directional only: taste interactions
+
+Sensory science supports the directions and none of the arithmetic.
+[Salt suppresses bitterness](https://www.mdpi.com/2304-8158/6/12/103);
+[acid enhances saltiness](https://www.sciencedirect.com/science/article/abs/pii/S0268005X26002365)
+at low to moderate concentrations;
+[fat interacts with bitter perception](https://www.sciencedirect.com/science/article/abs/pii/S0300908418301706)
+and is increasingly treated as its own modality.
+
+These are perceptual interactions measured in controlled solutions. They support
+"acid cuts richness" and support **no coefficient at all**. A rule reading "add one
+tablespoon of acid per 200 g of fat" would be inventing the number the literature
+declines to give — §59's shape exactly: direction yes, weighted average no.
+
+### Version one changes no quantities, and the reason is the field's own benchmark
+
+The computational-cooking field cannot reliably evaluate its own generated recipes.
+Human evaluation there is
+[small-scale and convenience-sampled](https://arxiv.org/pdf/2502.02028), traditional
+metrics are [insufficient for recipe quality](https://arxiv.org/html/2412.04922), and
+the standard instrument is a **"Recipe Turing Test"** — can a person tell the
+generated ingredient list from a real one?
+
+**That measures plausibility, not edibility.** A field whose best evaluation is
+"indistinguishable from real" has not solved "actually works", and building on it
+means inheriting that gap while a household inherits the shopping bill.
+
+So a blend combines components **as written** and states what is likely off — "this
+sauce was built for pork belly; on cod it may read as heavy" — and the cook adjusts.
+That ships the useful half without the dangerous half. Changing quantities inside a
+familiar recipe layout is the confident-invention failure at its worst, because
+nobody discovers it until they have shopped and cooked.
+
+A blend is therefore **a proposal, marked untried**, visually unlike an ordinary
+recipe, with every claim carrying its source class — mechanism, direction, or the
+model's own judgement — kept distinct as §57a requires. It becomes an ordinary
+recipe when the household marks it cooked, which makes the person the evaluator: the
+only evaluator that works.
+
+### Technique is not scheduled, and here are the counts
+
+Not deferred pending a decision — **removed from the sequence until a corpus exists
+that could measure it.** Across 376 stored steps in production:
+
+| verb | count | | verb | count |
+|---|---|---|---|---|
+| grill | 20 | | sauté | 7 |
+| simmer | 19 | | toast | 6 |
+| boil | 14 | | **sear** | **4** |
+| bake | 13 | | **braise** | **2** |
+| fry | 11 | | **roast** | **2** |
+| whisk | 10 | | **marinate** | **0** |
+
+No step contains two technique verbs. The techniques the feature was asked for are
+the ones the corpus does not have, so there is nothing to tune against and nothing
+to hold out.
+
+Technique is also harder than `course` in three ways: it is a **sequence** rather
+than a label ("marinate then sear" — the order is the content), it is
+**per-component** rather than per-recipe (the protein is seared, the sauce reduced),
+and the corpus is empty of it.
+
+**What would put it back on the sequence:** 40–60 recipes whose steps genuinely
+contain varied technique, hand-labelled as ordered `(component, technique)` pairs,
+split into a tuning set and a held-out set never tuned against. That corpus has to be
+imported first. Recorded as counts rather than as an omission so the next reader
+finds a measurement.
+
+### Components: inference, with sections as evidence
+
+A component is **inferred from ingredients and steps**, with a declared section used
+as a strong prior rather than as the answer. Sections cannot be the mechanism: most
+captions have none, and a heading may be `You'll need:` rather than `Sauce:`.
+
+Components are **per recipe, never a global taxonomy**. The moment there is a shared
+list of "sauces", two recipes' sauces merge the way `almond milk` merged into
+`whole milk` on the shopping list. A component belongs to its recipe and carries a
+role from a small closed list, like `course`.
+
+### The derived-recipe decision, which did not exist
+
+§39 is *"Children now, invited adults later"* and does not cover this; nothing else
+in this document does, and `recipes` has no lineage column. So:
+
+**A blend is a recipe row with a lineage.** `derived_from` naming its sources and a
+`derivation` recording which component came from where. It is a real recipe — it must
+plan, shop and scale like any other, and a parallel object would double every screen.
+
+**Household scope.** Every source must share the blend's `family_id`, checked rather
+than assumed, or a blend leaks one household's recipe into another.
+
+**Snapshot, not live.** A blend does not change when its sources are edited. The
+alternative is a recipe that silently changes under somebody who has already shopped
+for it — the same reasoning that keeps a source photograph a photograph.
