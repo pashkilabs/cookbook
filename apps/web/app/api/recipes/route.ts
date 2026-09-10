@@ -1,6 +1,7 @@
 import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
 import { createRecipeFrom, attachRecipePhoto, classifyIfUnclassified } from "@/lib/recipe-writes";
+import { createBlendFrom, type RequestedPart } from "@/lib/blends";
 
 /**
  * Create a recipe from what somebody typed — or from a review they just approved.
@@ -67,6 +68,27 @@ export async function POST(request: Request) {
     return Response.json({ error: "expected a JSON body" }, { status: 400 });
   }
 
+  /*
+   * A blend, as a third mode on this route rather than a route of its own — the host caps
+   * serverless functions at twelve and a deployment has already been refused for exceeding it
+   * (§37). A `blend` key says which: JSON with one creates a lineage, JSON without one creates
+   * an ordinary recipe, multipart attaches a photograph.
+   *
+   * It does not go through `createRecipeFrom`: a blend's ingredients are read from its sources
+   * here rather than parsed from what a client sent, so there is no text to prepare and nothing
+   * for `prepareRecipe` to validate. Sharing the function would mean a `blend` branch inside it
+   * doing none of its work.
+   */
+  const blend = (body as { blend?: unknown }).blend;
+  if (blend !== undefined) {
+    const parsed = readBlend(blend);
+    if (!parsed.ok) return Response.json({ error: parsed.error }, { status: 400 });
+    const madeBlend = await createBlendFrom(supabase, family.id, parsed.value);
+    return madeBlend.ok
+      ? Response.json({ id: madeBlend.id })
+      : Response.json({ error: madeBlend.error }, { status: madeBlend.status });
+  }
+
   const created = await createRecipeFrom(supabase, family.id, body as Record<string, unknown>);
   if (!created.ok) return Response.json({ error: created.error }, { status: created.status });
 
@@ -75,4 +97,53 @@ export async function POST(request: Request) {
   await classifyIfUnclassified(supabase, created.id);
 
   return Response.json({ id: created.id });
+}
+
+const ROLES = new Set([
+  "protein", "carbohydrate", "sauce", "vegetable", "garnish", "marinade", "sweet",
+]);
+
+/**
+ * What the client is allowed to say about a blend: which recipe, and which of its lines.
+ *
+ * Never the ingredient text. A client that could post content would have it stored under a
+ * lineage claiming it came from a recipe that never contained it, and nothing downstream could
+ * tell the difference — so every field here is a selection or a label, and the lines themselves
+ * are read from the database in `createBlendFrom`.
+ *
+ * Validated rather than cast. `role` is checked against the same closed list the column's CHECK
+ * holds, so a bad value is a sentence here instead of a constraint violation two writes later.
+ */
+function readBlend(
+  input: unknown,
+): { ok: true; value: { title: string; parts: RequestedPart[] } } | { ok: false; error: string } {
+  if (typeof input !== "object" || input === null) return { ok: false, error: "expected a blend" };
+  const raw = input as { title?: unknown; parts?: unknown };
+  if (typeof raw.title !== "string") return { ok: false, error: "a blend needs a title" };
+  if (!Array.isArray(raw.parts)) return { ok: false, error: "a blend needs parts" };
+
+  const parts: RequestedPart[] = [];
+  for (const entry of raw.parts) {
+    if (typeof entry !== "object" || entry === null) return { ok: false, error: "a part is not an object" };
+    const part = entry as Record<string, unknown>;
+    if (typeof part.sourceRecipeId !== "string" || !part.sourceRecipeId) {
+      return { ok: false, error: "a part must name its recipe" };
+    }
+    if (!Array.isArray(part.lineIndexes) || part.lineIndexes.some((n) => !Number.isInteger(n) || (n as number) < 0)) {
+      return { ok: false, error: "a part must name whole, non-negative line numbers" };
+    }
+    const role = typeof part.role === "string" && ROLES.has(part.role) ? part.role : null;
+    parts.push({
+      sourceRecipeId: part.sourceRecipeId,
+      componentName: typeof part.componentName === "string" ? part.componentName : "",
+      role,
+      taken: part.taken === "whole" ? "whole" : "component",
+      lineIndexes: part.lineIndexes as number[],
+      // a client asserting its own agreement would be asserting a measurement it did not take
+      agreement: null,
+      readings: null,
+      adjusted: part.adjusted === true,
+    });
+  }
+  return { ok: true, value: { title: raw.title, parts } };
 }

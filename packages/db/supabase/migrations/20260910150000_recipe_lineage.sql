@@ -68,10 +68,19 @@ alter table public.recipes
 comment on column public.recipes.derived_at is
   'When this recipe was assembled from others (§60 step 4). Null for an ordinary recipe. A recipe with this set can never be published: it is a derivative of somebody else''s prose, not a household''s own work.';
 
--- authenticated may not set it: a blend is created through the route, which is the
--- only thing that also writes the lineage rows. A client that could stamp this
--- could mark any recipe a blend, or unmark one to publish it.
-revoke insert (derived_at), update (derived_at) on public.recipes from authenticated;
+-- INSERT yes, UPDATE never, and the asymmetry is the whole guarantee.
+--
+-- The create route runs with the caller's own session — it has no power its caller
+-- does not — so a household must be able to stamp this when it makes a blend.
+-- What it must never be able to do is *clear* it, because clearing it is how a
+-- blend would become publishable: the CHECK only refuses `derived_at is not null
+-- and visibility = public`, so an UPDATE grant here would be a way round it rather
+-- than through it.
+--
+-- Marking one's own ordinary recipe as derived is possible and harmless — it makes
+-- that recipe unpublishable, which is a household's own business.
+grant insert (derived_at) on public.recipes to authenticated;
+revoke update (derived_at) on public.recipes from authenticated;
 
 create table public.recipe_derivations (
   id uuid primary key default gen_random_uuid(),
@@ -324,8 +333,12 @@ begin
   if has_column_privilege('authenticated', 'public.recipe_derivations'::regclass, 'updated_at', 'UPDATE') then
     raise exception 'authenticated can stamp its own updated_at on a derivation';
   end if;
+  -- the one that matters: clearing it is the way round the CHECK rather than through it
   if has_column_privilege('authenticated', 'public.recipes'::regclass, 'derived_at', 'UPDATE') then
-    raise exception 'a client can mark a recipe a blend, or unmark one to publish it';
+    raise exception 'a client can unmark a blend, and an unmarked blend can be published';
+  end if;
+  if not has_column_privilege('authenticated', 'public.recipes'::regclass, 'derived_at', 'INSERT') then
+    raise exception 'a household cannot create a blend through its own session';
   end if;
   if not has_column_privilege('authenticated', 'public.recipe_derivations'::regclass, 'component_name', 'INSERT') then
     raise exception 'a household cannot record what a part was called';

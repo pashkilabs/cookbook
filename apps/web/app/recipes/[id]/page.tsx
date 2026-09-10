@@ -49,7 +49,7 @@ export default async function RecipePage({
   const recipe = maybeRow(
     await supabase
     .from("recipes")
-    .select("id, title, source_name, source_url, servings, time_minutes, times_made, make_again, visibility, course, cuisine, dish_form, principal_protein, palate_notes, palate_key")
+    .select("id, title, source_name, source_url, servings, time_minutes, times_made, make_again, visibility, course, cuisine, dish_form, principal_protein, palate_notes, palate_key, components, components_agreement, components_readings, derived_at")
     .eq("id", id)
     .eq("family_id", family.id)
     .is("deleted_at", null)
@@ -59,6 +59,21 @@ export default async function RecipePage({
 
   // an id belonging to another household lands here too, which is the point
   if (!recipe) notFound();
+
+  /*
+   * The stored partition, validated rather than cast.
+   *
+   * A jsonb column is whatever was last written into it, and this one is written by a model's
+   * answer. Anything not shaped like a part is dropped rather than rendered as `undefined`.
+   */
+  const storedParts = (Array.isArray(recipe.components) ? recipe.components : [])
+    .filter(
+      (part): part is { name: string; role: string | null } =>
+        typeof part === "object" && part !== null &&
+        typeof (part as { name?: unknown }).name === "string" &&
+        (part as { name: string }).name.trim().length > 0,
+    )
+    .map((part) => ({ name: part.name.trim(), role: typeof part.role === "string" ? part.role : null }));
 
   const [ingredients, steps, ratings, members, photo, catalogRows] = await Promise.all([
     supabase
@@ -241,6 +256,30 @@ export default async function RecipePage({
 
       {/* the placement Stephen was reaching for: an existing recipe with no picture had no way
           to get one, on any screen. Labelled by what it does to the recipe you can see. */}
+      {/*
+        * A blend says so, first, before anything it might be mistaken for.
+        *
+        * §60: a blend is a proposal, marked untried, visually unlike an ordinary recipe. The one
+        * thing it must never be taken for is something somebody has cooked — and `times_made`
+        * cannot carry that, because an ordinary recipe nobody has made yet is also 0.
+        */}
+      {recipe.derived_at !== null && (
+        <aside className="proposal">
+          <h2>{recipe.times_made > 0 ? "A blend you have cooked" : "A proposal. Nobody has cooked this."}</h2>
+          <p>
+            Assembled from parts of two of your own recipes, with every quantity exactly as its
+            own recipe wrote it. Nothing was rebalanced for the pairing, two lines wanting the
+            same thing stay two lines, and each method below is reproduced whole —{" "}
+            <strong>including steps for ingredients this blend does not use.</strong>
+          </p>
+          <p className="meta">
+            Your shopping list still combines duplicates properly across the week; the
+            duplication is confined to this page. A blend stays private whatever the sharing
+            settings say.
+          </p>
+        </aside>
+      )}
+
       {/* the general-knowledge half, kept apart from any observation (§57a) */}
       <PalateNotes notes={palate} />
 
@@ -269,6 +308,9 @@ export default async function RecipePage({
             shortlisted={shortlistRows.some((row) => row.week_start === weekStart)}
             shortlistedNext={shortlistRows.some((row) => row.week_start === nextWeekStart)}
           />
+          <Link className="button quiet" href={`/recipes/blend?from=${recipe.id}`}>
+            Pair this with…
+          </Link>
           <Link className="button" href={`/recipes/${recipe.id}/edit`}>
             Edit
           </Link>
@@ -382,6 +424,47 @@ export default async function RecipePage({
           <p className="meta">No ingredients recorded.</p>
         )}
       </section>
+
+      {/*
+        * The parts this recipe splits into — §60 step 2, reachable at last.
+        *
+        * Shown, never acted on. §61 measured the agreement number against thirty hand-labelled
+        * recipes and found it separates a right partition from a wrong one at 50/50, because
+        * three runs of one model at temperature zero are one opinion sampled three times and
+        * fail together. So this is an observation a person can weigh, in the taste-readings
+        * shape, and the sentence under it says plainly that nothing has checked the boundaries.
+        *
+        * Low agreement is still worth saying: if two readings disagree at least one is wrong,
+        * necessarily. Agreement proves nothing in the other direction, so it is never shown as
+        * a credential.
+        */}
+      {storedParts.length > 0 && (
+        <section>
+          <h2>This recipe splits into</h2>
+          <p>
+            {storedParts.map((part, at) => (
+              <span key={`${part.name}-${at}`}>
+                {at > 0 ? " · " : ""}
+                <strong>{part.name}</strong>
+                {part.role && <span className="meta"> ({part.role})</span>}
+              </span>
+            ))}
+          </p>
+          <p className="meta">
+            How the model read it. <strong>Nothing has checked that these are the right
+            boundaries</strong> — a person looking at them is what does that, which is why
+            pairing one with another recipe lets you move them line by line.
+            {typeof recipe.components_agreement === "number" && recipe.components_agreement < 0.7
+              ? " The three readings disagreed about where the parts divide, so treat this as a rough guess."
+              : ""}
+          </p>
+          <p>
+            <Link className="button quiet" href={`/recipes/blend?from=${recipe.id}`}>
+              Pair a part of this with another recipe
+            </Link>
+          </p>
+        </section>
+      )}
 
       {/*
         * Where it came from, on every recipe that has it.

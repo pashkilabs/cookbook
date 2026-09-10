@@ -654,3 +654,22 @@ label.servings .meta { font-size: 0.75rem; color: var(--muted); }
     --tile-ink: #b9a992;
   }
 }
+
+/*
+ * A blend, which must not look like a recipe somebody has cooked.
+ *
+ * Visually unlike an ordinary recipe on purpose (§60): its own ground, its own border, its own
+ * heading before any claim. The same block shape the palate note uses, for the same reason —
+ * a statement whose provenance matters is rendered as its own thing rather than as page prose.
+ */
+.proposal {
+  margin: 0 0 var(--s5);
+  padding: var(--s4);
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  background: var(--raised, transparent);
+}
+.proposal h2 { margin: 0 0 var(--s2); font-size: 1rem; }
+.proposal p { margin: 0 0 var(--s2); }
+.proposal p:last-child { margin-bottom: 0; }
