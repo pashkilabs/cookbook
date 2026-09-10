@@ -47,6 +47,7 @@ export function PartPicker({
   slot,
   heading,
   action,
+  split,
 }: {
   lines: PickerLine[];
   parts: PickerPart[];
@@ -60,6 +61,8 @@ export function PartPicker({
   slot: "" | "2";
   heading: string;
   action: string;
+  /** the split action, when this recipe has not been cut into parts yet — a server child */
+  split?: React.ReactNode;
 }) {
   const router = useRouter();
   const first = parts[0]!;
@@ -108,8 +111,11 @@ export function PartPicker({
           ))}
         </div>
       ) : (
-        // prose, not an absence: a screen showing nothing here looks like one that never looked
-        <p className="meta">{onlyWholeBecause}</p>
+        <>
+          {/* prose, not an absence: a screen showing nothing here looks like one that never looked */}
+          <p className="meta">{onlyWholeBecause}</p>
+          {split}
+        </>
       )}
 
       {lowAgreement && (

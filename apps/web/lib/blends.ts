@@ -81,19 +81,16 @@ const INGREDIENT_COLUMNS = "position, amount, unit, item_text, note, is_estimate
 /**
  * What a recipe offers to a blend: its lines, and the parts it might be cut into.
  *
- * **Reads the stored partition; infers only when asked.** Inference is three model calls and a
- * write, so the save route never asks — it must not be able to spend inference on a request a
- * client controls, and it does not need to: it stores the lines a person already confirmed.
- *
- * The blend composer asks, once, at the moment somebody has said they want this recipe split.
- * That is what finally gives `componentsFor` a caller: §60 steps 2 and 3 have been built and
- * unreachable, which is the same shape as an endpoint with no way in from the product.
+ * **Reads the stored partition and never infers.** Inference is three model calls and up to a
+ * minute, so it lives behind an explicit action (`POST /api/recipes/[id]` with `split`) rather
+ * than inside any render. That is not tidiness: a slow render is a blank screen, a blank screen
+ * gets reloaded, and a reload used to start three fresh calls — paying twice, with the second
+ * run free to disagree with the first. Reading only means a reload of this page costs nothing.
  */
 export async function offerFor(
   supabase: SupabaseClient,
   familyId: string,
   recipeId: string,
-  options: { infer?: boolean } = {},
 ): Promise<BlendOffer | null> {
   const recipe = maybeRow(
     await supabase
@@ -139,27 +136,9 @@ export async function offerFor(
     readings: null,
   };
 
-  /*
-   * Inference happens here or nowhere, and only for a recipe that has never been split.
-   *
-   * A recipe with a stored partition is left alone even if it looks poor: re-rolling it would
-   * give a household a different split every visit, which is incoherent whatever the accuracy
-   * (§60). `componentsFor` handles its own staleness — it recomputes when the ingredient lines
-   * change, and when a partition was built on fewer than three readings.
-   */
-  let components = recipe.components;
-  let agreement = recipe.components_agreement;
-  let readings = recipe.components_readings;
-  if (options.infer && lines.length > 0) {
-    const { componentsFor } = await import("./tastes");
-    const inferred = await componentsFor(supabase, recipe, ingredients);
-    if (inferred) {
-      components = inferred.components as unknown as typeof recipe.components;
-      agreement = inferred.agreement;
-      readings = inferred.readings;
-    }
-  }
-
+  const components = recipe.components;
+  const agreement = recipe.components_agreement;
+  const readings = recipe.components_readings;
   const stored = Array.isArray(components) ? components : null;
   const usable = (stored ?? []).filter(
     (part): part is { name: string; from: number; to: number; role: string | null } =>

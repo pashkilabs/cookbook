@@ -112,6 +112,62 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     .maybeSingle();
   if (!owned.data) return Response.json({ error: "no such recipe" }, { status: 404 });
 
+  /*
+   * Splitting into components, as a mode on the reclassify button's route (§37's function cap).
+   *
+   * **Why a POST and not a page render.** Splitting is three model calls and can take a minute
+   * against a slow provider. Doing it inside the composer's GET meant a minute of silence, and
+   * a minute of silence is how somebody concludes the page has hung and reloads — which started
+   * three *fresh* calls, paid twice, and let the second run disagree with the first. Behind an
+   * explicit action the problem does not arise: reloading the composer now costs nothing,
+   * because the composer no longer infers.
+   *
+   * The person asked for it, so it is worth the wait; and the client can say what is happening
+   * while it runs, which a server render cannot.
+   */
+  const body = await request.json().catch(() => ({}));
+  if ((body as { split?: unknown }).split === true) {
+    const ingredients = rows(
+      await supabase
+        .from("recipe_ingredients")
+        .select("item_text, amount, unit, section")
+        .eq("recipe_id", id)
+        .is("deleted_at", null)
+        .order("position"),
+      "lines to split",
+    );
+    const recipe = maybeRow(
+      await supabase
+        .from("recipes")
+        .select("id, title, components, components_key, components_agreement, components_readings")
+        .eq("id", id)
+        .eq("family_id", family.id)
+        .maybeSingle(),
+      "recipe to split",
+    );
+    if (!recipe) return Response.json({ error: "no such recipe" }, { status: 404 });
+
+    const { componentsFor } = await import("@/lib/tastes");
+    const split = await componentsFor(supabase, recipe, ingredients);
+    if (!split) {
+      /*
+       * Three outcomes, not two. A reader that could not be reached is not a recipe that has no
+       * parts, and telling somebody "this is one thing" when the provider timed out is a
+       * confident answer to a question nobody managed to ask.
+       */
+      return Response.json(
+        { error: "nothing came back from the reader — it may be busy. Worth trying again." },
+        { status: 503 },
+      );
+    }
+    return Response.json({
+      ok: true,
+      parts: split.components.length,
+      readings: split.readings,
+      agreement: split.agreement,
+    });
+  }
+
   // asked for explicitly, so the existing values are cleared rather than protected — that is
   // what the button means
   await supabase

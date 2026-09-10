@@ -6,6 +6,7 @@ import { platformStore } from "@/lib/platform";
 import { offerFor, type BlendOffer } from "@/lib/blends";
 import { searchRecipes } from "@/lib/recipe-search";
 import { PartPicker, type PickerLine } from "./part-picker";
+import { SplitButton } from "./split";
 import { SaveBlend, type SavePart } from "./save";
 
 /**
@@ -38,8 +39,8 @@ export default async function BlendPage({
   const from = query.from ?? "";
   if (!from) redirect("/recipes");
 
-  // infer here: this is the moment somebody has asked for this recipe to be split
-  const source = await offerFor(supabase, family.id, from, { infer: true });
+  // no inference in a render: splitting is behind the button, so a reload costs nothing
+  const source = await offerFor(supabase, family.id, from);
   // an id belonging to another household lands here too, which is the point
   if (!source) redirect("/recipes");
   if (source.isBlend) {
@@ -59,7 +60,7 @@ export default async function BlendPage({
 
   const takeA = readSelection(query.take, query.lines, query.adj, source);
   const withId = query.with ?? "";
-  const other = withId ? await offerFor(supabase, family.id, withId, { infer: true }) : null;
+  const other = withId ? await offerFor(supabase, family.id, withId) : null;
   const takeB = other ? readSelection(query.take2, query.lines2, query.adj2, other) : null;
 
   const crumb = (
@@ -82,6 +83,7 @@ export default async function BlendPage({
           lines={pickerLines(source)}
           parts={source.parts}
           onlyWholeBecause={source.onlyWholeBecause}
+          split={source.parts.length < 2 ? <SplitButton recipeId={source.recipeId} label="Split it into parts" /> : null}
         />
       </main>
     );
@@ -163,6 +165,7 @@ export default async function BlendPage({
           lines={pickerLines(other)}
           parts={other.parts}
           onlyWholeBecause={other.onlyWholeBecause}
+          split={other.parts.length < 2 ? <SplitButton recipeId={other.recipeId} label="Split it into parts" /> : null}
         />
       </main>
     );
