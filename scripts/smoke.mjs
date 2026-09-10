@@ -738,6 +738,148 @@ try {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  /*
+   * Blending (§60 step 4).
+   *
+   * A smoke check that calls an endpoint proves the endpoint and nothing else — two of the last
+   * three things built had no way in from the product while their checks were green. So this
+   * exercises the whole write: two real recipes, a blend of parts of both, then reads back the
+   * lineage and the composed lines to see that they are what was asked for.
+   *
+   * The reachability of the screen is a separate guard (`check-routes-reachable.mjs`), which is
+   * mutation-tested. Between them: the route works and the screen linking to it exists.
+   */
+  console.log("\nblending");
+  if (recipeId) {
+    const second = await call("POST", "/api/recipes", {
+      body: {
+        title: "Smoke Test Sauce",
+        servings: "2",
+        timeMinutes: "10",
+        sourceName: "",
+        sourceUrl: "",
+        ingredients: "200 ml double cream\n1 tbsp mustard",
+        steps: "Reduce.",
+      },
+    });
+    const sauceId = second.body?.id ?? null;
+    if (sauceId) madeRecipes.push(sauceId);
+    record("a second recipe to blend with", second.status === 200 && Boolean(sauceId), `HTTP ${second.status}`);
+
+    if (sauceId) {
+      const blended = await call("POST", "/api/recipes", {
+        body: {
+          blend: {
+            title: "Smoke Test Blend",
+            parts: [
+              // the client sends line numbers, never content — the route reads the lines itself
+              // the pie was edited down to one line earlier in this run, so index 0 is all it
+              // has — the first version of this check asked for index 2 and got a correct 409
+              { sourceRecipeId: recipeId, componentName: "the filling", role: "sweet",
+                taken: "component", lineIndexes: [0], adjusted: true },
+              { sourceRecipeId: sauceId, componentName: "the sauce", role: "sauce",
+                taken: "component", lineIndexes: [0, 1], adjusted: false },
+            ],
+          },
+        },
+      });
+      const blendId = blended.body?.id ?? null;
+      if (blendId) madeRecipes.push(blendId);
+      record("blend parts of two recipes", blended.status === 200 && Boolean(blendId), `HTTP ${blended.status}`);
+
+      if (blendId) {
+        const lines = await rest("GET", `/recipe_ingredients?recipe_id=eq.${blendId}&select=position,item_text,section&order=position`);
+        record(
+          "and it took the lines that were chosen, not the whole recipe",
+          Array.isArray(lines) && lines.length === 3,
+          `${Array.isArray(lines) ? lines.length : "no"} lines`,
+        );
+        record(
+          "and each line knows which part it came from",
+          Array.isArray(lines) && lines[0]?.section === "the filling" && lines[2]?.section === "the sauce",
+          Array.isArray(lines) ? lines.map((l) => l.section).join(", ") : "none",
+        );
+
+        // the stale-selection guard, which found a real mistake in this very check
+        const stale = await call("POST", "/api/recipes", {
+          body: {
+            blend: {
+              title: "Blend of a line that is not there",
+              parts: [
+                { sourceRecipeId: recipeId, componentName: "gone", role: null, taken: "component", lineIndexes: [99], adjusted: false },
+                { sourceRecipeId: sauceId, componentName: "the sauce", role: null, taken: "component", lineIndexes: [0], adjusted: false },
+              ],
+            },
+          },
+        });
+        if (stale.body?.id) madeRecipes.push(stale.body.id);
+        record(
+          "refuses a line that is no longer in its recipe",
+          stale.status === 409,
+          `HTTP ${stale.status}`,
+        );
+
+        const lineage = await rest("GET", `/recipe_derivations?blend_recipe_id=eq.${blendId}&select=component_name,source_title,ingredients_from,ingredients_to,adjusted&order=position`);
+        record(
+          "and the lineage records where each part came from",
+          // "Pie II": the recipe is renamed by the edit earlier in this run, and the lineage
+          // snapshots the title as it was at the cut — which is the point of storing it
+          Array.isArray(lineage) && lineage.length === 2 && lineage[0]?.source_title === "Smoke Test Pie II",
+          Array.isArray(lineage) ? lineage.map((l) => `${l.component_name}<-${l.source_title}`).join(" ") : "none",
+        );
+        record(
+          "and remembers that a person moved the boundaries",
+          Array.isArray(lineage) && lineage[0]?.adjusted === true && lineage[1]?.adjusted === false,
+          Array.isArray(lineage) ? `${lineage[0]?.adjusted}, ${lineage[1]?.adjusted}` : "none",
+        );
+
+        const asBlend = await rest("GET", `/recipes?id=eq.${blendId}&select=servings,derived_at,visibility`);
+        record(
+          "a blend states no servings, because its parts disagree",
+          asBlend?.[0]?.servings === null && asBlend?.[0]?.derived_at !== null,
+          `servings ${asBlend?.[0]?.servings}, derived ${Boolean(asBlend?.[0]?.derived_at)}`,
+        );
+
+        /*
+         * The boundary, attempted against production rather than assumed from the migration.
+         *
+         * A raw fetch rather than `rest`, which treats any 4xx as a service-role refusal and
+         * aborts the run — right for every other call here and wrong for this one, where the
+         * refusal IS the result. A CHECK violation (23514) is what success looks like.
+         */
+        const publish = await fetch(`${SUPABASE}/rest/v1/recipes?id=eq.${blendId}`, {
+          method: "PATCH", headers: svc, body: JSON.stringify({ visibility: "public" }),
+        });
+        const refusal = await publish.json().catch(() => ({}));
+        const stillPrivate = await rest("GET", `/recipes?id=eq.${blendId}&select=visibility`);
+        record(
+          "and can never be published (§60), refused by the database itself",
+          publish.status === 400 && refusal?.code === "23514" && stillPrivate?.[0]?.visibility === "private",
+          `HTTP ${publish.status} ${refusal?.code ?? ""}, visibility ${stillPrivate?.[0]?.visibility}`,
+        );
+
+        const onBlend = await call("POST", "/api/recipes", {
+          body: {
+            blend: {
+              title: "Blend of a blend",
+              parts: [
+                { sourceRecipeId: blendId, componentName: "x", role: null, taken: "whole", lineIndexes: [0], adjusted: false },
+                { sourceRecipeId: sauceId, componentName: "y", role: null, taken: "whole", lineIndexes: [0], adjusted: false },
+              ],
+            },
+          },
+        });
+        if (onBlend.body?.id) madeRecipes.push(onBlend.body.id);
+        record(
+          "and refuses to be blended again",
+          onBlend.status === 400,
+          `HTTP ${onBlend.status}`,
+        );
+      }
+    }
+  }
+
   const path = `${familyId}/smoke-${stamp}.jpg`;
   const upload = await fetch(`${SUPABASE}/storage/v1/object/recipe-photos/${path}`, {
     method: "POST",
