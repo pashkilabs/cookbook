@@ -443,6 +443,22 @@ guessing.
   So: when somebody reports that a journey does not work, **trace the journey**, in order,
   across whatever boundary it crosses — a week, a household, a deploy — rather than
   auditing its components. A component test cannot see a handoff, and a handoff is where
-  two people'"'"'s correct work meets. Same family as *an endpoint answering is not a feature*
+  two people's correct work meets. Same family as *an endpoint answering is not a feature*
   and *a permission nothing has exercised is a permission you do not have*: all three are
   the gap between a part being right and the path through it being walked.
+
+  **The rule, so this is a habit rather than a diagnosis:** a value that crosses **three or
+  more boundaries gets one test that walks the whole path**, in order, asserting the value at
+  the far end. Not a test per hop — those already exist, and they are what make the join
+  invisible. Component tests cover the hops and **cannot see the join by construction**, so
+  no number of them adds up to one walk.
+
+  Four bugs have now lived in a join and none in a hop: the future-weeks handoff above; the
+  classification query; the eval cascade diverging from the product's; and `section`, which
+  crossed parser → `draftFrom` → `prepareRecipe` → insert with every hop correct, every test
+  green, and nothing on the screen. That last one is the worst shape of it — **a passing suite
+  arguing a feature exists is worse than an endpoint that says nothing**, because the endpoint
+  at least never claimed otherwise.
+
+  Count the boundaries when adding a value, not when a bug is reported. Three is the trigger:
+  `apps/web/test/section-round-trip.test.ts` is the template.
