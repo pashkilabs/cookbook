@@ -3065,14 +3065,34 @@ whose 480 minutes are a marinade. Separating them needs the technique extraction
 removed from the sequence above for want of a corpus. The error runs toward silence,
 which is the direction to be wrong in.
 
-### The direction tier is designed and not shipped
+### The direction tier is not shipped, and the matcher is what blocks it
 
-Salt suppresses bitterness and acid cuts richness, and those support a sentence each.
-What they need first is an ingredient-to-property lookup — which line is the acid,
-which is the fat — and the matcher this repository already has turns `almond milk`
-into `whole milk` and `onion powder` into `onion`. A directional warning built on it
-would be confidently wrong about the *ingredient* before it ever reached the
-interaction. **Fix the matcher, then ship the tier.**
+Not deferred pending a decision. **Blocked, on a named defect, with a named test for
+when it clears** — the same shape as technique above, so the next reader finds a
+condition rather than an opinion.
+
+Salt suppresses bitterness and acid cuts richness. Each supports one sentence, and the
+sentence needs an ingredient-to-property lookup first: which line is the acid, which is
+the fat. The lookup this repository has is the catalog matcher, and it conflates
+distinct products — `almond milk` → `whole milk`, `onion powder` → `onion`,
+`whole-wheat flour` → `flour`.
+
+That is fatal here rather than merely untidy. A directional warning built on it is
+**wrong about the ingredient before it ever reaches the interaction**, and it fails in
+the most damaging direction available: it produces a fluent, mechanism-flavoured
+sentence about a dish that does not contain what the sentence names. A cook can argue
+with "this may read as heavy". Nobody can argue with a warning about an ingredient
+they do not have, because they will assume they misread their own recipe.
+
+**What unblocks it:** the matcher distinguishing a qualified product from its head noun
+— `almond milk` is not `milk`, `onion powder` is not `onion` — with that behaviour under
+test. Until then the honest answer is silence, and silence is cheap: §60 already holds
+that saying nothing is the correct answer more often than this feature will want to
+admit.
+
+Note the ordering this implies. The shopping-list rename bug and the matcher conflation
+are not a separate strand of work that happens to be open; **the matcher is a dependency
+of the direction tier**, and fixing it pays twice.
 
 ### The gate: 0.7, three readings, and why it reports rather than censors
 

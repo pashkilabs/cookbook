@@ -10,7 +10,21 @@ type R = { from: number; to: number; role: string | null };
 // capture the three readings ONCE, then score both implementations on identical input — the
 // previous comparison confounded a code change with model variance and was not a result
 if (!existsSync(CACHE)) {
-  const cascade = cascadeFromEnv()!;
+  /*
+ * regression: this was `cascadeFromEnv()!`, and the script loaded no env file. The assertion
+ * made a missing credential look like ninety transport failures inside the catch below —
+ * a configuration error wearing an outage's clothes, which is the most expensive kind of
+ * wrong diagnosis. A check that cannot run must say so before it runs, not ninety times after.
+ */
+for (const line of readFileSync(new URL("../../../apps/web/.env.local", import.meta.url), "utf8").split("\n")) {
+  const at = line.indexOf("=");
+  if (at > 0 && !line.startsWith("#")) process.env[line.slice(0, at).trim()] ??= line.slice(at + 1).trim();
+}
+const cascade = cascadeFromEnv();
+if (!cascade) {
+  console.error("COULD NOT MEASURE: no inference cascade — check PASHKI_LLM_* in apps/web/.env.local");
+  process.exit(3);
+}
   const recipes: Array<{ id: string; recipe_ingredients: Array<{ position: number; amount: number | null; unit: string | null; item_text: string }> }> =
     JSON.parse(readFileSync("/tmp/clean.json", "utf8"));
   const byId = new Map(recipes.map((r) => [r.id, r]));
