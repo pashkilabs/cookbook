@@ -724,6 +724,93 @@ export type Database = {
           },
         ]
       }
+      recipe_derivations: {
+        Row: {
+          adjusted: boolean
+          blend_recipe_id: string
+          component_name: string
+          created_at: string
+          deleted_at: string | null
+          family_id: string
+          id: string
+          ingredients_from: number
+          ingredients_to: number
+          lines_key: string
+          position: number
+          role: string | null
+          source_agreement: number | null
+          source_readings: number | null
+          source_recipe_id: string | null
+          source_title: string
+          steps_from: number | null
+          steps_key: string | null
+          steps_to: number | null
+          taken: string
+          updated_at: string
+        }
+        Insert: {
+          adjusted?: boolean
+          blend_recipe_id: string
+          component_name: string
+          created_at?: string
+          deleted_at?: string | null
+          family_id: string
+          id?: string
+          ingredients_from: number
+          ingredients_to: number
+          lines_key: string
+          position: number
+          role?: string | null
+          source_agreement?: number | null
+          source_readings?: number | null
+          source_recipe_id?: string | null
+          source_title: string
+          steps_from?: number | null
+          steps_key?: string | null
+          steps_to?: number | null
+          taken: string
+          updated_at?: string
+        }
+        Update: {
+          adjusted?: boolean
+          blend_recipe_id?: string
+          component_name?: string
+          created_at?: string
+          deleted_at?: string | null
+          family_id?: string
+          id?: string
+          ingredients_from?: number
+          ingredients_to?: number
+          lines_key?: string
+          position?: number
+          role?: string | null
+          source_agreement?: number | null
+          source_readings?: number | null
+          source_recipe_id?: string | null
+          source_title?: string
+          steps_from?: number | null
+          steps_key?: string | null
+          steps_to?: number | null
+          taken?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_derivations_blend"
+            columns: ["blend_recipe_id", "family_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id", "family_id"]
+          },
+          {
+            foreignKeyName: "recipe_derivations_source"
+            columns: ["source_recipe_id", "family_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id", "family_id"]
+          },
+        ]
+      }
       recipe_ingredients: {
         Row: {
           amount: number | null
@@ -844,6 +931,7 @@ export type Database = {
           created_by: string | null
           cuisine: string | null
           deleted_at: string | null
+          derived_at: string | null
           dish_form: string | null
           family_id: string
           id: string
@@ -873,6 +961,7 @@ export type Database = {
           created_by?: string | null
           cuisine?: string | null
           deleted_at?: string | null
+          derived_at?: string | null
           dish_form?: string | null
           family_id: string
           id?: string
@@ -902,6 +991,7 @@ export type Database = {
           created_by?: string | null
           cuisine?: string | null
           deleted_at?: string | null
+          derived_at?: string | null
           dish_form?: string | null
           family_id?: string
           id?: string
