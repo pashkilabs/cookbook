@@ -36,6 +36,8 @@ export interface PreparedRecipe {
     itemText: string;
     note: string;
     isEstimated: boolean;
+    /** the heading this line appeared under, as the recipe wrote it — null when it declared none */
+    section: string | null;
   }>;
   steps: Array<{ position: number; text: string }>;
   /** null when unknown — the extractor returns null rather than guessing, and blank stays blank */
@@ -92,6 +94,10 @@ export function prepareRecipe(input: RecipeInput): PreparationResult {
         // the parser flags an amount it inferred rather than read; the review screen and the
         // detail screen both surface it, so it must survive being typed in too
         isEstimated: ingredient.estimated === true,
+        // the heading the line sat under. `parseIngredientList` reads "Sauce:" as a heading and
+        // applies it to what follows, so a section survives the review screen's text round-trip
+        // and a household can type one (§60)
+        section: ingredient.section ?? null,
       })),
       steps: asLines(input.steps).map((text, index) => ({ position: index, text })),
     },

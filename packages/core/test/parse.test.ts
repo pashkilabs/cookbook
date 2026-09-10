@@ -129,8 +129,11 @@ describe("parseIngredientList", () => {
     const result = parseIngredientList([
       "For the sauce:", "", "1 cup cream", "2 cloves garlic", "   ",
     ]);
-    expect(result).toHaveLength(3);
-    expect(result.map((r) => r.item)).toEqual(["for the sauce", "cream", "garlic"]);
+    // was 3, asserting that "For the sauce:" became an ingredient called "for the sauce" — a
+    // test documenting a bug as though it were the design. It is a heading, and it now says so.
+    expect(result).toHaveLength(2);
+    expect(result.map((r) => r.item)).toEqual(["cream", "garlic"]);
+    expect(result.every((r) => r.section === "For the sauce")).toBe(true);
   });
 });
 
@@ -380,5 +383,46 @@ describe("prep written without a comma", () => {
     const [parsed] = parseIngredientList(["2 x 400g cans cannellini beans drained and rinsed"]);
     expect(parsed?.item).toBe("cannellini beans");
     expect(parsed?.note).toContain("drained and rinsed");
+  });
+});
+
+describe("headings become sections, not ingredients", () => {
+  // regression: "Sauce:" parsed as an ingredient called "sauce" and reached the shopping list.
+  // Fixed on the vision path by dropping headings; parseIngredientList never learned it, so
+  // anyone typing a heading in the review screen got a phantom line.
+  it("reads a trailing-colon line as a heading and applies it to what follows", () => {
+    const parsed = parseIngredientList(["Sauce:", "1 cup cream", "2 tbsp mustard"]);
+    expect(parsed.map((line) => line.item)).toEqual(["cream", "mustard"]);
+    expect(parsed.every((line) => line.section === "Sauce")).toBe(true);
+  });
+
+  it("switches section at the next heading and leaves earlier lines alone", () => {
+    const parsed = parseIngredientList(["Dough:", "300 g flour", "Filling:", "200 g apples"]);
+    expect(parsed.map((line) => [line.item, line.section])).toEqual([
+      ["flour", "Dough"],
+      ["apples", "Filling"],
+    ]);
+  });
+
+  it("leaves lines before any heading unsectioned, which is not the same as a blank section", () => {
+    const parsed = parseIngredientList(["1 tsp salt", "Sauce:", "1 cup cream"]);
+    expect(parsed[0]!.section ?? null).toBeNull();
+    expect(parsed[1]!.section).toBe("Sauce");
+  });
+
+  /*
+   * The costs are not symmetric. A heading read as an ingredient is a visible phantom; an
+   * ingredient read as a heading DELETES it and the cook finds out at the stove. So the rule
+   * only fires where nobody could have meant an ingredient.
+   */
+  it("keeps a quantity-bearing line with a colon as an ingredient", () => {
+    const parsed = parseIngredientList(["2 tbsp oil: divided"]);
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]!.item).toBe("oil");
+    expect(parsed[0]!.section ?? null).toBeNull();
+  });
+
+  it("ignores a bare colon, which names nothing", () => {
+    expect(parseIngredientList([":", "1 tsp salt"]).map((l) => l.section ?? null)).toEqual([null]);
   });
 });

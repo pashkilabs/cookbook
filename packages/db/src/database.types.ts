@@ -737,6 +737,7 @@ export type Database = {
           note: string
           position: number
           recipe_id: string
+          section: string | null
           unit: string | null
           updated_at: string
         }
@@ -752,6 +753,7 @@ export type Database = {
           note?: string
           position: number
           recipe_id: string
+          section?: string | null
           unit?: string | null
           updated_at?: string
         }
@@ -767,6 +769,7 @@ export type Database = {
           note?: string
           position?: number
           recipe_id?: string
+          section?: string | null
           unit?: string | null
           updated_at?: string
         }

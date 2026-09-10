@@ -25,4 +25,4 @@
  * Bump it when a migration is added that application code depends on. Bumping unnecessarily costs
  * a check; forgetting costs a page that 500s for whoever opens it.
  */
-export const REQUIRED_MIGRATION = "20260820160000_palate_note_cache";
+export const REQUIRED_MIGRATION = "20260909090000_ingredient_section";

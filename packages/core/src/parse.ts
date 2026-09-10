@@ -266,11 +266,58 @@ export function parseIngredientLine(raw: string): ParsedIngredient | null {
   };
 }
 
-/** Parse a whole ingredient list, discarding anything that isn't one. */
+/**
+ * Is this line a heading rather than an ingredient?
+ *
+ * **Deliberately conservative: a trailing colon and no quantity, and nothing else.**
+ *
+ * The cost of the two mistakes is not symmetric. A heading read as an ingredient puts a phantom
+ * "sauce" on a shopping list, which is visible and annoying. An ingredient read as a heading
+ * **deletes it** — the cook shops without it and finds out at the stove. So the rule only fires
+ * where a person could not reasonably have meant an ingredient.
+ *
+ * That leaves `Brownie Layer (9x13)` — a real heading, no colon — still read as an ingredient
+ * here. It is handled where it can be: the extractor reports `section` explicitly, and
+ * `parseSectionedIngredients` uses that. Guessing at it in this function is the mistake that took
+ * two wrong attempts on the vision path: one compared the text to its section and missed a
+ * `(9x13)` column label, the next required no digits and `9x13` sailed through. Both passed their
+ * unit tests because the tests asserted the shape I had imagined (CLAUDE.md).
+ */
+function headingOf(line: string): string | null {
+  const trimmed = line.trim();
+  if (!trimmed.endsWith(":")) return null;
+  const label = trimmed.slice(0, -1).trim();
+  if (!label) return null;
+  // a quantity means it is an ingredient with a colon in it, not a heading
+  const parsed = parseIngredientLine(label);
+  if (parsed && (parsed.amount !== null || parsed.unit !== null)) return null;
+  return label;
+}
+
+/**
+ * Parse a whole ingredient list, discarding anything that isn't one.
+ *
+ * **Headings become sections rather than ingredients.** A line reading `Sauce:` used to parse as
+ * an ingredient called "sauce" and reach the shopping list; it now applies to every line that
+ * follows until the next heading. That is also what lets a section survive the review screen,
+ * which renders the list back to text and re-parses it on save — so a household can type a
+ * heading and have it mean something.
+ */
 export function parseIngredientList(lines: string[]): ParsedIngredient[] {
-  return lines
-    .map((line) => parseIngredientLine(line))
-    .filter((x): x is ParsedIngredient => x !== null);
+  const out: ParsedIngredient[] = [];
+  let section: string | null = null;
+
+  for (const line of lines) {
+    const heading = headingOf(line);
+    if (heading !== null) {
+      section = heading;
+      continue;
+    }
+    const parsed = parseIngredientLine(line);
+    if (!parsed) continue;
+    out.push(section === null ? parsed : { ...parsed, section });
+  }
+  return out;
 }
 
 /**

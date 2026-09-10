@@ -28,6 +28,7 @@ export async function writeChildren(
         item_text: line.itemText,
         note: line.note,
         is_estimated: line.isEstimated,
+        section: line.section,
         ingredient_id: null,
       })),
     );

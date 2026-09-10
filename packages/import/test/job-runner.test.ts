@@ -3,6 +3,7 @@ import {
   drainQueue,
   runNextJob,
   type FinishJobInput,
+  type FinishOutcome,
   type ImportJob,
   type JobQueue,
   type JobRunnerOptions,
@@ -183,9 +184,12 @@ describe("typed terminal states", () => {
     await runNextJob(
       options({ queue, imports: { fetcher: createFakeFetcher({ [NOTHING]: { html: PAGE_WITH_NO_RECIPE } }) } }),
     );
+    // `result` is nullable since the classify job, which produces no draft — so a null here is
+    // itself a failure worth asserting rather than something to optional-chain past
     const recorded = queue.finished[0]!.result;
-    expect(recorded.ok).toBe(false);
-    if (!recorded.ok) expect(recorded.failure.kind).toBe("no-recipe-found");
+    expect(recorded).not.toBeNull();
+    expect(recorded!.ok).toBe(false);
+    if (recorded && !recorded.ok) expect(recorded.failure.kind).toBe("no-recipe-found");
   });
 
   it("refuses a kind it does not drain, rather than leaving it queued forever", async () => {
@@ -194,7 +198,7 @@ describe("typed terminal states", () => {
       const outcome = await runNextJob(options({ queue }));
       expect(outcome.status, kind).toBe("failed");
       const recorded = queue.finished[0]!.result;
-      if (recorded.ok) throw new Error("expected failure");
+      if (!recorded || recorded.ok) throw new Error("expected failure");
       expect(recorded.failure).toEqual({ kind: "unsupported-job-kind", jobKind: kind });
     }
   });
@@ -370,9 +374,15 @@ describe("a classify job", () => {
     ...extra,
   });
   let finished: FinishJobInput | null = null;
+  // reset through a function: assigning `null` inline narrows the variable to `null`, and every
+  // later read then types as `never` because control-flow analysis cannot see the async closure
+  // writing to it
+  const reset = () => {
+    finished = null;
+  };
 
   it("finishes done, not review — there is no draft for anyone to look at", async () => {
-    finished = null;
+    reset();
     const outcome = await runNextJob(
       runnerFor({ classifyHousehold: async () => ({ classified: 3 }) }) as never,
     );
@@ -383,19 +393,19 @@ describe("a classify job", () => {
   // §54: the allowance is for importing recipes, and these are already owned — charging would
   // bill a household for a schema change made after they saved them
   it("never charges the household", async () => {
-    finished = null;
+    reset();
     await runNextJob(runnerFor({ classifyHousehold: async () => ({ classified: 1 }) }) as never);
     expect(finished?.charge).toBe(false);
   });
 
   it("hands back no result, rather than fabricating one", async () => {
-    finished = null;
+    reset();
     await runNextJob(runnerFor({ classifyHousehold: async () => ({ classified: 0 }) }) as never);
     expect(finished?.result).toBeNull();
   });
 
   it("fails typed when the worker cannot classify, rather than leaving it queued forever", async () => {
-    finished = null;
+    reset();
     const outcome = await runNextJob(runnerFor({}) as never);
     expect(outcome.status).toBe("failed");
     expect(finished?.status).toBe("failed");
