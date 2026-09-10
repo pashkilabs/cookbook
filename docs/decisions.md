@@ -2947,6 +2947,51 @@ split into a tuning set and a held-out set never tuned against. That corpus has 
 imported first. Recorded as counts rather than as an omission so the next reader
 finds a measurement.
 
+### Step 2 as built: stored, agreed once, and a floor rather than a verdict
+
+Inference is unstable — `right` scored 11, 12 and 19 of thirty across identical runs.
+So components are **computed once and stored**, keyed on the ingredient lines, not
+inferred per view: a household visiting the same recipe twice would otherwise see it
+split two different ways, which is incoherent whatever the accuracy.
+
+**Best-of-three at write, never at read.** Three calls spent once buy one stable
+answer; one call spent repeatedly buys a different answer each time. Measured against
+the thirty labelled recipes:
+
+| | right | wrong | declined | components found |
+|---|---|---|---|---|
+| single shot | 10/30 | 10 | 10 | 38/71 |
+| best of three | **19/30** | 9 | **2** | **51/71** |
+
+Mean agreement 0.77, three calls per recipe, five recipes agreeing below 0.6. The
+decline collapse is the half that matters — a decline is *no components at all*, so
+recovering eight of ten is what makes the feature usable. The single-shot baseline is
+the **first** of the three readings, not the best of them, which would have been the
+cherry-pick the measurement exists to test.
+
+The winner is the **medoid**, not the mode: two readings differing by one ingredient
+at a boundary are the same reading, and demanding identity would declare disagreement
+on nearly everything. Agreement is symmetrised, because a six-way split matches every
+component of a two-way split in one direction and an unsymmetrised score would let the
+most over-split reading win by containing everything. It is stored beside the
+partition — a low number is not a wrong answer, it is a partition nobody should build
+on yet — and a single surviving reading stores 0 rather than 1, because internally
+consistent is not agreed.
+
+**Today's number is a floor, not a verdict.** `recipe_ingredients.section` landed on
+2026-09-09, so only imports from that date carry the headings a recipe declares — and
+supplying true sections took `right` from ~14 to 25 of thirty. The measured corpus has
+none of them. **The same inference therefore improves passively as Stephen imports**,
+with no code change, and a stored partition can be recomputed when it does. Any future
+reading of "19 of 30" has to account for that: it is the score on a corpus with zero
+section coverage, which is the worst case this feature will ever face.
+
+**Roles are not the bottleneck and are not being tuned further.** They reached ~96%
+of components *found* (93/96/100 across three runs), up from 74%. But unconditionally
+— across all true components, including those never found — they land at 56–72%,
+because a component that is not found cannot be given a role either. The constraint is
+detection, not naming.
+
 ### Components: inference, with sections as evidence
 
 A component is **inferred from ingredients and steps**, with a declared section used
