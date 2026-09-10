@@ -97,3 +97,29 @@ describe("the labelled set", () => {
     expect(AGREEMENT).toBe(0.7);
   });
 });
+
+describe("what the labelled set can and cannot measure about roles", () => {
+  const roles = COMPONENT_LABELS.flatMap((r) => r.components.map((c) => c.role));
+  const count = (role: string) => roles.filter((r) => r === role).length;
+
+  /*
+   * A role scored on one example is not scored. `sweet` exists because the corpus needs it — 9%
+   * of recipes are desserts the other roles cannot name — but this set holds a single instance,
+   * so any accuracy figure for it is noise. Recorded here rather than left for a reader to infer
+   * from a percentage that looks like a measurement.
+   */
+  it("cannot measure sweet, and says so rather than implying it can", () => {
+    expect(count("sweet")).toBeLessThan(3);
+  });
+
+  it("measures the four common roles on enough examples to mean something", () => {
+    for (const role of ["protein", "carbohydrate", "sauce", "vegetable"]) {
+      expect(count(role), role).toBeGreaterThanOrEqual(7);
+    }
+  });
+
+  it("holds marinade thinly — enough to catch a systematic confusion with sauce, not to score", () => {
+    expect(count("marinade")).toBeGreaterThanOrEqual(3);
+    expect(count("marinade")).toBeLessThan(7);
+  });
+});

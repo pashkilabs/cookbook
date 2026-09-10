@@ -63,4 +63,5 @@ console.log(`\n${withSections ? "WITH true sections" : "ingredients only"}`);
 console.log(`  right ${tally.right}/${n}   wrong ${tally.wrong}   declined ${tally.declined}   could-not-measure ${unmeasured}`);
 console.log(`  component count correct: ${countRight}/${n}`);
 console.log(`  components found: ${matched}/${expected}   roles right: ${rolesRight}/${matched}`);
+console.log(`  ROLE ACCURACY: ${rolesRight}/${matched} = ${matched?Math.round(rolesRight/matched*100):0}%`);
 console.log(`  of the declines: ${why.empty} answered nothing, ${why.malformed} answered a non-partition`);

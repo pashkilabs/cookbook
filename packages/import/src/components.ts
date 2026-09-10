@@ -37,7 +37,7 @@ export const COMPONENTS_JSON_SCHEMA = {
           to: { type: "integer", description: "last ingredient position, inclusive" },
           role: {
             type: ["string", "null"],
-            enum: ["protein", "carbohydrate", "sauce", "vegetable", "garnish", null],
+            enum: ["protein", "carbohydrate", "sauce", "vegetable", "garnish", "marinade", "sweet", null],
           },
         },
       },
@@ -62,7 +62,42 @@ export const COMPONENTS_INSTRUCTIONS = [
   "two things were seasoned separately. And a change of purpose: a list that goes from a protein",
   "and its spices to an oil, an acid and a herb has moved from the meat to the dressing.",
   "",
-  "Say each component's role, or null if none of them fits. A dessert is often none of them.",
+  /*
+   * Roles scored 34/46 from ingredients alone — a third wrong, on the field a blend selects by.
+   * "I love this sauce" is a role query, so this is the same bar the protein chips were held to.
+   * The original instruction was one sentence; each role now says what distinguishes it from the
+   * one it is most often confused with.
+   */
+  "Then say what each component IS, choosing one role:",
+  "",
+  "protein — what the dish is built around: the meat, fish, beans or eggs, with the seasonings",
+  "and liquid cooked with them. A one-pan dinner or a soup is a protein component even though it",
+  "contains vegetables and starch, because the whole thing is one thing.",
+  "carbohydrate — rice, pasta, potatoes, bread, a dough, a wrap. What the dish is served on or in.",
+  "sauce — made separately and served WITH or spooned OVER: a dressing, a gravy, a salsa, a",
+  "guacamole, a frosting, a filling. If it is added to the finished dish, it is a sauce.",
+  "marinade — rubbed or soaked into something BEFORE cooking and largely not eaten as such. If",
+  "the component's job is to flavour a protein before heat, it is a marinade, not a sauce.",
+  "vegetable — a salad, a slaw, a side of greens, a bowl of raw toppings eaten as part of the",
+  "dish rather than scattered on top.",
+  "garnish — scattered on at the end and easily left off: herbs, seeds, wedges, a spoon of sour",
+  "cream. If leaving it out would barely change the dish, it is a garnish, not a vegetable.",
+  "sweet — the substance a dessert is made of: a posset, a cookie dough, a batter, an ice cream.",
+  "A frosting or a filling is NOT sweet — it is applied to something, so it is a sauce.",
+  "",
+  "Answer null when none of them fits rather than choosing the nearest. A cocktail is none of",
+  "them, and a wrong role is worse than an absent one because it is what people filter on.",
+  "",
+  /*
+   * The null above is about a component's ROLE. The model was reading it as permission to answer
+   * nothing at all: 8 of 9 declines were single-component recipes, where it returned an empty
+   * list rather than "one component covering everything". Two different nulls, conflated —
+   * so the one that is never allowed is now said outright.
+   */
+  "**Never return an empty list.** Every recipe has at least one component. If the whole recipe",
+  "is one thing — a skillet, a soup, a marinade, a dough — return exactly one component covering",
+  "every ingredient. That is the commonest correct answer, not a failure to split. The null above",
+  "is only ever about a role; there is no null for the components themselves.",
 ].join(" ");
 
 export interface RecipeComponent {
@@ -72,7 +107,9 @@ export interface RecipeComponent {
   role: string | null;
 }
 
-const ROLES = new Set(["protein", "carbohydrate", "sauce", "vegetable", "garnish"]);
+const ROLES = new Set([
+  "protein", "carbohydrate", "sauce", "vegetable", "garnish", "marinade", "sweet",
+]);
 
 export function componentsPrompt(recipe: {
   title: string;
