@@ -115,6 +115,16 @@ rebuild, and everything else depends on it.*
       scripts rather than dashboards wherever the API allows it — `set:smtp`,
       `set:site-url`, `issue:entitlement` — and `check:parity` compares the two
       environments. `docs/deployment.md`.
+- [x] **Recipe blending** (§60 steps 1-4). A household takes the part it likes from one
+      recipe and pairs it with a part of another; the result is an ordinary recipe that
+      plans, scales and shops, marked a proposal until somebody cooks it, and never
+      publishable. Sections persist and render, components are inferred once and stored,
+      compatibility says one mechanism-backed thing and is otherwise silent, and the
+      person confirms the boundaries line by line — which §61 makes the whole safety
+      mechanism rather than a convenience. Verified in a browser, which is the only way
+      the last of those can be verified at all.
+      **Steps 5 and 6 are not next:** technique is removed for want of a corpus, and
+      rebalancing wants evidence from step 4 that does not exist yet.
 - [ ] **Render the public recipe pages.** The schema, the anon policies and the column
       grants have shipped and nothing uses them: the read surface is live on a
       public project for a feature that does not exist. Either build it or consider

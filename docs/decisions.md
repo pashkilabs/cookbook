@@ -3127,6 +3127,57 @@ was allowed to be said, with the reason. An empty list under a passed gate and a
 list under a failed one are different answers and must render differently — the same
 rule as `too-few` in the taste readings.
 
+### Step 4 as built: a proposal a person assembles, and the gate that became a screen
+
+Shipped and verified in a browser, which for this feature is not a formality — see the
+last paragraph.
+
+**Line-level ticking, because §61 left nothing else.** The model's part arrives pre-ticked
+and every line stays individually tickable. That is the whole safety mechanism, and it is
+load-bearing rather than polite: agreement separates a right partition from a wrong one at
+50/50, so there is no signal to gate on and nothing may stand between a person and the
+selection they are blending from. It also matches where the model is actually good —
+**the count of parts is right for 18 of the 19 recipes that genuinely have two or more,
+while only 47 of 71 individual components match.** Good at "this recipe is about three
+things", bad at "which line belongs to which". So it draws and a person moves.
+
+The consequence worth keeping: detection stops being a correctness constraint and becomes
+a convenience gradient. Right means no clicks, wrong means a few, absent means picking
+from scratch and the feature still works.
+
+**The client sends selections, never content.** A recipe id and line numbers; the lines
+themselves are read from the database by the route. A client that could post ingredient
+text would have it stored under a lineage claiming it came from a recipe that never
+contained it, and nothing downstream could tell.
+
+**Inference is behind a button, not inside a render.** Three calls at up to forty seconds
+is a blank screen, a blank screen gets reloaded, and a reload used to start three *fresh*
+calls — paid twice, with the second free to disagree with the first. Moving it to an
+explicit POST dissolves that rather than mitigating it: the composer no longer infers, so
+reloading costs nothing.
+
+Two faults found by asking what happens when the provider is slow, rather than by watching
+it happen:
+
+- The three readings ran **in series**. They are independent by construction, so that only
+  bought wall clock — and three sixty-second timeouts in series exceeds the serverless
+  duration cap, so the platform would kill the request before the write. Paid for,
+  unobservable. Now parallel, worst case one timeout.
+- **The per-call timeout equalled the function cap**, both sixty seconds, so a call using
+  its full timeout would be killed at the moment it gave up and nothing after it would run.
+  Now 45s. The rule rather than the number: *a timeout inside a deadline finishes first,
+  with room for the work that follows. Two equal deadlines is a race whose loser is always
+  the error handling.*
+
+**Verified in a browser, and that is the evidence that matters here.** Everything else
+about this feature can be tested; the thing §61 makes safety-critical cannot. Three
+questions, all confirmed by a person actually using it: the waiting message reads as
+reassuring rather than as a hang; "the model proposed this, you fix it" is legible without
+being told; and Stage D reads as a proposal rather than as a recipe. **That third is what
+§61 rests on** — with no confidence signal available, a person understanding they are
+correcting rather than accepting *is* the mechanism, and it has to work without
+explanation or it does not work at all.
+
 ## §61 — Self-consistency is not confidence, and this project will reach for it again
 
 Recorded as its own decision rather than as a footnote to components, because the
