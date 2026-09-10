@@ -44,23 +44,57 @@ import { collagenWarnings, type CompatibilityWarning } from "./collagen.js";
 /**
  * How closely the three readings must agree before anything may be said *about a component*.
  *
- * Set to the same number the eval uses to decide a component matches its hand-labelled one
- * (`AGREEMENT` in the components fixture). Two different numbers for "is this the same
- * partition" would be two incompatible notions of sameness in one codebase, and the looser one
- * would win by being the one a feature happened to call.
+ * Chosen to match `AGREEMENT` in the components fixture, so one codebase holds one notion of
+ * "same partition". That is an argument about coherence, and it was the only argument here
+ * until the number was measured.
+ *
+ * ---------------------------------------------------------------------------
+ * Measured, and it does not do what this name promises
+ * ---------------------------------------------------------------------------
+ *
+ * Against the thirty hand-labelled recipes, scored from readings captured once:
+ *
+ *   passes the gate (>=0.7 and three readings)   7 of 14 right   50%
+ *   fails the gate                               8 of 16 right   50%
+ *
+ * The gate separates nothing. Worse, the band table says why: among recipes where three
+ * readings agreed at **0.85 or better**, only 7 of 13 were right. Three independent readings
+ * agreeing *perfectly* were wrong four times in eleven.
+ *
+ * **Agreement measures consistency, not correctness.** Three runs of one model at temperature
+ * zero on one prompt are not three independent opinions; they are one opinion sampled three
+ * times, and they fail together on exactly the recipes the prompt handles badly. A number built
+ * from their concurrence cannot see that, by construction.
+ *
+ * So this must not be read as confidence, and nothing may be suppressed or admitted on it
+ * alone. It is kept because §60 requires the number be *shown* beside a partition — a reader
+ * can weigh "the three readings disagreed" for themselves — and because the reverse claim is
+ * still sound: **low agreement is genuine evidence of trouble even though high agreement is not
+ * evidence of correctness.** The two directions are not symmetric and only one was ever
+ * measurable this way.
+ *
+ * The thing that actually decides whether a component is right is a person looking at it.
  */
 export const COMPONENT_TRUST = 0.7;
 
 /**
- * All three readings must have come back — and this condition matters more than the threshold.
+ * All three readings must have come back.
  *
- * With a single reading there is nothing to compare it against, so agreement is reported as 1.0:
- * perfect agreement with itself. A gate on agreement alone therefore **passes most easily
- * exactly where the evidence is thinnest**, which is inverted. Requiring three makes the
- * agreement number mean what its name says.
+ * The structural argument is sound and still holds: with a single reading there is nothing to
+ * compare against, so agreement is reported as 1.0 — perfect agreement with itself — and a gate
+ * on agreement alone would pass most easily exactly where the evidence is thinnest. That is why
+ * `components_readings` is stored; before it was, two surviving runs and three wrote the same
+ * 1.0 and were indistinguishable afterwards.
  *
- * This is why `components_readings` is stored at all. Before it was, two surviving runs and
- * three surviving runs both wrote 1.0 and were indistinguishable afterwards.
+ * **But it buys no accuracy, and I claimed it would.** I argued this condition mattered more
+ * than the threshold. Measured: recipes with three readings were right 7 of 15; recipes with
+ * fewer were right 8 of 15. If anything it points the wrong way. (That comparison is confounded —
+ * a provider outage put recipes in the "fewer" bucket that would otherwise have had three — so
+ * the honest reading is "no measurable benefit", not "actively harmful".)
+ *
+ * Kept because a lone reading genuinely cannot report agreement, which is a statement about what
+ * the number *means* rather than a claim about accuracy. Not kept as a quality filter, because
+ * it is not one.
  */
 export const READINGS_NEEDED = 3;
 

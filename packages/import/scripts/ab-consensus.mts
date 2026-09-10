@@ -61,6 +61,14 @@ if (!cascade) {
    * full of nulls scores as "both implementations declined equally" — a tidy, meaningless tie.
    */
   const attempted = Object.keys(out).length * 3;
+  const nulls = Object.values(out).reduce((n, rs) => n + rs.filter((r) => r === null).length, 0);
+  /*
+   * Always print the split, even when it passes. The per-loss line is capped at three to keep
+   * the log readable, and without this the run reported 28 nulls with three logged throws —
+   * leaving "how many were the provider" unanswerable after the fact. A capped log is a
+   * filtered pipeline, which is the same trap as a grep that hides the error it was looking for.
+   */
+  console.log(`\ncalls ${attempted}: ${lost} lost in transport, ${nulls - lost} declined by the model`);
   if (lost > attempted / 4) {
     console.error(`\nCOULD NOT MEASURE: ${lost} of ${attempted} calls were lost in transport.`);
     console.error("Not written. The provider, not the consensus code, is what this would measure.");

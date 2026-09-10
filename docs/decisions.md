@@ -3111,6 +3111,13 @@ inverted. This is what `components_readings` is for; before it was stored, two
 surviving runs and three surviving runs both wrote 1.0 and were indistinguishable
 afterwards.
 
+**The gate does not work. See §61.** Measured after the fact against the thirty labelled
+recipes, `COMPONENT_TRUST` separates nothing: 7 of 14 right above it, 8 of 16 below.
+Agreement across three runs of one model at temperature zero measures determinism and
+reports it as accuracy. The paragraph below describes what was built and why; §61 records
+what measuring it found, and the constraint that follows — there is no confidence signal,
+so nothing may stand between a person and the selection they are blending from.
+
 **The gate reports, it does not censor.** A mechanism warning reads an ingredient line
 and a duration in a step — neither produced by the component inference — and is as
 true of a badly split recipe as a well split one. Gating it would suppress a sound
@@ -3119,3 +3126,107 @@ mechanism warnings regardless and states separately whether anything *partition-
 was allowed to be said, with the reason. An empty list under a passed gate and an empty
 list under a failed one are different answers and must render differently — the same
 rule as `too-few` in the taste readings.
+
+## §61 — Self-consistency is not confidence, and this project will reach for it again
+
+Recorded as its own decision rather than as a footnote to components, because the
+defect is in the *method* and the method is reusable. Anything built this way
+inherits the blind spot.
+
+### What was built, and what it claimed
+
+Component inference is unstable — `right` scored 11, 12 and 19 of thirty across
+identical runs — so §60 spends three calls at write time, keeps the reading the other
+two most agree with, and stores how much they agreed. That number then gated whether
+anything might be said *about a component*: `COMPONENT_TRUST = 0.7`, and all three
+readings present.
+
+The threshold was chosen for coherence — it is the number the eval already uses to
+decide a component matches its hand label, and two different numbers for "same
+partition" would be two incompatible notions of sameness in one codebase. That is a
+good argument about consistency and **not an argument that the number separates right
+from wrong**. Nothing tested whether it did.
+
+### Measured against the thirty hand-labelled recipes
+
+Scored from readings captured once, so both sides saw identical input:
+
+| | n | right | |
+|---|---|---|---|
+| **passes the gate** (≥0.7 and three readings) | 14 | 7 | **50%** |
+| **fails the gate** | 16 | 8 | **50%** |
+
+The gate separates nothing. Splitting it into its two halves:
+
+| | n | right | |
+|---|---|---|---|
+| three readings, any agreement | 15 | 7 | 47% |
+| fewer than three readings | 15 | 8 | 53% |
+| ≥0.7 agreement, any readings | 18 | 10 | 56% |
+| <0.7 agreement | 12 | 5 | 42% |
+
+And by band, among recipes where all three readings came back:
+
+| agreement | n | right | |
+|---|---|---|---|
+| 0.50–0.70 | 1 | 0 | — |
+| 0.70–0.85 | 1 | 0 | — |
+| **0.85–1.00** | **13** | **7** | **54%** |
+
+**Three independent readings agreeing perfectly were wrong four times in eleven.**
+
+`READINGS_NEEDED = 3` was argued — by me, in writing — to matter *more* than the
+threshold. It buys no accuracy at all. That comparison is confounded, since a provider
+outage put recipes in the "fewer" bucket that would otherwise have had three, so the
+honest reading is **no measurable benefit** rather than actively harmful.
+
+### Why, and this is the part that generalises
+
+**Three runs of one model at temperature zero on one prompt are not three independent
+opinions. They are one opinion sampled three times.** They fail *together* on exactly
+the inputs the prompt handles badly — a recipe whose structure the instructions do not
+describe well produces the same wrong split every time, confidently and consistently.
+A number built from their concurrence cannot see that, by construction: it is measuring
+the model's determinism, which is high, and reporting it as though it were the model's
+accuracy, which is not.
+
+So **self-consistency across runs of one model is not evidence of correctness**, and
+sampling it more times does not make it so. Independence would require varying something
+that could actually change the failure — a different model, a different prompt, a
+different modality — and even then the failures may correlate through the training data.
+
+The seductive part is that the number *looks* like a confidence: it is bounded 0 to 1,
+it moves, and low values do coincide with trouble. It reads exactly like the thing it
+is not.
+
+### The asymmetry that survives, and its real basis
+
+**Low agreement is evidence of trouble. High agreement is not evidence of correctness.**
+
+The basis is logical rather than statistical, which matters because the statistics here
+are too thin to carry it: 42% against 56% at n=12 and n=18 is suggestive and no more.
+The logic is solid on its own — **if two readings disagree, at least one of them is
+wrong**, necessarily. If they agree, nothing follows. Disagreement is a proof of error
+somewhere; agreement is the absence of one signal, and absence of a signal is not a
+result. That is the same rule as *silence reads as success*, arriving through a metric
+instead of through a check.
+
+So the number is kept and **shown**, never acted on: a reader can weigh "the three
+readings disagreed" for themselves, which is the taste-readings rule — an observation a
+person can weigh beats a verdict they can only accept or ignore.
+
+### What this forces on anything built downstream
+
+**There is no confidence signal available.** Not a weak one to be used carefully — none.
+So nothing may stand between a person and a model's structural judgement about their own
+recipe. A person correcting a proposed selection is not the safest option among several;
+it is the only one, because there is no measurement that could substitute for it.
+
+It also kills the compromise that looks reasonable: *present confidently when agreement
+is high, ask when it is low.* At 0.85 and above the proposal is wrong 46% of the time.
+There is no confident presentation to earn.
+
+**Before building any future confidence measure, ask what would have to vary for two
+answers to be genuinely independent** — and if the answer is "nothing", it is a
+determinism meter with a confidence meter's name. Measure it against hand labels before
+anything is gated on it. This one was reasoned, shipped, documented, and wrong for a day.
