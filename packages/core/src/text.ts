@@ -6,9 +6,20 @@ const PREP_WORDS = [
   "softened", "melted", "room temperature", "cold", "warm", "optional",
   "to taste", "plus more", "divided", "for serving", "for garnish",
   "uncooked", "peeled", "trimmed", "rinsed", "drained", "halved", "quartered",
+  // states rather than products: the catalog has one basil and one pasta, so "dried basil" and
+  // "dry orecchiette pasta" should reach them rather than fall off the list entirely
+  "dry", "dried",
 ];
 
 const PREP_RE = new RegExp(`\\b(${PREP_WORDS.join("|")})\\b`, "g");
+
+/**
+ * The same words, as single tokens, for deciding whether what is left over after a catalog
+ * match is preparation or a different product. See `catalog.ts`.
+ */
+export const PREP_TOKENS: ReadonlySet<string> = new Set(
+  PREP_WORDS.flatMap((word) => word.split(" ")),
+);
 
 /**
  * Aggressive normalisation: strips preparation words, so "finely diced onion"

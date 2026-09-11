@@ -46,7 +46,20 @@ export function consolidate(
       if (!bucket) {
         bucket = {
           key,
-          label: item ? item.names[0]! : normaliseName(ingredient.item) || ingredient.item,
+          /*
+           * What the recipe called it, never what the catalog calls it.
+           *
+           * regression: this was `item.names[0]`, the catalog's canonical name, so a matched
+           * line was *renamed* on the shopping list — "3½ cup spaghetti" for a recipe asking
+           * for orecchiette. Reported as the list being wrong, and it was: a person cannot
+           * check a list against a recipe that no longer uses the same words, which is the one
+           * thing a shopping list has to let them do.
+           *
+           * The **key** stays the catalog item, which is what makes two recipes' cream add up
+           * to one pint. Only the label follows the recipe. Those are different jobs and
+           * sharing one string conflated them.
+           */
+          label: normaliseName(ingredient.item) || ingredient.item,
           item,
           aisle: catalog.aisleFor(ingredient.item),
           uses: [],

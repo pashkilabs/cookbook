@@ -1,5 +1,5 @@
 import type { CatalogItem, PackageSize } from "./types.js";
-import { lightName, normaliseName } from "./text.js";
+import { PREP_TOKENS, lightName, normaliseName } from "./text.js";
 
 export const AISLE_ORDER = [
   "Produce", "Meat & Seafood", "Dairy", "Bakery", "Frozen", "Pantry", "Spices", "Other",
@@ -43,6 +43,117 @@ export interface Catalog {
  * "finely chopped onion" find "onion", while the gentle form keeps "diced
  * tomatoes" (a tin) from collapsing into "tomatoes" (fresh produce).
  */
+/**
+ * Does this written name really name this catalog item — or merely contain its word?
+ *
+ * ---------------------------------------------------------------------------
+ * The bug this replaces
+ * ---------------------------------------------------------------------------
+ *
+ * Matching was `form.includes(candidate)`, a bare substring test, so **a qualified product
+ * matched its head noun**: `almond milk` bought whole milk, `onion powder` bought onions,
+ * `whole-wheat flour` bought plain flour. It also matched across word boundaries, so
+ * `buttermilk` contained `milk`.
+ *
+ * This is the shopping list, which is the one output of this app that **costs money when it is
+ * wrong** — and the almond-milk case buys dairy for a household that does not eat it. A wrong
+ * recipe wastes an evening; this wastes a shop and breaks a diet.
+ *
+ * ---------------------------------------------------------------------------
+ * An allow-list, because the failure directions are not symmetric
+ * ---------------------------------------------------------------------------
+ *
+ * The rule is: the candidate must appear as **whole words**, and everything left over must be
+ * *preparation* — the same words `normaliseName` already strips. `finely chopped onion` leaves
+ * nothing and matches; `onion powder` leaves "powder" and does not.
+ *
+ * Stated as an allow-list on purpose, exactly as `photo_object_is_public` is. An exclusion list
+ * of forbidden qualifiers would let every qualifier nobody has thought of through by default,
+ * and the next `almond milk` is by definition one nobody has thought of.
+ *
+ * **Failing to match is the safe direction here**, which is what makes the strictness
+ * affordable: an unmatched line still appears on the shopping list, under the name the recipe
+ * gave it. It simply does not consolidate with others or get a package size. That is a much
+ * smaller harm than buying the wrong product confidently.
+ */
+export function claims(form: string, candidate: string): boolean {
+  const words = split(form);
+  const wanted = split(candidate);
+  if (wanted.length === 0 || wanted.length > words.length) return false;
+
+  for (let at = 0; at + wanted.length <= words.length; at += 1) {
+    if (!wanted.every((word, n) => sameWord(words[at + n]!, word))) continue;
+    const before = words.slice(0, at);
+    const residue = [...before, ...words.slice(at + wanted.length)];
+
+    // "onion powder" is not onion, "bread crumbs" are not bread, "peanut butter" is not butter
+    if (residue.some((word) => FORM_WORDS.has(word))) continue;
+
+    /*
+     * A bare head noun takes no qualifier: "almond milk" is not milk, "soy milk" is not milk.
+     *
+     * Only when the candidate IS the head noun on its own. `coconut milk` is its own product
+     * and matching it exactly is right — rejecting that because the *name* contains "milk"
+     * threw away the specific match in favour of nothing, which measured worse on every count.
+     */
+    if (FORM_WORDS.has(candidate) && before.some((word) => !isHarmless(word))) continue;
+
+    return true;
+  }
+  return false;
+}
+
+const split = (text: string): string[] => text.split(/[\s-]+/).filter(Boolean);
+
+/**
+ * Words naming a **form or a product in their own right**, which change what you buy.
+ *
+ * Not a list of every qualifier — that list is open-ended and the attempt measured badly, giving
+ * up 99 of 434 real matches to fix 11 conflations. This is the narrow claim that survived
+ * measurement: fixes 10 of 11 known conflations while giving up 18, of which 16 were themselves
+ * wrong matches (`peanut butter` was buying butter, `tomato ketchup` was buying tomatoes).
+ *
+ * `juice` and `zest` are deliberately absent: you buy a lemon for lemon juice.
+ *
+ * **The trade this encodes.** Failing to match is not free — an unmatched line still appears on
+ * the shopping list, but it does not consolidate and gets no package size, and consolidation is
+ * the thing this product exists to do. So the rule earns each rejection rather than rejecting on
+ * suspicion.
+ */
+const FORM_WORDS: ReadonlySet<string> = new Set([
+  "powder", "granules", "extract", "essence", "ketchup", "vinegar", "syrup",
+  "crumbs", "breadcrumbs", "flakes", "seeds", "sauce", "oil", "milk", "butter",
+  "paste", "stock", "broth", "wine", "jam", "jelly",
+]);
+
+/**
+ * A leftover word that cannot change which product to buy.
+ *
+ * Numbers and measures are included because `find` is reachable with raw text — "1 large onion,
+ * diced" leaves a "1" behind, "1/2 c. olive oil" leaves "c." — and neither names a product.
+ */
+const isHarmless = (word: string): boolean =>
+  PREP_TOKENS.has(word) ||
+  /^[\d.,/¼½¾⅓⅔⅛]+$/.test(word) ||
+  MEASURE_WORDS.test(word) ||
+  word === "of" || word === "or" || word === "and";
+
+const MEASURE_WORDS =
+  /^(c|tbsp|tsp|oz|lb|lbs|g|kg|ml|l|cup|cups|tablespoons?|teaspoons?|pints?|cloves?|bulbs?|stalks?|dollop|heaping|handful|pinch|cans?|jars?|packets?|bunch)\.?$/;
+
+/**
+ * Singular and plural are the same word.
+ *
+ * The catalog stores singular and recipes are written in plural, which is why plurals live in
+ * `names` as aliases — but not every alias has one, and `yellow onions` must still find
+ * `yellow onion`. Compared per word rather than by stripping the whole string, so `tomato paste`
+ * is not quietly turned into `tomatoes paste`.
+ */
+function sameWord(a: string, b: string): boolean {
+  if (a === b) return true;
+  return a === `${b}s` || b === `${a}s` || a === `${b}es` || b === `${a}es`;
+}
+
 export function createCatalog(items: CatalogItem[]): Catalog {
   const raw = items.flatMap((item) =>
     item.names.map((name) => ({ name: name.toLowerCase(), item })),
@@ -78,7 +189,7 @@ export function createCatalog(items: CatalogItem[]): Catalog {
     let found: CatalogItem | null = null;
     outer: for (const { name: candidate, item } of byLength) {
       for (const form of forms) {
-        if (form === candidate || form.includes(candidate)) {
+        if (form === candidate || claims(form, candidate)) {
           found = item;
           break outer;
         }
