@@ -19,7 +19,6 @@ wrappers.
   `#padthai`
 - the invisible `⁣` (U+2063) Instagram line separators, which are why some captions
   read as one long line
-- `��` where the source's emoji did not survive, in `instagram-texas-twinkies.txt`
 - trailing post-age markers — `27w`, `Edited · 23w`, `See less`
 - vulgar fractions (`½`, `⅓`, `1½`), `tb` vs `tbsp`, `oz.` with the stop
 - amounts that are only a gesture: `eyeball some nutmeg`, `2 splashes vanilla`,
@@ -38,7 +37,11 @@ arrived, so the fixture is usable as it stands.
 **Two look like refusals and are not.** Both are recipes, and both are the most
 valuable text fixtures in the set (decisions §46):
 
-- `instagram-texas-twinkies.txt` — every ingredient named, every amount absent.
+- `instagram-texas-twinkies.txt` — re-transcribed 2026-09-11 from a **different post** to the
+  damaged original, which carried 28 replacement characters where its emoji should have been. The
+  replacement states a yield (`Makes 12`), lists its ingredients explicitly, and marks each step
+  with an emoji. Its expectation was rewritten from the new text rather than reconciled with the
+  old, because the two share only a dish name.
   Expected output is the named ingredients with `amount: null` and **no invented
   quantities**. This is the cleanest measure of whether an extractor fabricates
   when a source declines to specify — the same failure the reel path will have,

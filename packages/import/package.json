@@ -36,7 +36,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
     "eval": "tsx eval.mts",
-    "ripeness": "tsx scripts/ripeness.mts"
+    "ripeness": "tsx scripts/ripeness.mts",
+    "score:twinkies": "tsx scripts/score-twinkies.mts"
   },
   "devDependencies": {
     "@pashki/db": "workspace:^",

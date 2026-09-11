@@ -292,24 +292,42 @@ export const reddit_grill_thread: Fixture = {
 
 export const caption_texas_twinkies: Fixture = {
   id: "caption-texas-twinkies",
+  /*
+   * Re-transcribed 2026-09-11 from a DIFFERENT post to the damaged original.
+   *
+   * The old one was Traeger-branded, dash-bulleted, stated no yield and buried its
+   * ingredients inside the steps; 28 of its characters were U+FFFD where emoji should have
+   * been. This one states `Makes 12`, lists its ingredients, and marks every step with an
+   * emoji. The expectation below was written from the new text rather than reconciled with
+   * the old — they share only a dish name.
+   *
+   * What it exercises that nothing else in the set does: a stated yield, emoji-prefixed
+   * steps for `stripLeadingDecoration`, a container word whose catalog package is literally
+   * labelled `8 oz block`, an ingredient with no amount at all, and a `Pro tip:` postscript
+   * that is not a step.
+   */
   input: {
     kind: "caption",
-    text: "Texas Twinkies for the Super Bowl 🏈 🐄\nRecipe below 👇🏾\n��Set @traegergrills to 275*\n��Chop up left over brisket to fine shreds\n��Use half a block of @phillycreamchs cream cheese\n��Shred cheddar cheese to your desire\n��Mix all together\n��Cut open jalapeño and scoop out seeds\n��Fill the jalapeño with brisket and cheese mixture\n��Cover the jalapeño with the piece you cut from earlier and wrap in bacon\n��Season with your favorite rub\n��Put on traeger for 1 hour\n��Half way through put on traeger glaze\n��Cook for an additional 20-30 mins or until bacon is cooked and jalapeño is cooked to your liking!\n��Take em off and let em cool so you don't burn your mouth like me!\n��Enjoy 🤙🏾 27w\n",
+    text: "Texas Twinkie 🤠🇺🇸\nRecipe Below ⤵️⤵️⤵️\n\nMakes 12 ⤵️\n🔥12 large jalapeños \n🔥1 block of cream cheese \n🔥1/2 pound chopped Brisket \n🔥12 strips of bacon 🥓 \n🔥BBQ rub \n\n💥Hallow out the Jalapeño like a boat 🛶\n💥Add in the cream cheese and brisket \n💥Wrap bacon around the jalapeño making sure to cover the filling \n💥Coat with your favorite bbq rub \n💥Set smoker to 350 degrees \n💥Smoke for 1 hour\n💥Then paint on bbq sauce \n💥Back in the smoker for 20 minutes until the sauce gets tacked on \n🤯 Enjoy! \n\nPro tip: Place on a sheet pan with an elevated pan grate. This helps so that the bacon grease catches in the pan and you won't get a grease fire in your grill. 👊🏼\n",
   },
   expected: {
     outcome: "recipe",
     recipe: {
-      title: "Texas Twinkies",
-      servings: null,
-      totalMinutes: 90,
+      title: "Texas Twinkie",
+      // the first stated yield in the caption set
+      servings: 12,
+      // "Smoke for 1 hour" plus "Back in the smoker for 20 minutes"; both stated, so adding
+      // them is arithmetic rather than estimation
+      totalMinutes: 80,
       ingredients: [
-        { amount: null, unit: null, item: "leftover brisket" },
-        { amount: null, unit: null, item: "cream cheese" },
-        { amount: null, unit: null, item: "cheddar cheese" },
-        { amount: null, unit: null, item: "jalapeños" },
-        { amount: null, unit: null, item: "bacon" },
-        { amount: null, unit: null, item: "rub" },
-        { amount: null, unit: null, item: "traeger glaze" },
+        { amount: 12, unit: null, item: "jalapeños" },
+        // a container word, and the catalog sells cream cheese in a package labelled
+        // "8 oz block" — the parse is a quantity, whatever the conversion does with it
+        { amount: 1, unit: "block", item: "cream cheese" },
+        { amount: 0.5, unit: "lb", item: "brisket" },
+        { amount: 12, unit: null, item: "bacon" },
+        // no amount anywhere, and the method only says "your favorite bbq rub"
+        { amount: null, unit: null, item: "bbq rub" },
       ],
     },
   },

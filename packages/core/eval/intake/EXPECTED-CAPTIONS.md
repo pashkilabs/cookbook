@@ -17,35 +17,69 @@ Conventions, applied throughout:
 
 ---
 
-## 1. `instagram-texas-twinkies` — the null-amount case
+## 1. `instagram-texas-twinkies` — a stated yield, emoji steps, and a container word
 
-**Recipe**, not a refusal. Every ingredient named, not one quantified. This is the
-sharpest fixture in the set: it measures directly whether an extractor invents
-quantities when the source declines to give them.
+**Rewritten, not repaired.** The original fixture was damaged (28 replacement
+characters) and the re-transcription is a **different post**: Traeger-branded,
+dash-bulleted, no stated yield, its ingredients embedded in the steps. This one
+states `Makes 12`, carries an explicit ingredient list, and marks every step with
+an emoji. Nothing of the old expectation carries over, so none of it was
+reconciled — the table below is read from the new text alone.
 
-title `Texas Twinkies` · servings ⚠ `null` · totalMinutes ⚠ `90`
+title `Texas Twinkie` · servings `12` · totalMinutes ⚠ `80`
 
 | amount | unit | item | section |
 |---|---|---|---|
-| null | null | leftover brisket | null |
-| null | null | cream cheese | null |
-| null | null | cheddar cheese | null |
-| null | null | jalapeños | null |
-| null | null | bacon | null |
-| null | null | rub | null |
-| null | null | traeger glaze | null |
+| 12 | null | jalapeños | null |
+| 1 | block | cream cheese | null |
+| 0.5 | lb | chopped brisket | null |
+| 12 | null | strips of bacon 🥓 | null |
+| null | null | bbq rub | null |
 
-- ⚠ **`half a block of cream cheese` is null, not 0.5 block.** "Block" is a
-  container word the parser canonicalises to `can`, so `0.5 can cream cheese`
-  would be *expressible* — and wrong, because half of an unstated block is not a
-  quantity. Any extractor producing a number here has invented one.
-- ⚠ **totalMinutes 90**: "1 hour" plus "an additional 20-30 mins", taking the
-  upper bound. Arguable — the source never states a total, and `null` is
-  defensible. I lean 90 because both components are stated and adding them is
-  arithmetic, not estimation.
-- ⚠ `275*` is a temperature, not a quantity, and is not an ingredient. An
-  extractor emitting `275` as an amount has read the smoker setting as food.
-- `Set @traegergrills` is equipment. Not an ingredient.
+- **`Makes 12` is a yield**, and the first in the caption set. The sibling
+  fixtures all have `servings: null`, so this is the only one that measures
+  whether an extractor reads a stated count rather than inventing or omitting one.
+- ⚠ **totalMinutes 80**: "Smoke for 1 hour" plus "Back in the smoker for 20
+  minutes". Both components are stated and adding them is arithmetic rather than
+  estimation, which is the same reasoning the damaged fixture's note used. `null`
+  remains defensible — the source never states a total.
+- ⚠ **`1 block of cream cheese` is 1 `block`, not 227 g and not null.** The
+  container work exists for exactly this: `block` is a container word, and the
+  catalog's cream cheese is sold in a package *labelled* "8 oz block" (227 g). It
+  does not currently convert — see the note below — but the **parse** is a
+  quantity, and an extractor emitting `null` here has thrown away a number the
+  source gave.
+- ⚠ **`12 strips of bacon 🥓` is expected as 12 × `bacon`**, and neither the core
+  parser nor the model produces that: both return `strips of bacon 🥓`, trailing
+  emoji included. The expectation states what is right rather than what happens,
+  which is the point of an eval — the amount and unit are correct, and the item is
+  where the shortfall is. Same for `chopped Brisket`: the set strips preparation
+  from items elsewhere (`diced strawberries` → `strawberries`), so `brisket` is
+  the expectation and `chopped brisket` is the observed miss.
+- **Emoji-prefixed steps are stored as written and stripped at render**
+  (`stripLeadingDecoration`, recipe page). So a step coming back as
+  `💥Set smoker to 350 degrees` is correct, not a defect — the decoration belongs
+  to the source and the screen is what removes it.
+- **`BBQ rub` has no amount at all**, and `your favorite bbq rub` appears again in
+  the method. One ingredient, unquantified — the null-amount case the damaged
+  fixture used to carry, surviving into the replacement.
+- ⚠ **`cuisine` stays `null`, and the model disagrees.** Measured, it answers
+  `American` — defensible for a smoked bacon-wrapped popper called a Texas
+  Twinkie under a US flag. The expectation holds to the rule the rest of the set
+  follows (the caption names no cuisine *in words*, and a dish name containing a
+  place is not a claim), and **is deliberately not moved to match the answer**:
+  fitting an expectation to what an extractor produced is how an eval stops
+  measuring anything. If the rule is ever revisited, revisit it for the whole set.
+- **`350 degrees` is a temperature**, not a quantity, and the smoker is equipment.
+  An extractor emitting `350` as an amount has read the setting as food.
+- **`bbq sauce` appears only in the method**, never in the list. Whether to
+  promote it to an ingredient is the interesting question this fixture asks; the
+  expectation above says **no** — the list is what the source declared, and an
+  extractor that harvests the method will also harvest the sheet pan.
+- **The `Pro tip:` paragraph is not a step.** It follows `Enjoy!`, is not
+  emoji-marked like every other step, and describes equipment rather than an
+  action on the food. An extractor that appends it has mistaken a postscript for
+  the method.
 
 ## 2. `instagram-summer-toast-board` — three sections, mostly null
 

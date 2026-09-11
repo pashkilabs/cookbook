@@ -216,7 +216,7 @@ export const CAPTION_CLASS_EXPECTATIONS: CaptionClassExpectation[] = [
   { fixture: "instagram-summer-toast-board", course: ["starter"], cuisine: null,
     why: "the caption says it is what she would start the night with — the source saying so is the rule" },
   { fixture: "instagram-texas-twinkies", course: ["starter", "snack"], cuisine: null,
-    why: "a Super Bowl jalapeno popper: savoury, small, eaten between meals or as a starter" },
+    why: "a bacon-wrapped jalapeno popper: savoury, small, eaten between meals or as a starter. Cuisine stays null on the rule the set already follows — the caption names none in words, and a dish name containing a place is not a claim about cuisine any more than French toast is. The flag emoji in the title is decoration; if that reading is ever revisited, `american` is the defensible alternative" },
 ];
 
 /** genuine variants of one answer, not broader categories */
