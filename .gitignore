@@ -12,3 +12,4 @@ coverage/
 
 # `supabase link` stores the linked project ref and credentials here
 supabase/.temp/
+.check-test.log

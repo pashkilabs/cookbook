@@ -386,11 +386,18 @@ eval fixture wants the same.
 
 ### Seen once, not chased — what to look for if it returns
 
-**An intermittent in `@pashki/platform-client`.** `supabase-store.test.ts > an adult invited
-into a household they do not own > returns null when the account is a member of nothing`
-failed once during a full `pnpm test`, then passed alone and passed on every subsequent full
-run. Captured rather than chased: an intermittent that gets explained away is how a real one
-hides, and so is chasing one that has fired once.
+**An intermittent in the suite. It has now fired twice and only one has a name.**
+
+First: `supabase-store.test.ts > an adult invited into a household they do not own > returns
+null when the account is a member of nothing`, during a full `pnpm test`, passing alone and on
+every rerun. Second: a `pnpm check` reporting `test=1` where an immediately preceding and an
+immediately following `pnpm test` were both green — **and that one was lost**, because the
+output was filtered through a grep and then overwritten. Two occurrences, one identifiable.
+
+That is why `pnpm check` now writes the full test output to `.check-test.log` and says so when
+it fails. A flake cannot be reproduced on demand, so the run that catches it has to leave
+evidence behind — and the file is redirected rather than piped, because `$?` after a pipe
+reports the wrong command. Losing the second occurrence is the reason this mechanism exists.
 
 **The hypothesis, so it is not re-derived.** Turbo runs the package suites concurrently and
 `@pashki/db` and `@pashki/platform-client` both talk to the *same* local Postgres. That test
