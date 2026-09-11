@@ -1,4 +1,5 @@
 import { anonAuth } from "@/lib/auth-anon";
+import { normaliseEmail } from "@/lib/email-address";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { siteUrl } from "@/lib/site-url";
 
@@ -29,7 +30,8 @@ export async function POST(request: Request) {
     return Response.json({ error: "expected a JSON body" }, { status: 400 });
   }
 
-  const email = body.email?.trim().toLowerCase();
+  // one normaliser, so the form and the route cannot drift apart again
+  const email = body.email === undefined ? undefined : normaliseEmail(String(body.email));
   const password = body.password;
   const householdName = body.householdName?.trim();
   const displayName = body.displayName?.trim();

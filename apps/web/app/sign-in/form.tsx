@@ -1,5 +1,6 @@
 "use client";
 
+import { normaliseEmail } from "@/lib/email-address";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { browserClient } from "@/lib/supabase-browser";
@@ -41,7 +42,7 @@ export function SignInForm() {
         const response = await fetch("/api/signup", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ email, password, householdName, displayName }),
+          body: JSON.stringify({ email: normaliseEmail(email), password, householdName, displayName }),
         });
         const body = (await response.json().catch(() => ({}))) as {
           error?: string;
@@ -56,7 +57,9 @@ export function SignInForm() {
       }
 
       const { error: signIn } = await browserClient().auth.signInWithPassword({
-        email,
+        // regression: sent untouched, so a leading space from an autofill or a paste looked up
+        // an address that signup had already trimmed — answered as "invalid credentials"
+        email: normaliseEmail(email),
         password,
       });
       if (signIn) throw new Error(signIn.message);
@@ -87,7 +90,7 @@ export function SignInForm() {
       const response = await fetch("/api/resend", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: normaliseEmail(email) }),
       });
       const body = (await response.json().catch(() => ({}))) as { message?: string };
       setNotice(body.message ?? "If that address needs confirming, a new link is on its way.");

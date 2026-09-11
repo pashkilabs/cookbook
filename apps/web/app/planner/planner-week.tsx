@@ -229,11 +229,44 @@ export function PlannerWeek(props: {
                         call(`scale-${entry.id}`, `/api/plan-entries/${entry.id}`, "PATCH", patch)
                       }
                     />
+                    {/*
+                      * Moving a meal, as a select rather than a drag.
+                      *
+                      * reported: meals could not move between weeks at all — the PATCH updated
+                      * only `scale`. A select works with one thumb on a phone, where dragging
+                      * between two days that are not both on screen does not.
+                      *
+                      * The two week options move the meal to the same weekday seven days either
+                      * side, which is what "not this week, next week" means in practice and needs
+                      * no second calendar to express.
+                      */}
+                    <select
+                      aria-label="Move to another day"
+                      className="quiet"
+                      value=""
+                      disabled={busy !== null}
+                      onChange={(event) => {
+                        const date = event.target.value;
+                        if (!date) return;
+                        call(`move-${entry.id}`, `/api/plan-entries/${entry.id}`, "PATCH", { date });
+                      }}
+                    >
+                      <option value="">Move…</option>
+                      {props.days
+                        .filter((option) => option.date !== entry.date)
+                        .map((option) => (
+                          <option key={option.date} value={option.date}>
+                            {option.weekday}
+                          </option>
+                        ))}
+                      <option value={shiftDays(entry.date, 7)}>→ next week</option>
+                      <option value={shiftDays(entry.date, -7)}>← last week</option>
+                    </select>
                     <button
                       type="button"
                       className="quiet"
                       disabled={busy !== null}
-                      title="Take it off this day"
+                      title="Take it off this day — it goes back to the waiting list"
                       onClick={() => call(`remove-${entry.id}`, `/api/plan-entries/${entry.id}`, "DELETE")}
                     >
                       ✕
@@ -247,4 +280,18 @@ export function PlannerWeek(props: {
       </div>
     </>
   );
+}
+
+/**
+ * The same weekday, a number of days away — in plain ISO, not through a Date.
+ *
+ * `new Date("2026-09-14")` parses as UTC midnight and renders in local time, so west of
+ * Greenwich a day can arrive as the evening before. Counting days on the calendar avoids the
+ * timezone entirely, which matters because a meal moved to "next Tuesday" landing on Monday is
+ * exactly the kind of off-by-one nobody notices until the shopping list is wrong.
+ */
+function shiftDays(date: string, days: number): string {
+  const shifted = new Date(`${date}T12:00:00Z`);
+  shifted.setUTCDate(shifted.getUTCDate() + days);
+  return shifted.toISOString().slice(0, 10);
 }

@@ -35,7 +35,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
-    "eval": "tsx eval.mts"
+    "eval": "tsx eval.mts",
+    "ripeness": "tsx scripts/ripeness.mts"
   },
   "devDependencies": {
     "@pashki/db": "workspace:^",
