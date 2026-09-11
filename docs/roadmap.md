@@ -125,10 +125,15 @@ rebuild, and everything else depends on it.*
       the last of those can be verified at all.
       **Steps 5 and 6 are not next:** technique is removed for want of a corpus, and
       rebalancing wants evidence from step 4 that does not exist yet.
-- [ ] **Render the public recipe pages.** The schema, the anon policies and the column
-      grants have shipped and nothing uses them: the read surface is live on a
-      public project for a feature that does not exist. Either build it or consider
-      revoking until it is built.
+- [ ] **Render the public recipe pages.** The schema stays and the read surface is
+      **revoked pending the feature** (`20260911090000`): the anon half went in August,
+      and the `authenticated` half — any signed-in account reading any household's
+      published recipe — went now, because nothing renders one and "build it or revoke
+      it" had been true here for weeks. Not a decision against public pages. `visibility`,
+      `private.recipe_is_public` and the column grants are untouched, so restoring it is
+      one migration that re-creates three policies — and replaces
+      `assert_public_reads_revoked` in the same breath, which is deliberately in the way
+      so that restoring the surface is something somebody writes down.
 - [x] **An HTTP surface for the seam.** Session, entitlement, quota spend and device
       registration, as a framework-agnostic router plus a Fetch adapter, so Next.js
       in Phase 2 and any host in Phase 3 share one implementation. The account is
@@ -378,6 +383,35 @@ eval fixture wants the same.
 10. **Seed idempotency** was verified by hand — but the catalog round-trip test
     would fail loudly if a second seed duplicated rows. Downgraded from where it
     sat before.
+
+### Seen once, not chased — what to look for if it returns
+
+**An intermittent in `@pashki/platform-client`.** `supabase-store.test.ts > an adult invited
+into a household they do not own > returns null when the account is a member of nothing`
+failed once during a full `pnpm test`, then passed alone and passed on every subsequent full
+run. Captured rather than chased: an intermittent that gets explained away is how a real one
+hides, and so is chasing one that has fired once.
+
+**The hypothesis, so it is not re-derived.** Turbo runs the package suites concurrently and
+`@pashki/db` and `@pashki/platform-client` both talk to the *same* local Postgres. That test
+asserts an account is a member of *nothing* — an assertion about absence, which is the kind
+another suite's fixtures can falsify just by existing at the wrong moment. `@pashki/db`
+creates and deletes households throughout its run.
+
+**What would confirm it**, in the order worth trying:
+
+1. Run the two suites concurrently in a loop and see whether it reproduces at all
+   (`pnpm --filter @pashki/db test & pnpm --filter @pashki/platform-client test`). If it does
+   not reproduce in fifty rounds, the hypothesis is wrong and the next suspect is a clock or a
+   leftover row from an earlier *sequential* run.
+2. Print what the query actually returned rather than only that it was non-empty — if the rows
+   belong to a household with a different test label, the cross-suite theory is confirmed in
+   one line.
+3. Check whether the assertion is scoped to its own household at all. If it counts rows
+   globally, the fix is scoping the query, not serialising the suites.
+
+**What would NOT confirm it:** a clean run. The whole point is that it passes most of the time.
+Do not record a green full suite as evidence against this.
 
 ### Known and accepted
 

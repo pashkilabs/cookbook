@@ -215,20 +215,27 @@ describe.skipIf(instance === null)("row-level security", () => {
       expect(data).toEqual([]);
     });
 
-    it("sees its own household plus other households' published recipes, and nothing else", async () => {
-      // this used to assert "only its own household". Publishing changed what is
-      // true, not just what is tested: a signed-in person following a friend's link
-      // has to be able to read it.
+    it("sees its own household and nothing else", async () => {
+      /*
+       * This assertion has now been all three things, which is worth leaving on the record.
+       *
+       * It began as "only its own household". Publishing widened it — a signed-in person
+       * following a friend's link had to be able to read the page. Nothing was ever built to
+       * render that page, so the widening has been revoked pending the feature
+       * (20260911090000) and it is back to the original claim.
+       *
+       * Not a reversal of §17. The schema for publishing is untouched; only the standing
+       * permission is gone, and it is one migration to restore.
+       */
       const { data, error } = await alpha.client.from("recipes").select("id, family_id");
       expect(error).toBeNull();
 
       const foreignIds = data!
         .filter((row) => row.family_id !== alpha.familyId)
         .map((row) => row.id);
-      // published: visible. Unpublished: not. Asserted as membership rather than an
-      // exact set, because published rows are visible across households and a
-      // shared database may hold other households' pages.
-      expect(foreignIds).toContain(beta.publicRecipeId);
+      expect(foreignIds).toEqual([]);
+      // named individually as well, so a failure says which kind leaked
+      expect(foreignIds).not.toContain(beta.publicRecipeId);
       expect(foreignIds).not.toContain(beta.recipeId);
       expect(foreignIds).not.toContain(beta.tombstonedRecipeId);
     });
@@ -241,13 +248,27 @@ describe.skipIf(instance === null)("row-level security", () => {
       expect(data).toEqual([]);
     });
 
-    it("can read another household's published recipe", async () => {
+    /*
+     * Changed deliberately, and kept rather than deleted so the change is visible.
+     *
+     * This asserted §17's design: a published recipe is readable by any signed-in account. That
+     * surface is **revoked pending the feature** (20260911090000) — nothing renders a public
+     * recipe, and the read path had been live on a public project for a feature that does not
+     * exist. The schema, `visibility` and `private.recipe_is_public` all stay, so restoring it is
+     * one migration.
+     *
+     * When public pages are built, this test flips back and `assert_public_reads_revoked` is
+     * replaced in the same migration that re-creates the policies — which is the point of the
+     * assertion being in the way.
+     */
+    it("cannot read another household's published recipe, because that surface is revoked", async () => {
       const { data, error } = await alpha.client
         .from("recipes")
         .select("id, title")
         .eq("id", beta.publicRecipeId);
+      // no error, no rows: RLS filters rather than refusing, so revoked and absent look alike
       expect(error).toBeNull();
-      expect(data).toHaveLength(1);
+      expect(data).toEqual([]);
     });
 
     it("cannot read another household's members", async () => {
