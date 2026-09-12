@@ -54,46 +54,57 @@ export function PlannerWeek(props: {
   } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
+  /*
+   * `finally`, for the reason `shopping-list.tsx` documents at length: an offline `fetch`
+   * rejects, so a `setBusy(null)` after the await never runs and every control bound to
+   * `disabled={busy !== null}` stays dead. Same shape, same screen-wide consequence.
+   */
   async function call(key: string, path: string, method: string, body?: unknown) {
     setBusy(key);
     setError(null);
-    const response = await fetch(path, {
-      method,
-      headers: body ? { "content-type": "application/json" } : {},
-      ...(body ? { body: JSON.stringify(body) } : {}),
-    });
-    if (!response.ok) {
-      const failed = (await response.json().catch(() => ({}))) as {
-        error?: string;
-        existing?: { id: string; servings: number | null; scale: number };
-        recipe?: { title: string; servings: number | null };
-      };
+    try {
+      const response = await fetch(path, {
+        method,
+        headers: body ? { "content-type": "application/json" } : {},
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      });
+      if (!response.ok) {
+        const failed = (await response.json().catch(() => ({}))) as {
+          error?: string;
+          existing?: { id: string; servings: number | null; scale: number };
+          recipe?: { title: string; servings: number | null };
+        };
 
-      /*
-       * Already on that day. Not merged silently and not refused — the household is told, and
-       * offered the thing they almost certainly meant: feed more people from the one entry
-       * (decisions §41).
-       */
-      if (response.status === 409 && failed.error === "already-planned" && failed.existing) {
-        setDuplicate({
-          entryId: failed.existing.id,
-          title: failed.recipe?.title ?? "That recipe",
-          servings: failed.existing.servings,
-          recipeServings: failed.recipe?.servings ?? null,
-          scale: failed.existing.scale,
-        });
-        setBusy(null);
+        /*
+         * Already on that day. Not merged silently and not refused — the household is told, and
+         * offered the thing they almost certainly meant: feed more people from the one entry
+         * (decisions §41).
+         */
+        if (response.status === 409 && failed.error === "already-planned" && failed.existing) {
+          setDuplicate({
+            entryId: failed.existing.id,
+            title: failed.recipe?.title ?? "That recipe",
+            servings: failed.existing.servings,
+            recipeServings: failed.recipe?.servings ?? null,
+            scale: failed.existing.scale,
+          });
+          return false;
+        }
+
+        setError(failed.error ?? `that did not work (${response.status})`);
         return false;
       }
-
-      setError(failed.error ?? `that did not work (${response.status})`);
-      setBusy(null);
+      router.refresh();
+      return true;
+    } catch {
+      setError("No signal — that one was not saved. Try it again in a moment.");
       return false;
+    } finally {
+      setBusy(null);
     }
-    setBusy(null);
-    router.refresh();
-    return true;
   }
+
+
 
   const place = (recipeId: string, date: string) => {
     setDuplicate(null);

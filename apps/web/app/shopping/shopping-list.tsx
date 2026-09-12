@@ -30,21 +30,41 @@ export function ShoppingList(props: {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
+  /*
+   * `finally`, and the whole list depends on it.
+   *
+   * regression: `setBusy(null)` sat after the await with no `try`. A shop is exactly where a
+   * connection drops, and an offline `fetch` **rejects** rather than returning — so that line
+   * never ran, `busy` stayed set, and every checkbox, every "Have it" and every pantry chip on
+   * the page is `disabled={busy !== null}`. One failed tap in aisle four and the entire list
+   * went dead in somebody's hand, silently: the caller drops the promise, so nothing surfaced.
+   * The optimistic tick stayed crossed off on screen, was never saved, and was gone on reload.
+   *
+   * CLAUDE.md requires this to work with no signal. It could not survive one bad tap.
+   */
   async function call(key: string, path: string, method: string, body: unknown) {
     setBusy(key);
     setError(null);
-    const response = await fetch(path, {
-      method,
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    setBusy(null);
-    if (!response.ok) {
-      const failed = (await response.json().catch(() => ({}))) as { error?: string };
-      setError(failed.error ?? `that did not work (${response.status})`);
+    try {
+      const response = await fetch(path, {
+        method,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) {
+        const failed = (await response.json().catch(() => ({}))) as { error?: string };
+        setError(failed.error ?? `that did not work (${response.status})`);
+        return false;
+      }
+      return true;
+    } catch {
+      // named as signal rather than as an error, because that is what it almost always is in a
+      // supermarket, and because the useful thing to say is that the list still works
+      setError("No signal — that one was not saved. The list still works; try it again in a moment.");
       return false;
+    } finally {
+      setBusy(null);
     }
-    return true;
   }
 
   async function toggleTick(line: ShoppingLine) {
