@@ -266,11 +266,8 @@ try {
   // ---------------------------------------------------------------------------
   console.log("routes answer at all (401 is an answer; 500 is not)");
   const surface = [
-    ["GET", "/api/import/jobs"],
     ["POST", "/api/import", { url: "https://example.com/x" }],
-    ["POST", "/api/import/batch", { urls: "https://example.com/x" }],
-    ["POST", "/api/import/drain", {}],
-    ["POST", "/api/import/jobs/00000000-0000-0000-0000-000000000000", {}],
+    ["POST", "/api/photos/reap", {}],
     ["POST", "/api/recipes", {}],
     ["PATCH", "/api/recipes/00000000-0000-0000-0000-000000000000", {}],
     ["POST", "/api/plan-entries", {}],
@@ -433,45 +430,62 @@ try {
     photoFailure ? `${photoFailure.kind}: ${String(photoFailure.detail).slice(0, 160)}` : single.body?.photo ? "stored" : "the page had none",
   );
 
-  const batch = await call("POST", "/api/import/batch", {
-    body: { urls: "https://www.bbcgoodfood.com/recipes/classic-lasagne\nhttps://www.instagram.com/p/x/\nhttps://www.bbcgoodfood.com/recipes/classic-lasagne" },
-  });
-  record("batch import queues", batch.status === 200, `HTTP ${batch.status}`);
-  record(
-    "batch rejects a social link and collapses a duplicate at submission",
-    batch.status === 200 && batch.body?.queued === 1 && batch.body?.rejected === 1 && batch.body?.duplicates === 1,
-    batch.status === 200 ? `queued ${batch.body?.queued}, rejected ${batch.body?.rejected}, duplicate ${batch.body?.duplicates}` : "",
-  );
-
-  const drained = await call("POST", "/api/import/drain", { body: { maxJobs: 2 } });
-  record("the drain route runs", drained.status === 200, `HTTP ${drained.status}`);
-
-  const progress = await call("GET", "/api/import/jobs");
-  record("job progress is readable", progress.status === 200, `HTTP ${progress.status}`);
-
   /*
-   * The scheduler's door, which is not the one the batch screen uses.
+   * The scheduler's door, moved rather than deleted.
    *
-   * The route accepted a session and refused the shared secret, so smoke passed while the queue
-   * never drained: the secret was set on both sides and *differed*. Testing the session path only
-   * is how a check can be green about a feature nobody can use.
+   * This used to point at `/api/import/drain`, and it was the check that caught a shared secret
+   * set on both sides and *differing* — the queue never drained while smoke was green, because
+   * the route accepted a session and refused the secret. The drain is retired
+   * (20260912120000) and the **photo reaper** now authenticates with the same
+   * `PASHKI_DRAIN_SECRET` through the same `machineCaller`, so the coverage belongs there.
+   *
+   * Losing it with the drain would have retired the only thing verifying that machine auth
+   * works at all — and "presence is not agreement" is exactly what it exists to prove.
    */
   if (E.PASHKI_DRAIN_SECRET) {
-    const asScheduler = await fetch(`${base}/api/import/drain`, {
+    const asScheduler = await fetch(`${base}/api/photos/reap`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-pashki-drain-secret": E.PASHKI_DRAIN_SECRET },
-      body: JSON.stringify({ maxJobs: 1 }),
+      body: JSON.stringify({}),
       signal: AbortSignal.timeout(90_000),
     });
     record(
-      "the drain route accepts the scheduler's secret",
+      "the reaper accepts the scheduler's secret",
       asScheduler.status === 200,
       asScheduler.status === 401
         ? "401 — the secret on the host differs from the one the scheduler presents"
         : `HTTP ${asScheduler.status}`,
     );
+
+    const asStranger = await fetch(`${base}/api/photos/reap`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-pashki-drain-secret": "not-the-secret" },
+      body: JSON.stringify({}),
+      signal: AbortSignal.timeout(90_000),
+    });
+    record(
+      "and refuses a wrong one",
+      asStranger.status === 401,
+      `HTTP ${asStranger.status}`,
+    );
   } else {
-    skip("the drain route accepts the scheduler's secret", "PASHKI_DRAIN_SECRET is not in the environment");
+    skip("the reaper accepts the scheduler's secret", "PASHKI_DRAIN_SECRET is not in the environment");
+  }
+
+  /*
+   * The retired batch surface must be gone, not merely unused.
+   *
+   * A route left behind is a route somebody can still reach, and the reason for retiring this
+   * was that it never worked. 404 is the assertion — a 200 would mean the door is still open,
+   * and a 500 would mean it is open and broken.
+   */
+  for (const [name, path, method] of [
+    ["the batch import route", "/api/import/batch", "POST"],
+    ["the drain route", "/api/import/drain", "POST"],
+    ["the job list route", "/api/import/jobs", "GET"],
+  ]) {
+    const gone = await call(method, path, method === "POST" ? { body: {} } : {});
+    record(`${name} is gone`, gone.status === 404, `HTTP ${gone.status}`);
   }
 
   console.log("\nhousehold members");

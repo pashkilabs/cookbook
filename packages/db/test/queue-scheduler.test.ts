@@ -185,55 +185,53 @@ describe.skipIf(instance === null)("the import queue scheduler", () => {
     }
   });
 
-  describe("the tick itself", () => {
-    it("does not call out when the queue is empty", async () => {
-      await clearQueue();
-      const result = sql<{ dispatched: boolean; reason: string }>(
-        "select private.dispatch_import_drain()",
+  /*
+   * The tick is retired, and that is what is asserted now.
+   *
+   * These tests used to exercise `private.dispatch_import_drain()` — idle, not-configured, and
+   * the pg_net request id proving a call went out. The batch importer never delivered a recipe
+   * to anyone (zero jobs from the real household, forty demo jobs all failed), so the surface
+   * is retired and the function dropped (20260912120000).
+   *
+   * Rewritten rather than deleted. The queue's own behaviour above — which jobs are claimable,
+   * lease expiry, tombstones — is kept in full, because `import_jobs` is kept in full: this is
+   * a revocation of the standing surface, not of the shape. What changed is that nothing
+   * dispatches to a route that no longer exists.
+   */
+  describe("the retired drain", () => {
+    it("has no dispatch function, because its route is gone", () => {
+      const exists = sql<{ exists: boolean }>(
+        `select jsonb_build_object('exists', exists (
+           select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+           where n.nspname = 'private' and p.proname = 'dispatch_import_drain'
+         ))`,
       );
-      expect(result).toMatchObject({ dispatched: false, reason: "idle" });
+      expect(exists.exists).toBe(false);
     });
 
-    it("says so when there is work and nowhere to send it", async () => {
-      // an unconfigured scheduler and an empty queue must not look the same, or a queue that
-      // never drains reads as a queue with nothing in it
-      await clearQueue();
-      await queueJob();
-      const result = sql<{ dispatched: boolean; reason: string }>(
-        "select private.dispatch_import_drain()",
+    it("is not scheduled, so nothing ticks at a 404 every minute", () => {
+      const scheduled = sql<{ count: number }>(
+        "select jsonb_build_object('count', count(*)) from cron.job where jobname = 'pashki-import-drain'",
       );
-      expect(result).toMatchObject({ dispatched: false, reason: "not-configured" });
+      expect(Number(scheduled.count)).toBe(0);
     });
 
-    it("calls out once it has somewhere to send work", async () => {
-      // pg_net is asynchronous: http_post returns a request id immediately and the response
-      // lands later. The id is what proves the call was made, and it is deterministic —
-      // asserting on the response would be asserting on a background worker's timing.
-      await clearQueue();
-      await queueJob();
-      exec(
-        `insert into private.scheduler_config (id, drain_endpoint, secret)
-         values (true, 'http://127.0.0.1:9/api/import/drain', 'test-secret')
-         on conflict (id) do update set drain_endpoint = excluded.drain_endpoint`,
+    it("did not take the photo reaper with it, which shares its config row and its secret", () => {
+      // the reason PASHKI_DRAIN_SECRET survives the retirement, asserted rather than assumed
+      const reaper = sql<{ count: number }>(
+        "select jsonb_build_object('count', count(*)) from cron.job where jobname = 'pashki-photo-reaper'",
       );
-      try {
-        const result = sql<{ dispatched: boolean; request_id: number }>(
-          "select private.dispatch_import_drain()",
-        );
-        expect(result.dispatched).toBe(true);
-        expect(typeof result.request_id).toBe("number");
-      } finally {
-        exec("delete from private.scheduler_config");
-      }
+      expect(Number(reaper.count)).toBe(1);
     });
-  });
 
-  it("is scheduled exactly once", async () => {
-    const rows = sql<Array<{ jobname: string; schedule: string }>>(
-      "select jsonb_agg(jsonb_build_object('jobname', jobname, 'schedule', schedule)) from cron.job where jobname = 'pashki-import-drain'",
-    );
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ schedule: "* * * * *" });
+    it("keeps the queue's shape, so a returning need finds it built and tested", () => {
+      const table = sql<{ exists: boolean }>(
+        `select jsonb_build_object('exists', exists (
+           select 1 from pg_tables where schemaname = 'public' and tablename = 'import_jobs'
+         ))`,
+      );
+      expect(table.exists).toBe(true);
+    });
   });
 });
 

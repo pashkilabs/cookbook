@@ -25,4 +25,4 @@
  * Bump it when a migration is added that application code depends on. Bumping unnecessarily costs
  * a check; forgetting costs a page that 500s for whoever opens it.
  */
-export const REQUIRED_MIGRATION = "20260912090000_household_timezone";
+export const REQUIRED_MIGRATION = "20260912120000_retire_import_drain";

@@ -384,6 +384,13 @@ eval fixture wants the same.
     would fail loudly if a second seed duplicated rows. Downgraded from where it
     sat before.
 
+### Retired
+
+**The batch importer** (§63). Zero jobs ever from the real household, forty demo jobs all
+failed with `fetch-failed`. Door, drain and job routes gone; `import_jobs` and the queue code
+kept, revoked pending a need. `PASHKI_DRAIN_SECRET` stays because the photo reaper shares it,
+and the smoke check that proves it works moved to the reaper rather than dying with the drain.
+
 ### Seen once, not chased — what to look for if it returns
 
 **An intermittent in the suite. It has now fired twice and only one has a name.**

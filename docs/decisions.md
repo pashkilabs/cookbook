@@ -3357,3 +3357,63 @@ argument for it over anything on the backlog:
   `adjusted` labels §61 leaves as the only evaluator
 
 None of those needed new machinery. They needed the one write nobody could make.
+
+## §63 — The batch importer is retired: a door that never delivered a recipe
+
+Removed rather than fixed, on evidence rather than taste.
+
+### What production said
+
+42 import jobs exist. **40 belong to the demo household on one day in August, and
+every one is `cancelled` (30) or `failed` (10)** — all with `error: fetch-failed`.
+The real household has **zero import jobs, ever**: 58 recipes across 28 days, and
+not one arrived this way. Stephen confirms he never used it.
+
+### Why removed and not fixed
+
+**The need is not there.** 31 recipes came from a URL, one at a time — including
+the evening 29 were captured in one sitting, which went through the single-link
+door 29 times. A door nobody opens *while doing precisely the thing it exists for*
+is not blocked; it is unwanted.
+
+**`fetch-failed` on all ten was never a queue bug.** It is the fetcher meeting ten
+sites at once, and a site that fails one fetch fails a batch too. Bulk import makes
+the *failure* bulk. The single-link path works because a person watches it and
+retries — which is the review-screen principle the whole product rests on, and bulk
+is the one place that principle was absent.
+
+**It was the most expensive surface per unit of value in the app**: three routes, a
+client screen, a cron tick every minute, and the only reason the scheduler's shared
+secret existed as far as imports were concerned. Three serverless functions
+recovered.
+
+### Revoked pending a need, not decided against
+
+`import_jobs`, its policies and grants, `private.claim_import_jobs`, and
+`packages/import`'s queue and runner all stay, along with every test of the queue's
+own behaviour — which jobs are claimable, lease expiry, tombstones. If queued work
+returns (a share target, a URL worth retrying, a video that takes a minute) the
+shape is here and tested.
+
+What is gone is the standing surface: the route the cron called, the two routes the
+screen called, the screen, and the chip that opened it.
+`assert_import_drain_retired` fails if the cron job returns, and is deliberately in
+the way — restoring it means replacing that assertion in the same migration, so a
+returning scheduler is something somebody writes down.
+
+### `PASHKI_DRAIN_SECRET` survives, and its name is now wrong
+
+**It could not be retired.** `machineCaller` authenticates the **photo reaper** with
+the same secret, and the reaper is live. `private.scheduler_config` was already
+renamed from `import_drain_config` in August for exactly this reason: the codebase
+noticed the name had outgrown the drain and renamed the table but not the variable.
+
+Left alone rather than renamed. Renaming means changing Vercel, the config row and
+the reaper's auth together, with a window where the reaper 401s — and a 401'ing
+reaper is how photographs stopped being collected once already. A wrong name is
+cheaper than that window.
+
+**The check moved rather than dying with the drain.** The smoke test that caught a
+shared secret set on both sides and *differing* pointed at the drain route; it now
+points at the reaper, with a wrong-secret case beside it. Deleting it along with the
+drain would have retired the only thing verifying machine auth works at all.
