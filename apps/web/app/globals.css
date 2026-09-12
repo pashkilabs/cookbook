@@ -673,3 +673,21 @@ label.servings .meta { font-size: 0.75rem; color: var(--muted); }
 .proposal h2 { margin: 0 0 var(--s2); font-size: 1rem; }
 .proposal p { margin: 0 0 var(--s2); }
 .proposal p:last-child { margin-bottom: 0; }
+
+/*
+ * Tonight, at the top of the screen somebody opens at 5pm.
+ *
+ * Its own block, like the blend proposal, because it answers a different question from the
+ * cookbook below it. Quieter than the proposal — this is not a claim, it is a fact about the
+ * plan — so it borrows the accent only as a left edge.
+ */
+.tonight {
+  margin: 0 0 var(--s5);
+  padding: var(--s3) var(--s4);
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  background: var(--raised, transparent);
+}
+.tonight h2 { margin: 0 0 var(--s2); font-size: 0.8rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.tonight p { margin: 0 0 var(--s2); }
+.tonight p:last-child { margin-bottom: 0; }

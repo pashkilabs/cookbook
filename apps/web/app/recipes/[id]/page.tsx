@@ -9,6 +9,7 @@ import { maybeRow, rows } from "@/lib/rows";
 import { platformStore } from "@/lib/platform";
 import { startOfWeek, addWeeks, todayIso } from "@/lib/week";
 import { ShortlistButton } from "../shortlist-button";
+import { CookTonight } from "../cook-tonight";
 import { RemoveRecipe } from "./remove";
 import { Verdicts } from "./verdicts";
 import { PhotoUpload } from "../photo-upload";
@@ -308,6 +309,11 @@ export default async function RecipePage({
             shortlisted={shortlistRows.some((row) => row.week_start === weekStart)}
             shortlistedNext={shortlistRows.some((row) => row.week_start === nextWeekStart)}
           />
+          {/*
+            * First, because it is the commonest thing somebody wants from a recipe they have
+            * just opened at 5pm — and it used to cost four screens (§ tonight).
+            */}
+          <CookTonight recipeId={recipe.id} today={todayIso(family.timezone)} />
           <Link className="button quiet" href={`/recipes/blend?from=${recipe.id}`}>
             Pair this with…
           </Link>

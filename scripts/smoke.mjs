@@ -750,6 +750,62 @@ try {
    * The reachability of the screen is a separate guard (`check-routes-reachable.mjs`), which is
    * mutation-tested. Between them: the route works and the screen linking to it exists.
    */
+  // ---------------------------------------------------------------------------
+  /*
+   * Tonight, and cooking it.
+   *
+   * The whole journey in three calls: put a recipe on today, record that it was cooked, and see
+   * the count follow. That last assertion is the one that matters — `times_made` is derived by a
+   * trigger, so it is the only proof the event reached the number four screens read.
+   */
+  console.log("\ntonight");
+  if (recipeId) {
+    const today = new Date().toISOString().slice(0, 10);
+    const onTonight = await call("POST", "/api/plan-entries", { body: { recipeId, date: today } });
+    record(
+      "put a recipe on tonight in one call",
+      onTonight.status === 200 || onTonight.status === 409,
+      `HTTP ${onTonight.status}`,
+    );
+
+    const mine = await rest("GET", `/plan_entries?family_id=eq.${familyId}&date=eq.${today}&select=id,cooked_at&deleted_at=is.null`);
+    const entryForTonight = mine?.[0]?.id;
+    if (entryForTonight) {
+      record("and it is not yet cooked", mine[0].cooked_at === null, `cooked_at ${mine[0].cooked_at}`);
+
+      const cooked = await call("PATCH", `/api/plan-entries/${entryForTonight}`, { body: { cooked: true } });
+      record("record that it was cooked", cooked.status === 200, `HTTP ${cooked.status}`);
+
+      const after = await rest("GET", `/recipes?id=eq.${recipeId}&select=times_made`);
+      record(
+        "and the count a household reads follows from the meal",
+        Number(after?.[0]?.times_made) >= 1,
+        `times_made ${after?.[0]?.times_made}`,
+      );
+
+      const undone = await call("PATCH", `/api/plan-entries/${entryForTonight}`, { body: { cooked: false } });
+      const back = await rest("GET", `/recipes?id=eq.${recipeId}&select=times_made`);
+      record(
+        "unmarking it puts the count back",
+        undone.status === 200 && Number(back?.[0]?.times_made) === 0,
+        `HTTP ${undone.status}, times_made ${back?.[0]?.times_made}`,
+      );
+
+      const noWrite = await fetch(`${SUPABASE}/rest/v1/recipes?id=eq.${recipeId}`, {
+        method: "PATCH",
+        headers: { apikey: ANON, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ times_made: 99 }),
+      });
+      record(
+        "and a household cannot write the count itself",
+        noWrite.status >= 400,
+        `HTTP ${noWrite.status}`,
+      );
+    } else {
+      skip("cooking a meal", "no plan entry for today was readable");
+    }
+  }
+
   console.log("\nblending");
   if (recipeId) {
     const second = await call("POST", "/api/recipes", {
