@@ -637,6 +637,38 @@ try {
      * real household. **A status code is not a rendered page.** This asserts the planned recipe's
      * ingredients actually appear, and that the failure banner does not.
      */
+    /*
+     * Every page a signed-in household actually opens, rendered.
+     *
+     * The gap that let the planner ship broken: smoke calls ROUTES, and a server-rendered page
+     * is not a route. A hundred green checks, every endpoint answering, and the most-used screen
+     * in the product was 500ing for every household — because `membersFor`, a function, was
+     * handed to a client component, which React refuses at runtime and TypeScript does not see.
+     *
+     * So each page is loaded as a real session and asserted twice: alive (a 500 means no handler
+     * ran at all), and carrying something only a working render produces. A status code is not a
+     * rendered page — the shopping list taught that, and the planner taught it again.
+     */
+    for (const [name, path, marker] of [
+      ["the planner", `/planner?week=${weekStart}`, "Waiting for a day"],
+      ["the recipe list", "/recipes", "Tonight"],
+      ["the household screen", "/household", "Where you cook"],
+    ]) {
+      const page = await call("GET", path);
+      const body = typeof page.body === "string" ? page.body : JSON.stringify(page.body);
+      record(`${name} renders`, alive(page), `HTTP ${page.status}`);
+      record(
+        `and ${name} is a page rather than a status`,
+        page.status === 200 && body.includes(marker),
+        page.status === 200 ? `looked for ${JSON.stringify(marker)}` : `HTTP ${page.status}`,
+      );
+      record(
+        `and ${name} has no server-side exception`,
+        !/Application error|server-side exception|Functions cannot be passed/i.test(body),
+        "checked for Next's error page and the RSC function refusal",
+      );
+    }
+
     const shopping = await call("GET", `/shopping?week=${weekStart}`);
     const html = typeof shopping.body === "string" ? shopping.body : JSON.stringify(shopping.body);
     record("the shopping list renders", alive(shopping), `HTTP ${shopping.status}`);
