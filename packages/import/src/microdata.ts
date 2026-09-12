@@ -142,5 +142,14 @@ export function extractSiteName(html: string): string | null {
   const og = /<meta[^>]*property=["']og:site_name["'][^>]*content=["']([^"']+)["']/i.exec(
     String(html ?? ""),
   );
-  return og?.[1]?.trim() || null;
+  /*
+   * Through `stripTags`, which decodes entities as well as removing markup.
+   *
+   * regression: this returned the attribute raw, so five of thirty-nine stored source names read
+   * `Salt &amp; Lavender`, `Kroll&#039;s Korner`, `Grey Goose&reg; Vodka` — printed verbatim on
+   * every recipe card. Titles, ingredients and steps were all clean because they already go
+   * through this function; the site name was the one string that did not, and it is the one on
+   * the card under the photograph.
+   */
+  return stripTags(og?.[1] ?? "").trim() || null;
 }

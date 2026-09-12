@@ -51,6 +51,14 @@ export function lightName(input: string): string {
     .trim();
 }
 
+/** a numeric entity's character, or the entity left alone when it is not printable text */
+function codePoint(code: number, whole: string): string {
+  if (!Number.isFinite(code)) return whole;
+  // C0/C1 controls and anything past the Unicode range are not text a recipe should carry
+  if (code < 0x20 || (code >= 0x7f && code <= 0x9f) || code > 0x10ffff) return " ";
+  return String.fromCodePoint(code);
+}
+
 export function stripTags(input: string): string {
   return String(input ?? "")
     .replace(/<[^>]*>/g, " ")
@@ -62,6 +70,20 @@ export function stripTags(input: string): string {
     .replace(/&frac14;/gi, "¼")
     .replace(/&frac34;/gi, "¾")
     .replace(/&deg;/gi, "°")
+    /*
+     * Numeric entities become their character, not a space.
+     *
+     * regression: the named list above catches `&#39;` and the catch-all below turned everything
+     * else into whitespace — so `Kroll&#039;s Korner`, the same apostrophe written with a leading
+     * zero, came out as `Kroll s Korner`. A publisher choosing a zero-padded entity is not
+     * writing a different character, and a space is never the right reading of one.
+     *
+     * Decimal and hex both, and only in the ranges that are text: a control character decoded
+     * into a recipe title would be invisible damage of exactly the kind U+FFFD already caused in
+     * the fixtures.
+     */
+    .replace(/&#(\d+);/g, (whole, code) => codePoint(Number(code), whole))
+    .replace(/&#x([0-9a-f]+);/gi, (whole, code) => codePoint(parseInt(code, 16), whole))
     .replace(/&[a-z#0-9]+;/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
