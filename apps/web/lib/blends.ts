@@ -294,7 +294,9 @@ export async function createBlendFrom(
       principal_protein: null,
       // never attempted, and a blend has no source text to classify from anyway
       classified_at: null,
-      times_made: 0,
+      // not named: times_made is derived from cooked plan entries and the client
+      // has no grant on it. The column default is 0 and this is a single-row insert,
+      // so the default applies (the union-of-keys hazard is a *batch* one).
       status: "active",
       // the CHECK refuses public alongside derived_at; this is belt as well as braces
       visibility: "private",

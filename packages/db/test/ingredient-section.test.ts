@@ -45,7 +45,6 @@ describe.skipIf(instance === null)("the heading a recipe wrote", () => {
         title: "Cinnamon rolls",
         status: "active",
         visibility: "private",
-        times_made: 0,
       })
       .select("id")
       .single();

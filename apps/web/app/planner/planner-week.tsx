@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ServingsField } from "./servings-field";
+import { Cooked, type CookMember } from "./cooked";
 
 /**
  * The week, and the writes that arrange it.
@@ -28,7 +29,10 @@ export function PlannerWeek(props: {
   weekStart: string;
   today: string;
   days: Array<{ date: string; weekday: string; label: string }>;
-  placed: Array<{ id: string; date: string; scale: number; recipe: Recipe }>;
+  placed: Array<{ id: string; date: string; scale: number; cookedAt: string | null; recipe: Recipe }>;
+  familyId: string;
+  /** everyone in the household, with what they have already said about this recipe */
+  membersFor: (recipeId: string) => CookMember[];
   waiting: Array<{ id: string; recipe: Recipe }>;
   /**
    * What this household's children have consistently rated low, for the recipes waiting.
@@ -240,6 +244,20 @@ export function PlannerWeek(props: {
                       * side, which is what "not this week, next week" means in practice and needs
                       * no second calendar to express.
                       */}
+                    {/*
+                      * On the day, next to the meal. The moment a household knows something was
+                      * cooked is the evening it was cooked, and this is the screen they are
+                      * looking at then — asking them to open the recipe later is why there were
+                      * two ratings against twenty-eight planned dinners.
+                      */}
+                    <Cooked
+                      entryId={entry.id}
+                      familyId={props.familyId}
+                      recipeId={entry.recipe.id}
+                      cookedAt={entry.cookedAt}
+                      members={props.membersFor(entry.recipe.id)}
+                      disabled={busy !== null}
+                    />
                     <select
                       aria-label="Move to another day"
                       className="quiet"

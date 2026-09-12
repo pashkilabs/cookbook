@@ -779,9 +779,12 @@ describe.skipIf(instance === null)("row-level security", () => {
         .eq("id", alpha.recipeId)
         .single();
 
+      // `make_again` rather than `times_made`: this needs any column the client genuinely owns,
+      // and times_made became derived from cooked plan entries (20260911120000) with the grant
+      // revoked, so it now proves a permission error rather than a timestamp
       const bumped = await alpha.client
         .from("recipes")
-        .update({ times_made: 1 })
+        .update({ make_again: true })
         .eq("id", alpha.recipeId)
         .select("updated_at")
         .single();

@@ -104,7 +104,9 @@ export async function createRecipeFrom(
        * backfill re-classified every one of them on every run, paying again for answers it had.
        */
       classified_at: new Date().toISOString(),
-      times_made: 0,
+      // not named: times_made is derived from cooked plan entries and the client
+      // has no grant on it. The column default is 0 and this is a single-row insert,
+      // so the default applies (the union-of-keys hazard is a *batch* one).
       status: "active",
       visibility: "private",
       make_again: null,

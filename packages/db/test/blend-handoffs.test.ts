@@ -42,8 +42,7 @@ describe.skipIf(instance === null)("a blend, from composition to the shopping li
   const insertRecipe = async (fields: Record<string, unknown>) => {
     const made = await household.client
       .from("recipes")
-      .insert({ family_id: household.familyId, status: "active", times_made: 0,
-        visibility: "private", ...fields })
+      .insert({ family_id: household.familyId, status: "active", visibility: "private", ...fields })
       .select("id")
       .single();
     if (made.error) throw made.error;

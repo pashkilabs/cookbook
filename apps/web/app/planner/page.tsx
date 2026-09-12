@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { userClient } from "@/lib/supabase-server";
-import { platformStore } from "@/lib/platform";
+import { platformClient, platformStore } from "@/lib/platform";
+import { rows } from "@/lib/rows";
 import {
   addWeeks,
   dayAndMonth,
@@ -46,7 +47,7 @@ export default async function PlannerPage({
   const [entries, shortlist] = await Promise.all([
     supabase
       .from("plan_entries")
-      .select("id, date, scale, recipe_id, recipes!inner(id, title, servings, time_minutes)")
+      .select("id, date, scale, cooked_at, recipe_id, recipes!inner(id, title, servings, time_minutes)")
       .eq("family_id", family.id)
       .gte("date", days[0]!)
       .lte("date", days[6]!)
@@ -65,6 +66,7 @@ export default async function PlannerPage({
     id: entry.id as string,
     date: entry.date as string,
     scale: Number(entry.scale),
+    cookedAt: (entry.cooked_at as string | null) ?? null,
     recipe: entry.recipes as unknown as { id: string; title: string; servings: number | null; time_minutes: number | null },
   }));
 
@@ -93,6 +95,32 @@ export default async function PlannerPage({
       }));
     }
   }
+
+  /*
+   * Everyone in the household, so a meal can be rated where it was cooked.
+   *
+   * Through the seam, because "who is in this household" is a platform question and
+   * `family_members` is a platform table. Adults and children alike: children are rated and
+   * never sign in, so an adult sets every score including their own.
+   */
+  const members = await platformClient(auth.user.id).listMembers();
+  const scores = rows(
+    await supabase
+      .from("ratings")
+      .select("recipe_id, family_member_id, score")
+      .eq("family_id", family.id)
+      .is("deleted_at", null)
+      .in("recipe_id", placed.map((entry) => entry.recipe.id)),
+    "ratings for the week",
+  );
+  const scoreFor = (recipeId: string, memberId: string) =>
+    scores.find((row) => row.recipe_id === recipeId && row.family_member_id === memberId)?.score ?? null;
+  const membersFor = (recipeId: string) =>
+    members.map((member) => ({
+      id: member.id,
+      displayName: member.displayName,
+      score: scoreFor(recipeId, member.id) as number | null,
+    }));
 
   return (
     <main>
@@ -133,6 +161,8 @@ export default async function PlannerPage({
         today={todayIso()}
         days={days.map((date) => ({ date, weekday: weekdayName(date), label: dayAndMonth(date) }))}
         placed={placed}
+        familyId={family.id}
+        membersFor={membersFor}
         waiting={waiting}
         warnings={warnings}
       />

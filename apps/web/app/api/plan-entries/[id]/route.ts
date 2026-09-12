@@ -13,7 +13,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if ("response" in scope) return scope.response;
   const { supabase, familyId } = scope;
 
-  let body: { servings?: unknown; scale?: unknown; date?: unknown };
+  let body: { servings?: unknown; scale?: unknown; date?: unknown; cooked?: unknown };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -33,6 +33,31 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     .maybeSingle();
   if (!entry.data) return Response.json({ error: "no such entry" }, { status: 404 });
   const recipeServings = (entry.data.recipes as unknown as { servings: number | null }).servings;
+
+  /*
+   * Recording that the meal was cooked — the shortest of the three intents, and the one this
+   * route existed without for the whole life of the app.
+   *
+   * Handled before the scale branch and returning immediately: marking cooked says nothing
+   * about how much was made, and falling through to the servings validation is what made a
+   * move-only request answer 400. Three intents through one handler was already one too many.
+   *
+   * `cooked_at` is set to `now()` by the database rather than a timestamp from here: a client
+   * clock can be minutes out, and a meal recorded in the future is a meal the planner will show
+   * as not yet eaten.
+   */
+  if (body.cooked !== undefined) {
+    const { data, error } = await supabase
+      .from("plan_entries")
+      .update({ cooked_at: body.cooked === true ? new Date().toISOString() : null })
+      .eq("id", id)
+      .eq("family_id", familyId)
+      .is("deleted_at", null)
+      .select("id, cooked_at");
+    if (error) return Response.json({ error: refusal(error) }, { status: statusFor(error) });
+    if (data.length === 0) return Response.json({ error: "no such entry" }, { status: 404 });
+    return Response.json({ id, cookedAt: data[0]!.cooked_at });
+  }
 
   /*
    * A move changes the day and nothing else.

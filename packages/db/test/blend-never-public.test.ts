@@ -53,7 +53,6 @@ describe.skipIf(instance === null)("a blend is never publishable", () => {
     family_id: household.familyId,
     title: "Probe",
     status: "active",
-    times_made: 0,
     ...extra,
   });
 
@@ -155,8 +154,7 @@ describe.skipIf(instance === null)("a published recipe is not readable across ho
 
     const made = await admin
       .from("recipes")
-      .insert({ family_id: theirs.familyId, title: "Their public roast", status: "active",
-        times_made: 0, visibility: "public" })
+      .insert({ family_id: theirs.familyId, title: "Their public roast", status: "active", visibility: "public" })
       .select("id")
       .single();
     if (made.error) throw made.error;

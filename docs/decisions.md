@@ -3281,3 +3281,79 @@ There is no confident presentation to earn.
 answers to be genuinely independent** — and if the answer is "nothing", it is a
 determinism meter with a confidence meter's name. Measure it against hand labels before
 anything is gated on it. This one was reasoned, shipped, documented, and wrong for a day.
+
+## §62 — A meal that was cooked is an event, and the count is derived from it
+
+The app could not record that you cooked something. `plan_entries.cooked_at` existed
+from the first app-tables migration and was never written; `recipes.times_made` was
+displayed in four places — "made 3×", "untried", a filter chip, and a blend's
+"Nobody has cooked this" — and incremented nowhere.
+
+So every recipe read *untried* forever, the Untried filter matched everything, and
+§60's own graduation rule — *"it becomes an ordinary recipe when the household marks
+it cooked"* — described a mechanism that did not exist.
+
+### What production said
+
+| | |
+|---|---|
+| recipes | 77 |
+| cooked at least once | **2 (3%)**, neither by any code path |
+| ratings | 26, across 7 recipes |
+| plan entries | 28, from 2026-08-10 to 2026-09-14 |
+| shopping ticks | 52, across **one** week |
+
+**Twenty-eight meals planned; none recorded as eaten.** The household planned five
+weeks of dinners and did at least one real shop — 52 ticks is a trolley — and the app
+retained no memory of a single meal. The loop was plan → shop → cook → *nothing*.
+
+### Event, not counter
+
+A counter cannot answer what a household actually asks. "Made 11×" does not say
+*when*, and "we had that last week" is the reason anybody looks. An event carries the
+date, the scale it was cooked at, and the slot: a record of a meal rather than a tally
+against a recipe.
+
+The asymmetry settles it. **A count is derivable from events; events are not derivable
+from a count.** So `times_made` survives — four screens read it — as a cache of
+`count(cooked plan entries)`, maintained by trigger, with the client's grant revoked.
+A number a client can write is a number that can disagree with the meals behind it,
+which is how it came to say "untried" about everything.
+
+It also changes what the planner *is*. A past week can show what a household ate
+rather than what it intended, and "planned but never cooked" becomes visible — which
+is information about the plan, not an absence.
+
+**Recomputed rather than incremented.** Marking, unmarking, soft-deleting a cooked
+entry, restoring it and moving it are five paths that would each need their own
+arithmetic, and `ON DELETE CASCADE does not fire on a soft delete` is exactly the one
+a `+1/-1` scheme forgets. A recount over one recipe's entries is a handful of rows and
+is right by construction.
+
+### Where it lives, and why that is the whole design
+
+**On the planner, on the day.** The moment a household knows a meal was cooked is the
+evening it was cooked, and the screen they are looking at then is the week. A control
+on the recipe page would need somebody to remember, later, to open a recipe they have
+already eaten — and the two-ratings-against-twenty-eight-dinners number is what that
+costs.
+
+**The rating is offered in the same breath, not as an errand.** Marking cooked opens
+the scores inline. An opinion exists at the table and is gone a week later, and every
+screen between the two is somewhere to give up. Nothing is required: the meal is
+recorded whether or not anybody scores it, because the count must not depend on the
+household having an opinion.
+
+### What one write feeds
+
+This is the smallest change in the product with the widest reach, and that is the
+argument for it over anything on the backlog:
+
+- the **kid-friendly chip** and the taste patterns, which are honest about standing on
+  nothing — and the reason they stand on nothing is upstream of them
+- the **make-again** filter, which currently sorts on an opinion nobody was asked for
+- **blend graduation** (§60), which has no other trigger
+- every future measurement of what a household actually likes, including the
+  `adjusted` labels §61 leaves as the only evaluator
+
+None of those needed new machinery. They needed the one write nobody could make.
