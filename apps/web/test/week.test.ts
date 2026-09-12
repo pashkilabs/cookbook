@@ -109,8 +109,45 @@ describe("isIsoDate", () => {
 });
 
 describe("todayIso", () => {
-  it("is the calendar day in UTC", () => {
-    expect(todayIso(new Date("2026-08-12T23:30:00Z"))).toBe("2026-08-12");
-    expect(todayIso(new Date("2026-08-13T00:30:00Z"))).toBe("2026-08-13");
+  /*
+   * regression: this returned the UTC calendar day, so a household west of Greenwich read the
+   * wrong day every evening. Stephen is in Texas: at 5pm on a Tuesday it is already Wednesday in
+   * UTC, so the planner rang Wednesday and "Make this week" on a Sunday evening meant next week.
+   */
+  it("is the calendar day where the household cooks, not in UTC", () => {
+    // 2026-08-12 23:30 UTC is still the 12th in London and already... no: it is the 12th there
+    // too, and the 12th at 18:30 in Chicago. The interesting instant is after UTC midnight.
+    const afterUtcMidnight = new Date("2026-08-13T02:30:00Z");
+    expect(todayIso("UTC", afterUtcMidnight)).toBe("2026-08-13");
+    expect(todayIso("America/Chicago", afterUtcMidnight)).toBe("2026-08-12");
+  });
+
+  it("gets a Sunday evening in Texas right, which is what broke the week", () => {
+    // 2026-08-16 is a Sunday. 23:00 in Chicago is 04:00 UTC on Monday the 17th, so a
+    // UTC-answering app moved the household into the next week while they were planning this one
+    const sundayEvening = new Date("2026-08-17T04:00:00Z");
+    expect(todayIso("UTC", sundayEvening)).toBe("2026-08-17");
+    expect(todayIso("America/Chicago", sundayEvening)).toBe("2026-08-16");
+    expect(startOfWeek(todayIso("America/Chicago", sundayEvening))).toBe("2026-08-10");
+    // and the UTC answer is a different week entirely — the bug, in one line
+    expect(startOfWeek(todayIso("UTC", sundayEvening))).toBe("2026-08-17");
+  });
+
+  it("handles a zone east of Greenwich too, which fails the other way", () => {
+    // Auckland is ahead: 11:00 UTC on the 12th is already the 13th there
+    expect(todayIso("Pacific/Auckland", new Date("2026-08-12T13:00:00Z"))).toBe("2026-08-13");
+  });
+
+  it("survives daylight saving, because it asks a zone rather than an offset", () => {
+    // Chicago is UTC-5 in August and UTC-6 in January; a stored offset would be wrong half the
+    // year, which is why the column holds an IANA name
+    expect(todayIso("America/Chicago", new Date("2026-08-13T04:30:00Z"))).toBe("2026-08-12");
+    expect(todayIso("America/Chicago", new Date("2026-01-13T05:30:00Z"))).toBe("2026-01-12");
+  });
+
+  it("falls back to UTC for a zone the runtime cannot resolve, rather than throwing", () => {
+    // the database refuses to store an unresolvable zone, so this is the disagreement case —
+    // and the fallback is the behaviour every household had before the column existed
+    expect(todayIso("Mars/Olympus_Mons", new Date("2026-08-13T02:30:00Z"))).toBe("2026-08-13");
   });
 });

@@ -59,7 +59,7 @@ describe("getSession", () => {
 
   it("prefers the household the account owns over one it was invited to", async () => {
     const seed = standardSeed();
-    const invited: Family = { id: "fam-2", name: "In-laws", ownerAccountId: "other", measurementSystem: "us" };
+    const invited: Family = { id: "fam-2", name: "In-laws", ownerAccountId: "other", measurementSystem: "us", timezone: "UTC" };
     const store = createInMemoryStore({
       ...seed,
       families: [invited, ...(seed.families ?? [])],

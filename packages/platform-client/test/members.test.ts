@@ -22,8 +22,8 @@ const store = () =>
       { id: "account-2", email: "two@example.test" },
     ],
     families: [
-      { id: "fam-1", name: "One", ownerAccountId: "account-1", measurementSystem: "metric" },
-      { id: "fam-2", name: "Two", ownerAccountId: "account-2", measurementSystem: "metric" },
+      { id: "fam-1", name: "One", ownerAccountId: "account-1", measurementSystem: "metric", timezone: "UTC" },
+      { id: "fam-2", name: "Two", ownerAccountId: "account-2", measurementSystem: "metric", timezone: "UTC" },
     ],
     members: [
       { id: "mem-1", familyId: "fam-1", accountId: "account-1", displayName: "Adult One", colour: null, isChild: false, birthYear: null },

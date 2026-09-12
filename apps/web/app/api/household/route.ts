@@ -74,11 +74,32 @@ export async function PATCH(request: Request) {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return Response.json({ error: "sign in first" }, { status: 401 });
 
-  let body: { measurementSystem?: unknown };
+  let body: { measurementSystem?: unknown; timezone?: unknown };
   try {
     body = (await request.json()) as typeof body;
   } catch {
     return Response.json({ error: "expected a JSON body" }, { status: 400 });
+  }
+
+  /*
+   * What day it is where the household cooks.
+   *
+   * Handled first and returning immediately, so it does not fall through to the measurement
+   * validation — the mistake that made a move-only plan-entry PATCH answer 400 about servings.
+   */
+  if (body.timezone !== undefined) {
+    if (typeof body.timezone !== "string" || !body.timezone) {
+      return Response.json({ error: "timezone must be an IANA zone name" }, { status: 400 });
+    }
+    try {
+      const family = await platformClient(auth.user.id).setTimezone(body.timezone);
+      return Response.json({ timezone: family.timezone });
+    } catch (thrown) {
+      return Response.json(
+        { error: thrown instanceof Error ? thrown.message : "that timezone was refused" },
+        { status: 400 },
+      );
+    }
   }
 
   const system = body.measurementSystem;

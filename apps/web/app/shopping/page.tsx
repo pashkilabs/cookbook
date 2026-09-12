@@ -19,13 +19,19 @@ export default async function ShoppingPage({
   searchParams: Promise<{ week?: string }>;
 }) {
   const { week: requested } = await searchParams;
-  const weekStart = startOfWeek(isIsoDate(requested) ? requested : todayIso());
 
   const supabase = await userClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) redirect("/sign-in");
   const family = await platformStore().findFamilyForAccount(auth.user.id);
   if (!family) redirect("/recipes");
+
+  /*
+   * The household comes first now, because the week depends on it: "this week" is a question
+   * about where the household cooks, and it was answered in UTC — so a Texas Sunday evening
+   * planned next week (§ the timezone decision).
+   */
+  const weekStart = startOfWeek(isIsoDate(requested) ? requested : todayIso(family.timezone));
 
   const { week, error } = await buildShoppingWeek(
     supabase,

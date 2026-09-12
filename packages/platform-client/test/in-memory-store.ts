@@ -115,6 +115,13 @@ export function createInMemoryStore(seed: Seed = {}, clock: Clock = () => new Da
       return { ...family };
     },
 
+    async setTimezone(input) {
+      const family = families.find((f) => f.id === input.familyId);
+      if (!family) return null;
+      family.timezone = input.timezone;
+      return { ...family };
+    },
+
     async removeMember(input) {
       const at = members.findIndex(
         (m) => m.id === input.memberId && m.familyId === input.familyId,
@@ -301,6 +308,7 @@ export function createInMemoryStore(seed: Seed = {}, clock: Clock = () => new Da
             ownerAccountId: input.accountId,
             // what the column defaults to for a household that has never chosen
             measurementSystem: "us" as const,
+            timezone: "UTC",
           };
           families.push(created);
           return created;
@@ -351,7 +359,7 @@ export function standardSeed(
 ): Seed {
   return {
     accounts: [{ id: ACCOUNT_ID, email: "adult@example.test" }],
-    families: [{ id: FAMILY_ID, name: "Household", ownerAccountId: ACCOUNT_ID, measurementSystem: "us" }],
+    families: [{ id: FAMILY_ID, name: "Household", ownerAccountId: ACCOUNT_ID, measurementSystem: "us", timezone: "UTC" }],
     members: [
       {
         id: "mem-1",

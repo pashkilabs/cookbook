@@ -14,7 +14,7 @@ export {
 } from "./seed-catalog.js";
 export * from "./substitutions.js";
 
-export { readTastes, tasteSummary, evidence, ENOUGH_TO_SAY, ENOUGH_TO_MENTION } from "./tastes.js";
+export { readTastes, tasteSummary, evidence, isTelling, TELLING_DIMENSIONS, ENOUGH_TO_SAY, ENOUGH_TO_MENTION } from "./tastes.js";
 export type { TasteReading, TasteState, TasteDimension, RatingObservation } from "./tastes.js";
 
 export { consensusPartition, partitionAgreement } from "./partitions.js";

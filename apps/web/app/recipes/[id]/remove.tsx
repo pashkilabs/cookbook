@@ -36,15 +36,21 @@ export function RemoveRecipe({ recipeId, title }: { recipeId: string; title: str
         onClick={async () => {
           setBusy(true);
           setError(null);
-          const response = await fetch(`/api/recipes/${recipeId}`, { method: "DELETE" });
-          if (!response.ok) {
-            const body = (await response.json().catch(() => ({}))) as { error?: string };
-            setError(body.error ?? `could not remove it (${response.status})`);
+
+          // `finally`: an offline fetch rejects, so a reset after the await never runs and every
+          // control gated on this flag stays dead (scripts/check-busy-guarded.mjs)
+          try {
+            const response = await fetch(`/api/recipes/${recipeId}`, { method: "DELETE" });
+            if (!response.ok) {
+              const body = (await response.json().catch(() => ({}))) as { error?: string };
+              setError(body.error ?? `could not remove it (${response.status})`);
+              return;
+            }
+            router.push("/recipes");
+            router.refresh();
+          } finally {
             setBusy(false);
-            return;
           }
-          router.push("/recipes");
-          router.refresh();
         }}
       >
         {busy ? "Removing…" : "Yes, remove"}

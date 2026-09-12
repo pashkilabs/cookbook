@@ -41,22 +41,28 @@ export function AcceptInvitation({
           onClick={async () => {
             setBusy(true);
             setError(null);
-            const response = await fetch("/api/invitations/accept", {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({ token }),
-            });
-            const body = (await response.json().catch(() => ({}))) as {
-              familyId?: string;
-              error?: string;
-            };
-            if (!response.ok || !body.familyId) {
-              setError(body.error ?? `that did not work (${response.status})`);
+
+            // `finally`: an offline fetch rejects, so a reset after the await never runs and every
+            // control gated on this flag stays dead (scripts/check-busy-guarded.mjs)
+            try {
+              const response = await fetch("/api/invitations/accept", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ token }),
+              });
+              const body = (await response.json().catch(() => ({}))) as {
+                familyId?: string;
+                error?: string;
+              };
+              if (!response.ok || !body.familyId) {
+                setError(body.error ?? `that did not work (${response.status})`);
+                return;
+              }
+              router.push("/recipes");
+              router.refresh();
+            } finally {
               setBusy(false);
-              return;
             }
-            router.push("/recipes");
-            router.refresh();
           }}
         >
           {busy ? "Joining…" : "Accept and join"}

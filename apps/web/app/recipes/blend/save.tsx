@@ -30,6 +30,9 @@ export function SaveBlend({ title, parts }: { title: string; parts: SavePart[] }
   const save = async () => {
     setSaving(true);
     setError(null);
+    // the reset moved into `finally`: it was duplicated on three exits and missing on the
+    // success path by design, which the guard cannot distinguish from an oversight — and on
+    // rejection it was missing for real (scripts/check-busy-guarded.mjs)
     try {
       const response = await fetch("/api/recipes", {
         method: "POST",
@@ -41,12 +44,13 @@ export function SaveBlend({ title, parts }: { title: string; parts: SavePart[] }
         // the route's own sentence where there is one; a status where there is not, because
         // "that did not work" with no number is unactionable for whoever is asked about it
         setError(body.error ?? `that did not work (${response.status})`);
-        setSaving(false);
         return;
       }
       router.push(`/recipes/${body.id}`);
     } catch {
       setError("that did not reach the server");
+    } finally {
+      // on success the component unmounts as the router navigates, so this is a no-op there
       setSaving(false);
     }
   };

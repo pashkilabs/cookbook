@@ -225,6 +225,25 @@ function assertYear(year: number | null): number | null {
   }
 
   /**
+   * Set what day it is for this household.
+   *
+   * Refused here as well as by the CHECK, so a mistyped zone names the field rather than
+   * surfacing as a Postgres violation the UI has to decode — and `Intl` is the same authority
+   * `todayIso` will consult, so a zone accepted here is one that will actually resolve.
+   */
+  async function setTimezone(timezone: string): Promise<Family> {
+    const family = await ownFamily();
+    try {
+      new Intl.DateTimeFormat("en-CA", { timeZone: timezone });
+    } catch {
+      throw new Error(`${String(timezone)} is not a timezone`);
+    }
+    const updated = await store.setTimezone({ familyId: family.id, timezone });
+    if (!updated) throw new Error("no such household");
+    return updated;
+  }
+
+  /**
    * Remove a member.
    *
    * **You cannot remove yourself.** Leaving a household is a different action with different
@@ -307,6 +326,7 @@ function assertYear(year: number | null): number | null {
     updateMember,
     removeMember,
     setMeasurementSystem,
+    setTimezone,
     inviteAdult,
     listInvitations,
     revokeInvitation,

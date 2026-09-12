@@ -68,7 +68,7 @@ export default async function RecipesPage({
   const error = found.error;
 
   // which of these are already wanted this week, so the button starts in the right state
-  const weekStart = startOfWeek(todayIso());
+  const weekStart = startOfWeek(todayIso(family.timezone));
   // both weeks, because shortlisting only ever reached this one and the planner's waiting list
   // is week-scoped — so a recipe was stranded here while next week showed empty
   const nextWeekStart = addWeeks(weekStart, 1);

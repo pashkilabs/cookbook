@@ -88,6 +88,12 @@ export function warningsFor(
   tastes: readonly ChildTastes[],
   recipe: { cuisine: string | null; principal_protein: string | null; dish_form: string | null },
 ): Array<{ displayName: string; reading: TasteReading }> {
+  /*
+   * `course` is absent because it is not a telling dimension (`TELLING_DIMENSIONS` in core) —
+   * almost every dinner is a main, so "Ada avoids main" says a child dislikes dinner. It used to
+   * be absent by being left out of this list, which is the same behaviour reached by coincidence
+   * rather than by decision, and the household screen was never told.
+   */
   const wanted = new Map<string, string>([
     ["cuisine", recipe.cuisine ?? ""],
     ["principalProtein", recipe.principal_protein ?? ""],

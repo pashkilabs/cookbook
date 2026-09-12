@@ -39,25 +39,34 @@ export function ShortlistButton(props: {
     setBusy(true);
     setError(null);
 
-    const on = week === "this" ? shortlisted : nextWeek;
-    const response = await fetch("/api/shortlist", {
-      method: on ? "DELETE" : "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        recipeId: props.recipeId,
-        weekStart: week === "this" ? props.weekStart : props.nextWeekStart,
-      }),
-    });
-    if (!response.ok) {
-      const failed = (await response.json().catch(() => ({}))) as { error?: string };
-      setError(failed.error ?? `that did not work (${response.status})`);
+    /*
+     * `finally`, enforced by scripts/check-busy-guarded.mjs.
+     *
+     * An offline `fetch` REJECTS, so a reset placed after the await never runs and every
+     * control gated on this flag stays dead. The shopping list lost its entire page to one
+     * bad tap in a supermarket that way.
+     */
+    try {
+      const on = week === "this" ? shortlisted : nextWeek;
+      const response = await fetch("/api/shortlist", {
+        method: on ? "DELETE" : "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          recipeId: props.recipeId,
+          weekStart: week === "this" ? props.weekStart : props.nextWeekStart,
+        }),
+      });
+      if (!response.ok) {
+        const failed = (await response.json().catch(() => ({}))) as { error?: string };
+        setError(failed.error ?? `that did not work (${response.status})`);
+        return;
+      }
+      if (week === "this") setShortlisted(!shortlisted);
+      else setNextWeek(!nextWeek);
+      router.refresh();
+    } finally {
       setBusy(false);
-      return;
     }
-    if (week === "this") setShortlisted(!shortlisted);
-    else setNextWeek(!nextWeek);
-    setBusy(false);
-    router.refresh();
   }
 
   return (

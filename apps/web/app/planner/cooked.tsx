@@ -65,58 +65,68 @@ export function Cooked({
   const setCooked = async (cooked: boolean) => {
     setBusy(true);
     setError(null);
-    const response = await fetch(`/api/plan-entries/${entryId}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ cooked }),
-    });
-    const body = (await response.json().catch(() => ({}))) as { error?: string };
-    setBusy(false);
-    if (!response.ok) {
-      setError(body.error ?? `that did not work (${response.status})`);
-      return;
+
+    // `finally`: an offline fetch rejects, so a reset after the await never runs and every
+    // control gated on this flag stays dead (scripts/check-busy-guarded.mjs)
+    try {
+      const response = await fetch(`/api/plan-entries/${entryId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ cooked }),
+      });
+      const body = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) {
+        setError(body.error ?? `that did not work (${response.status})`);
+        return;
+      }
+      // opened on marking, closed on unmarking: the scores are about a meal that happened
+      setOpen(cooked);
+      router.refresh();
+    } finally {
+      setBusy(false);
     }
-    // opened on marking, closed on unmarking: the scores are about a meal that happened
-    setOpen(cooked);
-    router.refresh();
   };
 
   const rate = async (memberId: string, score: number) => {
     setBusy(true);
     setError(null);
-    const supabase = browserClient();
-    const stamp = new Date().toISOString();
 
-    // update-then-insert, not upsert: `ratings_one_per_member` is a partial unique index and
-    // PostgREST cannot restate its predicate as an ON CONFLICT target (verdicts.tsx)
-    const updated = await supabase
-      .from("ratings")
-      .update({ score, rated_at: stamp })
-      .eq("recipe_id", recipeId)
-      .eq("family_member_id", memberId)
-      .is("deleted_at", null)
-      .select("id");
-    if (updated.error) {
-      setError(refusal(updated.error));
-      setBusy(false);
-      return;
-    }
-    if (updated.data.length === 0) {
-      const inserted = await supabase.from("ratings").insert({
-        family_id: familyId,
-        recipe_id: recipeId,
-        family_member_id: memberId,
-        score,
-        rated_at: stamp,
-      });
-      if (inserted.error) {
-        setError(refusal(inserted.error));
-        setBusy(false);
+    // `finally`: a rejected request — offline, or a refused write — must not leave the
+    // flag set, because every control here is gated on it (scripts/check-busy-guarded.mjs)
+    try {
+      const supabase = browserClient();
+      const stamp = new Date().toISOString();
+
+      // update-then-insert, not upsert: `ratings_one_per_member` is a partial unique index and
+      // PostgREST cannot restate its predicate as an ON CONFLICT target (verdicts.tsx)
+      const updated = await supabase
+        .from("ratings")
+        .update({ score, rated_at: stamp })
+        .eq("recipe_id", recipeId)
+        .eq("family_member_id", memberId)
+        .is("deleted_at", null)
+        .select("id");
+      if (updated.error) {
+        setError(refusal(updated.error));
         return;
       }
+      if (updated.data.length === 0) {
+        const inserted = await supabase.from("ratings").insert({
+          family_id: familyId,
+          recipe_id: recipeId,
+          family_member_id: memberId,
+          score,
+          rated_at: stamp,
+        });
+        if (inserted.error) {
+          setError(refusal(inserted.error));
+          return;
+        }
+      }
+      setScores((current) => ({ ...current, [memberId]: score }));
+    } finally {
+      setBusy(false);
     }
-    setScores((current) => ({ ...current, [memberId]: score }));
-    setBusy(false);
   };
 
   if (!cookedAt) {

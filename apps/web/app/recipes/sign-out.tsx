@@ -20,9 +20,15 @@ export function SignOutButton() {
       disabled={busy}
       onClick={async () => {
         setBusy(true);
-        await browserClient().auth.signOut();
-        router.push("/sign-in");
-        router.refresh();
+        // `finally`: signing out with no signal rejects, and without this the button reads
+        // "Signing out…" for ever with no way to try again (scripts/check-busy-guarded.mjs)
+        try {
+          await browserClient().auth.signOut();
+          router.push("/sign-in");
+          router.refresh();
+        } finally {
+          setBusy(false);
+        }
       }}
     >
       {busy ? "Signing out…" : "Sign out"}

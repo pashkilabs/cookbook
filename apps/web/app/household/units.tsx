@@ -31,20 +31,27 @@ export function UnitsSetting({ current }: { current: "us" | "metric" }) {
     setSystem(next);
     setError(null);
 
-    const response = await fetch("/api/household", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ measurementSystem: next }),
-    });
+    try {
+      const response = await fetch("/api/household", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ measurementSystem: next }),
+      });
 
-    if (!response.ok) {
-      // put it back rather than leaving the screen claiming something the database does not say
+      if (!response.ok) {
+        // put it back rather than leaving the screen claiming something the database does not say
+        setSystem(previous);
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        setError(body?.error ?? "That did not save.");
+        return;
+      }
+      startTransition(() => router.refresh());
+    } catch {
+      // an offline fetch rejects; without this the chip shows the new units and the database
+      // never heard, which is the screen claiming something that is not true
       setSystem(previous);
-      const body = (await response.json().catch(() => null)) as { error?: string } | null;
-      setError(body?.error ?? "That did not save.");
-      return;
+      setError("No signal — that was not saved.");
     }
-    startTransition(() => router.refresh());
   }
 
   return (

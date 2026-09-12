@@ -24,25 +24,31 @@ export function ImportFlow() {
     event.preventDefault();
     setBusy(true);
     setError(null);
-    const response = await fetch("/api/import", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ url }),
-    });
-    const body = (await response.json().catch(() => ({}))) as {
-      draft?: Draft;
-      photo?: Photo | null;
-      fromCache?: boolean;
-      error?: string;
-    };
-    setBusy(false);
-    if (!response.ok || !body.draft) {
-      setError(body.error ?? `that did not work (${response.status})`);
-      return;
+
+    // `finally`: an offline fetch rejects, so a reset after the await never runs and every
+    // control gated on this flag stays dead (scripts/check-busy-guarded.mjs)
+    try {
+      const response = await fetch("/api/import", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const body = (await response.json().catch(() => ({}))) as {
+        draft?: Draft;
+        photo?: Photo | null;
+        fromCache?: boolean;
+        error?: string;
+      };
+      if (!response.ok || !body.draft) {
+        setError(body.error ?? `that did not work (${response.status})`);
+        return;
+      }
+      setDraft(body.draft);
+      setPhoto(body.photo ?? null);
+      setFromCache(body.fromCache ?? false);
+    } finally {
+      setBusy(false);
     }
-    setDraft(body.draft);
-    setPhoto(body.photo ?? null);
-    setFromCache(body.fromCache ?? false);
   }
 
   async function save(edited: Draft, photoFile: File | null) {

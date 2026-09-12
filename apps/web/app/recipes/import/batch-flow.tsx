@@ -105,25 +105,31 @@ export function BatchFlow() {
     event.preventDefault();
     setBusy(true);
     setError(null);
-    const response = await fetch("/api/import/batch", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ urls }),
-    });
-    const body = (await response.json().catch(() => ({}))) as {
-      results?: SubmitResult[];
-      error?: string;
-    };
-    setBusy(false);
-    if (!response.ok || !body.results) {
-      setError(body.error ?? `that did not work (${response.status})`);
-      return;
+
+    // `finally`: a rejected submission must not leave every control on the batch screen
+    // disabled with nothing said (scripts/check-busy-guarded.mjs)
+    try {
+      const response = await fetch("/api/import/batch", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ urls }),
+      });
+      const body = (await response.json().catch(() => ({}))) as {
+        results?: SubmitResult[];
+        error?: string;
+      };
+      if (!response.ok || !body.results) {
+        setError(body.error ?? `that did not work (${response.status})`);
+        return;
+      }
+      // rejected and duplicate lines never became jobs, so they are shown from the submission
+      setRefused(body.results.filter((result) => result.status !== "queued"));
+      setUrls("");
+      await refresh();
+      void drain();
+    } finally {
+      setBusy(false);
     }
-    // rejected and duplicate lines never became jobs, so they are shown from the submission
-    setRefused(body.results.filter((result) => result.status !== "queued"));
-    setUrls("");
-    await refresh();
-    void drain();
   }
 
   async function accept(job: Job, edited: Draft, photoFile: File | null) {

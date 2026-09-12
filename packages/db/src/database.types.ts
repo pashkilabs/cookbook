@@ -123,6 +123,7 @@ export type Database = {
           measurement_system: string
           name: string
           owner_account_id: string
+          timezone: string
           updated_at: string
         }
         Insert: {
@@ -132,6 +133,7 @@ export type Database = {
           measurement_system?: string
           name: string
           owner_account_id: string
+          timezone?: string
           updated_at?: string
         }
         Update: {
@@ -141,6 +143,7 @@ export type Database = {
           measurement_system?: string
           name?: string
           owner_account_id?: string
+          timezone?: string
           updated_at?: string
         }
         Relationships: [

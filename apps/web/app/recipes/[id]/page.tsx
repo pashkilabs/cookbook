@@ -198,7 +198,7 @@ export default async function RecipePage({
 
   const scores = new Map(ratings.data?.map((r) => [r.family_member_id, r.score]) ?? []);
 
-  const weekStart = startOfWeek(todayIso());
+  const weekStart = startOfWeek(todayIso(family.timezone));
   // both weeks, because shortlisting only ever reached this one and the planner's waiting list
   // is week-scoped — so a recipe was stranded here while next week showed empty
   const nextWeekStart = addWeeks(weekStart, 1);

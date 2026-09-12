@@ -37,6 +37,31 @@ export const ENOUGH_TO_MENTION = 3;
 /** the dimensions a rating can be grouped by — every one is a column on `recipes` */
 export type TasteDimension = "cuisine" | "principalProtein" | "dishForm" | "course";
 
+/**
+ * The dimensions worth saying something about. `course` is not one.
+ *
+ * "Ada rates main highly" is true, unfalsifiable and useless: almost every dinner is a main, so
+ * the reading says a child likes dinner. It sorts *first* on the household screen, because it
+ * has the most ratings behind it — so the one place this work comes back led with its emptiest
+ * sentence.
+ *
+ * `warningsFor` already excluded it, by building a map of three dimensions and quietly omitting
+ * the fourth. That was right and invisible: two lists agreeing by coincidence rather than one
+ * decision, and the screen was never told. Named here so both read the same thing.
+ *
+ * Still *grouped* — `readTastes` counts course like any other dimension, because the count is
+ * real and a future screen might have a use for it. This governs what is said out loud.
+ */
+export const TELLING_DIMENSIONS: readonly TasteDimension[] = [
+  "cuisine",
+  "principalProtein",
+  "dishForm",
+];
+
+/** Whether a reading is worth putting in front of somebody. See `TELLING_DIMENSIONS`. */
+export const isTelling = (dimension: TasteDimension): boolean =>
+  TELLING_DIMENSIONS.includes(dimension);
+
 export interface RatingObservation {
   memberId: string;
   dimension: TasteDimension;
@@ -119,7 +144,15 @@ export function tasteSummary(readings: readonly TasteReading[], totalRatings: nu
   if (totalRatings === 0) {
     return { state: "nothing", message: "No ratings yet — patterns start once a few are in." };
   }
-  if (!readings.some((reading) => reading.state === "pattern")) {
+  /*
+   * Only *telling* patterns count, so this agrees with what the screen renders.
+   *
+   * A child whose only pattern is `course` has nothing worth saying, and without this the
+   * summary reported `pattern` while the filtered list rendered nothing — a name followed by
+   * blank space, which reads as a broken screen rather than as "not enough yet". The summary
+   * and the list have to be answering the same question.
+   */
+  if (!readings.some((reading) => reading.state === "pattern" && isTelling(reading.dimension))) {
     return {
       state: "too-few",
       message:

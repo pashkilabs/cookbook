@@ -31,6 +31,17 @@ export interface Family {
    * write it — changing a household's settings is a platform operation.
    */
   measurementSystem: MeasurementSystem;
+  /**
+   * IANA zone name deciding what "today" and "this week" mean for this household.
+   *
+   * A household setting for the same reason `measurementSystem` is: two adults on two phones in
+   * two places must read one week, and a device guess would make "this week" mean different
+   * things to the two people planning it. It also has to work server-side, where the device is a
+   * data centre in whatever region the host chose.
+   *
+   * Defaults to `UTC`, which is what every household silently got before this existed.
+   */
+  timezone: string;
 }
 
 /** Kept in step with `packages/core`'s own union rather than imported, so the seam stays free of it. */
@@ -310,6 +321,8 @@ export interface PlatformStore {
    * On the port because `families` is a platform table. Scoped by `familyId` in SQL rather than
    * by the caller having resolved the right household, the same as the member writes above.
    */
+  /** the household's IANA zone; validated against pg_timezone_names by a CHECK */
+  setTimezone(input: { familyId: string; timezone: string }): Promise<Family | null>;
   setMeasurementSystem(input: {
     familyId: string;
     system: MeasurementSystem;
@@ -499,6 +512,8 @@ export interface PlatformClient {
    * the same list is the thing this prevents (§28).
    */
   setMeasurementSystem(system: MeasurementSystem): Promise<Family>;
+  /** the household's IANA zone, deciding what "today" and "this week" mean */
+  setTimezone(timezone: string): Promise<Family>;
   removeMember(memberId: string): Promise<void>;
 
   /**

@@ -65,26 +65,37 @@ export function Roster({
     setBusy(true);
     setError(null);
     setNotice(null);
-    const response = await fetch(path, {
-      method,
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const parsed = (await response.json().catch(() => ({}))) as { error?: string; sent?: boolean };
-    setBusy(false);
-    // 202: the invitation is recorded and the email did not go. Said out loud rather than
-    // reported as success, because the person will not receive anything.
-    if (response.status === 202) {
-      setNotice(parsed.error ?? "Saved, but the email could not be sent.");
+
+    /*
+     * `finally`, enforced by scripts/check-busy-guarded.mjs.
+     *
+     * An offline `fetch` REJECTS, so a reset placed after the await never runs and every
+     * control gated on this flag stays dead. The shopping list lost its entire page to one
+     * bad tap in a supermarket that way.
+     */
+    try {
+      const response = await fetch(path, {
+        method,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const parsed = (await response.json().catch(() => ({}))) as { error?: string; sent?: boolean };
+      // 202: the invitation is recorded and the email did not go. Said out loud rather than
+      // reported as success, because the person will not receive anything.
+      if (response.status === 202) {
+        setNotice(parsed.error ?? "Saved, but the email could not be sent.");
+        router.refresh();
+        return true;
+      }
+      if (!response.ok) {
+        setError(parsed.error ?? `that did not work (${response.status})`);
+        return false;
+      }
       router.refresh();
       return true;
+    } finally {
+      setBusy(false);
     }
-    if (!response.ok) {
-      setError(parsed.error ?? `that did not work (${response.status})`);
-      return false;
-    }
-    router.refresh();
-    return true;
   }
 
   return (

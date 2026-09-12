@@ -66,25 +66,36 @@ export function RecipeForm(
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
-    setError(null);
 
-    const target = props.mode === "edit" ? `/api/recipes/${props.recipeId}` : "/api/recipes";
-    const response = await fetch(target, {
-      method: props.mode === "edit" ? "PATCH" : "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(values),
-    });
-    const body = (await response.json().catch(() => ({}))) as { id?: string; error?: string };
+    /*
+     * `finally`, enforced by scripts/check-busy-guarded.mjs.
+     *
+     * An offline `fetch` REJECTS, so a reset placed after the await never runs and every
+     * control gated on this flag stays dead. The shopping list lost its entire page to one
+     * bad tap in a supermarket that way.
+     */
+    try {
+      setError(null);
 
-    if (!response.ok) {
-      setError(body.error ?? `could not save (${response.status})`);
+      const target = props.mode === "edit" ? `/api/recipes/${props.recipeId}` : "/api/recipes";
+      const response = await fetch(target, {
+        method: props.mode === "edit" ? "PATCH" : "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(values),
+      });
+      const body = (await response.json().catch(() => ({}))) as { id?: string; error?: string };
+
+      if (!response.ok) {
+        setError(body.error ?? `could not save (${response.status})`);
+        return;
+      }
+
+      const id = props.mode === "edit" ? props.recipeId : body.id;
+      router.push(`/recipes/${id}`);
+      router.refresh();
+    } finally {
       setBusy(false);
-      return;
     }
-
-    const id = props.mode === "edit" ? props.recipeId : body.id;
-    router.push(`/recipes/${id}`);
-    router.refresh();
   }
 
   return (

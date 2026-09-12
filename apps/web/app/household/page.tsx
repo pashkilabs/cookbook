@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { UnitsSetting } from "./units";
+import { TimezoneSetting } from "./timezone";
 import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
 import { MEMBER_COLOURS, invitationState } from "@pashki/platform-client";
 import { Roster } from "./roster";
 import { childTastes } from "@/lib/tastes";
-import { evidence } from "@pashki/core";
+import { evidence, isTelling } from "@pashki/core";
 
 /**
  * Who is in the household.
@@ -66,6 +67,7 @@ export default async function HouseholdPage() {
           you read and never what you saved.
         </p>
         <UnitsSetting current={family.measurementSystem} />
+        <TimezoneSetting current={family.timezone} />
       </section>
 
       <h2>Who eats here</h2>
@@ -112,7 +114,10 @@ export default async function HouseholdPage() {
               ) : (
                 <ul className="meta">
                   {child.readings
-                    .filter((reading) => reading.state === "pattern")
+                    // `course` is excluded, the way `warningsFor` already excludes it: "rates
+                    // main highly" sorts first because it has the most ratings behind it, and
+                    // says a child likes dinner (§ TELLING_DIMENSIONS)
+                    .filter((reading) => reading.state === "pattern" && isTelling(reading.dimension))
                     .map((reading) => (
                       <li key={`${reading.dimension}-${reading.value}`}>
                         {reading.leaning === "likes"

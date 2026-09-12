@@ -6,7 +6,11 @@
  * `Date` objects would mean a household in Auckland planning Monday and the server storing
  * Sunday, and the bug only appears for some people at some times of year. Anchoring at UTC
  * midnight and never formatting through a locale removes the whole class, including daylight
- * saving, because no clock is ever consulted.
+ * saving.
+ *
+ * **One clock is consulted, and only one: `todayIso`.** The header used to claim none was, and
+ * that was the bug — see below. Every other function here is pure arithmetic on date strings and
+ * consults nothing.
  *
  * Weeks start on **Monday**. That is a product choice: a shopping trip belongs to the week it
  * feeds, and a Sunday-start week splits a weekend across two shops.
@@ -57,9 +61,41 @@ export function weekDays(weekStart: IsoDate): IsoDate[] {
   return Array.from({ length: 7 }, (_, offset) => addDays(weekStart, offset));
 }
 
-/** Today, as the calendar day it is in UTC. */
-export function todayIso(now: Date = new Date()): IsoDate {
-  return now.toISOString().slice(0, 10);
+/**
+ * Today, as the calendar day it is **where the household cooks**.
+ *
+ * regression: this returned the UTC calendar day, which is wrong every evening for anybody west
+ * of Greenwich. In Texas at 5pm on Tuesday it is already Wednesday in UTC, so the planner rang
+ * the wrong day, and on a Sunday evening "Make this week" quietly meant next week. The file
+ * header claimed no clock was ever consulted, which made the one place that does consult one
+ * look like it did not.
+ *
+ * The zone comes from the household, not the device (§28's reasoning): two adults on two phones
+ * in two places must read one week, and a device guess would make "this week" mean different
+ * things to the two people planning it. It also has to work on a server, where the device is a
+ * data centre.
+ *
+ * `en-CA` because its short date format *is* `YYYY-MM-DD`, so this needs no reassembly — and
+ * reassembling parts by hand is where a zero-padding bug lives.
+ */
+export function todayIso(timezone: string, now: Date = new Date()): IsoDate {
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(now);
+  } catch {
+    /*
+     * An unresolvable zone falls back to UTC, which is what this did for everybody before the
+     * column existed — so the failure is the old behaviour rather than a new one. The database
+     * refuses to store a zone it cannot resolve (`families_timezone_is_known`), so reaching here
+     * means the runtime and Postgres disagree about the zone table, which is worth not crashing
+     * a page over.
+     */
+    return now.toISOString().slice(0, 10);
+  }
 }
 
 const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];

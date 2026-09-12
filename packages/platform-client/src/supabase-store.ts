@@ -108,7 +108,7 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
     async findFamilyForAccount(accountId: string): Promise<Family | null> {
       const owned = await supabase
         .from("families")
-        .select("id, name, owner_account_id, measurement_system")
+        .select("id, name, owner_account_id, measurement_system, timezone")
         .eq("owner_account_id", accountId)
         .is("deleted_at", null)
         .order("created_at", { ascending: true })
@@ -184,7 +184,7 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
         // standing between a mistyped id and another household's row
         .eq("id", input.familyId)
         .is("deleted_at", null)
-        .select("id, name, owner_account_id, measurement_system")
+        .select("id, name, owner_account_id, measurement_system, timezone")
         .maybeSingle();
       if (error) throw new Error(error.message);
       if (!data) return null;
@@ -193,6 +193,27 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
         name: data.name,
         ownerAccountId: data.owner_account_id,
         measurementSystem: (data.measurement_system === "metric" ? "metric" : "us"),
+        timezone: (data.timezone as string | null) || "UTC",
+      };
+    },
+
+    async setTimezone(input): Promise<Family | null> {
+      const { data, error } = await supabase
+        .from("families")
+        .update({ timezone: input.timezone })
+        // scoped by household id, like setMeasurementSystem: the service role bypasses RLS
+        .eq("id", input.familyId)
+        .is("deleted_at", null)
+        .select("id, name, owner_account_id, measurement_system, timezone")
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      if (!data) return null;
+      return {
+        id: data.id,
+        name: data.name,
+        ownerAccountId: data.owner_account_id,
+        measurementSystem: (data.measurement_system === "metric" ? "metric" : "us"),
+        timezone: (data.timezone as string | null) || "UTC",
       };
     },
 
@@ -437,7 +458,7 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
           const created = await supabase
             .from("families")
             .insert({ name: input.householdName, owner_account_id: input.accountId })
-            .select("id, name, owner_account_id, measurement_system")
+            .select("id, name, owner_account_id, measurement_system, timezone")
             .single();
           if (created.error) throw created.error;
           return toFamily(created.data);
@@ -517,6 +538,7 @@ function toFamily(row: {
   name: string;
   owner_account_id: string;
   measurement_system?: string | null;
+  timezone?: string | null;
 }): Family {
   return {
     id: row.id,
@@ -525,6 +547,9 @@ function toFamily(row: {
     // defaulted rather than asserted: the column defaults to 'us', and a row read before that
     // migration is a household that has never expressed a preference
     measurementSystem: row.measurement_system === "metric" ? "metric" : "us",
+    // same reasoning: the column defaults to UTC, and UTC is exactly what a household read
+    // before the column existed, so a row from before it is not wrong — it is unchanged
+    timezone: row.timezone || "UTC",
   };
 }
 

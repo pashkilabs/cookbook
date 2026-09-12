@@ -58,58 +58,66 @@ export function Verdicts(props: {
   async function rate(memberId: string, score: number) {
     setBusy(memberId);
     setError(null);
-    const supabase = browserClient();
 
-    // Update-then-insert rather than upsert. `ratings_one_per_member` is a *partial* unique
-    // index (`where deleted_at is null`), and PostgREST cannot name one as an ON CONFLICT
-    // target — it has no way to restate the predicate. Two devices rating the same person in
-    // the same instant can therefore both insert; the index refuses the second, which surfaces
-    // as an error rather than a duplicate.
-    const updated = await supabase
-      .from("ratings")
-      .update({ score, rated_at: new Date().toISOString() })
-      .eq("recipe_id", props.recipeId)
-      .eq("family_member_id", memberId)
-      .is("deleted_at", null)
-      .select("id");
+    // `finally`: a rejected request — offline, or a refused write — must not leave the
+    // flag set, because every control here is gated on it (scripts/check-busy-guarded.mjs)
+    try {
+      const supabase = browserClient();
 
-    if (updated.error) {
-      setError(refusal(updated.error));
-      setBusy(null);
-      return;
-    }
+      // Update-then-insert rather than upsert. `ratings_one_per_member` is a *partial* unique
+      // index (`where deleted_at is null`), and PostgREST cannot name one as an ON CONFLICT
+      // target — it has no way to restate the predicate. Two devices rating the same person in
+      // the same instant can therefore both insert; the index refuses the second, which surfaces
+      // as an error rather than a duplicate.
+      const updated = await supabase
+        .from("ratings")
+        .update({ score, rated_at: new Date().toISOString() })
+        .eq("recipe_id", props.recipeId)
+        .eq("family_member_id", memberId)
+        .is("deleted_at", null)
+        .select("id");
 
-    if (updated.data.length === 0) {
-      const inserted = await supabase.from("ratings").insert({
-        family_id: props.familyId,
-        recipe_id: props.recipeId,
-        family_member_id: memberId,
-        score,
-        rated_at: new Date().toISOString(),
-      });
-      if (inserted.error) {
-        setError(refusal(inserted.error));
-        setBusy(null);
+      if (updated.error) {
+        setError(refusal(updated.error));
         return;
       }
-    }
 
-    setMembers((current) =>
-      current.map((member) => (member.id === memberId ? { ...member, score } : member)),
-    );
-    setBusy(null);
+      if (updated.data.length === 0) {
+        const inserted = await supabase.from("ratings").insert({
+          family_id: props.familyId,
+          recipe_id: props.recipeId,
+          family_member_id: memberId,
+          score,
+          rated_at: new Date().toISOString(),
+        });
+        if (inserted.error) {
+          setError(refusal(inserted.error));
+          return;
+        }
+      }
+
+      setMembers((current) =>
+        current.map((member) => (member.id === memberId ? { ...member, score } : member)),
+      );
+    } finally {
+      setBusy(null);
+    }
   }
 
   async function setVerdict(next: boolean | null) {
     setBusy("make-again");
     setError(null);
-    const { error: failed } = await browserClient()
-      .from("recipes")
-      .update({ make_again: next })
-      .eq("id", props.recipeId);
-    if (failed) setError(refusal(failed));
-    else setMakeAgain(next);
-    setBusy(null);
+    // `finally`: a rejected request must not leave the flag set (scripts/check-busy-guarded.mjs)
+    try {
+      const { error: failed } = await browserClient()
+        .from("recipes")
+        .update({ make_again: next })
+        .eq("id", props.recipeId);
+      if (failed) setError(refusal(failed));
+      else setMakeAgain(next);
+    } finally {
+      setBusy(null);
+    }
   }
 
   return (

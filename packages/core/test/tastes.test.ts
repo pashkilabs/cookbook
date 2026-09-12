@@ -62,3 +62,36 @@ describe("the summary, whose whole job is to be visible when there is nothing", 
     expect(evidence(3)).toBe("3 ratings");
   });
 });
+
+describe("course is counted but never said out loud", () => {
+  const rated = (dimension: RatingObservation["dimension"], value: string, scores: number[]) =>
+    scores.map((score) => ({ memberId: "m", dimension, value, score }));
+
+  it("still groups course, because the count is real", () => {
+    // excluded from what is *said*, not from what is known — a future screen may want it
+    const readings = readTastes(rated("course", "main", [5, 5, 4, 5, 4, 5]));
+    expect(readings).toHaveLength(1);
+    expect(readings[0]?.state).toBe("pattern");
+  });
+
+  it("does not let a course pattern stand in for something worth reading", () => {
+    /*
+     * "Ada rates main highly" is true, unfalsifiable and useless — almost every dinner is a
+     * main, so it says a child likes dinner. It also sorts first, because it has the most
+     * ratings behind it, so the one screen where this work comes back led with its emptiest
+     * sentence. `warningsFor` already excluded course by quietly omitting it from a list.
+     */
+    const readings = readTastes(rated("course", "main", [5, 5, 4, 5, 4, 5]));
+    const summary = tasteSummary(readings, 6);
+    expect(summary.state).toBe("too-few");
+    expect(summary.message).toContain("too few to say");
+  });
+
+  it("says something as soon as a telling dimension has the ratings", () => {
+    const readings = readTastes([
+      ...rated("course", "main", [5, 5, 4, 5, 4, 5]),
+      ...rated("principalProtein", "fish", [1, 2, 1, 2, 1, 2]),
+    ]);
+    expect(tasteSummary(readings, 12).state).toBe("pattern");
+  });
+});
