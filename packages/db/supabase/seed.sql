@@ -3,7 +3,7 @@
 -- Written by scripts/generate-seed.ts from SEED_CATALOG in @pashki/core.
 -- Regenerate with: pnpm --filter @pashki/db gen:seed
 --
--- 66 ingredients, 185 package sizes, 3 container sizes.
+-- 66 ingredients, 185 package sizes, 25 container sizes.
 --
 -- Idempotent: `supabase db reset` runs this after the migrations, and running it
 -- again upserts rather than duplicating. Both tables have the unique constraints
@@ -312,9 +312,31 @@ on conflict (ingredient_id, system, label) do update set
 insert into public.ingredient_containers (ingredient_id, word, base_amount)
 select i.id, seed.word, seed.base_amount
 from (values
+  ('mozzarella', 'bag', 454),
+  ('greek-yogurt', 'tub', 907),
+  ('cream-cheese', 'block', 227),
+  ('feta', 'block', 200),
+  ('shrimp', 'bag', 454),
+  ('onion', 'bag', 6),
+  ('lemon', 'bag', 5),
+  ('lime', 'bag', 5),
+  ('tomatoes', 'container', 12),
+  ('avocado', 'bag', 4),
+  ('basil', 'packet', 1),
+  ('pasta', 'box', 454),
+  ('canned-tomatoes', 'tin', 400),
   ('dry-yeast', 'package', 7),
   ('dry-yeast', 'packet', 7),
-  ('dry-yeast', 'envelope', 7)
+  ('dry-yeast', 'envelope', 7),
+  ('dry-yeast', 'jar', 113),
+  ('tomato-paste', 'can', 170),
+  ('sun-dried-tomatoes', 'jar', 227),
+  ('broth', 'can', 429),
+  ('coconut-milk', 'can', 400),
+  ('coconut-milk', 'tin', 400),
+  ('beans', 'can', 425),
+  ('beans', 'tin', 400),
+  ('honey', 'jar', 355)
 ) as seed(ingredient_key, word, base_amount)
 join public.ingredients i on i.key = seed.ingredient_key
 on conflict (ingredient_id, word) do update set
@@ -327,9 +349,31 @@ where ic.ingredient_id = i.id
   and (i.key, ic.word) not in (
     select seed.ingredient_key, seed.word
     from (values
+  ('mozzarella', 'bag', 454),
+  ('greek-yogurt', 'tub', 907),
+  ('cream-cheese', 'block', 227),
+  ('feta', 'block', 200),
+  ('shrimp', 'bag', 454),
+  ('onion', 'bag', 6),
+  ('lemon', 'bag', 5),
+  ('lime', 'bag', 5),
+  ('tomatoes', 'container', 12),
+  ('avocado', 'bag', 4),
+  ('basil', 'packet', 1),
+  ('pasta', 'box', 454),
+  ('canned-tomatoes', 'tin', 400),
   ('dry-yeast', 'package', 7),
   ('dry-yeast', 'packet', 7),
-  ('dry-yeast', 'envelope', 7)
+  ('dry-yeast', 'envelope', 7),
+  ('dry-yeast', 'jar', 113),
+  ('tomato-paste', 'can', 170),
+  ('sun-dried-tomatoes', 'jar', 227),
+  ('broth', 'can', 429),
+  ('coconut-milk', 'can', 400),
+  ('coconut-milk', 'tin', 400),
+  ('beans', 'can', 425),
+  ('beans', 'tin', 400),
+  ('honey', 'jar', 355)
     ) as seed(ingredient_key, word, base_amount)
   );
 
