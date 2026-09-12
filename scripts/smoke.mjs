@@ -638,36 +638,105 @@ try {
      * ingredients actually appear, and that the failure banner does not.
      */
     /*
-     * Every page a signed-in household actually opens, rendered.
+     * EVERY screen a person can reach, rendered as a real session.
      *
-     * The gap that let the planner ship broken: smoke calls ROUTES, and a server-rendered page
-     * is not a route. A hundred green checks, every endpoint answering, and the most-used screen
-     * in the product was 500ing for every household — because `membersFor`, a function, was
-     * handed to a client component, which React refuses at runtime and TypeScript does not see.
+     * ---------------------------------------------------------------------------
+     * Why all of them and not the three that seemed to matter
+     * ---------------------------------------------------------------------------
      *
-     * So each page is loaded as a real session and asserted twice: alive (a 500 means no handler
-     * ran at all), and carrying something only a working render produces. A status code is not a
-     * rendered page — the shopping list taught that, and the planner taught it again.
+     * The planner was 500ing for every household while a hundred checks passed, because smoke
+     * called ROUTES and a server-rendered page is not a route. The obvious fix was to add the
+     * screens that looked important. Three reasons not to stop there:
+     *
+     * **The cost objection does not survive a measurement.** A page load is about a second.
+     * Twelve screens is twelve seconds on a run that already takes minutes.
+     *
+     * **"The marginal ones rarely change" is the wrong criterion.** A quiet screen is still
+     * changed by every cross-cutting edit, and those are the ones that break it: the timezone
+     * change touched four screens, the `finally` sweep eleven files, `TELLING_DIMENSIONS` two.
+     * Risk lives in shared code, and shared code hits the screens nobody is thinking about
+     * hardest.
+     *
+     * **Choosing three requires predicting which will break.** I had just demonstrated I cannot
+     * — I would have ranked the planner as well covered.
+     *
+     * So the static routes are **discovered from the app directory**, not listed, because a
+     * thirteenth screen that nobody adds here is the whole failure again. Dynamic routes are
+     * named explicitly, since they need real ids.
      */
-    for (const [name, path, marker] of [
-      ["the planner", `/planner?week=${weekStart}`, "Waiting for a day"],
-      ["the recipe list", "/recipes", "Tonight"],
-      ["the household screen", "/household", "Where you cook"],
-    ]) {
+    const pageDir = new URL("../apps/web/app/", import.meta.url);
+    const discover = async (dir, prefix = "") => {
+      const { readdir } = await import("node:fs/promises");
+      const entries = await readdir(new URL(dir), { withFileTypes: true });
+      const here = entries.some((e) => e.name === "page.tsx") ? [prefix || "/"] : [];
+      const below = [];
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        // dynamic segments and route groups are handled by name below, not discovered
+        if (entry.name.startsWith("[") || entry.name.startsWith("(") || entry.name === "api") continue;
+        below.push(...(await discover(new URL(`${entry.name}/`, dir), `${prefix}/${entry.name}`)));
+      }
+      return [...here, ...below];
+    };
+
+    /*
+     * A marker is content only a working render produces. Where there is no honest one — a
+     * redirect, or a screen whose content depends on state this run does not create — the
+     * check is alive-and-no-exception, which is still the assertion that would have caught the
+     * planner. Coverage is printed rather than assumed.
+     */
+    const MARKERS = {
+      "/planner": "Waiting for a day",
+      "/recipes": "Tonight",
+      "/household": "Where you cook",
+      "/recipes/new": "Add a recipe",
+      "/recipes/import": "One link",
+      /*
+       * No marker for `/sign-in` or `/`: a signed-in session is redirected away from both, so
+       * there is no content of theirs to assert. Asserting one failed, correctly — the page a
+       * session is bounced to is not the page that was asked for. They still get the
+       * alive-and-no-exception pair, which is the check that would have caught the planner.
+       */
+    };
+
+    const screens = [
+      ...(await discover(pageDir)).map((path) => [
+        path,
+        path === "/planner" ? `/planner?week=${weekStart}` : path,
+        MARKERS[path] ?? null,
+      ]),
+      // dynamic routes, with ids this run actually has
+      ["/recipes/[id]", `/recipes/${recipeId}`, null],
+      ["/recipes/[id]/edit", `/recipes/${recipeId}/edit`, null],
+      ["/recipes/blend?from=", `/recipes/blend?from=${recipeId}`, null],
+      // a token this run cannot hold: the invitation response carries none, on purpose. An
+      // invalid link must render a refusal, not an exception.
+      ["/invite/[token]", "/invite/not-a-real-token", null],
+    ];
+
+    let unmarked = 0;
+    for (const [name, path, marker] of screens) {
       const page = await call("GET", path);
       const body = typeof page.body === "string" ? page.body : JSON.stringify(page.body);
       record(`${name} renders`, alive(page), `HTTP ${page.status}`);
       record(
-        `and ${name} is a page rather than a status`,
-        page.status === 200 && body.includes(marker),
-        page.status === 200 ? `looked for ${JSON.stringify(marker)}` : `HTTP ${page.status}`,
-      );
-      record(
         `and ${name} has no server-side exception`,
-        !/Application error|server-side exception|Functions cannot be passed/i.test(body),
-        "checked for Next's error page and the RSC function refusal",
+        !/Application error|server-side exception|Functions cannot be passed|Digest:/i.test(body),
+        "Next's error page, and the RSC function refusal by name",
       );
+      if (marker) {
+        record(
+          `and ${name} is a page rather than a status`,
+          page.status === 200 && body.includes(marker),
+          page.status === 200 ? `looked for ${JSON.stringify(marker)}` : `HTTP ${page.status}`,
+        );
+      } else {
+        unmarked += 1;
+      }
     }
+    console.log(
+      `  ${screens.length} screens loaded as a session; ${unmarked} checked for life and exceptions only`,
+    );
 
     const shopping = await call("GET", `/shopping?week=${weekStart}`);
     const html = typeof shopping.body === "string" ? shopping.body : JSON.stringify(shopping.body);
