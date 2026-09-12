@@ -31,8 +31,12 @@ export function PlannerWeek(props: {
   days: Array<{ date: string; weekday: string; label: string }>;
   placed: Array<{ id: string; date: string; scale: number; cookedAt: string | null; recipe: Recipe }>;
   familyId: string;
-  /** everyone in the household, with what they have already said about this recipe */
-  membersFor: (recipeId: string) => CookMember[];
+  /*
+   * Plain data, keyed by recipe. A *function* here is a runtime refusal rather than a type
+   * error — "Functions cannot be passed directly to Client Components" — which is why the
+   * planner 500'd in production with a green `pnpm check`.
+   */
+  membersByRecipe: Record<string, CookMember[]>;
   waiting: Array<{ id: string; recipe: Recipe }>;
   /**
    * What this household's children have consistently rated low, for the recipes waiting.
@@ -266,7 +270,7 @@ export function PlannerWeek(props: {
                       familyId={props.familyId}
                       recipeId={entry.recipe.id}
                       cookedAt={entry.cookedAt}
-                      members={props.membersFor(entry.recipe.id)}
+                      members={props.membersByRecipe[entry.recipe.id] ?? []}
                       disabled={busy !== null}
                     />
                     <select

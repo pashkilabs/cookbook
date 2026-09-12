@@ -14,6 +14,7 @@ import {
   weekdayName,
 } from "@/lib/week";
 import { PlannerWeek } from "./planner-week";
+import type { CookMember } from "./cooked";
 import { childTastes, warningsFor } from "@/lib/tastes";
 
 /**
@@ -119,14 +120,30 @@ export default async function PlannerPage({
       .in("recipe_id", placed.map((entry) => entry.recipe.id)),
     "ratings for the week",
   );
-  const scoreFor = (recipeId: string, memberId: string) =>
-    scores.find((row) => row.recipe_id === recipeId && row.family_member_id === memberId)?.score ?? null;
-  const membersFor = (recipeId: string) =>
-    members.map((member) => ({
+  /*
+   * A plain object, not a function.
+   *
+   * regression: this was `membersFor: (recipeId) => CookMember[]` handed to `PlannerWeek`, which
+   * is a client component — and **a function cannot cross that boundary**. It is not a type
+   * error, so `tsc` passed; it is a runtime refusal, so the planner 500'd in production for
+   * every household while `pnpm check` was green. `pnpm smoke` never loaded the page.
+   *
+   * I made the same mistake earlier the same day with `continueTo` in the blend picker, caught
+   * it, and wrote a comment there saying a function cannot cross the boundary. Knowing the rule
+   * did not stop me repeating it, which is what `check-client-props.mjs` is for.
+   */
+  const membersByRecipe: Record<string, CookMember[]> = {};
+  for (const entry of placed) {
+    if (membersByRecipe[entry.recipe.id]) continue;
+    membersByRecipe[entry.recipe.id] = members.map((member) => ({
       id: member.id,
       displayName: member.displayName,
-      score: scoreFor(recipeId, member.id) as number | null,
+      score:
+        (scores.find(
+          (row) => row.recipe_id === entry.recipe.id && row.family_member_id === member.id,
+        )?.score as number | null) ?? null,
     }));
+  }
 
   return (
     <main>
@@ -168,7 +185,7 @@ export default async function PlannerPage({
         days={days.map((date) => ({ date, weekday: weekdayName(date), label: dayAndMonth(date) }))}
         placed={placed}
         familyId={family.id}
-        membersFor={membersFor}
+        membersByRecipe={membersByRecipe}
         waiting={waiting}
         warnings={warnings}
       />

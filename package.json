@@ -11,7 +11,7 @@
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
     "build": "turbo run build",
-    "check:boundaries": "node scripts/check-seed-catalog-usage.mjs && node scripts/check-platform-tables.mjs && node scripts/check-server-only.mjs && node scripts/check-native-imports.mjs && node scripts/check-tests-run.mjs && node scripts/check-fixture-text.mjs && node scripts/check-routes-reachable.mjs && node scripts/check-checked-queries.mjs && node scripts/check-busy-guarded.mjs",
+    "check:boundaries": "node scripts/check-seed-catalog-usage.mjs && node scripts/check-platform-tables.mjs && node scripts/check-server-only.mjs && node scripts/check-native-imports.mjs && node scripts/check-tests-run.mjs && node scripts/check-fixture-text.mjs && node scripts/check-routes-reachable.mjs && node scripts/check-checked-queries.mjs && node scripts/check-busy-guarded.mjs && node scripts/check-client-props.mjs",
     "check": "pnpm check:boundaries; b=$?; pnpm typecheck; t=$?; pnpm test > .check-test.log 2>&1; s=$?; cat .check-test.log; if [ $b -ne 0 ] || [ $t -ne 0 ] || [ $s -ne 0 ]; then echo \"\\ncheck FAILED - boundaries=$b typecheck=$t test=$s\"; if [ $s -ne 0 ]; then echo \"test output kept in .check-test.log - if that was intermittent, this file is the only record of it\"; fi; exit 1; else echo \"\\ncheck passed - boundaries, typecheck, test\"; fi",
     "smoke": "node scripts/smoke.mjs",
     "smoke:local": "node scripts/smoke.mjs http://127.0.0.1:3000 --local"
