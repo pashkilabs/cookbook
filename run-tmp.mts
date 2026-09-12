@@ -13,7 +13,9 @@ const items=ing.map((i:any)=>({key:i.key,names:[i.canonical_name,...(i.aliases||
 const catalog=createCatalog(catalogItemsFromRows(ing as any, pk as any, "us") as any);
 const entries=pe.map((e:any)=>({label:(rec.find((r:any)=>r.id===e.recipe_id)||{}).title,groupKey:e.date,scale:Number(e.scale),
  ingredients:ri.filter((i:any)=>i.recipe_id===e.recipe_id&&!i.deleted_at).map((i:any)=>({item:i.item_text,amount:i.amount??undefined,unit:i.unit??undefined}))}));
-const lines=consolidate(entries as any,catalog,{system:"us"});
+const pantry=L("pantry_items").filter((x:any)=>x.family_id===FAM&&!x.deleted_at).map((x:any)=>({name:x.name,...(x.amount===null?{}:{amount:Number(x.amount)}),...(x.unit===null?{}:{unit:x.unit})}));
+const lines=consolidate(entries as any,catalog,{pantry,deductPantry:true,system:"us"});
+console.log("pantry entries:",pantry.length,"lines flagged inPantry:",0);
 console.log("lines:",lines.length);
 const withPkg=lines.filter((l:any)=>l.packages&&l.packages.length);
 console.log("lines with package advice:",withPkg.length);
