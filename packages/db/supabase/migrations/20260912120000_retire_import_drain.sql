@@ -66,7 +66,45 @@ $do$;
 -- nothing dispatches to a route that no longer exists
 drop function if exists private.dispatch_import_drain();
 
-update private.scheduler_config set drain_endpoint = null;
+/*
+ * The column has to become nullable before it can be nulled, and the first version of this
+ * migration did not notice.
+ *
+ * `drain_endpoint text not null` since it was created. Locally there is no row at all — the
+ * config is populated by `set:drain-endpoint`, which is a hosted operation — so
+ * `update ... set drain_endpoint = null` matched **zero rows** and passed. Hosted has the row,
+ * and refused: `null value in column "drain_endpoint" violates not-null constraint`.
+ *
+ * That is the local/hosted blindness in its other direction. The recorded trap is that hosted
+ * grants more than local, so a local green proves nothing about privileges; this is the same
+ * shape through *data* — an empty table cannot fail a constraint, so a statement that only
+ * touches rows is untested wherever the rows are not. The push refused itself and rolled back,
+ * which is the outcome to want.
+ *
+ * Nullable is now correct rather than a concession: there is no drain endpoint, permanently,
+ * and a sentinel string would be a URL nothing serves.
+ */
+alter table private.scheduler_config alter column drain_endpoint drop not null;
+
+update private.scheduler_config set drain_endpoint = null where drain_endpoint is not null;
+
+do $do$
+begin
+  -- asserted, because the statement above is a no-op wherever there is no row and a silent
+  -- no-op is indistinguishable from a success
+  if exists (select 1 from private.scheduler_config where drain_endpoint is not null) then
+    raise exception 'a drain endpoint is still configured for a route that no longer exists';
+  end if;
+
+  -- and the reaper's endpoint must be untouched: they share this row
+  if exists (
+    select 1 from private.scheduler_config
+    where reaper_endpoint is null and drain_endpoint is null
+  ) and exists (select 1 from private.scheduler_config) then
+    raise warning 'the scheduler row has no endpoints at all — the reaper will not be dispatched until set:drain-endpoint is run';
+  end if;
+end;
+$do$;
 
 comment on column private.scheduler_config.drain_endpoint is
   'Null, and staying null: the batch importer''s drain route is retired (20260912120000). The column is kept because the reaper shares this row, and because a returning queue would use it again.';
