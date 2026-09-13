@@ -256,6 +256,35 @@ models be good enough. Do not add a silent-save path.
   two environments and is the only thing that can catch the difference. Found when the
   first hosted push refused itself: `import_cache`, one shared row set for the whole
   user base, was readable by `anon`, with only RLS between a stranger and the catalog.
+
+  **The same blindness through data, which is the face that is easy to miss.** An *empty
+  table cannot fail a constraint*, so a statement that only touches rows is untested
+  wherever the rows are not. `update private.scheduler_config set drain_endpoint = null`
+  passed locally and refused on hosted: the column has been `not null` since it was
+  created, and locally there is **no row at all**, because that config is populated by
+  `set:drain-endpoint`, which is a hosted operation. Zero rows matched, so nothing could
+  fail.
+
+  The privileges version of this is well known here and the data version reads as safe
+  precisely because the statement is so ordinary. So: **a migration that writes rows is
+  only tested where those rows exist**, and the environments differ in which rows exist as
+  much as in what is granted. The fix is the one that worked — **assert the state
+  afterwards**, in a `DO` block, because a no-op where there is no row is
+  indistinguishable from a success. `check:parity` compares schema and privileges; it does
+  not compare contents, and nothing does.
+
+- **A removal deploys in the reverse order of an addition.** Adding is migration first,
+  then code, because code ahead of its schema is a page that 500s — that asymmetry has
+  bitten four times and `/api/health` reports `schema` to catch it. Removing inverts it:
+  **take away what calls a thing before taking away the thing.** Unschedule the cron, then
+  delete the route; stop rendering the column, then drop it.
+
+  Got backwards when the batch importer was retired: the deployment removed
+  `/api/import/drain` while the every-minute cron was still scheduled, so production spent
+  a few minutes ticking at a 404. Harmless there — a scheduler retrying an idempotent
+  drain — and it would not be harmless for anything that counts its failures, alerts on
+  them, or gives up permanently after a few. The health check cannot help here either: it
+  compares migrations against what the *code* requires, and removed code requires nothing.
 - **`ON DELETE CASCADE` does not fire on a soft delete.** Every deletion here is an `UPDATE`
   setting `deleted_at`, because clients hold no `DELETE`, so a cascade declared on a foreign key
   never runs — a tombstoned recipe kept its plan entries and went on buying ingredients.
