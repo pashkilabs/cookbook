@@ -273,6 +273,29 @@ models be good enough. Do not add a silent-save path.
   indistinguishable from a success. `check:parity` compares schema and privileges; it does
   not compare contents, and nothing does.
 
+- **Ask which files are *not* covered, because a tool cannot report on what it was never
+  given.** `pnpm typecheck` ran five projects and reported success, and success there means
+  "every file I was told about is fine" — it says nothing about a file outside every
+  `include`. Sixteen were: **`eval.mts`**, which produces the accuracy numbers model choices
+  rest on; **`generate-seed.ts`**, which writes `seed.sql`; and every measurement script,
+  `ripeness` and `gate-curve` and `ab-consensus` among them. **A script that compiles as
+  nothing can report confidently from broken code**, and two were already broken — `eval.mts`
+  called `createImportExtractor` with options that do not satisfy its own type, and
+  `pull-corpus.mts` read `.length` off an `unknown`. A syntax error in `ripeness.mts` had
+  passed `tsc` entirely and was only caught by running it.
+
+  Same family as `check-tests-run.mjs`, which asks which test files no vitest config will run.
+  Both exist because the inverse question is the one with the answer in it: *which files does
+  nothing check?* `scripts/check-typechecked.mjs` asks it on every build, by diffing
+  `tsc --listFiles` against the tree, and is mutation-tested.
+
+  **And the fix wanted a correction from the test suite.** Making `fetcher` optional, I wrote
+  that the eval "always supplies its own" and replaced a caller's unconditionally. That broke
+  the test driving the whole cascade over a stub: a caller *does* supply a working fetcher for
+  a fixture with no capture. The claim was true of `eval.mts` and false of the type — which is
+  what a type is for, and why widening a gate finds things that then need thinking about
+  rather than just fixing.
+
 - **A removal deploys in the reverse order of an addition.** Adding is migration first,
   then code, because code ahead of its schema is a page that 500s — that asymmetry has
   bitten four times and `/api/health` reports `schema` to catch it. Removing inverts it:

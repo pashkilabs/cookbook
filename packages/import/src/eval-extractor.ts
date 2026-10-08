@@ -5,7 +5,7 @@ import type {
   FixtureInput,
   RefusalReason,
 } from "@pashki/core/eval";
-import type { ImportOptions, Tier } from "./types.js";
+import type { Fetcher, ImportOptions, Tier } from "./types.js";
 import { importRecipe } from "./pipeline.js";
 import { extractWithLlm } from "./tier2.js";
 import { importFromImages } from "./vision.js";
@@ -21,7 +21,22 @@ import { createPassthroughImagePreparer, type ImagePreparer, type SourceImage } 
  * measurable rather than arguable.
  */
 
-export interface ImportExtractorOptions extends ImportOptions {
+export interface ImportExtractorOptions extends Omit<ImportOptions, "fetcher"> {
+  /**
+   * Optional here, unlike on `ImportOptions`, and genuinely optional rather than ignored.
+   *
+   * A fixture that carries a captured snapshot never needs one: the url branch substitutes a
+   * fetcher serving the capture, because re-fetching would make yesterday's score unrepeatable.
+   * A fixture with **no** capture does need one, which is how `tier2.test.ts` drives the whole
+   * cascade over a stub — so this is "supply one if your fixtures lack captures", not "this is
+   * never used".
+   *
+   * Required by inheritance until now, and `eval.mts` has been calling
+   * `createImportExtractor({ skipPhoto: true })` without one since it was written. Nothing
+   * typechecked that file, so nothing said so — `scripts` and `eval.mts` sat outside every
+   * tsconfig (`scripts/check-typechecked.mjs`).
+   */
+  fetcher?: Fetcher;
   /** report the cost the cascade actually incurred, so the harness can sum it */
   reportUsage?: boolean;
   /**
@@ -90,7 +105,12 @@ export function createImportExtractor(options: ImportExtractorOptions): Extracto
        * capture, so tiers 0 and 1 read exactly what was hand-checked.
        */
       const snapshot = input.text;
-      const withSnapshot: ImportExtractorOptions = snapshot
+      /*
+       * Typed as `ImportOptions`, not `ImportExtractorOptions`: both branches below supply a
+       * fetcher, so this value really does satisfy what `importRecipe` requires — and saying so
+       * here is what stops the optionality above leaking into a call that needs one.
+       */
+      const withSnapshot: ImportOptions = snapshot
         ? {
             ...options,
             fetcher: {
@@ -102,7 +122,34 @@ export function createImportExtractor(options: ImportExtractorOptions): Extracto
               },
             },
           }
-        : options;
+        : {
+            ...options,
+            /*
+             * No capture: the caller's fetcher if it gave one, and otherwise a fetcher that
+             * refuses by name.
+             *
+             * This used to pass `options` through with no fetcher at all, surviving only because
+             * the four fixtures on this path are refused during URL normalisation before anything
+             * fetches — a coincidence, not a design, and the next no-capture fixture to reach a
+             * fetch would read `undefined.page()`.
+             *
+             * The first attempt at the fix replaced the caller's fetcher unconditionally, which
+             * broke the test that drives the whole cascade over a stub. That test is the
+             * correction: a caller **does** supply a working fetcher on this path, so "the eval
+             * always substitutes its own" was true of `eval.mts` and not of the type.
+             */
+            fetcher:
+              options.fetcher ?? {
+                async page(): Promise<never> {
+                  throw new Error(
+                    `fixture ${input.url} carries no captured page, and no fetcher was supplied`,
+                  );
+                },
+                async bytes(): Promise<never> {
+                  throw new Error("a fixture carries no images");
+                },
+              },
+          };
       const outcome = await importRecipe(input.url, withSnapshot);
       if (!outcome.ok) {
         const refusal = refusalFor(outcome.failure, "url");

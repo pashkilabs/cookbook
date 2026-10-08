@@ -24,6 +24,10 @@ const response = await fetch(`${url}/rest/v1/${query}`, {
   headers: { apikey: key, authorization: `Bearer ${key}` },
 });
 if (!response.ok) throw new Error(`${response.status} ${await response.text()}`);
-const rows = await response.json();
+/*
+ * Typed, because this file now typechecks. It did not before — `scripts` was outside every
+ * tsconfig — and `rows.length` on an `unknown` was invisible for as long as the script existed.
+ */
+const rows = (await response.json()) as Array<{ time_minutes: number | null }>;
 writeFileSync("/tmp/corpus.json", JSON.stringify(rows));
-console.log(`pulled ${rows.length} recipes, ${rows.filter((r: any) => r.time_minutes !== null).length} with a time`);
+console.log(`pulled ${rows.length} recipes, ${rows.filter((r) => r.time_minutes !== null).length} with a time`);
