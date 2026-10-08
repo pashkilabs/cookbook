@@ -32,7 +32,16 @@ export const COMPONENTS_JSON_SCHEMA = {
         additionalProperties: false,
         required: ["name", "from", "to", "role"],
         properties: {
-          name: { type: "string", description: "what a cook would call it — 'the sauce', 'guacamole'" },
+          /*
+           * The example is no longer a role word. It used to read "'the sauce', 'guacamole'", and
+           * a model following the first half returned `sauce` for a spicy mayo — the description
+           * was demonstrating the failure it was meant to prevent.
+           */
+          name: {
+            type: "string",
+            description:
+              "the thing itself, never its category — 'guacamole', 'coconut curry broth', 'spicy mayo', 'glazed chicken'. Not 'sauce' or 'protein': those are the role, given separately.",
+          },
           from: { type: "integer", description: "first ingredient position, inclusive" },
           to: { type: "integer", description: "last ingredient position, inclusive" },
           role: {
@@ -87,6 +96,31 @@ export const COMPONENTS_INSTRUCTIONS = [
   "",
   "Answer null when none of them fits rather than choosing the nearest. A cocktail is none of",
   "them, and a wrong role is worse than an absent one because it is what people filter on.",
+  "",
+  /*
+   * Naming was never asked for, and the schema's own example was a role word.
+   *
+   * Measured: nine recipes, and two of them I had hand-labelled myself came back role-named.
+   * `Hawaiian Chicken Poke Bowl` is `spicy mayo / glazed chicken / rice / bowl toppings` by hand
+   * and came back `sauce / protein / carbohydrate / vegetable`; the coconut curry one named one
+   * part of four. Every instruction above is about *splitting* and *roles* — eight paragraphs —
+   * and the name got a schema description whose example was `'the sauce'`.
+   *
+   * So the field was not empty, it was echoing the category back. Same family as §54's "a schema
+   * field is not a request": a field nobody asks for in words gets whatever the example suggests.
+   *
+   * The last sentence ties naming to split quality on purpose: a part you cannot name more
+   * specifically than its role is good evidence the split is not real, which is the instruction
+   * above about not inventing one, reached from the other side.
+   */
+  "NAME each component as the thing itself, not as its category. The role is the category and",
+  "you are giving that separately, so repeating it as the name says nothing: write 'guacamole',",
+  "not 'sauce'; 'coconut curry broth', not 'sauce'; 'spicy mayo', not 'sauce'; 'glazed chicken',",
+  "not 'protein'. Use the words the recipe itself uses where it names them.",
+  "",
+  "If you cannot name a part more specifically than its role, that is a sign the split is not",
+  "real — prefer one component covering everything to two you can only call 'protein' and",
+  "'carbohydrate'.",
   "",
   /*
    * The null above is about a component's ROLE. The model was reading it as permission to answer

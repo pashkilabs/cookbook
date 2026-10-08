@@ -3693,6 +3693,38 @@ made.** It may say "one batch might do for both". It must never say "skip to ste
 
 ## §68 — Bases, third attempt: three angles, one missing thing
 
+> ### Where this ended up — read this first
+>
+> **Corrected twice by better evidence.** A decision log that accumulates corrections in
+> its body gets read wrong, so the current conclusion is here and the history is below it.
+>
+> **The conclusion that stands.** Most recipes in this household are complete dishes with
+> no separable part. Measured four ways and then a fifth: 2 of 10 recipes have two or more
+> components. That is a fact about a style of cooking, not a deficiency in any matcher.
+>
+> **Correction 1 — the naming was a real blocker, and is now closed.** This entry first
+> said the model names roles instead of bases, then corrected itself to say it names a base
+> wherever there is one. **Both were wrong.** The prompt never asked for a name in words,
+> and the schema's example was `'the sauce'` — a role word — so the field echoed the
+> category back. Fixed: naming went from **8 of 9 recipes role-named to 0 of 10**, and a
+> poke bowl went from `sauce / protein / carbohydrate / vegetable` to
+> `spicy mayo / marinated chicken / jasmine rice / poke bowl toppings`, against a hand label
+> of `spicy mayo / glazed chicken / rice / bowl toppings`.
+>
+> **Correction 2 — fixing it did not change the population.** 2 of 10 after, against 3 of 9
+> before. The prompt raised what the app can *identify*, never what exists. So the
+> conclusion above survived the one lever that might have overturned it, which is the
+> strongest thing that can be said for it.
+>
+> **And `times_made > 1 is 0 of 62` is not evidence of anything.** It was cited here as
+> one. `cooked_at` has been set five times ever, all of them by smoke runs: the control
+> shipped on a screen nobody has opened. It measures a button, not a household.
+>
+> **What this does and does not block.** It blocks matching a base to *other* recipes.
+> It does **not** block *make extra now, cook faster later*, which needs only one finish —
+> the same recipe again — and is built in §69.
+
+
 §64 rejected bases matched from a typed pantry name. §67 measured the inverse and
 shipped it with its limitation recorded. This is the **third** angle — a base created
 from a recipe the app already knows, so it is not a name someone typed — and it is

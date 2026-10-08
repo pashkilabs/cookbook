@@ -129,18 +129,17 @@ const SHARED_ITEMS = 6;
 /*
  * Component names that are not bare role words — §68's cheaper reversal condition.
  *
- * A component named `dressing` is a base somebody could make once. One named `protein` is the
- * model saying this recipe has no separable part — which it says by falling back to the role,
- * and which is the correct answer for a grilled chicken.
+ * **Recipes with two or more parts**, which is the population question three attempts converged
+ * on. Counted free from the partitions already stored, so it accumulates with no model calls.
  *
- * So this is not a naming score. It measures **what fraction of a household's recipes have a
- * base at all**, which is the question three attempts have now converged on. Counted free from
- * the partitions already stored, so it accumulates with no model calls.
+ * This counted *names that are not a role word* until the naming prompt was fixed, and then it
+ * became meaningless: with the prompt asking for a name, `loaded potato soup` is not a role word
+ * and is also not a base — a one-pan dinner named once is the correct answer, and it passed.
+ * Measured on ten recipes, naming went from 8 of 9 role-named to 0 of 10 while the population
+ * stayed at 2 of 10. Two different questions, and the easy one had been standing in for the
+ * hard one.
  */
 const BASE_NAMES_WANTED = 6;
-const ROLE_WORDS = new Set([
-  "protein", "carbohydrate", "sauce", "vegetable", "garnish", "marinade", "sweet",
-]);
 
 try {
   const recipes = await count("recipes?select=id&deleted_at=is.null");
@@ -179,12 +178,9 @@ try {
   let baseNames = 0;
   for (const row of partitioned) {
     if (!Array.isArray(row.components)) continue;
-    for (const part of row.components as Array<{ name?: unknown }>) {
-      const name = typeof part?.name === "string" ? part.name.trim().toLowerCase() : "";
-      if (!name) continue;
-      componentNames += 1;
-      if (!ROLE_WORDS.has(name)) baseNames += 1;
-    }
+    componentNames += 1;
+    // two or more parts: one component is the whole dish, correctly, and is not a base
+    if (row.components.length > 1) baseNames += 1;
   }
   const repeated = await count("recipes?select=id&times_made=gt.1&deleted_at=is.null");
   const cooked = await count("recipes?select=id&times_made=gt.0&deleted_at=is.null");
@@ -281,19 +277,23 @@ try {
     `     (${byWeek.size} weeks planned, ${SHARED_ITEMS}+ shared non-protein, non-carb, non-staple items${bestPair ? `; e.g. ${bestPair}` : ""})`,
   );
   console.log(
-    `  component names that are not a role  ${String(baseNames).padStart(4)} / ${BASE_NAMES_WANTED}   ${verdict(baseNames, BASE_NAMES_WANTED)}`,
+    `  recipes split into two or more parts ${String(baseNames).padStart(4)} / ${BASE_NAMES_WANTED}   ${verdict(baseNames, BASE_NAMES_WANTED)}`,
   );
-  console.log(`     (of ${componentNames} names across ${partitioned.length} partitioned recipes)`);
+  console.log(`     (of ${componentNames} recipes with a stored partition)`);
   console.log(`
   §68's cheaper reversal condition, and the one a fourth attempt at bases should check FIRST.
   The single real split in this library names its parts "protein" and "carbohydrate", while every
   discussion of the feature argued from "the huli-huli marinade" — an example nobody had checked.
-  Checked properly, the model names a base where there IS one — Greek Salad gives "dressing" and
-  "salad" — and falls back to a role where there is not. So this is not a naming failure: it
-  measures what fraction of a household's recipes have a separable base at all. Three
-  measurements agree that fraction is low (§66: 6 in 79; §67: 1 of 5 firings; here: 2 of 7).
-  Thirty calls over ten recipes would answer it sooner, because what matters is a fraction and
-  today's denominator is four.
+  The naming blocker is closed: the prompt never asked for a name and the schema's example was
+  "the sauce", so the field echoed the category back. Measured on ten recipes, naming went from
+  8 of 9 role-named to 0 of 10, and the hard case — a poke bowl — went from
+  "sauce / protein / carbohydrate / vegetable" to "spicy mayo / marinated chicken / jasmine rice
+  / poke bowl toppings", against a hand label of "spicy mayo / glazed chicken / rice / bowl
+  toppings".
+
+  The POPULATION did not move: 2 of 10 recipes have two or more parts, against 3 of 9 before. So
+  §68 stands — most recipes here are complete dishes, and the prompt could not change that.
+  Fixing the naming raised what the app can *identify*, not what exists.
 `);
   console.log(`
   §66 found six real shared bases across 11 of 79 recipes — a Greek salad finished three ways,
