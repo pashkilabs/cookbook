@@ -393,6 +393,15 @@ recipes for all five bases tried, and a perfect matcher buys about three. Revers
 command: `pnpm --filter @pashki/import ripeness` reports repeat cooks and component splits, and
 at six repeats "skip to step 7, you made the ragù on Sunday" is one column on `plan_entries`.
 
+**Bases, three attempts** (§64, §67, §68). Three angles — matched from a typed pantry name,
+suggested from overlap at planning time, created from a recipe the app knows — converging on one
+missing thing: §60 removed step-level attribution for want of a corpus, so components are
+ingredient-only, so a base cannot say where in the method it is, so "skip to step 4" is
+unavailable. §60's own number would unblock it: 40–60 recipes with varied technique, hand-labelled
+as ordered `(component, technique)` pairs with a held-out set. The cheaper check first:
+`ripeness` reports *component names that are not a role*, which measures what fraction of recipes
+have a separable base at all — 2 of 7 today.
+
 **Shared bases, measured and not built** (§66). The inverse of §64 and not blocked by it: six
 real shared bases across 11 of 79 recipes, including a Greek salad finished three ways. The
 moment worth a screen is in the planner — "Tuesday and Thursday share the huli-huli marinade,

@@ -126,6 +126,21 @@ const SHARING_WEEKS_WANTED = 1;
  * two meals sharing a base in the same week? Precision is what makes that answer worth reading.
  */
 const SHARED_ITEMS = 6;
+/*
+ * Component names that are not bare role words — §68's cheaper reversal condition.
+ *
+ * A component named `dressing` is a base somebody could make once. One named `protein` is the
+ * model saying this recipe has no separable part — which it says by falling back to the role,
+ * and which is the correct answer for a grilled chicken.
+ *
+ * So this is not a naming score. It measures **what fraction of a household's recipes have a
+ * base at all**, which is the question three attempts have now converged on. Counted free from
+ * the partitions already stored, so it accumulates with no model calls.
+ */
+const BASE_NAMES_WANTED = 6;
+const ROLE_WORDS = new Set([
+  "protein", "carbohydrate", "sauce", "vegetable", "garnish", "marinade", "sweet",
+]);
 
 try {
   const recipes = await count("recipes?select=id&deleted_at=is.null");
@@ -151,6 +166,26 @@ try {
   const withSections = new Set(sectionRows.map((row) => row.recipe_id)).size;
 
   const blends = await count("recipes?select=id&derived_at=not.is.null&deleted_at=is.null");
+
+  /*
+   * A bare role word is not a base name. Read from stored partitions, excluding blends —
+   * `composeBlend` writes a part's name into `section` and its own lineage, which is structure
+   * this app generated rather than a model naming a part of a recipe.
+   */
+  const partitioned = (await rows(
+    "recipes?select=id,components&components=not.is.null&derived_at=is.null&deleted_at=is.null",
+  )) as Array<{ components: unknown }>;
+  let componentNames = 0;
+  let baseNames = 0;
+  for (const row of partitioned) {
+    if (!Array.isArray(row.components)) continue;
+    for (const part of row.components as Array<{ name?: unknown }>) {
+      const name = typeof part?.name === "string" ? part.name.trim().toLowerCase() : "";
+      if (!name) continue;
+      componentNames += 1;
+      if (!ROLE_WORDS.has(name)) baseNames += 1;
+    }
+  }
   const repeated = await count("recipes?select=id&times_made=gt.1&deleted_at=is.null");
   const cooked = await count("recipes?select=id&times_made=gt.0&deleted_at=is.null");
   // a part marked done needs a part to mark: components and repeats both have to be non-zero
@@ -245,6 +280,21 @@ try {
   console.log(
     `     (${byWeek.size} weeks planned, ${SHARED_ITEMS}+ shared non-protein, non-carb, non-staple items${bestPair ? `; e.g. ${bestPair}` : ""})`,
   );
+  console.log(
+    `  component names that are not a role  ${String(baseNames).padStart(4)} / ${BASE_NAMES_WANTED}   ${verdict(baseNames, BASE_NAMES_WANTED)}`,
+  );
+  console.log(`     (of ${componentNames} names across ${partitioned.length} partitioned recipes)`);
+  console.log(`
+  §68's cheaper reversal condition, and the one a fourth attempt at bases should check FIRST.
+  The single real split in this library names its parts "protein" and "carbohydrate", while every
+  discussion of the feature argued from "the huli-huli marinade" — an example nobody had checked.
+  Checked properly, the model names a base where there IS one — Greek Salad gives "dressing" and
+  "salad" — and falls back to a role where there is not. So this is not a naming failure: it
+  measures what fraction of a household's recipes have a separable base at all. Three
+  measurements agree that fraction is low (§66: 6 in 79; §67: 1 of 5 firings; here: 2 of 7).
+  Thirty calls over ten recipes would answer it sooner, because what matters is a fraction and
+  today's denominator is four.
+`);
   console.log(`
   §66 found six real shared bases across 11 of 79 recipes — a Greek salad finished three ways,
   two marinades, a hibachi vegetable base. The moment worth a screen is in the PLANNER: "Tuesday

@@ -3690,3 +3690,133 @@ it"* rather than *"are you sure"*.
 
 Unchanged from §66: **overlap says what is shared, never where in the method it is
 made.** It may say "one batch might do for both". It must never say "skip to step 7".
+
+## §68 — Bases, third attempt: three angles, one missing thing
+
+§64 rejected bases matched from a typed pantry name. §67 measured the inverse and
+shipped it with its limitation recorded. This is the **third** angle — a base created
+from a recipe the app already knows, so it is not a name someone typed — and it is
+the best of the three. It fails, and all three fail on the same missing thing, which
+none of them could show alone.
+
+**This entry exists so a fourth angle meets the reason before it starts.**
+
+### The chain
+
+> §60 removed step-level attribution **for want of a corpus with technique in it**
+> → components are ingredient-only
+> → a base cannot say *where in the method* it is
+> → `"skip to step 4"` is unavailable
+> → a base is a freezer label with no payoff.
+
+Every link is already recorded somewhere. The chain is what nobody had assembled.
+
+### Q1 — which recipes have a base at all? One, and not the one we argued from
+
+62 own recipes in the real household. **One** is split into two or more components.
+Its components are:
+
+```
+Hibachi Steak Bowls (4 steps)
+    protein        [0-12]   protein
+    carbohydrate   [13-13]  carbohydrate
+```
+
+**Role words used as names.** There is no "the hibachi marinade" component — there is
+a thirteen-line protein lump and a one-line carbohydrate.
+
+Every person reasoning about this feature, across three attempts, argued from *"the
+huli-huli marinade"* or *"the ragù base"* — an example nobody had checked against the
+data.
+
+**And then checking it properly corrected the conclusion.** Across every household,
+four recipes are partitioned, giving seven component names:
+
+```
+Greek Salad                 "dressing"   "salad"          <- named as bases
+Huli Huli Chicken           "protein"    "garnish"
+The Best Grilled Chicken    "protein"
+Hibachi Steak Bowls         "protein"    "carbohydrate"
+```
+
+So the model **names a base where there is one and falls back to a role where there
+is not.** Greek Salad genuinely separates into a dressing and a salad, and it is
+named that way. A grilled chicken is one dish with a protein, and the model says so.
+
+That is not a naming failure, and the first version of this entry called it one. It
+means **the blocker is the recipes, not the prompt** — most recipes do not have a
+separable base, which is precisely what §66 found from overlap (six real bases across
+11 of 79) and §64 found from matching. The three attempts converge on a fact about
+*recipes* rather than a deficiency in the code.
+
+### The cost of finding out more
+
+Splitting the remaining 61 recipes is **183 model calls**, three per recipe. Against:
+
+- a provider measured failing **2 calls in 3** during a multi-hour window (§61)
+- partitions scoring `right` **15 of 30**, components found 47 of 71
+- and **no confidence signal to filter them** — §61 measured agreement separating
+  right from wrong at 50/50 either side of 0.7
+
+So 183 calls buys roughly half-right partitions that nothing can rank. That is not a
+measurement, it is a purchase.
+
+### Q2 — a known base does not find its finishes either
+
+Creating the base from a recipe the app knows changes **identity**, not **matching**.
+You know what it is; finding another recipe that wants it is still §67's overlap
+question, and overlap cannot tell a base from a cuisine signature.
+
+The one finish a *known* base has is **the same recipe again** — §64's reversal
+condition — and `times_made > 1` is **0 of 62**.
+
+### Q3 — components do not carry method, which was the whole hope
+
+The genuinely new idea was that a component is a stretch of ingredients *plus the
+steps that make it* — the one representation here that carries method. It is not:
+
+```
+RecipeComponent          { name, from, to, role }
+from/to index            the INGREDIENT list
+steps seen by inference  none — inferComponents takes { title, ingredients }
+```
+
+The word `steps` appears **zero times** in `packages/import/src/components.ts`. The
+blend screen already says it out loud: *"Nothing here knows which steps make which
+part."* So §64's prohibition — overlap must never say "skip to step 7" — **binds a
+component exactly as it binds overlap**, for the same reason.
+
+The instinct about where this should live was right. The representation does not yet
+carry what it would need.
+
+### What would unblock it, in §60's own number
+
+> 40–60 recipes whose steps genuinely contain varied technique, hand-labelled as
+> ordered `(component, technique)` pairs, split into a tuning set and a held-out set
+> never tuned against.
+
+That corpus has to be imported first. §60 recorded the counts rather than the
+omission — sear 4, braise 2, roast 2, marinate 0 across 376 steps — so the gap is a
+measurement, not an opinion. **It is the same gap for all three attempts.**
+
+### The reversal condition: two cheap checks, before a fourth attempt
+
+Both are cheaper than any of the three attempts, and neither is a migration.
+
+1. **`times_made > 1` stops being 0.** Already reported by
+   `pnpm --filter @pashki/import ripeness`. Without a repeat cook, the only finish a
+   known base has has never once occurred.
+2. **How many recipes have a nameable base at all.** On `ripeness` as *component names
+   that are not a role*, counted free from stored partitions — **2 of 7 today**, both
+   from Greek Salad. The question is no longer "can the model name a base" (it can)
+   but **"what fraction of a household's recipes have one"**, and the three
+   measurements agree it is low: 6 real shared bases in 79 recipes (§66), 1 of 5
+   firings real (§67), and 2 of 7 component names (here).
+
+   Worth accelerating with **~10 recipes, 30 calls**, because the number that matters
+   is a *fraction* and today's denominator is four.
+
+A fourth attempt should check the second **first**. If a third of a household's
+recipes turn out to have a nameable base, the feature has a population and the
+remaining blocker is the method chain above. If it stays near a tenth, bases are a
+feature for a kind of cooking this household does not do, and that is the answer.
