@@ -44,6 +44,9 @@ pnpm --filter @pashki/db check:parity           # always after; schema, privileg
 pnpm --filter @pashki/db set:smtp               # mail provider for hosted auth
 pnpm --filter @pashki/db set:site-url <url>     # site_url + redirect allow list, together
 pnpm --filter @pashki/db issue:entitlement --email <address>
+pnpm --filter @pashki/db rotate:token           # replace SUPABASE_ACCESS_TOKEN — the one
+                                                # command here that does NOT need the env
+                                                # file sourced first, since it writes it
 ```
 
 Run `pnpm check` before saying a task is done. Database tests skip themselves when

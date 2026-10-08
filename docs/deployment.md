@@ -255,8 +255,27 @@ None of 1–3 matter while the URL is unadvertised and entitlements are granted 
 `the management API answered 401`. The database half still compares (23 tables, 27 private
 functions, all matching); the auth half is not running.
 
-**Refresh it at [supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens)**
-and update `SUPABASE_ACCESS_TOKEN` in `~/.pashki-supabase.env`.
+Get a new one at [supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens),
+then:
+
+```bash
+pnpm --filter @pashki/db rotate:token      # from packages/db; prompts, does not echo
+set -a && . ~/.pashki-supabase.env && set +a
+pnpm --filter @pashki/db check:parity
+```
+
+**It verifies before it writes.** The new token is checked against
+`GET /v1/projects/<ref>/config/auth` for the *linked* project before the file is touched, so a
+mistyped token is refused rather than stored — the failure worth designing out is a rotation that
+looks done and surfaces a week later as the same exit 2. A valid token issued on a different
+account answers 403/404 and is refused separately from an invalid one answering 401; a 500 or 429
+is *could not measure*, since neither says anything about the token.
+
+It writes a timestamped `.bak`, renames into place rather than writing in place, and **reads the
+value back, refusing if it does not match** — a write that reports success and stored something
+else is the whole point. It replaces *every* assignment of the key and says how many, because
+`set -a && .` is last-wins and replacing one of two is a silent no-op. Refusal paths are tested:
+401, no token, and whitespace all exit non-zero with the file byte-identical.
 
 Worth doing rather than living with. **That half has caught real divergence before** — hosted
 ships `mailer_autoconfirm: false` while the CLI ships `enable_confirmations = false`, so local is

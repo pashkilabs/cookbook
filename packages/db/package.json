@@ -39,7 +39,8 @@
     "set:smtp": "node scripts/set-smtp.mjs",
     "set:site-url": "node scripts/set-site-url.mjs",
     "issue:entitlement": "node scripts/issue-entitlement.mjs",
-    "set:drain-endpoint": "node scripts/set-drain-endpoint.mjs"
+    "set:drain-endpoint": "node scripts/set-drain-endpoint.mjs",
+    "rotate:token": "node scripts/rotate-access-token.mjs"
   },
   "devDependencies": {
     "@pashki/core": "workspace:^",
