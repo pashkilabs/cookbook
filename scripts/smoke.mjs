@@ -700,7 +700,9 @@ try {
      * planner. Coverage is printed rather than assumed.
      */
     const MARKERS = {
-      "/planner": "Waiting for a day",
+      // a screen may assert more than one, so a block added to it is covered rather than
+      // riding on a marker that was already passing
+      "/planner": ["Waiting for a day", "Alongside this week"],
       "/recipes": "Tonight",
       "/household": "Where you cook",
       "/recipes/new": "Add a recipe",
@@ -739,11 +741,13 @@ try {
         "Next's error page, and the RSC function refusal by name",
       );
       if (marker) {
-        record(
-          `and ${name} is a page rather than a status`,
-          page.status === 200 && body.includes(marker),
-          page.status === 200 ? `looked for ${JSON.stringify(marker)}` : `HTTP ${page.status}`,
-        );
+        for (const needle of Array.isArray(marker) ? marker : [marker]) {
+          record(
+            `and ${name} renders ${JSON.stringify(needle)}`,
+            page.status === 200 && body.includes(needle),
+            page.status === 200 ? "found" : `HTTP ${page.status}`,
+          );
+        }
       } else {
         unmarked += 1;
       }
