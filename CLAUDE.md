@@ -240,8 +240,15 @@ models be good enough. Do not add a silent-save path.
   here, and every negative test about unconfirmed accounts passes vacuously until
   `supabase/config.toml` is fixed. Neither environment is reliably stricter than the other;
   they simply differ, and `config.toml` has to be read against the hosted config rather than
-  trusted. `pnpm --filter @pashki/db check:parity` compares schema and privileges, **not auth
-  settings** — nothing automated catches this one yet.
+  trusted. **`check:parity` does now compare auth settings** — 26 of them, `mailer_autoconfirm`
+  among them, via `scripts/auth-parity.mjs`, which translates the CLI's `enable_confirmations`
+  into GoTrue's `GOTRUE_MAILER_AUTOCONFIRM` so the two environments are comparable at all. This
+  line said the opposite for a while after the mechanism landed, which is the costlier direction
+  for a note to rot in: **a memory claiming a gap that has been closed invites hand-checking what
+  is automated, or building the mechanism twice.** The caveat that remains is narrower — the auth
+  half needs `SUPABASE_ACCESS_TOKEN`, so it reports *could not measure* and exits 2 when the
+  management token expires, and a half that cannot run is not checking. Rotate with
+  `pnpm --filter @pashki/db rotate:token`.
 - **GoTrue matches `redirect_to` against its allow list, and a path under `site_url` is not
   implied.** An unlisted redirect is not an error: it is silently replaced with `site_url`, so
   the link in the email goes somewhere plausible and wrong. Add the path glob
