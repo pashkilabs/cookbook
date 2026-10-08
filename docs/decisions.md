@@ -3964,3 +3964,22 @@ This fires on recipes with two or more parts, and that is **2 of 10** measured
 (§68). Fixing the component-naming prompt took naming from 8-of-9 role-named to
 0-of-10 and left the population unmoved, so this is a feature for a fifth of a
 library rather than most of it. `pnpm --filter @pashki/import ripeness` tracks it.
+
+### Measured, not assumed
+
+`pnpm --filter @pashki/import ripeness` counts **bases kept** and **bases cooked all the way
+down**. Two columns existed and nothing established whether anybody reaches for the control —
+and the conditions here are exactly the ones under which a feature quietly goes unused: it fires
+on **a fifth of the library** (§68) and delivers **half** of what "cook faster later" suggests,
+since the shopping comes off the list and the method does not. One kept means somebody found the
+control; one spent means the loop closed — kept, deducted, spent — which is the half standing in
+for an expiry date. Zero of the first after a few weeks of real use is the answer that the
+control is not where a cook looks.
+
+A **partial** decrement is deliberately not reported. `amount` is the batches *remaining* and the
+count a base was kept at is not stored, so a base sitting at 1 cannot be told from one kept at 2
+and cooked once. A column existing only to measure its own feature is a column to keep correct
+for ever, and `updated_at` moving conflates a decrement with a top-up — the proxy trap this
+session recorded. Two numbers that are exactly true beat three where one is approximate and
+unlabelled.
+

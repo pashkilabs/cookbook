@@ -140,6 +140,20 @@ const SHARED_ITEMS = 6;
  * hard one.
  */
 const BASE_NAMES_WANTED = 6;
+/*
+ * Is the base feature used at all? (§69)
+ *
+ * Two columns exist and nothing measured whether anybody reaches for them. This is a feature
+ * that fires on **a fifth of the library** and delivers **half of what "cook faster later"
+ * suggests** — the shopping comes off, the method does not — and those are exactly the
+ * conditions under which a feature quietly goes unused. Guessing is what this project has a
+ * mechanism to avoid.
+ *
+ * One of each is the signal. One base kept means somebody found the control; one used up means
+ * the loop closed — kept, deducted, spent — which is the half that replaces an expiry date.
+ */
+const BASES_KEPT_WANTED = 1;
+const BASES_SPENT_WANTED = 1;
 
 try {
   const recipes = await count("recipes?select=id&deleted_at=is.null");
@@ -165,6 +179,28 @@ try {
   const withSections = new Set(sectionRows.map((row) => row.recipe_id)).size;
 
   const blends = await count("recipes?select=id&derived_at=not.is.null&deleted_at=is.null");
+
+  /*
+   * Bases, and the limit of what can be counted.
+   *
+   * `amount` is the batches *remaining*, and the count a base was kept at is not stored — so a
+   * base sitting at 1 is indistinguishable from one kept at 2 and cooked once. That is a
+   * deliberate omission rather than an oversight: a column existing only to measure its own
+   * feature is a column to keep correct for ever, and `updated_at` moving is a proxy that
+   * conflates a decrement with a top-up.
+   *
+   * So two numbers that are exactly true — kept, and used up — and the middle is not reported
+   * rather than reported approximately.
+   */
+  const basesKept = await count(
+    "pantry_items?select=id&from_recipe_id=not.is.null&deleted_at=is.null",
+  );
+  const basesSpent = await count(
+    "pantry_items?select=id&from_recipe_id=not.is.null&amount=eq.0&deleted_at=is.null",
+  );
+  const basesWaiting = await count(
+    "pantry_items?select=id&from_recipe_id=not.is.null&amount=gte.1&deleted_at=is.null",
+  );
 
   /*
    * A bare role word is not a base name. Read from stored partitions, excluding blends —
@@ -280,6 +316,23 @@ try {
     `  recipes split into two or more parts ${String(baseNames).padStart(4)} / ${BASE_NAMES_WANTED}   ${verdict(baseNames, BASE_NAMES_WANTED)}`,
   );
   console.log(`     (of ${componentNames} recipes with a stored partition)`);
+  console.log(
+    `  bases kept in the freezer            ${String(basesKept).padStart(4)} / ${BASES_KEPT_WANTED}   ${verdict(basesKept, BASES_KEPT_WANTED)}`,
+  );
+  console.log(
+    `  bases cooked all the way down        ${String(basesSpent).padStart(4)} / ${BASES_SPENT_WANTED}   ${verdict(basesSpent, BASES_SPENT_WANTED)}`,
+  );
+  console.log(`     (${basesWaiting} still waiting; a partial decrement is not separable — the count a base was kept at is not stored, on purpose)`);
+  console.log(`
+  §69 fires on a fifth of the library and delivers half of what "cook faster later" suggests:
+  the shopping comes off the list, the method does not, because components index the ingredient
+  list and the inference never sees the steps (§68). A feature that narrow and that partial is
+  one that goes quietly unused, and this measures whether it has rather than assuming either way.
+
+  One kept means somebody found the control. One cooked all the way down means the loop closed —
+  kept, deducted, spent — which is the half that stands in for an expiry date. Zero of the first
+  after a few weeks of real use is the answer that the control is not where a cook looks.
+`);
   console.log(`
   §68's cheaper reversal condition, and the one a fourth attempt at bases should check FIRST.
   The single real split in this library names its parts "protein" and "carbohydrate", while every

@@ -248,3 +248,19 @@ Sending was the blocker that could be removed. It was not the only one.
 
 None of 1–3 matter while the URL is unadvertised and entitlements are granted by hand. All of
 1–3 matter the day it is not.
+
+## The Supabase management token has expired
+
+`pnpm --filter @pashki/db check:parity` exits **2 — could not measure** on its auth half:
+`the management API answered 401`. The database half still compares (23 tables, 27 private
+functions, all matching); the auth half is not running.
+
+**Refresh it at [supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens)**
+and update `SUPABASE_ACCESS_TOKEN` in `~/.pashki-supabase.env`.
+
+Worth doing rather than living with. **That half has caught real divergence before** — hosted
+ships `mailer_autoconfirm: false` while the CLI ships `enable_confirmations = false`, so local is
+the *more permissive* of the two and every negative test about unconfirmed accounts passes
+vacuously until `config.toml` is fixed. Nothing else compares auth settings between the two
+environments. A half that cannot run is not checking, and the exit code says so rather than
+reporting a pass.
