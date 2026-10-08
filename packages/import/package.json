@@ -28,6 +28,10 @@
     "./photo-bucket": {
       "types": "./src/photo-bucket.ts",
       "default": "./src/photo-bucket.ts"
+    },
+    "./prompt-version": {
+      "types": "./src/prompt-version.ts",
+      "default": "./src/prompt-version.ts"
     }
   },
   "scripts": {

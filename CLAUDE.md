@@ -193,6 +193,31 @@ models be good enough. Do not add a silent-save path.
   bumping is part of the change, not a follow-up — and record what each version *means*, since
   a bare integer gives the next reader nothing to compare against.
 
+- **There was more than one cache, and only one of them had a version.** `EXTRACTOR_VERSION`
+  governs the *import* cache and is the subject of the trap above. The **palate note** and the
+  **component partition** are two further caches, keyed by `promptKey`, and nothing governed them
+  at all — so the fix for the first cache did not protect the other two, and the next instance
+  landed in the ones nobody had thought about.
+
+  What made it invisible is that `promptKey` was **built to avoid exactly this**. Its comment
+  reads: *"Derived from the input rather than bumped by hand, because a stamp only works if
+  something turns it — and nobody turned EXTRACTOR_VERSION for two releases."* Correct about
+  hand-stamps, and it then fingerprinted every input the *recipe* carries — title, lines,
+  declared sections — while omitting **the prompt, which is also an input**. So rewriting the
+  component instructions left every key byte-identical. Role-named parts went 8 of 9 → 0 of 10
+  **in the eval** and reached no household: the stored partitions were still named `protein`,
+  `garnish`, `carbohydrate` — the exact words the rewrite removed. A bug report of "splitting
+  extracts the protein and ignores the sauce" was a report about a prompt that had been fixed a
+  week earlier.
+
+  Two rules, and the second is the one worth keeping. **Ask how many caches a change invalidates,
+  not whether the one you remember is versioned** — the same question as *which files does nothing
+  check?*, asked about stored answers. And **a derived key is only as good as its list of inputs**:
+  the prompt is text and text can be fingerprinted, so `prompt-version.ts` hashes the instructions
+  *and the schema* — a description is half the prompt, which §54a already proved by letting an
+  example become a default. The digest is now the **first and required** argument to `promptKey`,
+  because the thing that failed twice was a sentence in a comment, and a type error is a mechanism.
+
 - **A permission nothing has exercised is a permission you do not have.** Every object
   in the photo bucket had been written by the import service as `service_role`, which
   **bypasses RLS entirely** — so `storage.objects` having no INSERT policy at all was

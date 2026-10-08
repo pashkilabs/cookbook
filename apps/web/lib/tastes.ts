@@ -1,4 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+/*
+ * A leaf module by design: `prompt-version.ts` reaches only `@pashki/core` and two type-only
+ * files, so importing it at module scope cannot pull `sharp` into this bundle — the hazard
+ * `check-native-imports` exists for, and the reason the import package is otherwise loaded
+ * dynamically here.
+ */
+import {
+  COMPONENTS_PROMPT_FINGERPRINT,
+  PALATE_PROMPT_FINGERPRINT,
+} from "@pashki/import/prompt-version";
 import { fingerprint, readTastes, tasteSummary, type RatingObservation, type TasteReading } from "@pashki/core";
 import { rows } from "./rows";
 import { platformClient } from "./platform";
@@ -145,7 +155,7 @@ export async function palateNotesFor(
   const lines = ingredients.map((row) =>
     [row.amount ?? "", row.unit ?? "", row.item_text ?? ""].join(" ").trim(),
   );
-  const key = promptKey(recipe.title, lines);
+  const key = promptKey(PALATE_PROMPT_FINGERPRINT, recipe.title, lines);
 
   if (recipe.palate_key === key && Array.isArray(recipe.palate_notes)) {
     return recipe.palate_notes as import("@pashki/import").PalateNote[];
@@ -204,10 +214,19 @@ export async function palateNotesFor(
  * input is what removes the human step — but only if it is derived from *all* of it. So the rule
  * is: an input reaches the model through this function, or it does not reach the model.
  *
+ * regression, the second time, from the same blind spot: **the prompt is an input.** This
+ * function listed every input the *recipe* carries and omitted the instructions, so rewriting
+ * the component prompt left every key identical and six households' partitions kept the names
+ * the rewrite removed. `prompt` closes it — and it is the **first parameter and required**, so a
+ * future cache cannot quietly omit it the way this one did. A type error is a mechanism; a
+ * sentence in a comment is the thing that failed twice.
+ *
  * Sections are joined with a separator that cannot occur in text, so a section named "x" on a
  * line "y" is not the same key as no section on "x\u0001y".
  */
 export function promptKey(
+  /** the fingerprint of the instructions and schema that will be sent — see `prompt-version.ts` */
+  prompt: string,
   title: string | null,
   lines: readonly string[],
   sections?: ReadonlyArray<string | null>,
@@ -216,6 +235,7 @@ export function promptKey(
   // a recipe with none must key identically whether the caller passed an array of nulls or nothing
   const sent = sections?.some(Boolean) ? sections : undefined;
   return fingerprint([
+    prompt,
     title ?? "",
     ...lines.map((line, at) => (sent ? `${sent[at] ?? ""}\u0001${line}` : line)),
   ]);
@@ -308,7 +328,7 @@ export async function componentsFor(
   // took `right` from ~14 to 25 of thirty when supplied
   const sections = ingredients.map((row) => row.section ?? null);
   const hasSections = sections.some(Boolean);
-  const key = promptKey(recipe.title, lines, sections);
+  const key = promptKey(COMPONENTS_PROMPT_FINGERPRINT, recipe.title, lines, sections);
 
   /*
    * A partition built on fewer than three readings is provisional, and is recomputed.
