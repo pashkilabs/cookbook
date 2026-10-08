@@ -3517,3 +3517,101 @@ exist. The deduction is real and good; the suggestion has never been built.
 If it is built, note what §64 measured: suggestion from the pantry faces the *easy*
 version of the matching problem (raw groceries against raw ingredient lines, both
 sides atomic), which is why it is plausible where bases are not.
+
+## §66 — Which recipes already share a base: measured, and the screen not built
+
+The inverse of §64, and **not blocked by it.** §64 asked *"does my frozen base match
+this recipe"*, which ingredient lines cannot answer because a base substitutes for
+ingredients **plus a stretch of method**. This asks *"which recipes overlap"* — a
+similarity question over ingredient lines, which is the easy side of the same
+distinction §65 drew about pantry suggestion.
+
+### The measurement
+
+Over 79 recipes with ingredients, comparing non-protein, non-carbohydrate,
+non-staple, non-aromatic lines resolved to catalog keys:
+
+| pairs sharing | count |
+|---|---|
+| ≥ 2 items | 187 |
+| ≥ 3 | 55 |
+| ≥ 4 | 16 |
+| **≥ 5** | **8** |
+| ≥ 6 | 5 |
+| ≥ 7 | 2 |
+
+At ≥5: **8 candidate sets over 11 of 79 recipes, 6 of them real.** The six:
+
+- **a Greek salad finished three ways** — honey, kalamata olives, oregano, feta,
+  tomatoes, across *Greek Salad*, *Grilled Chicken with Greek Salad* and
+  *Greek Chicken Bowl*. The existence proof.
+- the same pair at **10** shared items, adding cucumber, dill, bell pepper, vinegar
+- a **hibachi vegetable base** at 8 — butter, carrots, garlic powder, ginger paste,
+  mirin, mushrooms, teriyaki, zucchini
+- a **BBQ mop** — apple juice, brown sugar, honey, bbq sauce, worcestershire, mustard
+- a **huli-huli marinade** — brown sugar, pineapple juice, sherry, soy, sriracha, ketchup
+- the Greek pair again with lemon
+
+The other two are topping overlap — avocado, cilantro, cumin — which are garnishes
+you assemble, not a base you batch. **Compare §64, whose ceiling was 3 and whose
+three were spurious.** These are recognisable: you can read "that's a Greek salad"
+off the list.
+
+### Transitive closure is not a base, and the wrong version flatters
+
+The first grouping used connected components and produced a **group of six with
+nothing in common across all of it**: A–B share four, B–C share four, A–C share
+zero. That is a path through a similarity graph.
+
+**A base is a set of ingredients several recipes all contain**, so the set is the
+thing to enumerate and the group is whoever holds it. Grouping by shared *itemset*
+is the honest unit — and the wrong version is the flattering one, which is the
+reason to name it here rather than leave it to be rediscovered.
+
+### Protein-swapping was in the brief and the data does not request it
+
+"Replace the protein" is a method claim, not an ingredient one — chicken for pork in
+a braise is fine, chicken for pork in a dish whose steps say *"sear the breasts four
+minutes a side"* is not (§60's collagen reasoning).
+
+**But not one measured group asks for it.** The Greek base is uncooked, the BBQ mop
+and huli-huli are marinades, and the hibachi pair is steak in both. The mechanism
+exists if it is ever needed — `collagenWarnings` and `compatibilityReport` are built
+— and per §60 step 3 it would rarely speak. Building for protein-swapping now would
+be **building against an imagined use.**
+
+### Components do not matter here, and requiring them would be worse
+
+These groups are scatterings of lines; no component was involved in computing them.
+Requiring the shared base to be a component would restrict it to the 3 recipes that
+have any, and would need component-to-component matching across recipes, which §60
+forbids: *"two recipes' sauces merge the way `almond milk` merged into `whole
+milk`."* Overlap over catalog keys names no global category and sidesteps it.
+
+**Overlap alone is enough.**
+
+### What it must never claim
+
+> **Overlap says what is shared. It never says where in the method it is made.**
+
+§64's lesson arriving from the other side. So this may say *"make the marinade
+once"* and must **never** say *"skip to step 7"* — the first is a fact about
+ingredients, the second a claim about method that no ingredient comparison can
+support.
+
+### The screen is not built, and the trigger is a command
+
+The moment worth a screen is in the **planner**: "Tuesday and Thursday share the
+huli-huli marinade, make it once", which turns overlap into a saved job. With 11
+recipes in any group it fires about never, and **a screen that is correct and silent
+is the shape this project keeps shipping.**
+
+So `pnpm --filter @pashki/import ripeness` reports *weeks where two planned meals
+share a base*. Today: **0 of 1, across 11 planned weeks.**
+
+The trigger uses **six** shared items where the cataloguing above used five, and the
+first run is why: at five it reported READY on `avocado, cilantro, cumin, garlic
+powder, lime` — a shared garnish. A trigger that fires on noise is one that gets
+ignored. At six all five remaining candidates are real; it loses the group of three,
+which matters for cataloguing and not for *"has the household's own planning put two
+meals sharing a base in the same week"*.

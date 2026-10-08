@@ -49,6 +49,8 @@
  * number nobody is asked for is a number nobody looks at.
  */
 import { readFileSync } from "node:fs";
+import { createCatalog, normaliseName, parseIngredientList, isStaple } from "../../core/src/index.js";
+import { catalogItemsFromRows, INGREDIENT_COLUMNS, GROCERY_PACKAGE_COLUMNS } from "../../db/src/catalog.js";
 
 for (const line of readFileSync(new URL("../../../apps/web/.env.local", import.meta.url), "utf8").split("\n")) {
   const at = line.indexOf("=");
@@ -61,6 +63,15 @@ if (!url || !key) {
   // could-not-measure is a third outcome and must not read like a zero
   console.error("COULD NOT MEASURE: no Supabase credentials in apps/web/.env.local");
   process.exit(3);
+}
+
+/** rows, with the error surfaced rather than an empty array standing in for a failure */
+async function rows(path: string): Promise<unknown[]> {
+  const response = await fetch(`${url}/rest/v1/${path}`, {
+    headers: { apikey: key!, authorization: `Bearer ${key!}` },
+  });
+  if (!response.ok) throw new Error(`${response.status} ${await response.text()}`);
+  return (await response.json()) as unknown[];
 }
 
 /** counts through PostgREST's exact count, so nothing is paged or estimated */
@@ -88,6 +99,33 @@ const ADJUSTMENTS_WANTED = 30;
  * Half a dozen recipes cooked twice is enough to tell.
  */
 const REPEATS_WANTED = 6;
+/*
+ * One week is enough, because the question is whether the moment ever arrives.
+ *
+ * §66 measured which recipes share a base: 8 candidate sets over 11 of 79 recipes, six of them
+ * real — a Greek salad finished three ways, two marinades, a hibachi vegetable base. The useful
+ * moment is not on a recipe, it is in the planner: *"Tuesday and Thursday share the huli-huli
+ * marinade, make it once"*, which turns overlap into a saved job.
+ *
+ * With 11 recipes in any group, that moment fires roughly never today, and a screen that is
+ * correct and silent is the shape this project keeps shipping. So the number is reported and the
+ * screen is not built. One week with a sharing pair is the signal: it means the household's own
+ * planning has produced the case, rather than the corpus merely containing it.
+ */
+const SHARING_WEEKS_WANTED = 1;
+/*
+ * Six, and the first run of this line is why.
+ *
+ * §66 catalogued candidates at five shared items, where 6 of 8 are real. A TRIGGER cannot live
+ * with 2 in 8: set to five it reported READY on `avocado, cilantro, cumin, garlic powder, lime`
+ * — two recipes that share a garnish, not a base — and a trigger that fires on noise is one
+ * that gets ignored, which is the failure this project keeps naming.
+ *
+ * At six, all five remaining candidates are real. It loses the one group of three, which matters
+ * for *cataloguing* bases and not for the question here: has the household's own planning put
+ * two meals sharing a base in the same week? Precision is what makes that answer worth reading.
+ */
+const SHARED_ITEMS = 6;
 
 try {
   const recipes = await count("recipes?select=id&deleted_at=is.null");
@@ -126,6 +164,66 @@ try {
     "recipe_derivations?select=id&adjusted=is.true&deleted_at=is.null",
   );
 
+  /*
+   * Grouped by shared ITEMSET over catalog keys, never by transitive closure. A-B at four and
+   * B-C at four with A-C at zero is a path through a similarity graph, not a shared base — the
+   * wrong version produced a group of six with nothing in common across all of it (§66).
+   */
+  const ingredientRows = await rows(`ingredients?select=${INGREDIENT_COLUMNS}`);
+  const packageRows = await rows(`grocery_packages?select=${GROCERY_PACKAGE_COLUMNS}`);
+  const catalog = createCatalog(
+    catalogItemsFromRows(ingredientRows as never, packageRows as never),
+  );
+
+  const CARB = /\b(pasta|spaghetti|noodle|rice|bread|roll|tortilla|bun|potato|flour|couscous|quinoa|orzo|macaroni|lasagn)/i;
+  const PROTEIN = /\b(chicken|beef|pork|lamb|turkey|bacon|sausage|mince|brisket|steak|shrimp|prawn|salmon|cod|tilapia|fish|tofu|egg)/i;
+  const AROMATIC = new Set(["onion", "garlic", "shallot", "ginger", "spring onion", "scallion"]);
+
+  const lineRows = (await rows(
+    "recipe_ingredients?select=recipe_id,item_text&deleted_at=is.null",
+  )) as Array<{ recipe_id: string; item_text: string | null }>;
+  const linesByRecipe = new Map<string, string[]>();
+  for (const row of lineRows) {
+    linesByRecipe.set(row.recipe_id, [...(linesByRecipe.get(row.recipe_id) ?? []), row.item_text ?? ""]);
+  }
+  const baseKeys = (recipeId: string): Set<string> => {
+    const out = new Set<string>();
+    for (const parsed of parseIngredientList(linesByRecipe.get(recipeId) ?? [])) {
+      const text = parsed.item;
+      if (!text || isStaple(text)) continue;
+      const item = catalog.find(text);
+      const key = item ? item.key : normaliseName(text);
+      // the thing a base is finished WITH is excluded by definition, and so is noise
+      if (!key || item?.aisle === "Meat & Seafood" || PROTEIN.test(key) || CARB.test(key) || AROMATIC.has(key)) continue;
+      out.add(key);
+    }
+    return out;
+  };
+
+  const planned = (await rows(
+    "plan_entries?select=recipe_id,meal_plan_id&deleted_at=is.null",
+  )) as Array<{ recipe_id: string; meal_plan_id: string }>;
+  const byWeek = new Map<string, Set<string>>();
+  for (const entry of planned) {
+    byWeek.set(entry.meal_plan_id, new Set([...(byWeek.get(entry.meal_plan_id) ?? []), entry.recipe_id]));
+  }
+  let sharingWeeks = 0;
+  let bestPair = "";
+  for (const [, ids] of byWeek) {
+    const list = [...ids];
+    let found = false;
+    for (let i = 0; i < list.length && !found; i += 1)
+      for (let j = i + 1; j < list.length && !found; j += 1) {
+        const a = baseKeys(list[i]!), b = baseKeys(list[j]!);
+        const shared = [...a].filter((k) => b.has(k));
+        if (shared.length >= SHARED_ITEMS) {
+          found = true;
+          if (!bestPair) bestPair = shared.slice(0, 5).join(", ");
+        }
+      }
+    if (found) sharingWeeks += 1;
+  }
+
   const verdict = (have: number, want: number) =>
     have >= want ? `READY — re-measure` : `${want - have} more`;
 
@@ -141,6 +239,23 @@ try {
     `  recipes cooked more than once         ${String(repeated).padStart(4)} / ${REPEATS_WANTED}   ${verdict(repeated, REPEATS_WANTED)}`,
   );
   console.log(`     (${cooked} cooked at least once, ${split} split into two or more parts)`);
+  console.log(
+    `  weeks where two planned meals share a base  ${String(sharingWeeks).padStart(2)} / ${SHARING_WEEKS_WANTED}   ${verdict(sharingWeeks, SHARING_WEEKS_WANTED)}`,
+  );
+  console.log(
+    `     (${byWeek.size} weeks planned, ${SHARED_ITEMS}+ shared non-protein, non-carb, non-staple items${bestPair ? `; e.g. ${bestPair}` : ""})`,
+  );
+  console.log(`
+  §66 found six real shared bases across 11 of 79 recipes — a Greek salad finished three ways,
+  two marinades, a hibachi vegetable base. The moment worth a screen is in the PLANNER: "Tuesday
+  and Thursday share the huli-huli marinade, make it once", which turns overlap into a saved job.
+  With 11 recipes in any group it fires about never, and a screen that is correct and silent is
+  the shape this project keeps shipping. One sharing week means the household's own planning has
+  produced the case rather than the corpus merely containing it.
+
+  It can say "make the marinade once". It must never say "skip to step 7" — overlap says what is
+  shared, never where in the method it is made (§64, from the other side).
+`);
   console.log(`
   Repeat cooks are §64's reversal condition. Bases were rejected because a base substitutes
   for ingredients PLUS a stretch of method and an ingredient list cannot express the second —

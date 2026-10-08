@@ -393,6 +393,12 @@ recipes for all five bases tried, and a perfect matcher buys about three. Revers
 command: `pnpm --filter @pashki/import ripeness` reports repeat cooks and component splits, and
 at six repeats "skip to step 7, you made the ragù on Sunday" is one column on `plan_entries`.
 
+**Shared bases, measured and not built** (§66). The inverse of §64 and not blocked by it: six
+real shared bases across 11 of 79 recipes, including a Greek salad finished three ways. The
+moment worth a screen is in the planner — "Tuesday and Thursday share the huli-huli marinade,
+make it once" — and with 11 recipes in any group it fires about never. `ripeness` reports *weeks
+where two planned meals share a base*; today 0 of 1 across 11 planned weeks.
+
 **The pantry does not suggest recipes** (§65). It deducts from the shopping list and nothing
 else — asserted otherwise while scoping §64, by somebody who knows this codebase. Written down
 because the next design will assume it too.
