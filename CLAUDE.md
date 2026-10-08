@@ -362,7 +362,11 @@ models be good enough. Do not add a silent-save path.
   command, not the one you care about.** `pnpm check:parity | tail -12; echo "EXIT=$?"`
   printed `EXIT=0` for a run that had exited 1 and printed `DIFFERENCES (database): 2 of
   15 checks disagree` two lines above — the zero was `tail` succeeding. Redirect to a file
-  and check the code, or use `PIPESTATUS`. One rule, two shapes: **a pipeline can hide the
+  and check the code, or use the pipe status array — and note **this shell is zsh, where it is
+  `$pipestatus[1]`, lowercase and 1-indexed**. `${PIPESTATUS[0]}` is the bash spelling and in zsh
+  expands to *empty*, so this very workaround silently did nothing the first time it was followed:
+  `echo "exit=${PIPESTATUS[0]}"` printed `exit=`. A fix written in the wrong dialect fails the same
+  quiet way as the thing it was meant to prevent. One rule, two shapes: **a pipeline can hide the
   result you are measuring, whether by filtering the text or by replacing the status.**
 - **A smoke check that calls an endpoint proves the endpoint, and nothing else.** It is
   not evidence a feature exists and must never be allowed to stand in for one. Two of
