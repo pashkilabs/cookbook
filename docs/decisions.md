@@ -3417,3 +3417,103 @@ cheaper than that window.
 shared secret set on both sides and *differing* pointed at the drain route; it now
 points at the reaper, with a wrong-secret case beside it. Deleting it along with the
 drain would have retired the only thing verifying machine auth works at all.
+
+## §64 — Bases rejected: a base substitutes for method, and an ingredient list cannot say so
+
+Cook a component once, freeze it, finish it several ways. **Rejected on
+measurement**, and recorded at length because the idea will recur — it sounds
+obvious, most of the machinery really does already exist, and the reason it fails
+is not the reason anybody expects.
+
+### The measurement
+
+Five plausible bases against all 81 recipes in production, matched three ways: the
+shipped pantry rule (`normaliseName(name)` against a bucket's catalog key or its
+normalised label — an exact string match), both sides through `catalog.find`, and a
+deliberately over-generous head-noun substring as an upper bound.
+
+| base | pantry rule | catalog | loose |
+|---|---|---|---|
+| ragù base | **0** | 0 | 4 |
+| shredded chicken | **0** | 0 | 26 |
+| tomato sauce base | **0** | 4 | 20 |
+| pulled pork | **0** | 0 | 4 |
+| curry paste | **0** | 0 | 2 |
+
+The shipped rule finds **nothing at all**. The one non-zero catalog match is wrong:
+"tomato sauce base" resolves to `canned-tomatoes`, and a tin of tomatoes is not a
+finished base.
+
+The upper bound collapses on inspection. Of 17 distinct lines matching "shredded
+chicken", **exactly one is a finish** — `coarsely chopped cooked chicken`. The rest
+are `uncooked boneless skinless chicken thighs`, `chicken stock`, `chicken bouillon
+cube`, `chicken-flavor ramen noodles`, `trader joe's orange chicken`. One recipe
+matched **three different bases on three different generic words**.
+
+### Why a better matcher does not rescue it — the part not to re-derive
+
+This is **not** the freeform version of the catalog-matching problem measured in
+§-the-matcher. It is a different problem, and the difference is the whole entry:
+
+> **A base substitutes for a set of ingredients *plus a stretch of method*, and an
+> ingredient list cannot express the second.**
+
+A base is a *cooked composite*. An ingredient list names *raw atoms*. Recipes do not
+call for ragù — they call for mince, tomatoes and onion, and then tell you to make
+the ragù. The thing a base replaces is those lines **and the steps that combine
+them**, and the steps are precisely what is being skipped. Nothing that reads
+ingredient lines can see a stretch of method, so no matcher reading them can find a
+finish.
+
+That is why the ceiling is low rather than merely unreached: a *perfect* matcher
+takes this from 0 to about **3**, not to 20. Anybody who proposes "fix the matcher
+first" is proposing to buy three matches.
+
+You cannot substitute cooked shredded chicken into a recipe whose next instruction
+is "sear the chicken breasts". The ingredient matches and the dish does not.
+
+### The pantry says the same thing from the other side
+
+**31 items the household has actually typed, and not one is a base.** They are
+`yellow onion`, `carrots`, `cream cheese`, `italian sausage`, `15oz can whole kernel
+corn`. The pantry is being used as an inventory of raw groceries, which is what it
+is for and what it is good at.
+
+### What would change the answer
+
+The reframing the measurement points at: a finish is not *another* recipe, it is
+**the same recipe again, minus a part already made**. That leans on machinery that
+exists — `components` says which part, `cooked_at` says when it was made, and
+`recipe_derivations` already records a blend naming a source recipe's component.
+
+But the populations are honest: **0 recipes cooked more than once**, 3 split into
+components, 8 lineage rows and every one from a smoke test. And §60 already rejects
+a global component taxonomy, so cross-recipe component matching is decided against
+on separate grounds.
+
+**The reversal condition, which is a command rather than a memory.** When
+`times_made > 1` stops being zero and a handful of recipes are split through real
+use, "skip to step 7, you made the ragù on Sunday" becomes **one column on
+`plan_entries`** — a component marked already-made — rather than a new object with
+its own lifecycle. `pnpm --filter @pashki/import ripeness` reports both numbers.
+
+## §65 — The pantry does not suggest recipes, and the next design will assume it does
+
+Recorded because it was asserted in good faith while scoping §64, by someone who
+knows this codebase, and it is wrong.
+
+`pantry_items` appears in exactly one place outside its own route:
+`apps/web/lib/shopping.ts`, where `consolidate` is called with
+`{ pantry, deductPantry: true }` and subtracts what a household has from what it
+needs. **Nothing anywhere suggests a recipe from what is in the pantry.** There is
+no "what can I make tonight from what I have" — not on the recipe list, not in the
+filters, not on the planner.
+
+Worth having written down because it is the kind of thing a design leans on without
+checking. §64 was scoped on the belief that a pantry matcher already suggested
+recipes; the half the feature would have leaned on hardest was the half that did not
+exist. The deduction is real and good; the suggestion has never been built.
+
+If it is built, note what §64 measured: suggestion from the pantry faces the *easy*
+version of the matching problem (raw groceries against raw ingredient lines, both
+sides atomic), which is why it is plausible where bases are not.

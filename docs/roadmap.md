@@ -384,6 +384,19 @@ eval fixture wants the same.
     would fail loudly if a second seed duplicated rows. Downgraded from where it
     sat before.
 
+### Rejected on measurement
+
+**Bases** — cook a component once, freeze it, finish it several ways (§64). A base substitutes
+for ingredients *plus a stretch of method*, and an ingredient list cannot express the second, so
+no matcher reading ingredient lines can find a finish: the shipped pantry rule matched **0 of 81**
+recipes for all five bases tried, and a perfect matcher buys about three. Reversal condition is a
+command: `pnpm --filter @pashki/import ripeness` reports repeat cooks and component splits, and
+at six repeats "skip to step 7, you made the ragù on Sunday" is one column on `plan_entries`.
+
+**The pantry does not suggest recipes** (§65). It deducts from the shopping list and nothing
+else — asserted otherwise while scoping §64, by somebody who knows this codebase. Written down
+because the next design will assume it too.
+
 ### Retired
 
 **The batch importer** (§63). Zero jobs ever from the real household, forty demo jobs all

@@ -32,6 +32,21 @@
  *
  * Neither threshold is precise and neither pretends to be. Thirty is what the existing labelled
  * set holds, so it is the number at which a comparison is like-for-like.
+ *
+ * ---------------------------------------------------------------------------
+ * And the third: repeat cooks, which is §64's reversal condition
+ * ---------------------------------------------------------------------------
+ *
+ * Bases — cook a component once, freeze it, finish it several ways — were rejected on
+ * measurement (§64): a base substitutes for ingredients *plus a stretch of method*, and an
+ * ingredient list cannot express the second, so no matcher reading ingredient lines can find a
+ * finish. A perfect matcher buys three matches.
+ *
+ * What the measurement pointed at instead is that a finish is **the same recipe again, minus a
+ * part already made** — which needs one column on `plan_entries`, not a new object. That only
+ * pays off once recipes are actually cooked more than once and split into parts, and both were
+ * zero when it was proposed. So the condition is reported here rather than remembered: a
+ * number nobody is asked for is a number nobody looks at.
  */
 import { readFileSync } from "node:fs";
 
@@ -67,6 +82,12 @@ async function count(path: string): Promise<number> {
 
 const SECTIONS_WANTED = 30;
 const ADJUSTMENTS_WANTED = 30;
+/*
+ * Six rather than thirty, and lower on purpose. This is not a corpus to measure against — it
+ * is evidence that a household repeats meals at all, which is the only question §64 left open.
+ * Half a dozen recipes cooked twice is enough to tell.
+ */
+const REPEATS_WANTED = 6;
 
 try {
   const recipes = await count("recipes?select=id&deleted_at=is.null");
@@ -92,6 +113,15 @@ try {
   const withSections = new Set(sectionRows.map((row) => row.recipe_id)).size;
 
   const blends = await count("recipes?select=id&derived_at=not.is.null&deleted_at=is.null");
+  const repeated = await count("recipes?select=id&times_made=gt.1&deleted_at=is.null");
+  const cooked = await count("recipes?select=id&times_made=gt.0&deleted_at=is.null");
+  // a part marked done needs a part to mark: components and repeats both have to be non-zero
+  const splitRows = (await (
+    await fetch(`${url}/rest/v1/recipes?select=id,components&components=not.is.null&derived_at=is.null&deleted_at=is.null`, {
+      headers: { apikey: key!, authorization: `Bearer ${key!}` },
+    })
+  ).json()) as Array<{ components: unknown }>;
+  const split = splitRows.filter((r) => Array.isArray(r.components) && r.components.length > 1).length;
   const adjusted = await count(
     "recipe_derivations?select=id&adjusted=is.true&deleted_at=is.null",
   );
@@ -107,6 +137,18 @@ try {
   console.log(
     `  blend parts a person re-drew          ${String(adjusted).padStart(4)} / ${ADJUSTMENTS_WANTED}   ${verdict(adjusted, ADJUSTMENTS_WANTED)}`,
   );
+  console.log(
+    `  recipes cooked more than once         ${String(repeated).padStart(4)} / ${REPEATS_WANTED}   ${verdict(repeated, REPEATS_WANTED)}`,
+  );
+  console.log(`     (${cooked} cooked at least once, ${split} split into two or more parts)`);
+  console.log(`
+  Repeat cooks are §64's reversal condition. Bases were rejected because a base substitutes
+  for ingredients PLUS a stretch of method and an ingredient list cannot express the second —
+  so no matcher finds a finish, and a perfect one buys three matches. What does work is "the
+  same recipe again, minus a part you already made", and that needs recipes actually cooked
+  twice and split into parts. At ${REPEATS_WANTED} repeats with some splits, it is one column
+  on plan_entries rather than a new object.
+`);
   console.log(`
   Sections raise component detection with no code change — §60 records today's score as a
   floor because the measured corpus had none. At ${SECTIONS_WANTED}, re-run the components eval
