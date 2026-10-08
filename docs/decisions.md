@@ -3789,6 +3789,35 @@ component exactly as it binds overlap**, for the same reason.
 The instinct about where this should live was right. The representation does not yet
 carry what it would need.
 
+### What the four measurements say together
+
+No single row below is surprising. Together they are the finding, and it is the
+useful one:
+
+| angle | bases found |
+|---|---|
+| §64 — matched from a typed pantry name | **0** of 81 recipes |
+| §66 — shared, by ingredient overlap | **6** real in 79 |
+| §67 — suggested when a meal is planned | **1** of 5 firings real |
+| §68 — named inside a stored partition | **2** of 7 names |
+
+> **Most recipes in this household do not have a separable base. That is a fact about
+> a style of cooking, not a deficiency in the matcher.**
+
+Bases are a real technique — for cooking that *composes*: a sofrito, a ragù, a curry
+paste, a stock. This library is mostly **complete dishes**, where there is nothing to
+separate because nothing was composed. A grilled chicken has no base in it. Neither
+does a traybake, a taco bowl, or a sheet-pan dinner, and that is most of what is here.
+
+Four angles reached the same wall and each one read it as its own obstacle — a bad
+matcher, a weak overlap metric, a missing method representation. The wall is the
+corpus of recipes, and only the four together show it.
+
+**This reframes a fourth attempt.** The question is not *how to find bases better*.
+It is **whether this household cooks the kind of food that has them** — and the
+reversal condition below already asks exactly that. If the answer is no, every
+improvement to detection is work against a population that does not exist.
+
 ### What would unblock it, in §60's own number
 
 > 40–60 recipes whose steps genuinely contain varied technique, hand-labelled as

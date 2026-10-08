@@ -393,7 +393,11 @@ recipes for all five bases tried, and a perfect matcher buys about three. Revers
 command: `pnpm --filter @pashki/import ripeness` reports repeat cooks and component splits, and
 at six repeats "skip to step 7, you made the ragù on Sunday" is one column on `plan_entries`.
 
-**Bases, three attempts** (§64, §67, §68). Three angles — matched from a typed pantry name,
+**Bases, four measurements, one conclusion** (§64, §66, §67, §68). *Most recipes in this
+household do not have a separable base — a fact about a style of cooking, not a deficiency in
+the matcher.* Bases suit cooking that composes a sofrito, a ragù, a curry paste; this library is
+mostly complete dishes, where nothing was composed so nothing separates. A fourth attempt should
+ask whether the household cooks that kind of food, not how to find bases better. Three angles — matched from a typed pantry name,
 suggested from overlap at planning time, created from a recipe the app knows — converging on one
 missing thing: §60 removed step-level attribution for want of a corpus, so components are
 ingredient-only, so a base cannot say where in the method it is, so "skip to step 4" is
