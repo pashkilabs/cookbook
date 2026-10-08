@@ -39,3 +39,5 @@ export type { BlendLine, BlendPart, ComposedBlend, ComposedPart } from "./blend.
 
 export { recipesSharingBase, baseIngredients, asIngredients, SHARED_FOR_A_BASE } from "./bases.js";
 export type { SharedBase } from "./bases.js";
+
+export { linesCoveredByBase } from "./bases.js";

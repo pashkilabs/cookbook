@@ -127,3 +127,40 @@ export function recipesSharingBase<T extends { ingredients: ReadonlyArray<{ item
 /** `parseIngredientList` output, adapted — so a caller holding parsed lines need not reshape. */
 export const asIngredients = (parsed: readonly ParsedIngredient[]): Array<{ item: string }> =>
   parsed.map((line) => ({ item: line.item }));
+
+/**
+ * The ingredient positions a held base covers — looked up, never guessed.
+ *
+ * This is the whole reason a base created from a known recipe works where §64's typed name did
+ * not. `consolidate` matches a pantry item by exact name, so "the Greek dressing" matches no
+ * ingredient at all. A base that carries its recipe and its component's name needs no matching:
+ * the dressing *is* lines 0 to 9, and planning that recipe again skips exactly those.
+ *
+ * Matched on the component's **name**, not its index, because `components` is a derived cache
+ * keyed on the ingredient lines — re-reading a recipe can renumber its parts, and an index into
+ * a partition that has changed is the stale-pointer failure the blend lineage carries keys for.
+ * A rename simply stops matching, which is the safe direction: the base reverts to an ordinary
+ * pantry item and the lines go back on the list.
+ */
+export function linesCoveredByBase(
+  components: unknown,
+  componentName: string,
+  lineCount: number,
+): Set<number> {
+  const covered = new Set<number>();
+  if (!Array.isArray(components)) return covered;
+  const wanted = componentName.trim().toLowerCase();
+  if (!wanted) return covered;
+
+  for (const raw of components) {
+    if (typeof raw !== "object" || raw === null) continue;
+    const part = raw as { name?: unknown; from?: unknown; to?: unknown };
+    if (typeof part.name !== "string" || part.name.trim().toLowerCase() !== wanted) continue;
+    if (typeof part.from !== "number" || typeof part.to !== "number") continue;
+    // a range reaching past the list is a partition computed against different lines; ignored
+    // rather than clamped, because a clamp would cover somebody else's ingredients
+    if (part.from < 0 || part.to >= lineCount || part.from > part.to) continue;
+    for (let at = part.from; at <= part.to; at += 1) covered.add(at);
+  }
+  return covered;
+}

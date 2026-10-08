@@ -37,6 +37,8 @@ export function PlannerWeek(props: {
    * planner 500'd in production with a green `pnpm check`.
    */
   membersByRecipe: Record<string, CookMember[]>;
+  /** each recipe's component names, so a surplus is kept against the part it is (§69) */
+  partsByRecipe: Record<string, string[]>;
   waiting: Array<{ id: string; recipe: Recipe }>;
   /**
    * What this household's children have consistently rated low, for the recipes waiting.
@@ -271,6 +273,7 @@ export function PlannerWeek(props: {
                       recipeId={entry.recipe.id}
                       cookedAt={entry.cookedAt}
                       members={props.membersByRecipe[entry.recipe.id] ?? []}
+                      parts={props.partsByRecipe[entry.recipe.id] ?? []}
                       disabled={busy !== null}
                     />
                     <select

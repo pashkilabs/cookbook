@@ -1,6 +1,7 @@
 import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
 import { refusal } from "@/lib/refusal";
+import { maybeRow, rows } from "@/lib/rows";
 import { findOrCreateWeek } from "@/lib/planner";
 import { isIsoDate, startOfWeek } from "@/lib/week";
 import { statusFor } from "@/lib/recipe-writes";
@@ -56,6 +57,51 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       .select("id, cooked_at");
     if (error) return Response.json({ error: refusal(error) }, { status: statusFor(error) });
     if (data.length === 0) return Response.json({ error: "no such entry" }, { status: 404 });
+
+    /*
+     * Cooking it uses a batch of any base held for it (§69).
+     *
+     * Here rather than when the meal is planned, because planning is not using — the shopping
+     * list deducts on the plan and the freezer empties on the cook. And this is the decrement
+     * that replaces an expiry date: reaching zero is deletion happening naturally, so only an
+     * abandoned base lingers rather than every used one.
+     *
+     * Only on marking, never on unmarking. Un-cooking a meal does not put food back in the
+     * freezer, and crediting a batch for a mistaken tap would invent one.
+     */
+    if (body.cooked === true) {
+      const entryRow = maybeRow(
+        await supabase
+          .from("plan_entries")
+          .select("recipe_id")
+          .eq("id", id)
+          .eq("family_id", familyId)
+          .maybeSingle(),
+        "entry for the base decrement",
+      );
+      if (entryRow) {
+        const held = rows(
+          await supabase
+            .from("pantry_items")
+            .select("id, amount")
+            .eq("family_id", familyId)
+            .eq("from_recipe_id", entryRow.recipe_id)
+            .is("deleted_at", null)
+            .gte("amount", 1),
+          "bases to decrement",
+        );
+        for (const base of held) {
+          const left = Number(base.amount ?? 0) - 1;
+          // zero rather than a tombstone: a row at zero is a base the household used up, and
+          // the shopping list already ignores it. Deleting it would lose that it was ever there.
+          const spent = await supabase.from("pantry_items").update({ amount: left }).eq("id", base.id);
+          if (spent.error) {
+            console.warn(`[pashki] base ${base.id} not decremented: ${spent.error.message}`);
+          }
+        }
+      }
+    }
+
     return Response.json({ id, cookedAt: data[0]!.cooked_at });
   }
 

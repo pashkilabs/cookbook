@@ -25,4 +25,4 @@
  * Bump it when a migration is added that application code depends on. Bumping unnecessarily costs
  * a check; forgetting costs a page that 500s for whoever opens it.
  */
-export const REQUIRED_MIGRATION = "20260912120000_retire_import_drain";
+export const REQUIRED_MIGRATION = "20261008090000_pantry_base";

@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   consolidate,
   createCatalog,
+  linesCoveredByBase,
   parseIngredientList,
   recipesUsingLeftovers,
   significantLeftovers,
@@ -145,13 +146,68 @@ export async function buildShoppingWeek(
     byRecipe.set(row.recipe_id, lines);
   }
 
-  const entries: ConsolidationEntry[] = planned.map((entry) => ({
-    label: entry.recipe.title,
-    groupKey: entry.date,
-    // the planner's scale feeds straight through: a 1.5× recipe buys 1.5×
-    scale: entry.scale,
-    ingredients: parseIngredientList(byRecipe.get(entry.recipe.id) ?? []),
-  }));
+  /*
+   * Bases held in the freezer, and the lines they take off the list.
+   *
+   * A base is a pantry item that remembers which part of which recipe it is (§69), so the lines
+   * it covers are looked up rather than matched by name — which is what §64 measured as
+   * impossible for a name somebody typed.
+   *
+   * `amount` counts batches, so a base covers that many *occurrences*. Two batches of dressing
+   * and the salad planned three times buys the dressing once. The decrement happens when a meal
+   * is cooked, not here: planning is not using.
+   */
+  const baseRows = rows(
+    await supabase
+      .from("pantry_items")
+      .select("from_recipe_id, from_component, amount")
+      .eq("family_id", familyId)
+      .is("deleted_at", null)
+      .not("from_recipe_id", "is", null),
+    "bases held",
+  );
+  const batchesLeft = new Map<string, number>();
+  for (const row of baseRows) {
+    const key = `${row.from_recipe_id}|${String(row.from_component).toLowerCase()}`;
+    batchesLeft.set(key, (batchesLeft.get(key) ?? 0) + Math.floor(Number(row.amount ?? 0)));
+  }
+
+  const componentsOf = new Map(
+    rows(
+      await supabase
+        .from("recipes")
+        .select("id, components")
+        .eq("family_id", familyId)
+        .in("id", recipeIds)
+        .not("components", "is", null),
+      "components for bases",
+    ).map((row) => [row.id as string, row.components]),
+  );
+
+  const entries: ConsolidationEntry[] = planned.map((entry) => {
+    const lines = byRecipe.get(entry.recipe.id) ?? [];
+    const parsed = parseIngredientList(lines);
+
+    // every base this recipe has a batch left of, applied once per occurrence
+    const covered = new Set<number>();
+    const components = componentsOf.get(entry.recipe.id);
+    for (const [key, left] of batchesLeft) {
+      const [recipeId, componentName] = key.split("|");
+      if (recipeId !== entry.recipe.id || left < 1) continue;
+      const theseLines = linesCoveredByBase(components, componentName ?? "", lines.length);
+      if (theseLines.size === 0) continue;
+      for (const at of theseLines) covered.add(at);
+      batchesLeft.set(key, left - 1);
+    }
+
+    return {
+      label: entry.recipe.title,
+      groupKey: entry.date,
+      // the planner's scale feeds straight through: a 1.5× recipe buys 1.5×
+      scale: entry.scale,
+      ingredients: covered.size === 0 ? parsed : parsed.filter((_, at) => !covered.has(at)),
+    };
+  });
 
   const pantry = (pantryRows.data ?? []).map((row) => ({
     name: row.name as string,

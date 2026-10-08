@@ -134,6 +134,29 @@ export default async function PlannerPage({
    * it, and wrote a comment there saying a function cannot cross the boundary. Knowing the rule
    * did not stop me repeating it, which is what `check-client-props.mjs` is for.
    */
+  /*
+   * Each planned recipe's component names, for "made extra of —". Plain data, not a function:
+   * a function cannot cross into a client component, which is how the planner once 500'd.
+   */
+  const partsByRecipe: Record<string, string[]> = {};
+  for (const row of rows(
+    await supabase
+      .from("recipes")
+      .select("id, components")
+      .eq("family_id", family.id)
+      .in("id", placed.length > 0 ? placed.map((entry) => entry.recipe.id) : ["00000000-0000-0000-0000-000000000000"])
+      .not("components", "is", null),
+    "components for keeping",
+  )) {
+    const parts = Array.isArray(row.components)
+      ? (row.components as Array<{ name?: unknown }>)
+          .map((part) => (typeof part?.name === "string" ? part.name.trim() : ""))
+          .filter(Boolean)
+      : [];
+    // one part is the whole dish, correctly, and there is nothing to keep separately from it
+    if (parts.length > 1) partsByRecipe[row.id as string] = parts;
+  }
+
   const membersByRecipe: Record<string, CookMember[]> = {};
   for (const entry of placed) {
     if (membersByRecipe[entry.recipe.id]) continue;
@@ -200,6 +223,7 @@ export default async function PlannerPage({
         placed={placed}
         familyId={family.id}
         membersByRecipe={membersByRecipe}
+        partsByRecipe={partsByRecipe}
         waiting={waiting}
         warnings={warnings}
       />

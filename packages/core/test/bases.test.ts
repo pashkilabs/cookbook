@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createCatalog } from "../src/catalog.js";
-import { recipesSharingBase, baseIngredients, SHARED_FOR_A_BASE } from "../src/bases.js";
+import { recipesSharingBase, baseIngredients, linesCoveredByBase, SHARED_FOR_A_BASE } from "../src/bases.js";
 import { SEED_CATALOG } from "../src/seed-catalog.js";
 
 const catalog = createCatalog([...SEED_CATALOG]);
@@ -98,5 +98,42 @@ describe("recipesSharingBase", () => {
     const [match] = recipesSharingBase(tacos, [chilli], catalog);
     expect(match).toBeTruthy();
     expect(match!.labels).toContain("cumin");
+  });
+});
+
+describe("linesCoveredByBase", () => {
+  const components = [
+    { name: "dressing", from: 0, to: 9, role: "sauce" },
+    { name: "salad", from: 10, to: 15, role: "vegetable" },
+  ];
+
+  it("covers exactly the component's lines, looked up rather than matched by name", () => {
+    // the reason a base from a known recipe works where §64's typed name did not
+    expect([...linesCoveredByBase(components, "dressing", 16)]).toEqual([0,1,2,3,4,5,6,7,8,9]);
+    expect([...linesCoveredByBase(components, "salad", 16)]).toEqual([10,11,12,13,14,15]);
+  });
+
+  it("is case and space insensitive, because the name was typed once and stored", () => {
+    expect(linesCoveredByBase(components, "  Dressing ", 16).size).toBe(10);
+  });
+
+  it("covers nothing when the component has been renamed", () => {
+    /*
+     * The safe direction. `components` is a derived cache keyed on the ingredient lines, so
+     * re-reading a recipe can rename its parts. A miss means the base reverts to an ordinary
+     * pantry item and the lines go back on the shopping list — a household buys something it
+     * may already have, which is recoverable. The opposite would be not buying what it needs.
+     */
+    expect(linesCoveredByBase(components, "the dressing", 16).size).toBe(0);
+  });
+
+  it("ignores a range that reaches past the list rather than clamping it", () => {
+    // a partition computed against different lines; clamping would cover someone else's lines
+    expect(linesCoveredByBase([{ name: "dressing", from: 0, to: 99 }], "dressing", 16).size).toBe(0);
+  });
+
+  it("covers nothing when the recipe was never split", () => {
+    expect(linesCoveredByBase(null, "dressing", 16).size).toBe(0);
+    expect(linesCoveredByBase([], "dressing", 16).size).toBe(0);
   });
 });

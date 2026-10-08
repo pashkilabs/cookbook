@@ -3881,3 +3881,86 @@ A fourth attempt should check the second **first**. If a third of a household's
 recipes turn out to have a nameable base, the feature has a population and the
 remaining blocker is the method chain above. If it stays near a tenth, bases are a
 feature for a kind of cooking this household does not do, and that is the answer.
+
+## §69 — A base in the freezer: make extra now, cook faster later
+
+Three attempts failed at *matching* a base to other recipes (§64, §67, §68). This is
+the version that needs no matching: **the only finish is the same recipe again**, so
+the hard question never arises. §64, §66, §67 and §68 all measured matching against
+*other* recipes, and none of them blocks this.
+
+### The shape, and why it is a column rather than an object
+
+A base behaves like a jar of sauce: it is in the house, it comes off the shopping
+list, and it runs out. `pantry_items` already is that. What it could not do is say
+*which part of which recipe* it is — and §64 measured why that matters:
+`consolidate` matches a pantry item by exact name, so "the Greek dressing" matches
+no ingredient at all.
+
+Two columns remove the matching problem rather than improving it.
+`from_recipe_id` + `from_component` mean the lines are **looked up**: the dressing
+*is* lines 0–4 of Greek Salad, so planning it again skips exactly those.
+
+The component is stored **by name, not by index**. `components` is a derived cache
+keyed on the ingredient lines, so re-reading a recipe can renumber its parts, and an
+index into a changed partition is the stale-pointer failure the blend lineage carries
+keys for. A rename simply stops matching — the base reverts to an ordinary pantry item
+and the lines go back on the list, which is the safe direction: buying something you
+already have is recoverable, not buying what you need is not.
+
+### No expiry date, and the decrement is what replaces it
+
+An enforced shelf life means guessing it per food, and being wrong either discards
+good food or leaves a dead item deducting from the shopping list — and **the list is
+the one output that costs money when it is wrong**. The 31 pantry items this household
+has typed carry no dates and nobody has asked for any.
+
+`amount` counts **batches**, so the decrement ends a base naturally: two batches, cook
+one, one remains; cook again, zero, and the list buys it as normal. **Reaching zero is
+deletion happening by itself, so only an *abandoned* base lingers rather than every
+used one** — which is the argument for having no date rather than a concession to
+lacking one.
+
+Zero rather than a tombstone: a row at zero is a base the household used up, and the
+list already ignores it. A CHECK forbids going below zero, so an extra tap cannot
+invent a debt. All of it tested directly, because it is the path a date would have
+hidden.
+
+The decrement happens **on cooking, not on planning** — planning is not using. The
+list deducts on the plan and the freezer empties on the cook. Only on marking, never
+on unmarking: un-cooking a meal does not put food back in the freezer.
+
+### What it delivers, and what it does not — said on the screen
+
+> *"Next time this is planned it comes off your shopping list. The app does not know
+> which steps make it, so you will still need to find that in the method yourself —
+> the saving is the shopping, not the cooking."*
+
+§68's chain still binds: components index the ingredient list and the inference never
+sees the method, so `"skip to step 4"` is not available. **A feature sold as "cook
+faster later" that cannot skip a step has to say which half it delivers, in the same
+breath, or the first use teaches it instead.** That sentence is on the screen rather
+than in a comment.
+
+### What the invariants caught while building it
+
+Two existing assertions refused the migration, both correctly:
+
+- A plain `references recipes (id)` — `assert_household_invariants` pointed out that a
+  pantry item could then name **another household's** recipe and have its lines looked
+  up. Fixed with the composite key, as `recipe_derivations` uses.
+- No soft-delete propagation — `ON DELETE CASCADE` does not fire on an `UPDATE`, so the
+  FK alone leaves a base pointing at a tombstoned recipe. Registered as **nullify**: a
+  base outlives the recipe being tidied away, because it is still in the freezer.
+
+That second fix then broke a constraint of my own. `nullify` clears one column, so
+`(from_recipe_id is null) = (from_component is null)` would have failed the trigger
+outright. The looser rule is the truer one: a recipe id with no part name is nonsense,
+but **a part name with no recipe is a base whose recipe has gone** — still worth naming.
+
+### Population, stated plainly
+
+This fires on recipes with two or more parts, and that is **2 of 10** measured
+(§68). Fixing the component-naming prompt took naming from 8-of-9 role-named to
+0-of-10 and left the population unmoved, so this is a feature for a fifth of a
+library rather than most of it. `pnpm --filter @pashki/import ripeness` tracks it.

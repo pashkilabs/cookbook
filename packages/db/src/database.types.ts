@@ -524,6 +524,8 @@ export type Database = {
           created_at: string
           deleted_at: string | null
           family_id: string
+          from_component: string | null
+          from_recipe_id: string | null
           id: string
           ingredient_id: string | null
           name: string
@@ -535,6 +537,8 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           family_id: string
+          from_component?: string | null
+          from_recipe_id?: string | null
           id?: string
           ingredient_id?: string | null
           name: string
@@ -546,6 +550,8 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           family_id?: string
+          from_component?: string | null
+          from_recipe_id?: string | null
           id?: string
           ingredient_id?: string | null
           name?: string
@@ -553,6 +559,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "pantry_items_base_recipe"
+            columns: ["from_recipe_id", "family_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id", "family_id"]
+          },
           {
             foreignKeyName: "pantry_items_family_id_fkey"
             columns: ["family_id"]

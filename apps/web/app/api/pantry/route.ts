@@ -1,4 +1,5 @@
 import { userClient } from "@/lib/supabase-server";
+import { maybeRow } from "@/lib/rows";
 import { platformStore } from "@/lib/platform";
 import { refusal } from "@/lib/refusal";
 import { statusFor } from "@/lib/recipe-writes";
@@ -20,7 +21,7 @@ export async function POST(request: Request) {
   if ("response" in scope) return scope.response;
   const { supabase, familyId } = scope;
 
-  let body: { name?: unknown };
+  let body: { name?: unknown; fromRecipeId?: unknown; fromComponent?: unknown; batches?: unknown };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -28,6 +29,71 @@ export async function POST(request: Request) {
   }
   const name = typeof body.name === "string" ? body.name.trim().slice(0, 200) : "";
   if (!name) return Response.json({ error: "name is required" }, { status: 400 });
+
+  /*
+   * A BASE: a pantry item that remembers which part of which recipe it is (§69).
+   *
+   * Handled before the ordinary path and returning immediately, because it is a different row —
+   * an ordinary pantry item is a flag with no amount, and a base is a *count of batches*, which
+   * is what the shopping list decrements instead of an expiry date it would have to guess.
+   *
+   * The recipe is not checked for ownership here: the composite foreign key
+   * `(from_recipe_id, family_id) -> recipes (id, family_id)` refuses another household's at write
+   * time, which is a guarantee rather than a line of route code somebody can forget.
+   */
+  if (body.fromRecipeId !== undefined) {
+    const fromRecipeId = typeof body.fromRecipeId === "string" ? body.fromRecipeId : "";
+    const fromComponent =
+      typeof body.fromComponent === "string" ? body.fromComponent.trim().slice(0, 120) : "";
+    const batches = Number(body.batches ?? 1);
+    if (!fromRecipeId || !fromComponent) {
+      return Response.json(
+        { error: "a base needs the recipe it came from and the part it is" },
+        { status: 400 },
+      );
+    }
+    if (!Number.isInteger(batches) || batches < 1 || batches > 20) {
+      return Response.json({ error: "batches must be a whole number, 1 to 20" }, { status: 400 });
+    }
+
+    /*
+     * Another batch of the same part adds to what is there rather than making a second row.
+     * Two rows for one thing in a freezer is a thing nobody can reconcile, and the shopping
+     * list would deduct both.
+     */
+    const existing = maybeRow(
+      await supabase
+        .from("pantry_items")
+        .select("id, amount")
+        .eq("family_id", familyId)
+        .eq("from_recipe_id", fromRecipeId)
+        .ilike("from_component", fromComponent)
+        .is("deleted_at", null)
+        .maybeSingle(),
+      "existing base",
+    );
+
+    if (existing) {
+      const { error } = await supabase
+        .from("pantry_items")
+        .update({ amount: Number(existing.amount ?? 0) + batches })
+        .eq("id", existing.id);
+      if (error) return Response.json({ error: refusal(error) }, { status: statusFor(error) });
+      return Response.json({ kept: fromComponent, batches: Number(existing.amount ?? 0) + batches });
+    }
+
+    const { error } = await supabase.from("pantry_items").insert({
+      family_id: familyId,
+      name,
+      ingredient_id: null,
+      amount: batches,
+      unit: null,
+      from_recipe_id: fromRecipeId,
+      from_component: fromComponent,
+    });
+    if (error) return Response.json({ error: refusal(error) }, { status: statusFor(error) });
+    return Response.json({ kept: fromComponent, batches });
+  }
 
   const existing = await supabase
     .from("pantry_items")

@@ -273,6 +273,32 @@ models be good enough. Do not add a silent-save path.
   indistinguishable from a success. `check:parity` compares schema and privileges; it does
   not compare contents, and nothing does.
 
+- **An example in a schema description is a silent default.** `COMPONENTS_JSON_SCHEMA`
+  described a component's name as *"what a cook would call it — 'the sauce', 'guacamole'"*,
+  and eight paragraphs of instruction said nothing about naming at all. So the field was
+  **not empty — it echoed the example back**: a spicy mayo came back as `sauce`, a poke
+  bowl as `sauce / protein / carbohydrate / vegetable`. Asking for a name outright, and
+  replacing the example, moved it to `spicy mayo / marinated chicken / jasmine rice / poke
+  bowl toppings` — 8 of 9 recipes role-named became 0 of 10.
+
+  §54 is *a schema field is not a request*; this is the step along. **A field nobody asks
+  for in words gets whatever the example suggests**, and a role word in an example teaches
+  role words. So an example is a default: write ones that demonstrate the answer you want
+  and never one that demonstrates the failure you are trying to prevent.
+
+- **A proxy can rot without failing.** "Component names that are not a role word" was a
+  sound measure of the naming problem — while the prompt was broken. The moment the prompt
+  was fixed it became meaningless: `loaded potato soup` is not a role word and is also not
+  a base, so a one-pan dinner named once passed it, and the line read 10 of 10 while the
+  thing it was meant to measure had not moved at all.
+
+  **Nothing would have flagged this.** The number did not break, it kept answering a
+  question that had stopped being the question — and it was *my own* line, added two turns
+  before. So when a fix lands, re-ask what every measurement of it is now measuring:
+  **a proxy whose validity depends on a bug expires when the bug does.** The real question
+  here was always "how many recipes have two or more parts", and the easy question had been
+  standing in for the hard one.
+
 - **Ask which files are *not* covered, because a tool cannot report on what it was never
   given.** `pnpm typecheck` ran five projects and reported success, and success there means
   "every file I was told about is fine" — it says nothing about a file outside every

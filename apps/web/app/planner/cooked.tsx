@@ -45,6 +45,7 @@ export function Cooked({
   recipeId,
   cookedAt,
   members,
+  parts,
   disabled,
 }: {
   entryId: string;
@@ -52,12 +53,15 @@ export function Cooked({
   recipeId: string;
   cookedAt: string | null;
   members: CookMember[];
+  /** the recipe's components, so a surplus can be kept against the part it is */
+  parts: string[];
   disabled: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [kept, setKept] = useState<string[]>([]);
   const [scores, setScores] = useState<Record<string, number | null>>(
     Object.fromEntries(members.map((m) => [m.id, m.score])),
   );
@@ -129,6 +133,36 @@ export function Cooked({
     }
   };
 
+  /*
+   * "Made extra" — the base, recorded at the only moment it is true.
+   *
+   * A base is a pantry item that remembers which part of which recipe it is, so the lines it
+   * covers are looked up rather than matched by name (§69). Offered here because the evening you
+   * cooked a double batch is the only evening you know you did.
+   */
+  const keep = async (part: string) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/pantry", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: part, fromRecipeId: recipeId, fromComponent: part, batches: 1 }),
+      });
+      if (!response.ok) {
+        const failed = (await response.json().catch(() => ({}))) as { error?: string };
+        setError(failed.error ?? `that did not work (${response.status})`);
+        return;
+      }
+      setKept((current) => [...current, part]);
+      router.refresh();
+    } catch {
+      setError("No signal — that was not saved.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (!cookedAt) {
     return (
       <div>
@@ -191,6 +225,40 @@ export function Cooked({
           </p>
         </div>
       )}
+      {parts.length > 0 && (
+        <div>
+          <p className="meta">
+            Made extra of a part? Keep it for next time:
+          </p>
+          <div className="tabs">
+            {parts.map((part) => (
+              <button
+                key={part}
+                type="button"
+                className={kept.includes(part) ? "button" : "quiet"}
+                disabled={busy || kept.includes(part)}
+                onClick={() => keep(part)}
+              >
+                {kept.includes(part) ? `${part} — kept` : `made extra ${part}`}
+              </button>
+            ))}
+          </div>
+          {/*
+            * The honest sentence, on the screen rather than in a comment.
+            *
+            * A feature sold as "cook faster later" that cannot skip a step has to say which half
+            * it delivers, in the same breath, or the first use teaches it instead. §68's chain
+            * still binds: components index the ingredient list and the inference never sees the
+            * method, so the app does not know which steps make this part.
+            */}
+          <p className="meta">
+            Next time this is planned it comes off your shopping list. The app does not know
+            which steps make it, so you will still need to find that in the method yourself —
+            the saving is the shopping, not the cooking.
+          </p>
+        </div>
+      )}
+
       {error && <p className="meta">{error}</p>}
     </div>
   );
