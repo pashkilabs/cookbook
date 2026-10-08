@@ -36,3 +36,6 @@ export { fingerprint } from "./fingerprint.js";
 
 export { composeBlend, partIsIntact, servingsDisagreement } from "./blend.js";
 export type { BlendLine, BlendPart, ComposedBlend, ComposedPart } from "./blend.js";
+
+export { recipesSharingBase, baseIngredients, asIngredients, SHARED_FOR_A_BASE } from "./bases.js";
+export type { SharedBase } from "./bases.js";

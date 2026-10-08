@@ -691,3 +691,16 @@ label.servings .meta { font-size: 0.75rem; color: var(--muted); }
 .tonight h2 { margin: 0 0 var(--s2); font-size: 0.8rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
 .tonight p { margin: 0 0 var(--s2); }
 .tonight p:last-child { margin-bottom: 0; }
+
+/*
+ * The week's footnote. Quieter than the week above it — it is an aside, not a decision — and
+ * separated by a rule rather than a box, so it reads as the end of the page rather than a
+ * competing panel.
+ */
+.alongside {
+  margin-top: var(--s5);
+  padding-top: var(--s4);
+  border-top: 1px solid var(--line);
+}
+.alongside h2 { font-size: 0.8rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.alongside ul.ingredients { margin: var(--s2) 0; }

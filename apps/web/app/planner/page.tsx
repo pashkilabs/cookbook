@@ -14,6 +14,8 @@ import {
   weekdayName,
 } from "@/lib/week";
 import { PlannerWeek } from "./planner-week";
+import { AlongsideThisWeek } from "./alongside";
+import { alongsideThisWeek } from "@/lib/alongside";
 import type { CookMember } from "./cooked";
 import { childTastes, warningsFor } from "@/lib/tastes";
 
@@ -145,6 +147,18 @@ export default async function PlannerPage({
     }));
   }
 
+  /*
+   * After the week, as a footnote. Computed here because it is a read over the household's own
+   * library — no inference, no model, one query for every recipe's lines, which is the same shape
+   * the shopping list already affords.
+   */
+  const alongside = await alongsideThisWeek(
+    supabase,
+    family.id,
+    placed.map((entry) => entry.recipe.id),
+    family.measurementSystem,
+  );
+
   return (
     <main>
       <div className="bar">
@@ -189,6 +203,8 @@ export default async function PlannerPage({
         waiting={waiting}
         warnings={warnings}
       />
+
+      <AlongsideThisWeek alongside={alongside} weekStart={weekStart} />
 
 
     </main>

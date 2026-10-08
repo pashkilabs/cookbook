@@ -3615,3 +3615,78 @@ powder, lime` — a shared garnish. A trigger that fires on noise is one that ge
 ignored. At six all five remaining candidates are real; it loses the group of three,
 which matters for cataloguing and not for *"has the household's own planning put two
 meals sharing a base in the same week"*.
+
+## §67 — Base-sharing suggested at planning time: three reasons, never one score
+
+§66 waited for two planned meals to share a base **by chance** and found zero across
+eleven weeks. Stephen's inversion creates the overlap instead: a meal has just been
+planned, so compare it against the household's whole library. Same query
+`recipesUsingLeftovers` already is, with a different input.
+
+### Measured, on the real household
+
+63 recipes, 32 plan entries:
+
+| threshold | fires on | distribution |
+|---|---|---|
+| ≥ 4 shared | 12 of 32 | 20×0 · 5×1 · 7×2 |
+| **≥ 5** | **5 of 32** | 27×0 · 3×1 · 2×2 |
+| ≥ 6 | 1 of 32 | 31×0 · 1×1 |
+
+The inversion works — 5 of 32 against 0 of 11 weeks. But **four of those five firings
+are one Mexican-seasoning cluster**: cumin, cilantro, avocado, lime, cheese, across
+taco and chilli recipes. One is real — mirin, ginger paste, butter, carrots,
+mushrooms, zucchini, across two hibachi dishes.
+
+### The limitation, which is not a parameter
+
+> **Overlap cannot distinguish a base from a cuisine signature. The difference is
+> whether the items are *combined* or merely *co-present* — a method claim.**
+
+§64's lesson arriving a **third** time. An ingredient list cannot express method, so
+nothing reading one can tell a thing you cook once from a shelf you reach into twice.
+
+Tuning to six separates them cleanly and **buys the separation by going silent** —
+once in thirty-two. §66's `ripeness` line already measured what silence is worth, so
+the threshold stays at **five** and the screen **names what is shared**. That is the
+whole design: a stated reason makes one-in-five a glance and a dismissal, where a
+rank makes it noise. This reverses what I would have chosen before reading the
+firings.
+
+**It also improves on its own.** Base-sharing pairs grow with the *square* of the
+library, so 63 recipes is the worst case this will ever face. The threshold needs no
+tuning as the corpus grows; the same number simply finds more.
+
+### Three separate lines, never one ranked list
+
+Three signals were proposed — shares a base, uses up leftovers, rated well — and they
+pull apart: the best-rated recipe may share nothing, the one finishing the cream may
+be untried. More decisively, they are **not equally reliable**:
+
+| signal | what it rests on |
+|---|---|
+| uses up leftovers | exact arithmetic over base units. True or false. |
+| shares a base | one in five at the shipped threshold. A guess with a number behind it. |
+| rated well | needs six ratings on a dimension (`ENOUGH_TO_SAY`); this household has 26 across 7 recipes. Mostly silent. |
+
+A single score mixing a certainty, a guess and a thin statistic produces a number
+whose confidence cannot be read — **§61's shape exactly**, bounded and moving and
+uncheckable. So each line states what it rests on and each may be empty, which is the
+taste-readings principle: *an observation a person can weigh beats a verdict they can
+only accept or ignore.*
+
+**Leftovers are not recomputed.** The shopping list already knows what a week leaves
+spare *after packages are chosen* and suggests what would use it; the footnote links
+to it rather than answering the same question twice, which is how two parsers came to
+drift.
+
+### After placing, not while choosing
+
+A footnote below the week. A warning is more forceful than a display and this is a
+display — and the cook has already committed, so it reads as *"and while you're at
+it"* rather than *"are you sure"*.
+
+### What it must never claim
+
+Unchanged from §66: **overlap says what is shared, never where in the method it is
+made.** It may say "one batch might do for both". It must never say "skip to step 7".
