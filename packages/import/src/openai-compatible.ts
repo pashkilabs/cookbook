@@ -198,6 +198,58 @@ export function providerFromEnv(env: Record<string, string | undefined> = proces
 }
 
 /**
+ * The text tier's wiring fault, or null — the symmetric twin of `anthropicModelMismatch`.
+ *
+ * Vision had a construction-time guard and text had none, which is the asymmetry this closes.
+ * The faults below are **certain**, not heuristic: each is a credential or an id that the
+ * OpenAI-compatible protocol cannot carry at all, so naming it at boot is strictly better than
+ * learning about it as an empty extraction.
+ *
+ * The third case is not hypothetical — it is this repo's own regression. Wiring Anthropic into
+ * the eval left production sending `claude-haiku-4-5` to Together's Chat Completions endpoint and
+ * getting nothing back, while a card read perfectly in the measurement. `cascadeFromEnv` closed
+ * the *code* site for that class by making both callers share one builder; this closes the
+ * *configuration* site, which a shared builder cannot reach on its own.
+ *
+ * **What this cannot do, stated so nothing reads it as more than it is.** A well-formed key that
+ * the provider has revoked passes every check here. Dialect is checkable offline; acceptance is
+ * not, and the text tier's failure on a rejected key is *soft* — the cascade falls back to the
+ * deterministic tier, which handles most recipe sites correctly, so the symptom is captions and
+ * screenshots quietly extracting worse rather than anything erroring. That is the gap the
+ * fingerprint on `/api/health` exists to close, by turning "is production's key the one that
+ * works locally" from a guess into a comparison.
+ */
+export function textWiringFault(
+  apiKey: string,
+  model: string,
+  baseUrl: string | undefined,
+): string | null {
+  if (apiKey.startsWith("sk-ant-")) {
+    return (
+      `the text tier is configured with an Anthropic key (sk-ant-…), and the text path posts ` +
+      `Chat Completions — a protocol Anthropic does not speak (§7). Set PASHKI_LLM_API_KEY to a ` +
+      `key for the provider at PASHKI_LLM_BASE_URL, or configure this model as the vision tier.`
+    );
+  }
+  if (baseUrl && /(^|\/\/|\.)api\.anthropic\.com/i.test(baseUrl)) {
+    return (
+      `PASHKI_LLM_BASE_URL points at api.anthropic.com, which serves /v1/messages and not ` +
+      `/chat/completions. The text tier speaks the OpenAI-compatible protocol; Anthropic is ` +
+      `reached through the vision provider instead.`
+    );
+  }
+  if (/^claude-/i.test(model)) {
+    return (
+      `the text model "${model}" is an Anthropic id, and the text tier posts Chat Completions to ` +
+      `${baseUrl ?? "the configured base URL"}. This is the regression that shipped once already: ` +
+      `an Anthropic model id on an OpenAI-compatible endpoint returns nothing, quietly. Set ` +
+      `PASHKI_LLM_MODEL to a model the configured provider serves.`
+    );
+  }
+  return null;
+}
+
+/**
  * The whole cascade from the environment — one builder, so a model swap has one site.
  *
  * regression: the eval and the web app each built their own, and wiring Anthropic into the eval
@@ -228,6 +280,18 @@ export function cascadeFromEnv(
   if (visionKey && vision) {
     const mismatch = anthropicModelMismatch(visionKey, vision);
     if (mismatch) throw new Error(mismatch);
+  }
+
+  /*
+   * And the same for text, which had no construction-time guard at all — the asymmetry that
+   * made the text tier's faults soft while vision's were loud. Checked after the null return
+   * above, so an *absent* key still degrades rather than throwing: unconfigured and
+   * misconfigured are different answers, and only the second is a deployment fault.
+   */
+  const textKey = env.PASHKI_LLM_API_KEY;
+  if (textKey) {
+    const fault = textWiringFault(textKey, model, env.PASHKI_LLM_BASE_URL);
+    if (fault) throw new Error(fault);
   }
 
   return {

@@ -244,11 +244,51 @@ try {
   if (health.status === 200) {
     const c = health.body?.configured ?? {};
     console.log(`build ${String(health.body?.commit ?? "unknown").slice(0, 8)}  env ${health.body?.env}`);
-    console.log(`  configured: ${Object.entries(c).map(([k, v]) => `${k}=${v ? "yes" : "NO"}`).join("  ")}\n`);
+    /*
+     * Strings print as their value, not as yes/NO.
+     *
+     * regression: this line mapped every field through `v ? "yes" : "NO"`, so the three fields
+     * that report a *reason* rather than a fact were flattened to `yes` — including
+     * `schema="MISSING 20261008090000 — run: pnpm --filter @pashki/db db:push"`, which printed
+     * `schema=yes`. The route named the fault and the summary line hid it. A truthy string is not
+     * a pass.
+     */
+    console.log(
+      `  configured: ${Object.entries(c)
+        .map(([k, v]) => `${k}=${typeof v === "boolean" ? (v ? "yes" : "NO") : v === null ? "unset" : v}`)
+        .join("  ")}\n`,
+    );
     record("health reports a build", Boolean(health.body?.commit) || health.body?.env === "local");
     for (const key of ["supabase", "siteUrl", "tokenSigner"]) {
       record(`configured: ${key}`, c[key] === true, c[key] === true ? "" : "missing on this deployment");
     }
+
+    /*
+     * The fields that report a reason are asserted, not just printed.
+     *
+     * Health gained `visionWiring`, `textWiring` and `schema` precisely because a boolean cannot
+     * distinguish "not set" from "set wrongly" — and then nothing failed on them, so a wiring
+     * fault was something you had to read in passing. The text one matters most: a rejected
+     * inference key degrades to the deterministic tier rather than erroring, so it looks like
+     * normal operation.
+     *
+     * Three outcomes. A fault string FAILS; `unconfigured` or `unknown` is NOT CHECKED with its
+     * reason, because a tier nobody configured and a tier wired wrongly are different answers and
+     * only the second is a deployment fault.
+     */
+    for (const [key, absent] of [
+      ["textWiring", "unconfigured"],
+      ["visionWiring", "unconfigured"],
+    ]) {
+      const value = c[key];
+      if (value === undefined) skip(`health: ${key}`, "this build does not report it");
+      else if (value === absent) skip(`health: ${key}`, `the tier is ${absent} on this deployment`);
+      else record(`health: ${key}`, value === "ok", value === "ok" ? "" : String(value));
+    }
+    const schema = c.schema;
+    if (schema === undefined) skip("health: schema", "this build does not report it");
+    else if (String(schema).startsWith("unknown")) skip("health: schema", String(schema));
+    else record("health: schema", schema === "ok", schema === "ok" ? "" : String(schema));
   } else {
     console.log(`(no /api/health on this build — HTTP ${health.status})\n`);
   }

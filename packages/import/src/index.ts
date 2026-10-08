@@ -112,7 +112,12 @@ export {
   type VisionResult,
   type VisionValidation,
 } from "./vision.js";
-export { cascadeFromEnv, createOpenAiCompatibleProvider, providerFromEnv } from "./openai-compatible.js";
+export {
+  cascadeFromEnv,
+  createOpenAiCompatibleProvider,
+  providerFromEnv,
+  textWiringFault,
+} from "./openai-compatible.js";
 export { acceptsTemperature, anthropicModelMismatch } from "./anthropic.js";
 export { classifyRecipe, classificationPrompt, CLASSIFICATION_COLUMNS, CLASSIFY_JSON_SCHEMA, CLASSIFY_INSTRUCTIONS } from "./classify.js";
 export type { RecipeClassification } from "./classify.js";

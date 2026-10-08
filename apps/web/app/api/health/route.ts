@@ -13,12 +13,53 @@
  * Deliberately unauthenticated: it is what a smoke test calls before it has a session, and what
  * tells it whether it is testing the commit it thinks it is.
  */
-import { anthropicModelMismatch } from "@pashki/import";
+import { anthropicModelMismatch, textWiringFault } from "@pashki/import";
 import { REQUIRED_MIGRATION } from "@/lib/schema-version";
 
 /** the prefix, never the key: enough to see which dialect the id has to belong to */
 const visionKeyKind = (key: string | undefined): "anthropic" | "other" | null =>
   !key ? null : key.startsWith("sk-ant-") ? "anthropic" : "other";
+
+/**
+ * Which dialect the text key belongs to, from its prefix alone.
+ *
+ * Together's current keys begin `tgp_v1_`; its older ones were bare 64-character hex, and both
+ * formats authenticate, so the *kind* is the only thing that distinguishes a modern key from a
+ * legacy one still in service. Reported because "which of the two keys is this" was a real
+ * question that nothing deployed could answer.
+ */
+const textKeyKind = (key: string | undefined): "anthropic" | "together" | "together-legacy" | "other" | null => {
+  if (!key) return null;
+  if (key.startsWith("sk-ant-")) return "anthropic";
+  if (key.startsWith("tgp_v1_")) return "together";
+  if (/^[0-9a-f]{64}$/.test(key)) return "together-legacy";
+  return "other";
+};
+
+/**
+ * "ok", "unconfigured", or the reason — the twin of `visionWiring`, and the asymmetry that
+ * prompted it.
+ *
+ * Vision published a model id, a key kind and a wiring verdict; text published a model id and
+ * nothing else, so a text tier wired to the wrong dialect had no signal anywhere. It shares
+ * `textWiringFault` with `cascadeFromEnv`, which now throws on the same faults, so health cannot
+ * drift into disagreeing with the builder about what is wired.
+ *
+ * **"ok" means coherent, not accepted.** A well-formed key the provider has revoked passes this,
+ * and no static check can do better — which matters more here than for vision, because the text
+ * tier's failure is *soft*: the cascade falls back to the deterministic tier, which reads most
+ * recipe sites correctly, so a dead key shows up as captions quietly extracting worse rather than
+ * as anything erroring. A failure that looks like normal operation is the class this project keeps
+ * paying for, so the fingerprint below is the part that actually closes it. No liveness probe
+ * here on purpose: an unauthenticated endpoint that makes outbound billable calls is an abuse
+ * vector, and health is called by smoke tests in a loop.
+ */
+function textWiring(): string {
+  const key = process.env.PASHKI_LLM_API_KEY;
+  const model = process.env.PASHKI_LLM_MODEL;
+  if (!key || !model) return "unconfigured";
+  return textWiringFault(key, model, process.env.PASHKI_LLM_BASE_URL) ?? "ok";
+}
 
 /**
  * "ok", "unconfigured", or the reason — imported from the same guard that refuses at
@@ -122,6 +163,25 @@ export async function GET() {
          * interactive CLI login. Key *kind* is derived from the prefix — never the key.
          */
         textModel: process.env.PASHKI_LLM_MODEL ?? null,
+        /*
+         * The base URL as a value, because a URL is not a secret and it is the one whose wrong
+         * value is *silently* wrong — a correct key and a correct model id pointed at the wrong
+         * host fail exactly like a provider outage.
+         */
+        textBaseUrl: process.env.PASHKI_LLM_BASE_URL ?? null,
+        textKeyKind: textKeyKind(process.env.PASHKI_LLM_API_KEY),
+        /*
+         * The fingerprint is the half that catches what no static check can.
+         *
+         * `drainSecretFingerprint` exists because a shared secret was set on both sides and
+         * *differed*, so every tick 401'd while every presence check said yes. The text key is
+         * the same class with a worse symptom: a drain 401 is loud, and a rejected inference key
+         * degrades to the deterministic tier and extracts worse in silence. Twelve hex characters
+         * of SHA-256 identify a key without being usable, and turn "is production running the key
+         * that works locally" from a guess into a comparison.
+         */
+        textKeyFingerprint: await fingerprint(process.env.PASHKI_LLM_API_KEY),
+        textWiring: textWiring(),
         visionModel: process.env.PASHKI_LLM_VISION_MODEL ?? null,
         visionKeyKind: visionKeyKind(process.env.PASHKI_LLM_VISION_API_KEY),
         visionWiring: visionWiring(),

@@ -332,6 +332,26 @@ models be good enough. Do not add a silent-save path.
   what a type is for, and why widening a gate finds things that then need thinking about
   rather than just fixing.
 
+- **A reasoning model spends its output budget before it emits anything, so a tight `max_tokens`
+  returns a well-formed empty answer.** `maxOutputTokens` is declared on `LlmProvider` and **set
+  nowhere**: the text path omits `max_tokens` entirely and takes Together's default, and the
+  Anthropic path falls back to 4096. Fine today — this is written down for whoever sets one.
+
+  Measured on `openai/gpt-oss-120b`, asked for a single word. At `max_tokens: 8` it returned
+  **HTTP 200 with `content: ""`** and `reasoning_tokens: 6`; at 512 it answered `"reachable"`
+  having spent **39 of 49** completion tokens reasoning. So roughly 80% of the budget goes to
+  reasoning on a trivial prompt, and a limit sized against the *visible* answer starves the
+  invisible part that precedes it.
+
+  The failure shape is the point. Not a 400, not a timeout, not a refusal — a **200 with valid
+  JSON and nothing in it**, which the extractor reads as "the model found no ingredients" and the
+  review screen shows as an empty recipe. Same family as the stale cache serving a confident
+  well-formed wrong answer, and as a schema field nobody asks for coming back `[]`: **the
+  response is shaped correctly, so nothing downstream has grounds to object.** If a budget ever
+  becomes necessary — cost, latency, a provider's ceiling — size it against prompt complexity and
+  assert on non-empty content, because an empty string is the one reply that will not look like
+  an error anywhere.
+
 - **A removal deploys in the reverse order of an addition.** Adding is migration first,
   then code, because code ahead of its schema is a page that 500s — that asymmetry has
   bitten four times and `/api/health` reports `schema` to catch it. Removing inverts it:
