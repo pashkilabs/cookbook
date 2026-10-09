@@ -608,8 +608,27 @@ guessing.
   `/api/health` now reports `schema`, comparing `REQUIRED_MIGRATION` against what the
   database has applied, and **names the missing migration and the command that fixes it**
   so the answer is one curl rather than a diagnosis. It reports `unknown` when it cannot
-  check, never `ok` — a check that cannot run must not look like one that passed. Bump
-  `REQUIRED_MIGRATION` in the same commit as any migration application code depends on.
+  check, never `ok` — a check that cannot run must not look like one that passed.
+
+  **Then it happened a fifth time, and `schema` said `ok` throughout.** Two migrations landed, the
+  seam's select list grew a column hosted did not have, every provisioning request 500'd, and
+  `pnpm smoke` reported `2 of 36 FAILED`. The mechanism built for exactly this was green because
+  **the stamp is hand-turned and nobody turned it** — *a version stamp only works if somebody
+  turns it*, arriving through the one place that was supposed to be immune to it.
+
+  Worse, `schema-version.ts` argued against deriving the constant: *"computing it from the
+  migrations directory would make it always correct and therefore never informative."* **That
+  reasoning is wrong.** The constant describes the *build*; the comparison is against the
+  *database*. Deriving it makes it always correct about the build and leaves the interesting
+  question — has the database caught up — exactly as open. What the argument really protected
+  against was a migration no code depends on raising a warning: a **false alarm where the
+  alternative is a false ok**, and one costs a `db:push` while the other costs production.
+
+  So `scripts/check-schema-version.mjs` asserts the stamp names the newest migration, and
+  `pnpm check` now fails when it is stale. It stays a literal rather than a runtime directory
+  read, because a serverless bundle reading `packages/db` at request time is the file-tracing
+  hazard this project has already paid for. **A guard, not a reminder** — which is what a rule
+  that has now failed five times against people who know it actually needs.
 
 - **Verifying that A works and that B works is not verifying that A hands off to B.** Asked
   whether future weeks could be planned, I checked two things: the planner navigates weeks
