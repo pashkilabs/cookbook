@@ -43,7 +43,8 @@
     "ripeness": "tsx scripts/ripeness.mts",
     "score:twinkies": "tsx scripts/score-twinkies.mts",
     "gen:corpus": "tsx scripts/gen-corpus.mts",
-    "allergens": "tsx scripts/allergen-population.mts"
+    "allergens": "tsx scripts/allergen-population.mts",
+    "catalog:gap": "tsx scripts/catalog-gap.mts"
   },
   "devDependencies": {
     "@pashki/db": "workspace:^",

@@ -4153,6 +4153,36 @@ says *"we can see inside the category and not the jar"*. So the reading names th
 well as the line, and a caller writes "contains chicken broth, which can contain milk" rather than
 raising a generic flag. A more specific claim has to be more specifically worded.
 
+### The rule a future allergen addition follows
+
+This came out better than the design asked for, so it is stated as a rule rather than as a
+description of one refinement:
+
+> **An allergen near-universal in a product goes in `TERMS` and leaves through EXCLUDED. Only
+> brand-variable allergens go in a product's plausible set.**
+
+Everything follows from it. Because a plausible set holds nothing near-universal, every member is
+genuinely variable by jar — so **one phrase covers all of it, "can contain", and no likelihood
+scale is needed**. No "usually" versus "sometimes", no percentage, nothing a person cannot check by
+turning the bottle round. That is how this feature avoids inventing the confidence §61 measured as
+unavailable, and it is a structural property rather than a discipline somebody has to remember.
+
+The test for adding an allergen to a product is therefore one question with two answers, not a
+judgement on a scale: *is it in essentially every brand?* Yes → `TERMS`. No, but plausible →
+plausible set. Not plausible → out. Cross-contamination is never plausible-set material, because
+"made in a facility that also handles nuts" is true of most manufactured food and admitting it
+rebuilds the blanket under another name.
+
+### Catalog absence is not evidence about allergens
+
+Wiring catalog misses into `unrecognised` took CLEAR from **76 to 10 of 82**. The thing driving the
+filter was `dried oregano` having no package size, and nobody is worried about oregano.
+
+Same category error as reusing the matcher: the catalog's job is **buying**, so its absence is a
+*purchasing* fact. The input stays in the API — a future caller may have a source that genuinely
+cannot be reasoned about, and leaving the door without walking through it is correct — but nothing
+feeds catalog misses to it.
+
 ### Three outcomes, never two
 
 - **EXCLUDED** — a term matched. Removed from suggestions; the matched word is quoted back so a
@@ -4208,4 +4238,56 @@ filtering and grouping over data that exists. **There is no recommender to build
 
 No score, no percentage match, no "recommended for you", no single rank, and no allergy feature
 that returns two states.
+
+## §72 — The catalog gap is a shopping problem, and a narrow pass is worth it
+
+Surfaced by §71 and then explicitly **not** an allergen question. Measured on the real library:
+
+```
+946 ingredient rows, 138 staples, 808 buyable
+455 of 808 buyable rows resolve to a catalog item   (56%)
+343 do not, across 214 distinct names
+61 of the 214 appear in two or more recipes
+0 resolved names lack a package row
+```
+
+**Forty-four per cent of buyable ingredient rows have no catalog item.** The catalog itself is
+internally complete — every item that resolves has package sizes — so this is coverage, not rot.
+
+### What it actually costs, with my first guess corrected
+
+I expected "ingredients do not consolidate". **Wrong.** `consolidate` keys on `item.key` when the
+catalog resolves and on `normaliseName(text)` when it does not, so two recipes writing the same
+words still add up. The losses are narrower and worth naming separately:
+
+- **Synonyms do not unify.** `scallions` and `spring onions` are one ingredient and two keys
+  without the catalog's alias list, so they are two lines and get bought twice.
+- **No package maths.** No `grocery_packages` row means no pint-against-500-ml decision, so the
+  founding example of this product — one pint split across Tuesday and Friday rather than two
+  half-pints and waste — cannot run on that line.
+- **No aisle.** The line does not group where a person walks.
+
+### Is it worth a pass? Narrowly, yes
+
+**No** to the 214. The long tail is one-recipe ingredients where a catalog entry never pays back.
+
+**And no to the premise that package maths is the prize.** The high-frequency misses are
+`oregano` (10 recipes), `garlic powder` (8), `thyme` (7), `smoked paprika`, `onion powder`,
+`cumin`, `cinnamon`, `nutmeg` — **dried spices bought once and kept for a year.** Package maths on
+oregano is worth nothing.
+
+**Yes** to the 61 shared names, because the payoff is the one I had not been counting: **aisle
+placement on the lines that appear every week**. A list you can walk in shop order is the everyday
+value, and 61 entries is bounded work with a known end.
+
+### The real find was not a catalog gap at all
+
+**`boneless` is an ingredient in five recipes.** The parser truncated "boneless skinless chicken
+breasts" to its first word, so the row says `boneless`, the shopping list says `boneless`, the
+component inference was handed `boneless`, and the allergen matcher reads `boneless`.
+
+It surfaced *here* only because this measurement sorts unresolved names by frequency — it had been
+invisible in every other view, including the recipe page, which renders it faithfully. **Fix this
+before any catalog pass**: a catalog entry for `boneless` would make a parser bug permanent, and
+corrupt data upstream is worse than thin data downstream.
 
