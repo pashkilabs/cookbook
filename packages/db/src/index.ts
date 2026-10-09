@@ -39,6 +39,8 @@ export const APP_TABLES = [
   // reference data, like grocery_packages: readable by every household, writable by none
   "ingredient_containers",
   "ratings",
+  // what a person has SAID they like and dislike, which outranks what ratings imply (§71)
+  "member_preferences",
   "meal_plans",
   "plan_entries",
   "shortlist_entries",
@@ -82,6 +84,7 @@ export const HOUSEHOLD_TABLES = [
   "recipe_ingredients",
   "recipe_steps",
   "ratings",
+  "member_preferences",
   "meal_plans",
   "plan_entries",
   "shortlist_entries",

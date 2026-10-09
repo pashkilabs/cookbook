@@ -518,6 +518,53 @@ export type Database = {
           },
         ]
       }
+      member_preferences: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          family_id: string
+          family_member_id: string
+          id: string
+          note: string | null
+          stance: string
+          subject: string
+          subject_kind: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          family_id: string
+          family_member_id: string
+          id?: string
+          note?: string | null
+          stance: string
+          subject: string
+          subject_kind: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          family_id?: string
+          family_member_id?: string
+          id?: string
+          note?: string | null
+          stance?: string
+          subject?: string
+          subject_kind?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_preferences_member"
+            columns: ["family_member_id", "family_id"]
+            isOneToOne: false
+            referencedRelation: "family_members"
+            referencedColumns: ["id", "family_id"]
+          },
+        ]
+      }
       pantry_items: {
         Row: {
           amount: number | null

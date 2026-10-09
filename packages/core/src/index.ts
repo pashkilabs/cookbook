@@ -49,3 +49,14 @@ export {
   type AllergenReading,
   type AllergenVerdict,
 } from "./allergens.js";
+export {
+  readForHousehold,
+  readForMember,
+  type HouseholdReading,
+  type InferredPreference,
+  type MemberReading,
+  type RecipeSubjects,
+  type Stance,
+  type StatedPreference,
+  type SubjectKind,
+} from "./preferences.js";
