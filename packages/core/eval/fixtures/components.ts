@@ -136,6 +136,16 @@ export interface ComponentScore {
   matched: number;
   /** of those matched, how many carried the right role */
   rolesRight: number;
+  /**
+   * The sauces, apart from everything else.
+   *
+   * Stephen's report is about one kind of component — "splitting extracts the protein and
+   * ignores the sauce" — and `right` scores the whole partition while `matched` pools every
+   * kind. Neither can answer it, so a retune aimed at sauces was being judged by numbers that
+   * could not see them.
+   */
+  saucesWanted: number;
+  saucesFound: number;
 }
 
 export function scoreComponents(
@@ -143,12 +153,18 @@ export function scoreComponents(
   proposed: readonly { from: number; to: number; role?: string | null }[] | null,
 ): ComponentScore {
   if (proposed === null) {
-    return { verdict: "declined", countExpected: labelled.length, countProposed: 0, matched: 0, rolesRight: 0 };
+    const wanted = labelled.filter((c) => c.role === "sauce" || c.role === "marinade").length;
+    return {
+      verdict: "declined", countExpected: labelled.length, countProposed: 0, matched: 0,
+      rolesRight: 0, saucesWanted: wanted, saucesFound: 0,
+    };
   }
 
   const taken = new Set<number>();
   let matched = 0;
   let rolesRight = 0;
+  let saucesWanted = 0;
+  let saucesFound = 0;
 
   for (const truth of labelled) {
     const want = spread(truth);
@@ -167,11 +183,28 @@ export function scoreComponents(
       matched += 1;
       if (proposed[best]!.role === truth.role) rolesRight += 1;
     }
+    /*
+     * The sauces, counted separately — because `right` is the wrong question for a change about
+     * sauces.
+     *
+     * `right` demands the *whole* partition and `matched` pools every component, so a retune that
+     * recovers the sauce and misplaces a garnish moves neither. "Splitting extracts the protein
+     * and ignores the sauce" is a claim about one kind of component, and a measurement that
+     * cannot see that kind cannot answer it — the proxy-rot lesson, asked before the retune
+     * rather than after it.
+     */
+    if (truth.role === "sauce" || truth.role === "marinade") {
+      saucesWanted += 1;
+      if (best >= 0 && bestScore >= AGREEMENT) saucesFound += 1;
+    }
   }
 
   // right means the whole partition is right: every component found, and none invented
   const verdict: ComponentVerdict =
     matched === labelled.length && proposed.length === labelled.length ? "right" : "wrong";
 
-  return { verdict, countExpected: labelled.length, countProposed: proposed.length, matched, rolesRight };
+  return {
+    verdict, countExpected: labelled.length, countProposed: proposed.length, matched,
+    rolesRight, saucesWanted, saucesFound,
+  };
 }

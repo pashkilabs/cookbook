@@ -41,19 +41,67 @@ import { isStaple, normaliseName } from "./text.js";
  *   protein, carbohydrate   the thing a base is *finished with*, by definition — a shared
  *                           chicken is not a shared base
  *   staples                 salt, pepper, oil, water: present everywhere, meaning nothing
- *   bare aromatics          two recipes sharing onion and garlic share nothing worth saying
+ *   lone aromatics          two recipes sharing onion and garlic share nothing worth saying —
+ *                           but see below, because a *cluster* of them is the canonical base
  */
 const CARBOHYDRATE =
   /\b(pasta|spaghetti|noodle|rice|bread|roll|tortilla|bun|potato|flour|couscous|quinoa|orzo|macaroni|lasagn)/i;
 const PROTEIN =
   /\b(chicken|beef|pork|lamb|turkey|bacon|sausage|mince|brisket|steak|shrimp|prawn|salmon|cod|tilapia|fish|tofu|egg)/i;
 const AROMATIC = new Set(["onion", "garlic", "shallot", "ginger", "spring onion", "scallion"]);
+
+/**
+ * The aromatic clusters that ARE bases — mirepoix and sofrito, by name.
+ *
+ * "Bare aromatics are not a base" was right about one onion and wrong about the technique. A
+ * **mirepoix** is onion, carrot and celery; a **sofrito** is tomato, onion, pepper and garlic;
+ * both are cooked down and frozen *specifically* to be a base, and they are the canonical
+ * examples of batch-cooking a foundation. Excluding every aromatic made the two best-attested
+ * bases in European and Latin cooking invisible to a matcher whose whole job is finding bases.
+ *
+ * So the exclusion survives for an aromatic appearing *alone*, which is what the original reason
+ * actually described, and lifts when the recipe carries a whole cluster. That keeps onion and
+ * garlic from inflating every pair — the reason the exclusion existed — while letting the
+ * clusters register, which is a change to **what a base is** rather than to how readily two
+ * recipes are called similar.
+ *
+ * Deliberately not a general "three or more aromatics" rule. Onion, garlic and ginger is the
+ * opening of half the world's cooking and is not a thing anybody batches; mirepoix and sofrito
+ * are named, written down and sold frozen. A named technique is evidence; a count is a guess.
+ */
+const AROMATIC_BASES: ReadonlyArray<readonly string[]> = [
+  ["onion", "carrot", "celery"],
+  // the sofrito pepper is a BELL pepper. `isStaple` classed every `X pepper` as a cupboard
+  // seasoning until this change, which is why this cluster could not have matched before it.
+  ["tomato", "onion", "bell pepper", "garlic"],
+];
+
+/** catalog keys are hyphenated and `normaliseName` output is not; compare in one space */
+const spaced = (key: string) => key.replace(/-/g, " ");
 const PROTEIN_AISLE = "Meat & Seafood";
 
 export function baseIngredients(
   ingredients: ReadonlyArray<{ item: string }>,
   catalog: Catalog,
 ): Map<string, string> {
+  /*
+   * Resolved first, because whether an aromatic counts depends on the rest of the list rather
+   * than on the ingredient in front of us — a single pass cannot know, when it reaches the onion,
+   * whether the celery is coming.
+   */
+  const present = new Set<string>();
+  for (const ingredient of ingredients) {
+    const text = ingredient.item;
+    if (!text) continue;
+    const item = catalog.find(text);
+    const key = item ? item.key : normaliseName(text);
+    if (key) present.add(key);
+  }
+  const seen = new Set([...present].map(spaced));
+  const clustered = new Set(
+    AROMATIC_BASES.filter((cluster) => cluster.every((member) => seen.has(member))).flat(),
+  );
+
   // key -> the recipe's own words for it, because a shopping list that renames what a recipe
   // said is a list nobody can check against the recipe
   const out = new Map<string, string>();
@@ -65,7 +113,8 @@ export function baseIngredients(
     if (!key) continue;
     if (item?.aisle === PROTEIN_AISLE) continue;
     if (PROTEIN.test(key) || CARBOHYDRATE.test(key)) continue;
-    if (AROMATIC.has(key)) continue;
+    // a lone aromatic says nothing; one standing in a complete mirepoix or sofrito is the base
+    if (AROMATIC.has(spaced(key)) && !clustered.has(spaced(key))) continue;
     if (!out.has(key)) out.set(key, normaliseName(text) || text);
   }
   return out;

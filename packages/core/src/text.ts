@@ -91,16 +91,65 @@ export function stripTags(input: string): string {
 
 /** Seasonings assumed to be in the cupboard already. */
 export const STAPLES = [
-  "salt", "kosher salt", "sea salt", "table salt", "flaky salt",
+  "salt", "kosher salt", "sea salt", "table salt", "flaky salt", "flaky sea salt",
   "pepper", "black pepper", "white pepper", "ground black pepper",
   "water", "ice", "ice water", "cooking spray", "olive oil spray",
-  "vegetable oil", "canola oil", "neutral oil", "oil",
+  /*
+   * The oils are listed one by one on purpose. `"oil"` plus a suffix match used to make *every*
+   * `X oil` a staple, which is right for olive oil and wrong for sesame, chilli and truffle oil
+   * — things you buy. Naming them costs a line and an unfamiliar oil now errs toward the
+   * shopping list, which is the visible direction.
+   */
+  "oil", "olive oil", "vegetable oil", "canola oil", "neutral oil", "sunflower oil",
+  "rapeseed oil", "avocado oil", "grapeseed oil",
 ];
 
+/**
+ * Words that describe a staple without changing what it is.
+ *
+ * The old rule matched a staple anywhere in the name — `n.startsWith(s + " ")` or
+ * `n.endsWith(" " + s)` — which is right for "freshly ground black pepper" and catastrophic for
+ * everything where the qualifier IS the identity. It classified **bell pepper, green pepper,
+ * sweet pepper, red pepper, jalapeno pepper and poblano pepper** as cupboard seasonings, so a
+ * recipe calling for one never reached the shopping list; `bell peppers` survived only because
+ * the plural does not end in " pepper", and catalog names are stored **singular**, so the
+ * canonical form was the broken one. It also swallowed **salt pork** (a meat), **truffle oil**
+ * and **sesame oil** (both bought), and **garlic salt** and **celery salt**.
+ *
+ * So the match is now anchored: an exact staple, or a staple behind these modifiers and nothing
+ * else. An allow-list rather than a list of exceptions, deliberately, because the two failure
+ * directions are not equal. A missed modifier tells somebody to buy salt — visible, mildly
+ * annoying, and they ignore it. A missed exception silently omits an ingredient from the
+ * shopping list, which is the invisible direction, and this codebase has paid for that shape
+ * enough times to choose against it.
+ */
+const STAPLE_MODIFIERS = new Set([
+  "freshly", "fresh", "ground", "coarse", "coarsely", "fine", "finely", "cracked", "flaked",
+  "extra", "virgin", "pure", "light", "cold", "pressed", "filtered", "warm", "hot", "boiling",
+  "iced", "chilled", "plain", "good", "quality", "plus", "more", "optional",
+]);
+
 export function isStaple(name: string): boolean {
-  const n = normaliseName(name);
+  // hyphens, because a catalog key is "olive-oil" and `normaliseName` gives "olive oil"; both
+  // reach this function and a rule written for one of them silently fails for the other
+  const n = normaliseName(name).replace(/-/g, " ").trim();
   if (!n) return false;
-  return STAPLES.some((s) => n === s || n.startsWith(`${s} `) || n.endsWith(` ${s}`));
+
+  // "salt and pepper" is two staples, not an ingredient — and so is "kosher salt and black pepper"
+  const joined = n.split(/\s+(?:and|&|\+)\s+/);
+  if (joined.length > 1) return joined.every((part) => isStaple(part));
+
+  if (STAPLES.includes(n)) return true;
+
+  /*
+   * Strip leading modifiers and ask again. **Leading only.** A word after the staple changes the
+   * noun — salt pork is a meat, pepper jack is a cheese — while a word before it almost always
+   * describes the same thing: coarse sea salt, extra virgin olive oil, freshly ground pepper.
+   */
+  const words = n.split(" ");
+  let at = 0;
+  while (at < words.length && STAPLE_MODIFIERS.has(words[at]!)) at += 1;
+  return at > 0 && STAPLES.includes(words.slice(at).join(" "));
 }
 
 const VULGAR_FRACTIONS: Record<string, string> = {
