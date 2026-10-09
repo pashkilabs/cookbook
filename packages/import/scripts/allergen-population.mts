@@ -60,18 +60,52 @@ const catalog = createCatalog(
   ),
 );
 
+/*
+ * The dried-spice gap, simulated rather than migrated.
+ *
+ * The unresolved list is led by dried herbs and ground spices — oregano, garlic powder, smoked
+ * paprika, onion powder, thyme — which the catalog does not carry. Filling it is cheap separate
+ * work, and the question is what it *buys*: this treats these as recognised and reports the third
+ * column, so the decision rests on a number rather than on the intuition that it must help.
+ *
+ * Measurement-only. It deliberately does NOT live in core or the catalog: a list invented to
+ * answer one question must not become a second source of truth about ingredients.
+ */
+const SPICE = [
+  "oregano", "basil", "thyme", "rosemary", "sage", "parsley", "cilantro", "coriander", "dill",
+  "chives", "tarragon", "marjoram", "bay leaf", "bay leaves", "paprika", "smoked paprika",
+  "cumin", "turmeric", "cinnamon", "nutmeg", "clove", "cloves", "allspice", "cardamom",
+  "cayenne", "chilli flakes", "chili flakes", "red pepper flakes", "garlic powder",
+  "onion powder", "mustard powder", "ginger powder", "ground ginger", "curry leaves",
+  "fennel seed", "fennel seeds", "caraway", "star anise", "saffron", "sumac", "mace",
+  "white pepper", "lemon zest", "lime zest", "orange zest", "vanilla", "baking powder",
+  "baking soda", "cornstarch", "corn starch", "granulated sugar", "brown sugar", "powdered sugar",
+  "honey", "maple syrup", "white vinegar", "red wine vinegar", "white wine vinegar",
+  "apple cider vinegar", "balsamic vinegar", "rice vinegar", "lemon juice", "lime juice",
+];
+const isSpice = (text: string) => {
+  const t = ` ${text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()} `;
+  return SPICE.some((term) => t.includes(` ${term} `) || t.includes(` ${term}s `));
+};
+
 const recipes = corpus.filter((r) => (r.recipe_ingredients ?? []).length > 0);
 console.log(`${recipes.length} recipes with ingredients (of ${corpus.length})\n`);
 
 const WANTED: readonly Allergen[] = ALLERGENS;
 const pad = (n: number) => String(n).padStart(3);
+/*
+ * Keyed by product AND allergen since the refinement: a jar is opaque only for its own plausible
+ * set, so "worcestershire" is a soy and wheat warning and not a peanut one. Counting products
+ * alone would hide which warnings a household actually sees.
+ */
 const jarCounts = new Map<string, number>();
 
-console.log("                 ──── compound products only ────   ──── and unresolved lines ────");
-console.log("allergen          CLEAR  UNKNOWN  EXCLUDED           CLEAR  UNKNOWN  EXCLUDED");
+console.log("                 ─ compound products only ─   ─ + unresolved lines ─   ─ + spices filled ─");
+console.log("allergen          CLEAR  UNKNOWN  EXCL        CLEAR  UNKNOWN  EXCL     CLEAR  UNKNOWN  EXCL");
 for (const allergen of WANTED) {
   const tally = { clear: 0, unknown: 0, excluded: 0 };
   const withCatalog = { clear: 0, unknown: 0, excluded: 0 };
+  const spicesFilled = { clear: 0, unknown: 0, excluded: 0 };
   for (const recipe of recipes) {
     const lines = (recipe.recipe_ingredients ?? []).map((row) =>
       [row.amount ?? "", row.unit ?? "", row.item_text ?? ""].join(" ").trim(),
@@ -81,8 +115,9 @@ for (const allergen of WANTED) {
     tally[bare.verdict] += 1;
     // counted on one allergen only: the same jar is opaque for all nine, and summing across them
     // multiplied every figure by about nine in the first run
-    if (allergen === WANTED[0]) {
-      for (const line of bare.opaque) jarCounts.set(line, (jarCounts.get(line) ?? 0) + 1);
+    for (const { product } of bare.opaque) {
+      const at = `${product} (${allergen})`;
+      jarCounts.set(at, (jarCounts.get(at) ?? 0) + 1);
     }
 
     // plus the lines our catalog cannot resolve — the fixable half
@@ -103,14 +138,17 @@ for (const allergen of WANTED) {
       })
       .map((row) => row.item_text ?? "");
     withCatalog[readAllergen(lines, allergen, { unrecognised }).verdict] += 1;
+    const afterSpices = unrecognised.filter((text) => !isSpice(text));
+    spicesFilled[readAllergen(lines, allergen, { unrecognised: afterSpices }).verdict] += 1;
   }
   console.log(
     `${allergen.padEnd(16)} ${pad(tally.clear)}     ${pad(tally.unknown)}      ${pad(tally.excluded)}` +
-      `              ${pad(withCatalog.clear)}     ${pad(withCatalog.unknown)}      ${pad(withCatalog.excluded)}`,
+      `       ${pad(withCatalog.clear)}     ${pad(withCatalog.unknown)}    ${pad(withCatalog.excluded)}` +
+      `      ${pad(spicesFilled.clear)}     ${pad(spicesFilled.unknown)}    ${pad(spicesFilled.excluded)}`,
   );
 }
 
-console.log(`\nthe jars driving UNKNOWN, most common first:`);
+console.log(`\nthe warnings a household would actually see, most common first:`);
 for (const [line, times] of [...jarCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12)) {
   console.log(`  ${String(times).padStart(3)}×  ${line.slice(0, 64)}`);
 }
@@ -124,7 +162,11 @@ for (const recipe of recipes) {
     }
   }
 }
-console.log(`\n${unresolved.size} distinct ingredient texts the catalog cannot resolve; most common:`);
+const spiceShare = [...unresolved.keys()].filter(isSpice).length;
+console.log(
+  `\n${unresolved.size} distinct ingredient texts the catalog cannot resolve; ` +
+    `${spiceShare} of them are dried herbs, spices, sugars or vinegars. Most common:`,
+);
 for (const [text, times] of [...unresolved.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10)) {
   console.log(`  ${String(times).padStart(3)}×  ${text.slice(0, 64)}`);
 }

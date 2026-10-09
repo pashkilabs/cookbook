@@ -104,42 +104,142 @@ const TERMS: Record<Allergen, readonly string[]> = {
 };
 
 /**
- * Manufactured or assembled products whose interior an ingredient list does not name.
+ * Products bought ready-made, and the allergens each can plausibly contain.
  *
- * The presence of any of these makes the answer `unknown` for every allergen that was not
- * *already* matched outright — a jar of red curry paste may contain fish sauce, shrimp paste and
- * peanut, and which of those is true depends on the jar.
+ * **Why a set per product rather than a blanket.** Marking a jar unknown for *all nine* allergens
+ * made Worcestershire sauce raise a peanut warning on five recipes, for a sauce that essentially
+ * never contains peanut. A warning a household learns to dismiss is worse than no warning —
+ * measured twice in this project already — so the blanket was training people to ignore the one
+ * flag that matters.
  *
- * Judged by whether a cook buys it made rather than by how many ingredients it has: a stock cube
- * is compound and a chopped onion is not, however many onions.
+ * **Conservative when uncertain: anything *plausible*, not anything likely.** If a product's set is
+ * arguable, the allergen goes in. The cost of a wrong inclusion is one recipe needlessly flagged;
+ * the cost of a wrong omission is the failure no caveat covers.
+ *
+ * **Scoped to plausible ingredients, not cross-contamination.** "Made in a facility that also
+ * handles nuts" is true of most manufactured food, so admitting it would reinstate the blanket
+ * under a different name and lose the distinction this exists to draw. A household that needs
+ * contamination-level caution needs labels, which §71 says this cannot replace.
+ *
+ * **An allergen near-universal in a product belongs in `TERMS`, not here** — anchovy in
+ * Worcestershire, wheat in bread. So everything in these sets is genuinely variable by brand, and
+ * one wording covers all of it: *can* contain. No likelihood scale, and therefore no invented
+ * confidence (§61).
+ *
+ * An empty set is meaningful: a bought product with nothing plausible among the nine, which
+ * stops forcing `unknown` without being removed from the list.
  */
-const COMPOUND: readonly string[] = [
-  "curry paste", "curry powder", "chilli powder", "chili powder", "pesto", "harissa", "gochujang",
-  "stock", "broth", "bouillon", "stock cube", "bouillon cube", "gravy", "roux",
-  "worcestershire", "oyster sauce", "fish sauce", "hoisin", "teriyaki", "ponzu", "sriracha",
-  "soy sauce", "tamari", "miso", "ketchup", "bbq sauce", "barbecue sauce", "yum yum sauce",
-  "mayonnaise", "mayo", "aioli", "ranch", "salad dressing", "vinaigrette", "marinade",
-  "seasoning", "spice blend", "spice mix", "taco seasoning", "italian seasoning", "old bay",
-  "bread", "bun", "roll", "tortilla", "naan", "pita", "brioche", "croissant", "pastry",
-  "puff pastry", "phyllo", "filo", "panko", "breadcrumb", "breadcrumbs", "cracker", "crackers",
-  "stuffing", "sausage", "chorizo", "hot dog", "bacon", "deli meat", "meatball",
-  "chocolate", "chocolate chips", "nutella", "marzipan", "ice cream", "condensed soup",
-  "cream of chicken", "cream of mushroom", "vanilla extract", "mirin", "cooking wine",
-  "protein powder", "tortilla chips", "pie crust", "pizza dough", "puff", "wrap",
-];
+const COMPOUND: Record<string, readonly Allergen[]> = {
+  // fermented and fish-derived sauces
+  worcestershire: ["soy", "wheat"],
+  "fish sauce": ["shellfish"],
+  "oyster sauce": ["soy", "wheat"],
+  hoisin: ["soy", "wheat", "sesame", "peanut"],
+  "soy sauce": ["wheat"],
+  tamari: ["wheat"],
+  miso: ["wheat"],
+  ponzu: ["wheat", "fish"],
+  teriyaki: ["soy", "wheat", "sesame"],
+  gochujang: ["soy", "wheat"],
+  sriracha: ["fish", "soy", "wheat"],
+  mirin: ["soy", "wheat"],
+  "cooking wine": ["soy", "wheat"],
+
+  // pastes, blends and powders
+  "curry paste": ["fish", "shellfish", "peanut", "soy"],
+  "curry powder": ["wheat"],
+  "chilli powder": ["wheat"],
+  "chili powder": ["wheat"],
+  pesto: ["tree-nut", "milk", "fish"],
+  harissa: [],
+  seasoning: ["wheat", "milk", "sesame"],
+  "spice blend": ["wheat", "milk", "sesame"],
+  "spice mix": ["wheat", "milk", "sesame"],
+  "taco seasoning": ["wheat", "milk"],
+  "italian seasoning": ["wheat"],
+  "old bay": ["wheat"],
+
+  // stocks and thickened liquids
+  stock: ["milk", "soy", "wheat"],
+  broth: ["milk", "soy", "wheat"],
+  bouillon: ["milk", "soy", "wheat"],
+  "stock cube": ["milk", "soy", "wheat"],
+  "bouillon cube": ["milk", "soy", "wheat"],
+  gravy: ["milk", "soy", "wheat"],
+  roux: ["milk"],
+  "condensed soup": ["milk", "soy", "wheat"],
+  "cream of chicken": ["soy", "wheat"],
+  "cream of mushroom": ["soy", "wheat"],
+
+  // table sauces and dressings
+  ketchup: ["soy", "wheat"],
+  "bbq sauce": ["soy", "wheat", "fish", "sesame"],
+  "barbecue sauce": ["soy", "wheat", "fish", "sesame"],
+  "yum yum sauce": ["egg", "soy", "wheat"],
+  mayonnaise: ["soy"],
+  mayo: ["soy"],
+  aioli: ["soy", "milk"],
+  ranch: ["milk", "egg", "soy", "wheat"],
+  "salad dressing": ["milk", "egg", "soy", "wheat"],
+  vinaigrette: ["milk", "egg", "soy", "wheat"],
+  marinade: ["soy", "wheat", "sesame", "fish"],
+
+  // baked and breaded things — wheat is in TERMS, so these carry what else varies
+  bread: ["milk", "egg", "soy", "sesame"],
+  bun: ["milk", "egg", "soy", "sesame"],
+  roll: ["milk", "egg", "soy", "sesame"],
+  tortilla: ["milk", "soy"],
+  naan: ["milk", "egg", "soy"],
+  pita: ["milk", "soy", "sesame"],
+  brioche: ["milk", "egg", "soy"],
+  croissant: ["milk", "egg", "soy"],
+  pastry: ["milk", "egg", "soy"],
+  "puff pastry": ["milk", "egg", "soy"],
+  phyllo: ["milk", "egg", "soy"],
+  filo: ["milk", "egg", "soy"],
+  "pie crust": ["milk", "egg", "soy"],
+  "pizza dough": ["milk", "soy"],
+  wrap: ["milk", "egg", "soy", "sesame"],
+  panko: ["milk", "egg", "soy", "sesame"],
+  breadcrumb: ["milk", "egg", "soy", "sesame"],
+  breadcrumbs: ["milk", "egg", "soy", "sesame"],
+  cracker: ["milk", "egg", "soy", "sesame"],
+  crackers: ["milk", "egg", "soy", "sesame"],
+  "tortilla chips": ["milk", "soy", "wheat"],
+  stuffing: ["milk", "egg", "soy"],
+
+  // prepared meats
+  sausage: ["milk", "egg", "soy", "wheat"],
+  chorizo: ["milk", "soy", "wheat"],
+  "hot dog": ["milk", "egg", "soy", "wheat"],
+  "deli meat": ["milk", "soy", "wheat"],
+  meatball: ["milk", "egg", "soy", "wheat"],
+  bacon: ["soy"],
+
+  // sweet things
+  chocolate: ["milk", "soy", "tree-nut", "peanut"],
+  "chocolate chips": ["milk", "soy", "tree-nut", "peanut"],
+  nutella: ["milk", "soy"],
+  marzipan: ["egg"],
+  "ice cream": ["egg", "soy", "tree-nut", "peanut"],
+  "protein powder": ["milk", "soy", "egg", "tree-nut", "peanut", "wheat"],
+  "vanilla extract": [],
+};
 
 /**
  * Phrases that contain an allergen's word and are not that allergen.
  *
  * `peanut butter` matched **milk**, because `butter` is a dairy term — found by the test suite,
- * and it is the catalog's lesson in mirror image: there the modifier was discarded and bought the
- * wrong product; here the modifier *reverses* the answer. `coconut milk` is the one that matters
- * most in practice, appearing in a quarter of this corpus and containing no dairy at all.
+ * and it is the catalog's lesson in mirror image. There the modifier is *discarded* and the wrong
+ * thing gets bought; here the modifier *reverses* the answer. Same word, opposite failure, which
+ * is better evidence than the argument that these cannot share code (§71).
+ *
+ * `coconut milk` is the one that matters most in practice: it appears throughout this corpus and
+ * contains no dairy at all.
  *
  * Applied by **removing the phrase from the line** before the positive terms are tried, so
- * "peanut butter and 50 ml milk" still matches milk on the second half. Suppressing the whole
- * line would be the over-correction that turns a false positive into a false negative, which is
- * the direction that must never be traded away.
+ * "peanut butter and 50 ml milk" still matches milk on the second half. Suppressing the whole line
+ * would turn a false positive into a false negative, which is the direction never to trade away.
  */
 const NOT_TERMS: Record<Allergen, readonly string[]> = {
   peanut: [],
@@ -184,8 +284,15 @@ export interface AllergenReading {
   verdict: AllergenVerdict;
   /** the written words that matched, quoted back so a person can check the reasoning */
   matched: string[];
-  /** lines bought ready-made, whose interior this cannot see */
-  opaque: string[];
+  /**
+   * Lines bought ready-made that could plausibly carry *this* allergen.
+   *
+   * The product is named as well as the line, because the claim changed with the refinement.
+   * "We cannot see inside this" has become "we can see inside the category and not the jar", and
+   * a more specific claim has to be more specifically worded: a caller writes "contains chicken
+   * broth, which can contain milk" rather than raising a generic flag.
+   */
+  opaque: Array<{ line: string; product: string }>;
   /** lines the caller could not recognise at all */
   unrecognised: string[];
 }
@@ -208,7 +315,7 @@ export function readAllergen(
 ): AllergenReading {
   const terms = TERMS[allergen];
   const matched: string[] = [];
-  const opaque: string[] = [];
+  const opaque: Array<{ line: string; product: string }> = [];
 
   for (const line of lines) {
     const raw = written(line);
@@ -223,8 +330,14 @@ export function readAllergen(
       matched.push(line.trim());
       continue;
     }
-    // compound is asked of the original line: cutting an exempt phrase must not hide a jar
-    if (COMPOUND.some((product) => names(raw, product))) opaque.push(line.trim());
+    /*
+     * Asked of the *original* line, because cutting an exempt phrase must not hide a jar — and
+     * only for products whose plausible set carries this allergen, which is the refinement.
+     */
+    const product = Object.keys(COMPOUND).find(
+      (name) => names(raw, name) && COMPOUND[name]!.includes(allergen),
+    );
+    if (product) opaque.push({ line: line.trim(), product });
   }
 
   const unrecognised = [...(options.unrecognised ?? [])];

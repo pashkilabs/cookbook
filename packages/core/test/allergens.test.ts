@@ -38,7 +38,9 @@ describe("what it cannot see, it says it cannot see", () => {
   it("calls a jar of curry paste unknown rather than clear", () => {
     const reading = readAllergen(["2 tbsp red curry paste", "400 ml coconut milk"], "fish");
     expect(reading.verdict).toBe("unknown");
-    expect(reading.opaque).toEqual(["2 tbsp red curry paste"]);
+    expect(reading.opaque).toEqual([
+      { line: "2 tbsp red curry paste", product: "curry paste" },
+    ]);
   });
 
   it("calls pesto unknown for tree nuts, because the pine nuts are inside the jar", () => {
@@ -121,8 +123,62 @@ describe("a phrase that contains an allergen's word and is not that allergen", (
   });
 
   it("still calls a jar opaque even when an exempt phrase was cut from the line", () => {
-    // coconut milk is exempt for dairy; the curry paste in the same line is still a jar
-    const reading = readAllergen(["400 ml coconut milk with 2 tbsp curry paste"], "milk");
+    /*
+     * coconut milk is exempt for dairy; the broth in the same line is still a jar that can carry
+     * it. This test originally used curry paste and went green on the pre-refinement blanket —
+     * curry paste can carry fish, shellfish, peanut and soy, and no dairy at all, so after the
+     * refinement it is correctly clear for milk. The failure was the refinement working.
+     */
+    const reading = readAllergen(["400 ml coconut milk with 1 cup chicken broth"], "milk");
     expect(reading.verdict).toBe("unknown");
+    expect(reading.opaque.map((o) => o.product)).toEqual(["broth"]);
+  });
+});
+
+describe("a jar is unknown only for what it could plausibly contain", () => {
+  /*
+   * The refinement. Marking a jar unknown for all nine allergens made Worcestershire raise a
+   * peanut warning on five recipes, and a warning a household learns to dismiss is worse than
+   * no warning.
+   */
+  it("does not raise a peanut warning for Worcestershire sauce", () => {
+    expect(verdict(["1 tbsp worcestershire sauce"], "peanut")).toBe("clear");
+    expect(verdict(["1 tbsp worcestershire sauce"], "shellfish")).toBe("clear");
+  });
+
+  it("still names fish outright for Worcestershire, which is a term and not a guess", () => {
+    // near-universal in the product, so it belongs in TERMS — which is why everything left in a
+    // compound's set is genuinely brand-variable and one wording covers it
+    expect(verdict(["1 tbsp worcestershire sauce"], "fish")).toBe("excluded");
+  });
+
+  it("keeps the soy and wheat that do vary by brand", () => {
+    expect(verdict(["1 tbsp worcestershire sauce"], "soy")).toBe("unknown");
+    expect(verdict(["1 tbsp worcestershire sauce"], "wheat")).toBe("unknown");
+  });
+
+  it("names the product, so a caller can say which jar and which allergen", () => {
+    const reading = readAllergen(["4 cup chicken broth"], "milk");
+    expect(reading.verdict).toBe("unknown");
+    expect(reading.opaque).toEqual([{ line: "4 cup chicken broth", product: "broth" }]);
+  });
+
+  it("errs toward inclusion where a set is arguable", () => {
+    // hoisin can carry peanut; curry paste can carry shrimp paste. Both go in.
+    expect(verdict(["2 tbsp hoisin sauce"], "peanut")).toBe("unknown");
+    expect(verdict(["1 tbsp red curry paste"], "shellfish")).toBe("unknown");
+  });
+
+  it("lets an empty set stop forcing unknown without dropping the product", () => {
+    // a bought product with nothing plausible among the nine
+    for (const allergen of ["peanut", "milk", "fish"] as const) {
+      expect(verdict(["1 tsp vanilla extract"], allergen), allergen).toBe("clear");
+    }
+  });
+
+  it("does not admit cross-contamination, which would reinstate the blanket", () => {
+    // "made in a facility that also handles nuts" is true of most manufactured food
+    expect(verdict(["1 tbsp italian seasoning"], "peanut")).toBe("clear");
+    expect(verdict(["1 tbsp italian seasoning"], "tree-nut")).toBe("clear");
   });
 });

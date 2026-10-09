@@ -4090,6 +4090,69 @@ So: a dedicated term set with explicit aliases, matched on **word boundaries aga
 written line, before normalisation** — normalisation being the step that loses `almond`. No catalog
 lookup, no stemming beyond plurals, no fuzzy match.
 
+### `peanut butter` matched milk — better evidence than the argument
+
+The head-noun argument above is reasoning. This is a demonstration, and it came from the test
+suite rather than from thinking about it.
+
+`butter` is a dairy term, so **`peanut butter` returned EXCLUDED for milk**. Same word as the
+catalog's own failure, opposite direction:
+
+| | what the modifier does | what goes wrong |
+|---|---|---|
+| **catalog** | **discarded** — it wants `milk` | `almond milk` buys whole milk: the wrong product |
+| **allergen matcher** | **read** — it wants `almond` | `peanut butter` reports dairy: the answer reversed |
+
+One function cannot do both. The catalog must throw the modifier away to find a package; the
+matcher must read it to find an allergen, *and* must read it a second time to know when it
+**reverses** the result — `coconut milk` contains no dairy, and appears throughout this corpus.
+
+Hence `NOT_TERMS`: phrases carrying an allergen's word that are not that allergen. Applied by
+**cutting the phrase out of the line**, not suppressing the line — "peanut butter and 50 ml milk"
+still matches milk, because turning a false positive into a false negative is the one trade never
+to make here.
+
+### The refinement: a jar is unknown only for what it could plausibly contain
+
+The first measurement marked a compound `unknown` for **all nine** allergens. So Worcestershire
+sauce raised a **peanut** warning on five recipes, for a sauce that essentially never contains
+peanut — and a warning a household learns to dismiss is worse than no warning, which this project
+has measured twice. The blanket was training people to ignore the one flag that matters.
+
+So each product carries the allergens it can plausibly contain. Measured on 82 recipes:
+
+| allergen | CLEAR before → after | UNKNOWN before → after |
+|---|---|---|
+| peanut | 34 → **76** | 43 → **1** |
+| tree-nut | 30 → **74** | 45 → **1** |
+| shellfish | 32 → **76** | 47 → **3** |
+| fish | 34 → 64 | 37 → 7 |
+| egg | 32 → 59 | 35 → 8 |
+| sesame | 33 → 57 | 39 → 15 |
+| milk | 14 → 25 | 23 → 12 |
+| wheat | 24 → 30 | 27 → 21 |
+| soy | 34 → 38 | 38 → **34** |
+
+The blanket was almost **entirely noise** for the three allergens where a missed warning is most
+serious. Soy and wheat stay high, honestly: they genuinely are in most manufactured food.
+
+Three rules hold it together:
+
+- **Conservative when uncertain — anything *plausible*, not anything likely.** An arguable set
+  gets the allergen. A wrong inclusion costs one needlessly flagged recipe; a wrong omission costs
+  the failure no caveat covers.
+- **Plausible ingredients, not cross-contamination.** "Made in a facility that also handles nuts"
+  is true of most manufactured food, so admitting it reinstates the blanket under another name.
+- **An allergen near-universal in a product belongs in `TERMS`, not in a plausible set** — anchovy
+  in Worcestershire, wheat in bread. So everything in a plausible set is genuinely brand-variable,
+  **one wording covers all of it — *can* contain — and no likelihood scale is needed**, which is
+  how this avoids inventing the confidence §61 says does not exist.
+
+And the sentence changed with the meaning. UNKNOWN no longer says *"we cannot see inside this"*; it
+says *"we can see inside the category and not the jar"*. So the reading names the **product** as
+well as the line, and a caller writes "contains chicken broth, which can contain milk" rather than
+raising a generic flag. A more specific claim has to be more specifically worded.
+
 ### Three outcomes, never two
 
 - **EXCLUDED** — a term matched. Removed from suggestions; the matched word is quoted back so a
