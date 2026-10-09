@@ -894,6 +894,17 @@ try {
         pasted.status === 422 || pasted.status === 429,
         `HTTP ${pasted.status} — ${String(pasted.body?.error ?? "").slice(0, 70)}`,
       );
+      /*
+       * The two assertions above are NOT CHECKED, not absent.
+       *
+       * A refusal here is legitimate — the model declines on some captions, and this run saw a
+       * 422 where the previous one saw a 200. But the dependent checks then simply *vanished*,
+       * so the run printed "133 passed" where the last printed 134, with nothing saying two were
+       * not measured. That is this file's own header arriving in this file: the only thing
+       * distinguishing a complete run from an incomplete one was remembering the old number.
+       */
+      skip("and the model found the ingredients", "the caption import was refused, so there is no draft to read");
+      skip("and core parsed the amounts rather than the model", "the caption import was refused, so there is no draft to read");
     }
 
     record(
