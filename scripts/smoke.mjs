@@ -762,7 +762,13 @@ try {
         MARKERS[path] ?? null,
       ]),
       // dynamic routes, with ids this run actually has
-      ["/recipes/[id]", `/recipes/${recipeId}`, null],
+      /*
+       * A real marker now, where there was none. A recipe this run just created has no stored
+       * partition, so a working render must offer to work one out — which is the assertion that
+       * the *control* is reachable, not merely that the page returns 200. The display of parts
+       * had been on this page since §60 with nothing on it able to produce them.
+       */
+      ["/recipes/[id]", `/recipes/${recipeId}`, "Parts of this recipe"],
       ["/recipes/[id]/edit", `/recipes/${recipeId}/edit`, null],
       ["/recipes/blend?from=", `/recipes/blend?from=${recipeId}`, null],
       // a token this run cannot hold: the invitation response carries none, on purpose. An

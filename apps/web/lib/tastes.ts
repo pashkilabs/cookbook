@@ -131,6 +131,36 @@ export function warningsFor(
 }
 
 /**
+ * The cache key for a recipe's partition — one implementation, two callers.
+ *
+ * `componentsFor` needs it to decide whether to re-ask the model; the recipe page needs it to
+ * decide whether the partition it is about to render is the *current* one or an answer to a
+ * question that has since changed. Building the lines twice would be two implementations that
+ * agree until somebody edits one of them, and this key already crosses enough boundaries —
+ * parser to draft to prepare to insert — to have earned a single home.
+ *
+ * The line format is load-bearing: `amount unit item_text`, joined and trimmed, in `position`
+ * order. A caller that assembles them differently gets a key that never matches, and a key that
+ * never matches is a control that always says "not read yet" while the partition sits in the
+ * column.
+ */
+export function componentsKeyFor(
+  recipe: { title: string | null },
+  ingredients: ReadonlyArray<{
+    item_text?: string | null;
+    amount?: number | null;
+    unit?: string | null;
+    section?: string | null;
+  }>,
+): string {
+  const lines = ingredients.map((row) =>
+    [row.amount ?? "", row.unit ?? "", row.item_text ?? ""].join(" ").trim(),
+  );
+  const sections = ingredients.map((row) => row.section ?? null);
+  return promptKey(COMPONENTS_PROMPT_FINGERPRINT, recipe.title, lines, sections);
+}
+
+/**
  * The general-knowledge note for a recipe — from the cache, or computed once and kept.
  *
  * **Why a column and not a memo.** This was a model call on every page view where nothing had
@@ -328,7 +358,8 @@ export async function componentsFor(
   // took `right` from ~14 to 25 of thirty when supplied
   const sections = ingredients.map((row) => row.section ?? null);
   const hasSections = sections.some(Boolean);
-  const key = promptKey(COMPONENTS_PROMPT_FINGERPRINT, recipe.title, lines, sections);
+  // through the shared helper, so the recipe page's staleness check and this cannot disagree
+  const key = componentsKeyFor(recipe, ingredients);
 
   /*
    * A partition built on fewer than three readings is provisional, and is recomputed.

@@ -14,7 +14,8 @@ import { RemoveRecipe } from "./remove";
 import { Verdicts } from "./verdicts";
 import { PhotoUpload } from "../photo-upload";
 import { PalateNotes } from "./palate";
-import { palateNotesFor } from "@/lib/tastes";
+import { SplitButton } from "../blend/split";
+import { componentsKeyFor, palateNotesFor } from "@/lib/tastes";
 import { linkify } from "./linkify";
 import { Substitution } from "./substitution";
 
@@ -50,7 +51,7 @@ export default async function RecipePage({
   const recipe = maybeRow(
     await supabase
     .from("recipes")
-    .select("id, title, source_name, source_url, servings, time_minutes, times_made, make_again, visibility, course, cuisine, dish_form, principal_protein, palate_notes, palate_key, components, components_agreement, components_readings, derived_at")
+    .select("id, title, source_name, source_url, servings, time_minutes, times_made, make_again, visibility, course, cuisine, dish_form, principal_protein, palate_notes, palate_key, components, components_key, components_agreement, components_readings, derived_at")
     .eq("id", id)
     .eq("family_id", family.id)
     .is("deleted_at", null)
@@ -110,6 +111,22 @@ export default async function RecipePage({
     // the catalog carries the energy figures; package sizes are about buying, not eating
     supabase.from("ingredients").select(INGREDIENT_COLUMNS),
   ]);
+
+  /*
+   * Is the stored partition an answer to *this* recipe, read by *this* prompt?
+   *
+   * Through `componentsKeyFor`, the same function `componentsFor` keys its cache with — a second
+   * implementation here would drift and the drift would be invisible, because a key that never
+   * matches reads as "not split yet" while the partition sits in the column.
+   *
+   * Cheap: a djb2 hash over the lines, no model and no network. Safe to compute on every view.
+   */
+  const partitionIsCurrent =
+    typeof recipe.components_key === "string" &&
+    // `.data ?? []` as everywhere else on this page. On a read failure the key is built from no
+    // lines and cannot match, so the page offers to work the parts out rather than showing a
+    // partition it could not verify — the safe direction of the two.
+    recipe.components_key === componentsKeyFor(recipe, ingredients.data ?? []);
 
   // The bucket is private, so a URL has to be signed. Signed as the person viewing, so the
   // storage policy is what authorises it — the same reasoning as reading the rows.
@@ -444,7 +461,53 @@ export default async function RecipePage({
         * necessarily. Agreement proves nothing in the other direction, so it is never shown as
         * a credential.
         */}
-      {storedParts.length > 0 && (
+      {/*
+        * A control, on the recipe — and the reason it is a control.
+        *
+        * The display below has been here since §60 and nothing on this page could *produce* it:
+        * a partition only existed if somebody had gone to the blend composer and asked for one,
+        * which is the rarest reason to want it. So the capability was reachable only from the
+        * screen for the use nobody has yet — the eighth thing shipped without a way in, and this
+        * one had its display already built.
+        *
+        * Not automatic on load. Three model calls, twelve to thirty seconds each, and the
+        * overwhelming majority of recipe views do not want a partition — auto-computing would be
+        * the import trigger's cost spread thinner, paid on every recipe anybody opens rather
+        * than at import. `SplitButton` is reused rather than reimplemented: it already says what
+        * the wait is for, disables itself so a second click cannot spend a second three calls,
+        * and separates "read as one thing" from "only one reading came back".
+        *
+        * **Three states, because stale is not the same as absent.** The stored partition is an
+        * answer to a prompt and a list of lines; either can have changed since. Showing a stale
+        * partition as current is the failure the version fingerprint exists to prevent — it was
+        * live for a week, and six households' recipes read `protein / garnish / carbohydrate`
+        * from a prompt that had been replaced.
+        */}
+      {storedParts.length > 0 && !partitionIsCurrent && (
+        <section>
+          <h2>This recipe splits into</h2>
+          <p className="meta">
+            The recipe or the way it is read has changed since these parts were worked out, so
+            they are not shown — a stale split looks exactly like a fresh one, which is worse
+            than none.
+          </p>
+          <SplitButton recipeId={recipe.id} label="Work out the parts again" />
+        </section>
+      )}
+
+      {storedParts.length === 0 && (
+        <section>
+          <h2>Parts of this recipe</h2>
+          <p className="meta">
+            Which bits were cooked separately — the sauce, the protein, the grain. Worth knowing
+            if you want to make one part in a batch, or pair it with something else. Reading it
+            takes under a minute and only happens when you ask.
+          </p>
+          <SplitButton recipeId={recipe.id} label="Work out the parts" />
+        </section>
+      )}
+
+      {storedParts.length > 0 && partitionIsCurrent && (
         <section>
           <h2>This recipe splits into</h2>
           <p>

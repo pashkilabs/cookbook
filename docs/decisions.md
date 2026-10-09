@@ -3983,3 +3983,80 @@ for ever, and `updated_at` moving conflates a decrement with a top-up — the pr
 session recorded. Two numbers that are exactly true beat three where one is approximate and
 unlabelled.
 
+## §70 — Splitting stays as calibrated: the literature is right and the wording did not deliver it
+
+> ### Where this ended up — read this first
+>
+> **No retune.** Sauce recovery is **60–65%** and the failures concentrate in one-pan dishes,
+> where a label and a model disagree about whether a marsala chicken is one thing or two. That is
+> a **genuine ambiguity**, not a miscalibrated prompt.
+>
+> The cooking research below is **correct** and the prompt rewrite built on it **measured worse on
+> its own target metric**. Both halves are the entry. A future reader reaching for the same change
+> should know it has been tried and what it cost.
+
+### The reported failure, and what it actually was
+
+Stephen: *"splitting extracts the protein and ignores the sauce."* Accurate, and two defects deep.
+
+The first was a **stale cache** — `promptKey` omitted the prompt, so the naming fix never reached
+production and the stored partitions were still named `protein`, `garnish`, `carbohydrate`. Fixed
+separately; see the `prompt-version.ts` header. Everything below is measured *after* that.
+
+### The research, which holds up
+
+Two of the prompt's rules did contradict published practice rather than merely being cautious:
+
+- **"protein — the meat, fish, beans or eggs, with the seasonings and liquid cooked with them"**
+  is backwards. In practice the protein is what gets **added** to a base, not what contains it.
+  A Thai red curry is paste plus coconut milk and then the meat, and **substituting the protein is
+  the named variation** — chicken, prawns or tofu in the same curry. An Indian restaurant kitchen
+  makes **one curry base** behind many curries and adds the protein late. A Chinese **master stock**
+  and master meat sauce are built once and reused for months. In every case the base is the
+  durable thing and the protein is the variable, which is only expressible if the base is a
+  component in its own right.
+- **"bare aromatics are not a base"** contradicts **mirepoix** (onion, carrot, celery) and
+  **sofrito** (tomato, onion, bell pepper, garlic) — cooked down and frozen *specifically* to be a
+  base, and the canonical examples of the technique.
+
+**The second rule was accepted and shipped** (`59a6225`): the exclusion now lifts for a complete
+named cluster. It also uncovered a live shopping-list bug — `isStaple` classed every `X pepper` as
+a cupboard seasoning, so sofrito could not have matched regardless.
+
+### The first rule was rewritten, measured, and reverted
+
+Measured against the 30 hand labels, best-of-three (as production runs), twice each:
+
+| | baseline | retuned |
+|---|---|---|
+| **sauces recovered** | **60%, 65%** | **55%, 60%** |
+| role accuracy | 96%, 94% | 85%, 86% |
+| right | 19, 20 | 18, 20 |
+| component count correct | 21, 22 | 19, 22 |
+
+Flat-to-worse on every measure **including its own target**. One intermediate finding: the first
+wording said the protein includes *"a marinade it soaked in"*, which **contradicted the prompt's own
+`marinade` role** — three of the thirty labels give a marinade its own component. Removing it did
+not recover role accuracy, so that was not the cause, but **a retune can contradict the schema it
+is retuning** and that is worth checking first.
+
+### Why this is a no rather than a not-yet
+
+The ground truth **agrees with the literature** — the labels are `bang bang sauce · chicken · rice
+· toppings`, `mushroom sauce · pasta`, `chicken · huli huli sauce · garnish`. So this was not a
+case of ground truth encoding the old philosophy; **I claimed it was, and was wrong**, having
+argued it before reading the labels.
+
+With the labels and the literature agreeing and only the prompt dissenting, the expected result was
+a clear gain. There was none. The remaining disagreements are dishes like Marsala Chicken, where
+the marsala, cream and mushrooms are both *the sauce* and *the liquid the chicken cooked in* —
+**both readings are defensible**, and 60–65% is what honest disagreement looks like rather than
+what a broken prompt looks like.
+
+### What would reverse it
+
+A measurement showing the one-pan cases are decidable — a labelling pass where two people
+independently agree on Marsala Chicken, say. Until then, retuning trades role accuracy for nothing.
+And note what the gain would be worth: the **display** of parts was already on the recipe page and
+the **control** to produce them was not, so the available improvement was reach, not accuracy.
+

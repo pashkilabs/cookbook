@@ -377,6 +377,42 @@ models be good enough. Do not add a silent-save path.
   assert on non-empty content, because an empty string is the one reply that will not look like
   an error anywhere.
 
+- **One run is not a baseline, and the number I quoted for a decision was the low end of a
+  five-point spread.** `measure-components` scored **one** reading per recipe while `componentsFor`
+  stores the consensus of **three**. Three runs of the *identical* prompt scored `right` **14, 18
+  and 19** of thirty. I reported "14/30" as the measured baseline, twice, and built a calibration
+  argument on it; the consensus figure is **20/30** and is stable to within a point.
+
+  Two separate faults, and the second is the one that generalises. The spread means **any retune
+  claiming less than a five-point move was measuring the weather** — so a plausible wording would
+  have "worked" on a coin-flip. And the single reading meant **the measurement path was not the
+  shipping path**, the same divergence that let the eval read a card perfectly while production
+  sent an Anthropic model id to Together. A measurement harness is code, and the question *does
+  this do what production does?* applies to it exactly as it applies to a route.
+
+  So: **report a range or a mean, never a single run, for anything a model produces** — and check
+  the harness reproduces the shipping configuration before trusting a single digit of it. The
+  tell that something was wrong was available and ignored: the figure sat four points below the
+  only other number in the file.
+
+- **A metric blind to the thing being tuned for cannot say whether the tuning worked.** The
+  component scorer reported `right` — the *whole* partition correct — and `matched`, which pools
+  every kind of component. The report being acted on was *"splitting extracts the protein and
+  ignores the sauce"*: a claim about **one kind**. So a retune aimed at sauces was judged by two
+  numbers that could not see sauces, and a change that moved sauce recovery would have shown up
+  as noise in both.
+
+  Adding `SAUCES RECOVERED` settled the question in one run — and settled it *against* the
+  retune, 60–65% before and 55–60% after, which neither `right` (19,20 → 18,20) nor role accuracy
+  could have told apart from drift. It also corrected the premise: sauce recovery was **already
+  60–65%**, not the near-zero six production recipes implied, so the failure was concentrated in
+  one-pan dishes rather than general.
+
+  §54a is *a proxy can rot without failing*. This is the step before it: **ask what the measure
+  can see before changing anything, not after.** The question is "if this change worked, which
+  number moves?" — and if the answer is "none of the ones I have", the measure is the first piece
+  of work, not the tuning.
+
 - **A removal deploys in the reverse order of an addition.** Adding is migration first,
   then code, because code ahead of its schema is a page that 500s — that asymmetry has
   bitten four times and `/api/health` reports `schema` to catch it. Removing inverts it:

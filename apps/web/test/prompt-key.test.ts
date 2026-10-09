@@ -3,7 +3,7 @@ import {
   COMPONENTS_PROMPT_FINGERPRINT,
   PALATE_PROMPT_FINGERPRINT,
 } from "@pashki/import/prompt-version";
-import { promptKey } from "../lib/tastes";
+import { componentsKeyFor, promptKey } from "../lib/tastes";
 
 /*
  * regression: the key fingerprinted amount/unit/item_text alone, while the title and the
@@ -71,6 +71,67 @@ describe("promptKey", () => {
       // computed from the prompt text at module load, so there is nothing to forget.
       expect(COMPONENTS_PROMPT_FINGERPRINT).toMatch(/^\d+:[0-9a-z]+$/);
       expect(PALATE_PROMPT_FINGERPRINT).toMatch(/^\d+:[0-9a-z]+$/);
+    });
+  });
+
+  /*
+   * The join, walked end to end.
+   *
+   * `componentsKeyFor` is built by the recipe page to decide whether to render a partition, and
+   * by `componentsFor` to decide whether to re-ask the model. If the two ever disagree the
+   * symptom is silent and wrong in both directions: a key that never matches reads as "not split
+   * yet" while the partition sits in the column, and a key that matches when it should not serves
+   * an answer to a question that has changed. One function is what prevents it; this is the test
+   * that the function is actually the thing being compared.
+   */
+  describe("componentsKeyFor is the key the cache is keyed on", () => {
+    const ingredients = [
+      { amount: 200, unit: "g", item_text: "flour", section: null },
+      { amount: 1, unit: null, item_text: "egg", section: "the batter" },
+    ];
+
+    it("builds the same key the components cache uses, from the lines as actually assembled", () => {
+      /*
+       * `"1  egg"` carries a double space, and that is the real format: the line is
+       * `[amount, unit, item_text].join(" ")` and a null unit leaves an empty middle field. Pinned
+       * exactly rather than written the tidy way — the first version of this test asserted
+       * `"1 egg"` and failed, which is the test asserting an assumption about the format instead
+       * of the format. The model is sent this string too, double space and all.
+       */
+      expect(componentsKeyFor({ title: "Pasta" }, ingredients)).toBe(
+        promptKey(
+          COMPONENTS_PROMPT_FINGERPRINT,
+          "Pasta",
+          ["200 g flour", "1  egg"],
+          [null, "the batter"],
+        ),
+      );
+    });
+
+    it("is not the palate note's key, for the same recipe", () => {
+      expect(componentsKeyFor({ title: "Pasta" }, ingredients)).not.toBe(
+        promptKey(PALATE_PROMPT_FINGERPRINT, "Pasta", ["200 g flour", "1  egg"], [null, "the batter"]),
+      );
+    });
+
+    it("changes when a line is edited, so an edited recipe is re-read", () => {
+      const edited = [{ ...ingredients[0]!, amount: 300 }, ingredients[1]!];
+      expect(componentsKeyFor({ title: "Pasta" }, edited)).not.toBe(
+        componentsKeyFor({ title: "Pasta" }, ingredients),
+      );
+    });
+
+    it("changes when a heading is added, which is the strongest input it has", () => {
+      const headed = [{ ...ingredients[0]!, section: "the dough" }, ingredients[1]!];
+      expect(componentsKeyFor({ title: "Pasta" }, headed)).not.toBe(
+        componentsKeyFor({ title: "Pasta" }, ingredients),
+      );
+    });
+
+    it("survives a recipe with no title, rather than keying everything the same", () => {
+      expect(componentsKeyFor({ title: null }, ingredients)).not.toBe(
+        componentsKeyFor({ title: "Pasta" }, ingredients),
+      );
     });
   });
 });
