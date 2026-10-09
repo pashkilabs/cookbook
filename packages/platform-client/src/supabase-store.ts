@@ -108,7 +108,7 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
     async findFamilyForAccount(accountId: string): Promise<Family | null> {
       const owned = await supabase
         .from("families")
-        .select("id, name, owner_account_id, measurement_system, timezone")
+        .select("id, name, owner_account_id, measurement_system, timezone, avoided_allergens")
         .eq("owner_account_id", accountId)
         .is("deleted_at", null)
         .order("created_at", { ascending: true })
@@ -184,7 +184,7 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
         // standing between a mistyped id and another household's row
         .eq("id", input.familyId)
         .is("deleted_at", null)
-        .select("id, name, owner_account_id, measurement_system, timezone")
+        .select("id, name, owner_account_id, measurement_system, timezone, avoided_allergens")
         .maybeSingle();
       if (error) throw new Error(error.message);
       if (!data) return null;
@@ -194,6 +194,33 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
         ownerAccountId: data.owner_account_id,
         measurementSystem: (data.measurement_system === "metric" ? "metric" : "us"),
         timezone: (data.timezone as string | null) || "UTC",
+        avoidedAllergens: Array.isArray(data.avoided_allergens) ? (data.avoided_allergens as string[]) : [],
+      };
+    },
+
+    async setAvoidedAllergens(input): Promise<Family | null> {
+      /*
+       * Deduplicated and sorted on the way in. No constraint forbids duplicates — the matcher
+       * reads this as a set, so they are harmless — but storing them makes two identical settings
+       * compare unequal, and a screen that round-trips its own value should get it back unchanged.
+       */
+      const allergens = [...new Set(input.allergens)].sort();
+      const { data, error } = await supabase
+        .from("families")
+        .update({ avoided_allergens: allergens })
+        .eq("id", input.familyId)
+        .is("deleted_at", null)
+        .select("id, name, owner_account_id, measurement_system, timezone, avoided_allergens")
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      if (!data) return null;
+      return {
+        id: data.id,
+        name: data.name,
+        ownerAccountId: data.owner_account_id,
+        measurementSystem: data.measurement_system === "metric" ? "metric" : "us",
+        timezone: (data.timezone as string | null) || "UTC",
+        avoidedAllergens: Array.isArray(data.avoided_allergens) ? (data.avoided_allergens as string[]) : [],
       };
     },
 
@@ -204,7 +231,7 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
         // scoped by household id, like setMeasurementSystem: the service role bypasses RLS
         .eq("id", input.familyId)
         .is("deleted_at", null)
-        .select("id, name, owner_account_id, measurement_system, timezone")
+        .select("id, name, owner_account_id, measurement_system, timezone, avoided_allergens")
         .maybeSingle();
       if (error) throw new Error(error.message);
       if (!data) return null;
@@ -214,6 +241,7 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
         ownerAccountId: data.owner_account_id,
         measurementSystem: (data.measurement_system === "metric" ? "metric" : "us"),
         timezone: (data.timezone as string | null) || "UTC",
+        avoidedAllergens: Array.isArray(data.avoided_allergens) ? (data.avoided_allergens as string[]) : [],
       };
     },
 
@@ -458,7 +486,7 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
           const created = await supabase
             .from("families")
             .insert({ name: input.householdName, owner_account_id: input.accountId })
-            .select("id, name, owner_account_id, measurement_system, timezone")
+            .select("id, name, owner_account_id, measurement_system, timezone, avoided_allergens")
             .single();
           if (created.error) throw created.error;
           return toFamily(created.data);
@@ -539,6 +567,7 @@ function toFamily(row: {
   owner_account_id: string;
   measurement_system?: string | null;
   timezone?: string | null;
+  avoided_allergens?: string[] | null;
 }): Family {
   return {
     id: row.id,
@@ -550,6 +579,9 @@ function toFamily(row: {
     // same reasoning: the column defaults to UTC, and UTC is exactly what a household read
     // before the column existed, so a row from before it is not wrong — it is unchanged
     timezone: row.timezone || "UTC",
+    // same reasoning again: a row from before the column is a household that avoids nothing,
+    // which is not wrong — it is unchanged
+    avoidedAllergens: Array.isArray(row.avoided_allergens) ? row.avoided_allergens : [],
   };
 }
 

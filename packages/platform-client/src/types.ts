@@ -42,6 +42,15 @@ export interface Family {
    * Defaults to `UTC`, which is what every household silently got before this existed.
    */
   timezone: string;
+  /**
+   * What this household avoids. A **dietary constraint, not health data** (§71).
+   *
+   * On the household rather than the member because "this household avoids peanuts" identifies
+   * nobody — the same category as being vegetarian — and because you do not cook two dinners, so
+   * the exclusion was always household-wide in effect. A per-member list would have held
+   * special-category data to produce an identical answer.
+   */
+  avoidedAllergens: string[];
 }
 
 /** Kept in step with `packages/core`'s own union rather than imported, so the seam stays free of it. */
@@ -323,6 +332,14 @@ export interface PlatformStore {
    */
   /** the household's IANA zone; validated against pg_timezone_names by a CHECK */
   setTimezone(input: { familyId: string; timezone: string }): Promise<Family | null>;
+  /**
+   * What the household avoids, validated against the nine by a CHECK.
+   *
+   * Replaces the whole list rather than adding or removing one: a set a person edits as a set is
+   * what the screen presents, and a partial update invites two tabs disagreeing about which
+   * allergens are on.
+   */
+  setAvoidedAllergens(input: { familyId: string; allergens: readonly string[] }): Promise<Family | null>;
   setMeasurementSystem(input: {
     familyId: string;
     system: MeasurementSystem;
@@ -514,6 +531,14 @@ export interface PlatformClient {
   setMeasurementSystem(system: MeasurementSystem): Promise<Family>;
   /** the household's IANA zone, deciding what "today" and "this week" mean */
   setTimezone(timezone: string): Promise<Family>;
+  /**
+   * Replace what the household avoids (§71) — a dietary constraint, not health data.
+   *
+   * Validated by the CHECK on the column rather than here: `packages/core` owns the matching
+   * vocabulary and the constraint owns storage, and a third list in the seam would be a third
+   * site to drift.
+   */
+  setAvoidedAllergens(allergens: readonly string[]): Promise<Family>;
   removeMember(memberId: string): Promise<void>;
 
   /**

@@ -122,6 +122,14 @@ export function createInMemoryStore(seed: Seed = {}, clock: Clock = () => new Da
       return { ...family };
     },
 
+    async setAvoidedAllergens(input) {
+      const family = families.find((f) => f.id === input.familyId);
+      if (!family) return null;
+      // deduplicated and sorted, as the real store does, so a round trip compares equal
+      family.avoidedAllergens = [...new Set(input.allergens)].sort();
+      return { ...family };
+    },
+
     async removeMember(input) {
       const at = members.findIndex(
         (m) => m.id === input.memberId && m.familyId === input.familyId,
@@ -309,6 +317,7 @@ export function createInMemoryStore(seed: Seed = {}, clock: Clock = () => new Da
             // what the column defaults to for a household that has never chosen
             measurementSystem: "us" as const,
             timezone: "UTC",
+            avoidedAllergens: [],
           };
           families.push(created);
           return created;
@@ -359,7 +368,7 @@ export function standardSeed(
 ): Seed {
   return {
     accounts: [{ id: ACCOUNT_ID, email: "adult@example.test" }],
-    families: [{ id: FAMILY_ID, name: "Household", ownerAccountId: ACCOUNT_ID, measurementSystem: "us", timezone: "UTC" }],
+    families: [{ id: FAMILY_ID, name: "Household", ownerAccountId: ACCOUNT_ID, measurementSystem: "us", timezone: "UTC", avoidedAllergens: [] }],
     members: [
       {
         id: "mem-1",

@@ -244,6 +244,25 @@ function assertYear(year: number | null): number | null {
   }
 
   /**
+   * What the household avoids (§71).
+   *
+   * **No allergen list lives here on purpose.** The CHECK on `families.avoided_allergens` is the
+   * authority and `packages/core` owns the matching vocabulary; a third copy in the seam would be
+   * a third site to drift, and `packages/db`'s test ties the two that exist. Unlike `setTimezone`
+   * — where `Intl` is the same authority the product will consult, so checking twice is checking
+   * once — there is nothing here that knows better than the constraint.
+   *
+   * Replaces the whole set rather than toggling one, because that is what the screen edits: a
+   * partial update invites two tabs disagreeing about which allergens are on.
+   */
+  async function setAvoidedAllergens(allergens: readonly string[]): Promise<Family> {
+    const family = await ownFamily();
+    const updated = await store.setAvoidedAllergens({ familyId: family.id, allergens });
+    if (!updated) throw new Error("no such household");
+    return updated;
+  }
+
+  /**
    * Remove a member.
    *
    * **You cannot remove yourself.** Leaving a household is a different action with different
@@ -327,6 +346,7 @@ function assertYear(year: number | null): number | null {
     removeMember,
     setMeasurementSystem,
     setTimezone,
+    setAvoidedAllergens,
     inviteAdult,
     listInvitations,
     revokeInvitation,

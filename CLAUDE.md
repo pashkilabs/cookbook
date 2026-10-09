@@ -589,14 +589,12 @@ no framework — so it runs identically in Next.js, Expo and the worker.
 2. **Sync engine choice.** Highest-risk dependency. Check maintenance health and
    funding before committing.
 3. **Copyright posture** on imported photos and prose.
-4. **Health data.** A child's allergy is special-category personal data, and storing it is a
-   different compliance question from storing a rating — the thing that has kept this surface
-   small is that personal data stays in Postgres and never reaches a prompt. An allergen is a
-   stricter case of that rule, not an exception: it must never reach an inference API. **And the
-   bar is wider than prompts** — a child's allergen must not appear in a shared view, a public
-   recipe page, an export, or anything a household might send on. Enforce it the way blends are
-   enforced: in the policy, asserted in `assert_rls_invariants`, so widening a read path later
-   cannot quietly widen this one (§71).
+*Health data was the fourth item here and is **settled**: allergens are stored on the household,
+not the member (§71). "This household avoids peanuts" identifies nobody and is the same category
+as being vegetarian, so the special-category question dissolves rather than being managed. The
+rule it leaves behind is worth keeping, though — **if the more sensitive shape produces an
+identical answer, it is not a design choice, it is a liability.** Per-member allergens would have
+held health data to compute a household-wide exclusion, because you do not cook two dinners.*
 
 If a task requires one of these to be settled, stop and say so rather than
 guessing.

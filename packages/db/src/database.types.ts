@@ -117,6 +117,7 @@ export type Database = {
       }
       families: {
         Row: {
+          avoided_allergens: string[]
           created_at: string
           deleted_at: string | null
           id: string
@@ -127,6 +128,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          avoided_allergens?: string[]
           created_at?: string
           deleted_at?: string | null
           id?: string
@@ -137,6 +139,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          avoided_allergens?: string[]
           created_at?: string
           deleted_at?: string | null
           id?: string

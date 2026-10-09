@@ -4183,6 +4183,37 @@ Same category error as reusing the matcher: the catalog's job is **buying**, so 
 cannot be reasoned about, and leaving the door without walking through it is correct — but nothing
 feeds catalog misses to it.
 
+### Allergens go on the household; dislikes go on the member
+
+A future reader will otherwise wonder why these two sit in different places, and the answer is the
+whole reason the hard part of this design went away.
+
+**"This household avoids peanuts" is a dietary constraint, not health information about a person.**
+Nobody is identified, nothing is attributable, and it is the same category as a household being
+vegetarian. So the special-category health-data question **dissolves** rather than being managed —
+no policy work, no export bar, no `assert_rls_invariants` clause, and no platform-table
+complication from naming a member on screen.
+
+**And it matches the kitchen.** You do not cook two dinners. The exclusion was always
+household-wide *in effect*, so per-member storage would have held something far more sensitive in
+order to produce an identical answer. That is the test worth remembering: if the more sensitive
+shape yields the same output, it is not a design choice, it is a liability.
+
+So `families.avoided_allergens` sits beside `measurement_system` and `timezone` — a household
+setting, written through the seam, with no client grant — and `/household` is where it is set.
+
+Dislikes stay per-member in `member_preferences`, and the distinction is the point:
+
+| | where | why |
+|---|---|---|
+| **allergen** | household | excludes for everyone; nobody has to be named for it to work |
+| **dislike** | member | personal, and "Ada does not like mushrooms" is the useful sentence |
+
+**One is a judgement and the other was almost health data.** A judgement is worth attributing,
+because knowing *whose* dislike it is makes the suggestion legible — "3 of 4, and Ada is the one
+who says no". An exclusion needs no name to do its job, so attributing it would be collecting
+sensitive data to no end.
+
 ### Three outcomes, never two
 
 - **EXCLUDED** — a term matched. Removed from suggestions; the matched word is quoted back so a
