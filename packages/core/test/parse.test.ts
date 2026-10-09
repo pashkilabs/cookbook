@@ -253,7 +253,17 @@ describe("a measure restated in the other system", () => {
     // regression: "unsalted butter" arrived as "/ 1 1/2 tbsp unsalted butter"
     for (const [line, amount, unit, item] of [
       ["20g/ 1 1/2 tbsp unsalted butter", 20, "g", "unsalted butter"],
-      ["1kg / 2lb bone in, skin on chicken thighs", 1, "kg", "bone in"],
+      /*
+       * This line asserted `"bone in"` as the ingredient, which is the same bug as `boneless` —
+       * a comma joining adjectives read as "item, preparation", losing the chicken. A sixth
+       * instance of the class, and it survived *because* a passing test pinned it: the suite was
+       * arguing the output was correct.
+       *
+       * The measure-restatement behaviour this case exists to check is unaffected — 1 kg still
+       * wins over the 2 lb restatement — so the expectation is corrected rather than the case
+       * dropped.
+       */
+      ["1kg / 2lb bone in, skin on chicken thighs", 1, "kg", "bone in, skin on chicken thighs"],
       ["250g/8oz cherry tomatoes", 250, "g", "cherry tomatoes"],
       ["1 cup/240ml milk", 1, "cup", "milk"],
     ] as const) {
@@ -424,5 +434,58 @@ describe("headings become sections, not ingredients", () => {
 
   it("ignores a bare colon, which names nothing", () => {
     expect(parseIngredientList([":", "1 tsp salt"]).map((l) => l.section ?? null)).toEqual([null]);
+  });
+});
+
+/*
+ * regression: a comma joining two adjectives was read as "item, preparation".
+ *
+ * "1 lb boneless, skinless chicken thighs" stored `item_text: "boneless"` and left the chicken in
+ * the note — so the shopping list said "boneless", the component inference was handed "boneless",
+ * and the allergen matcher read "boneless". Five recipes, plus one "cooked, cubed chicken".
+ *
+ * It renders faithfully, which is why nothing looked broken: the recipe page shows exactly what
+ * the row says.
+ */
+describe("a comma before the noun is not a preparation note", () => {
+  const parse = (line: string) => parseIngredientLine(line);
+
+  it("keeps the chicken when the comma joins two adjectives", () => {
+    const parsed = parse("1 lb boneless, skinless chicken thighs");
+    expect(parsed?.item).toContain("chicken");
+    expect(parsed?.item).not.toBe("boneless");
+  });
+
+  it("keeps the chicken in 'cooked, cubed chicken'", () => {
+    expect(parse("1 cup cooked, cubed chicken")?.item).toContain("chicken");
+  });
+
+  it("splits at the LATER comma, where the preparation actually starts", () => {
+    const parsed = parse("1 lb boneless, skinless chicken breasts, cut into 1-inch cubes");
+    expect(parsed?.item).toContain("chicken");
+    expect(parsed?.note ?? "").toContain("cut into");
+  });
+
+  it("still treats a real preparation note as a note", () => {
+    const parsed = parse("2 onions, finely chopped");
+    expect(parsed?.item).toBe("onions");
+    expect(parsed?.note ?? "").toContain("finely chopped");
+  });
+
+  it("still splits when the head names a food", () => {
+    for (const [line, item] of [
+      ["1 cup flour, sifted", "flour"],
+      ["2 cloves garlic, minced", "garlic"],
+      ["salt, to taste", "salt"],
+    ] as const) {
+      expect(parse(line)?.item, line).toContain(item);
+    }
+  });
+
+  it("leaves half & half alone, which has no comma to misread", () => {
+    // flagged by the scan that found this class — "half" is a descriptor word and `half & half`
+    // is cream. The scan over-matched; the parser never touched it, because the rule is
+    // comma-conditional. Pinned so a broader rule cannot quietly start touching it.
+    expect(parse("1 cup half & half")?.item).toContain("half");
   });
 });

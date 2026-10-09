@@ -327,15 +327,67 @@ export function parseIngredientList(lines: string[]): ParsedIngredient[] {
  * the comma *inside* the note and left the ingredient as `cumin (sub coriander`. Nothing in a
  * catalog matches that, and the failure looked like a missing ingredient rather than a mis-split.
  */
+/**
+ * Words that describe a food and never name one.
+ *
+ * Only needed to answer one question — *does the text before this comma contain a noun?* — so it
+ * is deliberately a list of **modifiers**, not an attempt at a vocabulary. A word missing from it
+ * means a comma is treated as a note boundary, which is the behaviour this had before; a word
+ * wrongly in it would keep too much text in the item, which head-noun matching absorbs. The safe
+ * direction is the short list.
+ */
+const PREP_ONLY = new Set([
+  "boneless", "skinless", "bone", "in", "deboned", "deveined", "shelled", "peeled", "seeded",
+  "stemmed", "trimmed", "rinsed", "drained", "patted", "dry",
+  "chopped", "diced", "minced", "sliced", "shredded", "grated", "crushed", "cubed", "julienned",
+  "halved", "quartered", "torn", "crumbled", "cut", "beaten", "whisked", "separated",
+  "melted", "softened", "toasted", "roasted", "cooked", "uncooked", "raw", "frozen", "thawed",
+  "fresh", "freshly", "dried", "ripe", "firm", "soft", "cold", "warm", "lukewarm", "room",
+  "temperature", "hot", "chilled",
+  "thinly", "finely", "roughly", "coarsely", "lightly", "well", "very", "large", "small",
+  "medium", "extra", "divided", "optional", "packed", "heaping", "plus", "about", "each", "more",
+  "good", "quality", "low", "reduced", "unsalted", "salted",
+]);
+
+/**
+ * The first comma that separates a food from its preparation — not one joining two adjectives.
+ *
+ * regression: a comma was read as "item, preparation" unconditionally. That is right for
+ * "2 onions, finely chopped" and wrong for **"1 lb boneless, skinless chicken thighs"**, which
+ * stored `item_text: "boneless"` and left the chicken in the note. Five recipes, plus one
+ * "cooked, cubed chicken".
+ *
+ * The damage was wide because every consumer reads `item_text`: the shopping list said
+ * `boneless`, the component inference was handed `boneless`, and the allergen matcher read
+ * `boneless` — **so a chicken recipe was invisible to a poultry search and clear for every
+ * allergen in it.** And nothing looked broken, because the recipe page renders the row
+ * faithfully. It surfaced only in a frequency-sorted list of names the catalog could not resolve.
+ *
+ * The test is one question: does the text before this comma contain a word that is not a
+ * modifier? If not, the comma is joining adjectives and the noun is still ahead, so keep
+ * looking. "boneless, skinless chicken breasts, cut into cubes" therefore splits at the
+ * *second* comma, which is where the preparation actually starts.
+ */
 function firstCommaOutsideParens(text: string): number {
   let depth = 0;
   for (let i = 0; i < text.length; i += 1) {
     const char = text[i];
     if (char === "(") depth += 1;
     else if (char === ")") depth = Math.max(0, depth - 1);
-    else if (char === "," && depth === 0) return i;
+    else if (char === "," && depth === 0 && namesSomething(text.slice(0, i))) return i;
   }
   return -1;
+}
+
+/** does this stretch carry a word that is not a modifier — i.e. has the noun arrived yet */
+function namesSomething(head: string): boolean {
+  const words = head
+    .toLowerCase()
+    .replace(/[^a-z\s&-]/g, " ")
+    .split(/[\s-]+/)
+    .filter((word) => word.length > 1 || word === "&");
+  // no words at all is a leading comma, which names nothing and must not become the item
+  return words.some((word) => !PREP_ONLY.has(word));
 }
 
 /**

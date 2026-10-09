@@ -44,7 +44,8 @@
     "score:twinkies": "tsx scripts/score-twinkies.mts",
     "gen:corpus": "tsx scripts/gen-corpus.mts",
     "allergens": "tsx scripts/allergen-population.mts",
-    "catalog:gap": "tsx scripts/catalog-gap.mts"
+    "catalog:gap": "tsx scripts/catalog-gap.mts",
+    "repair:split-items": "tsx scripts/repair-split-items.mts"
   },
   "devDependencies": {
     "@pashki/db": "workspace:^",
