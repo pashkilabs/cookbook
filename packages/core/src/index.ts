@@ -41,3 +41,11 @@ export { recipesSharingBase, baseIngredients, asIngredients, SHARED_FOR_A_BASE }
 export type { SharedBase } from "./bases.js";
 
 export { linesCoveredByBase } from "./bases.js";
+export {
+  ALLERGENS,
+  readAllergen,
+  readAllergens,
+  type Allergen,
+  type AllergenReading,
+  type AllergenVerdict,
+} from "./allergens.js";

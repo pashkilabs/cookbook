@@ -126,7 +126,8 @@ export const STAPLES = [
 const STAPLE_MODIFIERS = new Set([
   "freshly", "fresh", "ground", "coarse", "coarsely", "fine", "finely", "cracked", "flaked",
   "extra", "virgin", "pure", "light", "cold", "pressed", "filtered", "warm", "hot", "boiling",
-  "iced", "chilled", "plain", "good", "quality", "plus", "more", "optional",
+  "iced", "chilled", "lukewarm", "tepid", "room", "temperature", "plain", "good",
+  "quality", "plus", "more", "optional",
 ]);
 
 export function isStaple(name: string): boolean {
