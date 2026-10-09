@@ -4060,3 +4060,89 @@ independently agree on Marsala Chicken, say. Until then, retuning trades role ac
 And note what the gain would be worth: the **display** of parts was already on the recipe page and
 the **control** to produce them was not, so the available improvement was reach, not accuracy.
 
+## §71 — Allergies are an exclusion, and the allergen matcher is separate code from the catalog
+
+> ### Read this first
+>
+> **The allergen matcher must never be built on the catalog, or on a stricter version of it.**
+> They are *opposite* operations. And **hidden ingredients are not addressable**, so this is a
+> filter that reduces exposure and not a safety check — the design has to make that structural
+> rather than a caveat.
+
+### Why it is separate code, and not a stricter catalog
+
+`catalog.ts:54` records that fuzzy matching **matched a head noun**: `almond milk` bought whole
+milk, `onion powder` bought onions. That comment reads like an argument for *fixing* the matcher.
+For this purpose it is an argument for **not reusing it at all**, and a future reader will
+otherwise try to unify them.
+
+The catalog's job is to decide **what to buy**, so it wants the head noun — `milk` — and discards
+the modifier. An allergen check wants exactly the part that is discarded: `almond`. One throws away
+what the other needs, so a shared implementation is not a tuning problem, it is two requirements
+pulling in opposite directions through one function.
+
+The error directions are opposite too. The catalog must err **toward a match**, or nothing gets
+bought. The allergen matcher must err **toward flagging**, because a missed match is the failure
+with a consequence. Any attempt to serve both from one code path has to pick one, silently, for
+the other's callers.
+
+So: a dedicated term set with explicit aliases, matched on **word boundaries against the raw
+written line, before normalisation** — normalisation being the step that loses `almond`. No catalog
+lookup, no stemming beyond plurals, no fuzzy match.
+
+### Three outcomes, never two
+
+- **EXCLUDED** — a term matched. Removed from suggestions; the matched word is quoted back so a
+  person can check the machine's reasoning rather than trust it.
+- **UNKNOWN** — a line is unrecognised, or is a **compound** product whose interior cannot be
+  known. Surfaced **with the line named**: never silently hidden, never silently passed, and never
+  grouped with clear recipes, or the warning becomes decoration.
+- **CLEAR** — every line recognised, primitive, no match. **Does not say "safe".**
+
+### Hidden ingredients: stated loudly because it cannot be fixed
+
+**An ingredient list names what is added, not what is inside what is added.** `2 tbsp red curry
+paste` contains fish sauce; `¼ cup pesto` contains pine nuts and parmesan; `1 brioche bun` contains
+milk and egg. No text matching sees inside, and brand variation defeats even a per-product table —
+tamari is wheat-free and soy sauce is not.
+
+Therefore the catalog carries **primitive vs compound**, any compound forces **UNKNOWN** naming the
+line, and **the word "safe" never appears**. The strongest available sentence is *"nothing we could
+see"*, carried permanently on screen rather than in a dialog somebody dismisses once. A real safety
+check needs label or barcode data; approximating it is worse than not having it. §60 held the
+dietary rewrite for this reason.
+
+### The count-of-people rule, which is the spine of the whole design
+
+**Nothing on screen may be a number a person cannot verify by looking.** Suggestions partition by
+*reason* — allergies remove, stated dislikes, stated likes, learned patterns — and within a line
+order by **how many members it satisfies**. A count: "3 of 4" is checkable by looking at four
+people. A weighted score is not, and §67 measured that mixing a certainty, a guess and a thin
+statistic produces a number nobody can read, while §61 measured that no confidence signal exists to
+build one on.
+
+**A later feature wanting a score is a reversal of this decision, not an addition to it.**
+
+### Stated beats inferred, and nothing blends
+
+`EXCLUDED (allergy) → stated dislike → stated like → inferred`, with no blending at any step. The
+inferred value is shown *beside* the stated one so a person can see what the app concluded and
+disagree — the editable-classification pattern, because an inference nobody can correct goes wrong
+permanently. And *"nobody has said"* is a different answer from *"somebody said no"*; the empty
+state must say which, or absence reads as agreement.
+
+### Month one, which is the argument for the build order
+
+26 ratings across 7 recipes, so the learned line is **silent**. Worse: the `cooked it` control that
+would generate ratings has been live for weeks on a screen nobody has opened, so **the learned
+signal will stay thin regardless of what is built**. Any plan that waits for ratings is waiting on
+something that is not happening.
+
+Stated preferences are therefore the mechanism and not a stopgap — and ranked suggestions shrink to
+filtering and grouping over data that exists. **There is no recommender to build.**
+
+### What is deliberately not built
+
+No score, no percentage match, no "recommended for you", no single rank, and no allergy feature
+that returns two states.
+
