@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { SUBSTITUTIONS, createSubstitutions, formatInSystem, stripLeadingDecoration } from "@pashki/core";
+import { SUBSTITUTIONS, createSubstitutions, formatInSystem, isStaple, stripLeadingDecoration } from "@pashki/core";
 import { INGREDIENT_COLUMNS } from "@pashki/db/catalog";
 import { andList, energyForRecipe } from "@/lib/energy";
 import { scaleIngredientAmounts, servingsForScale } from "@/lib/planner";
@@ -12,6 +12,7 @@ import { ShortlistButton } from "../shortlist-button";
 import { CookTonight } from "../cook-tonight";
 import { RemoveRecipe } from "./remove";
 import { Verdicts } from "./verdicts";
+import { Preferences } from "./preferences";
 import { PhotoUpload } from "../photo-upload";
 import { PalateNotes } from "./palate";
 import { SplitButton } from "../blend/split";
@@ -121,6 +122,59 @@ export default async function RecipePage({
    *
    * Cheap: a djb2 hash over the lines, no model and no network. Safe to compute on every view.
    */
+  /*
+   * What this recipe lets somebody have an opinion *about*.
+   *
+   * Its classification and its own ingredients, deduplicated and capped. Staples are dropped —
+   * nobody states a preference about salt — and the cap exists because a nineteen-line recipe
+   * would otherwise produce a select nobody scrolls. Ordered as the recipe lists them, because
+   * that is the order the person reading it just saw.
+   */
+  const preferenceSubjects = (() => {
+    const out: Array<{ kind: string; value: string; label: string }> = [];
+    if (recipe.cuisine) out.push({ kind: "cuisine", value: recipe.cuisine, label: `${recipe.cuisine} food` });
+    if (recipe.dish_form) out.push({ kind: "dish_form", value: recipe.dish_form, label: String(recipe.dish_form) });
+    const seen = new Set<string>();
+    for (const line of ingredients.data ?? []) {
+      const text = (line.item_text ?? "").trim();
+      if (!text || isStaple(text)) continue;
+      const key = text.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ kind: "ingredient", value: text, label: text });
+      if (seen.size >= 14) break;
+    }
+    return out;
+  })();
+
+  /*
+   * What has already been said about those subjects — scoped by `family_id` explicitly.
+   *
+   * RLS decides what may leave the database; a screen decides whose kitchen it shows, and those
+   * are different questions. Filtered to this recipe's own subjects so the list under the control
+   * is about what is on the page rather than everything the household has ever stated.
+   */
+  const statedRows = preferenceSubjects.length === 0 ? [] : rows(
+    await supabase
+      .from("member_preferences")
+      .select("id, family_member_id, stance, subject, subject_kind")
+      .eq("family_id", family.id)
+      .is("deleted_at", null)
+      .in("subject", preferenceSubjects.map((subject) => subject.value)),
+    "stated preferences for this recipe",
+  );
+  const memberNames = new Map(members.map((member) => [member.id, member.displayName]));
+  const statedPreferences = statedRows
+    .filter((row) => memberNames.has(row.family_member_id as string))
+    .map((row) => ({
+      id: row.id as string,
+      memberId: row.family_member_id as string,
+      memberName: memberNames.get(row.family_member_id as string)!,
+      stance: (row.stance === "like" ? "like" : "dislike") as "like" | "dislike",
+      subject: row.subject as string,
+      subjectKind: row.subject_kind as string,
+    }));
+
   const partitionIsCurrent =
     typeof recipe.components_key === "string" &&
     // `.data ?? []` as everywhere else on this page. On a read failure the key is built from no
@@ -627,6 +681,23 @@ export default async function RecipePage({
           isChild: member.isChild,
           score: scores.get(member.id) ?? null,
         }))}
+      />
+
+      {/*
+        * In the same breath as the rating, and that is the whole design.
+        *
+        * A preference recorded at the moment an opinion exists is one that gets recorded — the
+        * reasoning that put rating inline with "Cooked it". Nobody navigates to a settings screen
+        * to announce that Ada does not like mushrooms; they find it out at dinner, a second after
+        * giving the recipe a 2.
+        *
+        * The subjects offered are *this recipe's own*, so nothing invites an opinion about
+        * something that is not in front of you.
+        */}
+      <Preferences
+        members={members.map((member) => ({ id: member.id, displayName: member.displayName }))}
+        subjects={preferenceSubjects}
+        stated={statedPreferences}
       />
     </main>
   );

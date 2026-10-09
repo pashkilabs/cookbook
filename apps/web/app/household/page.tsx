@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { UnitsSetting } from "./units";
 import { TimezoneSetting } from "./timezone";
+import { AllergenSetting } from "./allergens";
 import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
 import { MEMBER_COLOURS, invitationState } from "@pashki/platform-client";
@@ -68,6 +69,21 @@ export default async function HouseholdPage() {
         </p>
         <UnitsSetting current={family.measurementSystem} />
         <TimezoneSetting current={family.timezone} />
+      </section>
+
+      {/*
+        * Beside units and timezone because it is the same kind of thing: a household setting that
+        * governs a shared document. "This household avoids peanuts" identifies nobody, which is
+        * why it is here and not on a person (§71) — and you do not cook two dinners, so it was
+        * always household-wide in effect.
+        */}
+      <section style={{ marginBottom: "2rem" }}>
+        <h2>What you avoid</h2>
+        <p className="subtitle">
+          An allergy or anything else this kitchen keeps out. It applies to everyone here, because
+          one dinner gets cooked.
+        </p>
+        <AllergenSetting current={family.avoidedAllergens} />
       </section>
 
       <h2>Who eats here</h2>

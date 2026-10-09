@@ -75,6 +75,12 @@ let session = null;
  * Silence reads as success; so does a smaller number nobody is counting.
  */
 const skipped = [];
+/*
+ * The adult's own member id, set when the roster is exercised and used much later by the
+ * preference checks. It has to be the adult: the child added in that section is REMOVED at the
+ * end of it, so a later block using the child gets a correct 404 from a correct route.
+ */
+let adultMemberId = null;
 const skip = (name, why) => {
   skipped.push({ name, why });
   console.log(`  --    ${name}  — NOT CHECKED: ${why}`);
@@ -556,6 +562,10 @@ try {
     // the rule that stops a household deleting its only adult and stranding itself
     const members = await rest("GET", `/family_members?family_id=eq.${familyId}&account_id=eq.${accountId}&select=id`);
     const mine = members?.[0]?.id;
+    // kept for later blocks: the child below is REMOVED at the end of this section, so anything
+    // needing a live member has to use the adult. The preference checks used the child and got a
+    // correct 404 from a correct route — the test was wrong, not the code.
+    adultMemberId = mine ?? null;
     if (mine) {
       const self = await call("DELETE", "/api/members", { body: { id: mine } });
       record("refuses to remove yourself", self.status === 400, `HTTP ${self.status}`);
@@ -744,7 +754,9 @@ try {
       // riding on a marker that was already passing
       "/planner": ["Waiting for a day", "Alongside this week"],
       "/recipes": "Tonight",
-      "/household": "Where you cook",
+      // two markers, so the allergen control is covered rather than riding on one that already
+      // passed — the §71 setting is the whole reason this screen matters now
+      "/household": ["Where you cook", "What you avoid"],
       "/recipes/new": "Add a recipe",
       "/recipes/import": "One link",
       /*
@@ -768,7 +780,14 @@ try {
        * the *control* is reachable, not merely that the page returns 200. The display of parts
        * had been on this page since §60 with nothing on it able to produce them.
        */
-      ["/recipes/[id]", `/recipes/${recipeId}`, "Parts of this recipe"],
+      [
+        "/recipes/[id]",
+        `/recipes/${recipeId}`,
+        // the parts control, and the preference control that sits with the ratings. A recipe this
+        // run just created has no partition and no stated preferences, so a working render must
+        // offer both — which is the assertion that each is REACHABLE, not that the page is 200.
+        ["Parts of this recipe", "Was it something in particular?"],
+      ],
       ["/recipes/[id]/edit", `/recipes/${recipeId}/edit`, null],
       ["/recipes/blend?from=", `/recipes/blend?from=${recipeId}`, null],
       // a token this run cannot hold: the invitation response carries none, on purpose. An
@@ -851,6 +870,62 @@ try {
         ? `imperial on a metric page: ${/\b\d[\d.,½¼¾⅓⅔⅛]*\s?(lb|oz|cup|cups|qt|gal|pint)\b/.exec(quantities)[0]}`
         : "",
     );
+
+    /*
+     * The two §71 writes, exercised rather than assumed.
+     *
+     * Both controls render — the screen markers above assert that — and a control that renders is
+     * not a control that works. "An endpoint answering is not a feature" has its mirror image:
+     * a feature that is reachable still has to land in the database.
+     */
+    const avoid = await call("PATCH", "/api/household", { body: { avoidedAllergens: ["peanut", "sesame"] } });
+    record(
+      "a household can say what it avoids",
+      avoid.status === 200 && Array.isArray(avoid.body?.avoidedAllergens)
+        && avoid.body.avoidedAllergens.join() === "peanut,sesame",
+      `HTTP ${avoid.status} — ${JSON.stringify(avoid.body?.avoidedAllergens ?? null)}`,
+    );
+
+    // the CHECK is the authority, not the route: an unknown allergen must be refused, and
+    // refused with a status the UI can act on rather than a 500
+    const badAllergen = await call("PATCH", "/api/household", { body: { avoidedAllergens: ["unobtainium"] } });
+    record(
+      "and an allergen that is not one of the nine is refused, not stored",
+      badAllergen.status === 400,
+      `HTTP ${badAllergen.status}`,
+    );
+
+    const cleared = await call("PATCH", "/api/household", { body: { avoidedAllergens: [] } });
+    record("and can clear it again", cleared.status === 200
+      && Array.isArray(cleared.body?.avoidedAllergens) && cleared.body.avoidedAllergens.length === 0,
+      `HTTP ${cleared.status}`);
+
+    if (adultMemberId) {
+      const disliked = await call("POST", "/api/preferences", {
+        body: { familyMemberId: adultMemberId, stance: "dislike", subjectKind: "ingredient", subject: "mushroom" },
+      });
+      record("a preference can be stated", disliked.status === 200 && Boolean(disliked.body?.id),
+        `HTTP ${disliked.status}`);
+
+      // stating the opposite is an UPDATE, not a second row: `stance` is outside the unique
+      // index precisely so a like and a dislike cannot coexist for anything to resolve
+      const changed = await call("POST", "/api/preferences", {
+        body: { familyMemberId: adultMemberId, stance: "like", subjectKind: "ingredient", subject: "mushroom" },
+      });
+      record("and changing your mind replaces it rather than contradicting it",
+        changed.status === 200 && changed.body?.changed === true, `HTTP ${changed.status}`);
+
+      if (disliked.body?.id) {
+        const withdrawn = await call("DELETE", `/api/preferences?id=${disliked.body.id}`);
+        record("and it can be withdrawn", withdrawn.status === 200, `HTTP ${withdrawn.status}`);
+      } else {
+        skip("and it can be withdrawn", "nothing was stated, so there is nothing to withdraw");
+      }
+    } else {
+      skip("a preference can be stated", "the roster block did not run, so no live member id is known");
+      skip("and changing your mind replaces it rather than contradicting it", "no live member");
+      skip("and it can be withdrawn", "no live member");
+    }
 
     const backToUs = await call("PATCH", "/api/household", { body: { measurementSystem: "us" } });
     record("and can change back", backToUs.status === 200

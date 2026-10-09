@@ -74,7 +74,7 @@ export async function PATCH(request: Request) {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return Response.json({ error: "sign in first" }, { status: 401 });
 
-  let body: { measurementSystem?: unknown; timezone?: unknown };
+  let body: { measurementSystem?: unknown; timezone?: unknown; avoidedAllergens?: unknown };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -97,6 +97,30 @@ export async function PATCH(request: Request) {
     } catch (thrown) {
       return Response.json(
         { error: thrown instanceof Error ? thrown.message : "that timezone was refused" },
+        { status: 400 },
+      );
+    }
+  }
+
+  /*
+   * Checked before `measurementSystem`, and only when present — the same shape as `timezone`
+   * above, which exists because a move-only plan-entry PATCH once answered 400 about servings.
+   *
+   * Validated for *type* here and for *value* by the CHECK on the column: `packages/core` owns
+   * the matching vocabulary and the constraint owns storage, so a third list in this route would
+   * be a third site to drift (§71).
+   */
+  if (body.avoidedAllergens !== undefined) {
+    const list = body.avoidedAllergens;
+    if (!Array.isArray(list) || list.some((value) => typeof value !== "string")) {
+      return Response.json({ error: "avoidedAllergens must be an array of allergen names" }, { status: 400 });
+    }
+    try {
+      const family = await platformClient(auth.user.id).setAvoidedAllergens(list as string[]);
+      return Response.json({ avoidedAllergens: family.avoidedAllergens });
+    } catch (thrown) {
+      return Response.json(
+        { error: thrown instanceof Error ? thrown.message : "those were refused" },
         { status: 400 },
       );
     }
