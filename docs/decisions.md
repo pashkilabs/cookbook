@@ -4417,3 +4417,98 @@ mismatched key is a comparison rather than a guess.
 
 The affiliate programme exists. That is a commercial decision, not a technical one.
 
+## §74 — Kroger: endpoints confirmed by probe, matching unmeasured
+
+Open, free, self-service, certification environment first (`api-ce.kroger.com/v1/`). What it buys
+over §73's parked Instacart builder: **shelf prices** — the first thing here that could answer "is
+this week expensive?" — **no markup**, and possibly **aisle data**, which would *reverse* §73's
+conclusion rather than confirm it. What it costs: one chain, our own product matching, and a
+credential to look after.
+
+### The token: do not hold one
+
+§71 applied exactly, and it is the strongest part of the design. Not *store it carefully* —
+**do not hold it**.
+
+A Kroger refresh token lives **six months** and **places grocery orders on a person's account**.
+That is a different liability class from a rating or a household's avoided allergens. So the §71
+question: does a less sensitive shape give the same answer? It does. An access token lives **30
+minutes** and an export takes seconds, so the authorization-code flow runs **per export**, the
+token is held in memory for the one request, and nothing is persisted.
+
+What a refresh token would buy is **unattended** use — a cart filled on a schedule with nobody
+present. This project already forbids that shape: *every import passes a review screen; do not add
+a silent-save path*. A cart fill spends money, so it has a **stronger** claim on review than an
+import. **The capability the credential enables is one we have already decided against**, which is
+why not holding it costs nothing.
+
+If that is ever reversed it is a platform credential — service-role only, encrypted at rest, no
+`anon`/`authenticated` read path, asserted in `assert_rls_invariants` as blends are, never logged,
+never exported — and it becomes a new open question, because credential custody is not settled by
+analogy to a timezone column.
+
+### What the probe established, and what the controls destroyed
+
+Their portal is a JS-rendered SPA, so the documentation could not be read directly. Unauthenticated
+status codes answered most of it — **but only once the probe had controls**, and the first round of
+conclusions was wrong without them:
+
+```
+GET  /v1/products-not-real?filter.term=milk   → 401      a path that does not exist
+PUT  /v1/cart/nonsense  (no body)             → 411      a path that does not exist
+```
+
+So **401 does not prove a route exists** — the gateway authenticates before routing — and **411
+does not either**, being a Content-Length check that happens even earlier. With a body sent, 404
+becomes reachable and the comparison means something:
+
+```
+CONTROLS   PUT /v1/nonsense-does-not-exist  → 404    POST /v1/cart/nonsense → 404
+CONFIRMED  PUT  /v1/cart/add  → 401   exists, and PUT: POST /v1/cart/add → 404
+           GET  /v1/products  → 401   GET /v1/locations → 401
+           GET  /v1/cart      → 404   GET /v1/cart/basic → 404   — no read path
+           GET  /v1/carts     → 401   exists — the partner tier, not this one
+           POST /v1/connect/oauth2/token → 401
+```
+
+**The write-only premise is therefore evidence rather than assumption**: the cart accepts `PUT
+/v1/cart/add` and nothing reads it. Access token 1800s; refresh token 15,768,000s and only from the
+authorization-code grant; `cart.basic:write` cannot use `client_credentials`.
+
+**Still unconfirmed, and not guessed at:** parameter names and body schemas. A 401 fires before
+validation, so `filter.term` and the cart body remain unproven until a credential exists.
+
+### Matching is a proposal, never an action
+
+We own ingredient-to-product matching, and this project has measured that problem three times —
+`almond milk` bought whole milk because the catalog matcher takes the head noun (§71). Here the
+same mistake **spends money**.
+
+So: a match needs one product whose description contains every significant word of ours.
+**Two plausible products is not a match**, it is an ambiguity, and ambiguity is reported rather
+than resolved — no fuzzy distance, no model. The household reviews the matched products, with size
+and shelf price, **before anything is sent**, which is the review-screen rule arriving where it has
+its strongest claim. Unmatched and ambiguous lines are listed and named with a count, the way
+`withheld` already works in §73's builder.
+
+We are not building a matcher good enough to trust. We are building one whose failures are visible.
+
+### Sending twice is the failure with no undo
+
+The cart cannot be read or corrected, so a second send doubles the order invisibly.
+`cart_exports(family_id, week_start, line_keys[], body_fingerprint, sent_at, outcome)`, and
+**storing the line keys rather than only a digest** is what makes a changed list sendable: the
+unchanged lines are already in their cart, so a second send offers **only the delta**. A digest
+alone could answer "same list?" and nothing else.
+
+**Record the intent before sending, and treat an unknown outcome as sent.** A timed-out request
+cannot be known to have landed, and with money the asymmetry is clear: under-sending costs somebody
+adding one item by hand, double-sending costs a duplicate order. The three-outcome rule, pointed
+at money.
+
+### The store
+
+`families.kroger_location_id`, beside `timezone`, `measurement_system` and `avoided_allergens` — a
+household setting, written through the seam, no client grant, picked once on `/household`. Required
+for product search and for pricing, so it comes before any matching.
+

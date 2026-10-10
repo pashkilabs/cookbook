@@ -45,7 +45,8 @@
     "gen:corpus": "tsx scripts/gen-corpus.mts",
     "allergens": "tsx scripts/allergen-population.mts",
     "catalog:gap": "tsx scripts/catalog-gap.mts",
-    "repair:split-items": "tsx scripts/repair-split-items.mts"
+    "repair:split-items": "tsx scripts/repair-split-items.mts",
+    "kroger:matching": "tsx scripts/kroger-matching.mts"
   },
   "devDependencies": {
     "@pashki/db": "workspace:^",
