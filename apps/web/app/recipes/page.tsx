@@ -4,6 +4,8 @@ import { userClient } from "@/lib/supabase-server";
 import { maybeRow, rows } from "@/lib/rows";
 import { platformStore } from "@/lib/platform";
 import { keepWholeFamilyLikes, searchRecipes } from "@/lib/recipe-search";
+import { allergenSentence } from "@/lib/allergen-filter";
+import { andList } from "@/lib/energy";
 import { startOfWeek, addWeeks, todayIso } from "@/lib/week";
 import { Tonight, type TonightMeal } from "./tonight";
 import { ShortlistButton } from "./shortlist-button";
@@ -59,7 +61,18 @@ export default async function RecipesPage({
     );
   }
 
-  const found = await searchRecipes({ supabase, familyId: family.id, query: q, filter });
+  /*
+   * The household's avoided allergens, through the seam, into the one function both the list and
+   * search go through (§71). The reported bug was that this setting saved and changed nothing:
+   * the matcher was measured, the control rendered, and no call site joined them.
+   */
+  const found = await searchRecipes({
+    supabase,
+    familyId: family.id,
+    query: q,
+    filter,
+    avoidedAllergens: family.avoidedAllergens,
+  });
   const hits =
     filter === "family-likes"
       ? await keepWholeFamilyLikes(supabase, family.id, found.hits)
@@ -260,7 +273,22 @@ export default async function RecipesPage({
       )}
 
       <div className="recipes">
-      {narrowed.map(({ recipe, matchedIngredient }) => (
+      {/*
+        * The count of what was removed, stated rather than left silent.
+        *
+        * A filter that quietly shortens a list is indistinguishable from a household that owns
+        * fewer recipes — and this project's own rule is that a smaller number nobody is counting
+        * reads as success. Saying it also makes the setting checkable: somebody can see the
+        * filter working instead of trusting that it is.
+        */}
+      {(found.hiddenByAllergen ?? 0) > 0 && (
+        <p className="meta">
+          {found.hiddenByAllergen} hidden: {andList(family.avoidedAllergens.map((a) => (a === "tree-nut" ? "tree nuts" : a)))}{" "}
+          written in the ingredients. <Link href="/household">Change what you avoid</Link>.
+        </p>
+      )}
+
+      {narrowed.map(({ recipe, matchedIngredient, allergenNotes }) => (
         <Link className="card" key={recipe.id} href={`/recipes/${recipe.id}`}>
           {photoFor.has(recipe.id) ? (
             // eslint-disable-next-line @next/next/no-img-element -- signed URLs expire; the
@@ -288,6 +316,16 @@ export default async function RecipesPage({
               .join(" · ")}
           </p>
           {/* why this one is here, when the title says nothing about the search */}
+          {/*
+            * A warning, not a removal. These are the `unknown` readings: something bought
+            * ready-made could plausibly carry it, and only a label settles it. Hiding them would
+            * teach a household the app had read the label for them (§71).
+            */}
+          {allergenNotes?.map((note) => (
+            <p className="matched" key={`${note.allergen}-${note.because}`}>
+              {allergenSentence(note)}
+            </p>
+          ))}
           {matchedIngredient && (
             <p className="matched">contains {matchedIngredient}</p>
           )}

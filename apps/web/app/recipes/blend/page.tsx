@@ -98,6 +98,9 @@ export default async function BlendPage({
       familyId: family.id,
       query: query.q ?? "",
       filter: null,
+      // it offers recipes to pair with, so it filters — and it costs one argument because this
+      // reuses the recipe search rather than being a second door onto the same shelf (§71)
+      avoidedAllergens: family.avoidedAllergens,
     });
     // the existing family-scoped search, reused where it stands rather than a second door onto
     // the recipe list — which is what /recipes/browse was deleted for

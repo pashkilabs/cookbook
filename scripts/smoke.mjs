@@ -872,6 +872,26 @@ try {
     );
 
     /*
+     * These checks get their own recipe, and the reason is worth keeping.
+     *
+     * The first version used the shared `recipeId` — and the edit test above PATCHes that recipe
+     * to `ingredients: "2 cups flour"`, so by the time these ran the peanut and the lemons were
+     * gone. Both "reproductions" were measuring nothing: a probe that could not have succeeded.
+     * The failures looked like the reported bugs and were artefacts of the harness.
+     */
+    const subject = await call("POST", "/api/recipes", {
+      body: {
+        title: "Smoke Allergen Subject",
+        servings: "2", timeMinutes: "10", sourceName: "", sourceUrl: "",
+        ingredients: "2 tbsp peanut butter\n150 g rice noodles\n3 lemons",
+        steps: "Stir.",
+      },
+    });
+    const subjectId = subject.body?.recipe?.id ?? subject.body?.id ?? null;
+    record("a recipe for the allergen checks exists", subject.status === 200 && Boolean(subjectId),
+      `HTTP ${subject.status}`);
+
+    /*
      * The two §71 writes, exercised rather than assumed.
      *
      * Both controls render — the screen markers above assert that — and a control that renders is
@@ -915,6 +935,54 @@ try {
       record("and changing your mind replaces it rather than contradicting it",
         changed.status === 200 && changed.body?.changed === true, `HTTP ${changed.status}`);
 
+      /*
+       * Two members disagreeing is the NORMAL case — it is the whole reason preferences are per
+       * member — and the row has to express it. Reported live: liking rice noodles for one
+       * person and disliking them for another made the subject disappear, so the second
+       * statement could not be made at all.
+       */
+      const second = await call("POST", "/api/members", {
+        body: { displayName: "Smoke Disagreer" },
+      });
+      const secondId = second.body?.member?.id ?? null;
+      if (secondId) {
+        const theirs = await call("POST", "/api/preferences", {
+          body: { familyMemberId: secondId, stance: "dislike", subjectKind: "ingredient", subject: "rice noodles" },
+        });
+        const mineToo = await call("POST", "/api/preferences", {
+          body: { familyMemberId: adultMemberId, stance: "like", subjectKind: "ingredient", subject: "rice noodles" },
+        });
+        record(
+          "two members can disagree about the same subject",
+          theirs.status === 200 && mineToo.status === 200,
+          `dislike HTTP ${theirs.status}, like HTTP ${mineToo.status}`,
+        );
+
+        const withBoth = await call("GET", `/recipes/${subjectId}`);
+        const bothHtml = typeof withBoth.body === "string" ? withBoth.body : JSON.stringify(withBoth.body);
+        record(
+          "and the recipe page names both, rather than losing one",
+          withBoth.status === 200
+            && /Smoke Disagreer/.test(bothHtml)
+            && (bothHtml.match(/rice noodles/g) ?? []).length >= 2,
+          withBoth.status === 200
+            ? `${(bothHtml.match(/rice noodles/g) ?? []).length} mentions; options: ${JSON.stringify((bothHtml.match(/value="(?:ingredient|cuisine|dish_form|course):[^"]*"/g) ?? []).slice(0, 8))}`
+            : `HTTP ${withBoth.status}`,
+        );
+
+        // the subject must STILL be offered: a vanished option is a dead end for anybody who
+        // has not spoken yet
+        record(
+          "and the subject is still offered, so a third member could speak",
+          withBoth.status === 200 && /value="ingredient:rice noodles"/.test(bothHtml),
+          /value="ingredient:rice noodles"/.test(bothHtml) ? "still in the list" : "the option is gone",
+        );
+      } else {
+        skip("two members can disagree about the same subject", "a second member could not be added");
+        skip("and the recipe page names both, rather than losing one", "no second member");
+        skip("and the subject is still offered, so a third member could speak", "no second member");
+      }
+
       if (disliked.body?.id) {
         const withdrawn = await call("DELETE", `/api/preferences?id=${disliked.body.id}`);
         record("and it can be withdrawn", withdrawn.status === 200, `HTTP ${withdrawn.status}`);
@@ -926,6 +994,56 @@ try {
       skip("and changing your mind replaces it rather than contradicting it", "no live member");
       skip("and it can be withdrawn", "no live member");
     }
+
+    /*
+     * The filter, not the setting.
+     *
+     * A marker proving the control renders does not prove the thing it controls, and these two
+     * had drifted apart: the matcher was measured against 82 recipes, the setting saved and read
+     * back, and nothing joined them. For an allergy that is worse than an unbuilt feature — it
+     * implies a protection that does not exist, and §71's whole honesty argument assumed the
+     * filter ran.
+     */
+
+    const setPeanut = await call("PATCH", "/api/household", { body: { avoidedAllergens: ["peanut"] } });
+    record("avoiding peanut saves", setPeanut.status === 200, `HTTP ${setPeanut.status}`);
+
+    const hiddenList = await call("GET", "/recipes");
+    const hiddenHtml = typeof hiddenList.body === "string" ? hiddenList.body : JSON.stringify(hiddenList.body);
+    record(
+      "a recipe naming an avoided allergen is absent from the recipe list",
+      hiddenList.status === 200 && !hiddenHtml.includes("Smoke Allergen Subject"),
+      hiddenList.status === 200
+        ? hiddenHtml.includes("Smoke Allergen Subject") ? "still listed — the filter is not wired" : "hidden"
+        : `HTTP ${hiddenList.status}`,
+    );
+
+    const hiddenSearch = await call("GET", "/recipes?q=allergen");
+    const searchHtml = typeof hiddenSearch.body === "string" ? hiddenSearch.body : JSON.stringify(hiddenSearch.body);
+    record(
+      "and absent from search, which is a second door onto the same list",
+      hiddenSearch.status === 200 && !searchHtml.includes("Smoke Allergen Subject"),
+      hiddenSearch.status === 200
+        ? searchHtml.includes("Smoke Allergen Subject") ? "still found — search does not filter" : "hidden"
+        : `HTTP ${hiddenSearch.status}`,
+    );
+
+    // opened directly it must still render, with the reason named: hiding a recipe somebody has
+    // the link to would be a 404 for a recipe that exists
+    const direct = await call("GET", `/recipes/${subjectId}`);
+    const directHtml = typeof direct.body === "string" ? direct.body : JSON.stringify(direct.body);
+    record(
+      "but opening it directly says why, rather than refusing",
+      direct.status === 200 && /Contains peanut:/.test(directHtml),
+      direct.status === 200
+        ? /Contains peanut:/.test(directHtml) ? "the reason is named" : "no warning rendered"
+        : `HTTP ${direct.status}`,
+    );
+
+    const clearPeanut = await call("PATCH", "/api/household", { body: { avoidedAllergens: [] } });
+    record("and clearing it brings the recipe back", clearPeanut.status === 200
+      && (await call("GET", "/recipes")).body?.includes?.("Smoke Allergen Subject") !== false,
+      `HTTP ${clearPeanut.status}`);
 
     const backToUs = await call("PATCH", "/api/household", { body: { measurementSystem: "us" } });
     record("and can change back", backToUs.status === 200

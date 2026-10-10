@@ -15,6 +15,7 @@ import {
 } from "@/lib/week";
 import { PlannerWeek } from "./planner-week";
 import { AlongsideThisWeek } from "./alongside";
+import { readAvoidedAllergens } from "@/lib/allergen-filter";
 import { alongsideThisWeek } from "@/lib/alongside";
 import type { CookMember } from "./cooked";
 import { childTastes, warningsFor } from "@/lib/tastes";
@@ -79,7 +80,15 @@ export default async function PlannerPage({
     recipe: entry.recipes as unknown as { id: string; title: string; servings: number | null; time_minutes: number | null },
   }));
 
-  const waiting = (shortlist.data ?? []).map((row) => ({
+  /*
+   * The waiting list is an OFFER — recipes shortlisted and not yet given a day — so it filters.
+   * Anything already **placed** on a day is left alone and flagged instead: hiding a meal a
+   * household has planned would make the week lie about itself, and the useful thing is to say
+   * what is in it (§71).
+   */
+  const avoidedHere = await readAvoidedAllergens(supabase, family.id, family.avoidedAllergens);
+
+  const waiting = (shortlist.data ?? []).filter((row) => !avoidedHere.excluded.has(row.recipe_id as string)).map((row) => ({
     id: row.id as string,
     recipe: row.recipes as unknown as { id: string; title: string; servings: number | null; time_minutes: number | null },
   }));
@@ -180,6 +189,7 @@ export default async function PlannerPage({
     family.id,
     placed.map((entry) => entry.recipe.id),
     family.measurementSystem,
+    family.avoidedAllergens,
   );
 
   return (

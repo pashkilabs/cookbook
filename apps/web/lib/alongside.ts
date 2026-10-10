@@ -41,6 +41,7 @@ import {
 } from "@pashki/core";
 import { catalogItemsFromRows, INGREDIENT_COLUMNS, GROCERY_PACKAGE_COLUMNS } from "@pashki/db/catalog";
 import { rows } from "./rows";
+import { readAvoidedAllergens } from "./allergen-filter";
 
 export interface Alongside {
   /** recipes sharing enough with something already planned that one batch might do for both */
@@ -60,6 +61,12 @@ export async function alongsideThisWeek(
   familyId: string,
   plannedRecipeIds: readonly string[],
   system: "us" | "metric",
+  /*
+   * What the household avoids (§71). This screen **offers** recipes, so it filters — "a recipe
+   * hidden in one place and offered in another is worse than consistent silence", and a
+   * suggestion is the strongest form of offering there is.
+   */
+  avoidedAllergens: readonly string[] = [],
 ): Promise<Alongside> {
   if (plannedRecipeIds.length === 0) {
     return { sharesABase: [], leftoversLiveOnTheList: false };
@@ -105,6 +112,7 @@ export async function alongsideThisWeek(
     };
   });
 
+  const avoided = await readAvoidedAllergens(supabase, familyId, avoidedAllergens);
   const byId = new Map(library.map((recipe) => [recipe.id, recipe]));
   const planned = new Set(plannedRecipeIds);
 
@@ -116,7 +124,10 @@ export async function alongsideThisWeek(
   for (const id of planned) {
     const source = byId.get(id);
     if (!source) continue;
-    const candidates = library.filter((recipe) => !planned.has(recipe.id));
+      // removed, not demoted: an allergy is an exclusion and a suggestion list is an offer
+      const candidates = library.filter(
+        (recipe) => !planned.has(recipe.id) && !avoided.excluded.has(recipe.id),
+      );
     for (const found of recipesSharingBase(source, candidates, catalog)) {
       const existing = best.get(found.recipe.id);
       if (!existing || found.shared.length > existing.entry.shared.length) {

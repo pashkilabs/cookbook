@@ -17,6 +17,7 @@ import { PhotoUpload } from "../photo-upload";
 import { PalateNotes } from "./palate";
 import { SplitButton } from "../blend/split";
 import { componentsKeyFor, palateNotesFor } from "@/lib/tastes";
+import { allergenSentence, readAvoidedAllergens } from "@/lib/allergen-filter";
 import { linkify } from "./linkify";
 import { Substitution } from "./substitution";
 
@@ -174,6 +175,17 @@ export default async function RecipePage({
       subject: row.subject as string,
       subjectKind: row.subject_kind as string,
     }));
+
+  /*
+   * Does this recipe name something the household avoids?
+   *
+   * **Opening it directly never refuses.** Somebody with the link asked for this recipe, and a
+   * 404 for a recipe that exists is a worse answer than the recipe plus the reason. The list
+   * hides it; this names it (§71).
+   */
+  const allergenNotes = (
+    await readAvoidedAllergens(supabase, family.id, family.avoidedAllergens)
+  ).byRecipe.get(recipe.id) ?? [];
 
   const partitionIsCurrent =
     typeof recipe.components_key === "string" &&
@@ -359,7 +371,27 @@ export default async function RecipePage({
 
       <div className="bar" style={{ marginBottom: "1.5rem" }}>
         <div>
-          <h1>{recipe.title}</h1>
+          {/*
+        * Above everything, because the point of it is the decision to cook — not a footnote
+        * discovered after reading the method. Worded as §71 requires: what it saw, quoted, and
+        * never the word "safe".
+        */}
+      {allergenNotes.length > 0 && (
+        <section className="allergen-warning">
+          {allergenNotes.map((note) => (
+            <p key={`${note.allergen}-${note.because}`}>
+              <strong>{allergenSentence(note)}</strong>
+            </p>
+          ))}
+          <p className="meta">
+            Your household avoids {andList(family.avoidedAllergens.map((a) => (a === "tree-nut" ? "tree nuts" : a)))},
+            so this is hidden from the recipe list and from search. It reads ingredient lists, so
+            it cannot see inside a jar.
+          </p>
+        </section>
+      )}
+
+      <h1>{recipe.title}</h1>
           <ul className="facts">
             {[
               recipe.source_name,

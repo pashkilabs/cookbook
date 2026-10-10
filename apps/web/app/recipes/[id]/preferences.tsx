@@ -64,6 +64,18 @@ export function Preferences({
 
   if (members.length === 0 || subjects.length === 0) return null;
 
+  /*
+   * One entry per subject, each naming everyone who has spoken about it. Insertion-ordered by
+   * first mention so the list does not reshuffle when somebody adds an opinion.
+   */
+  const bySubject = new Map<string, StatedSoFar[]>();
+  for (const entry of stated) {
+    const list = bySubject.get(entry.subject);
+    if (list) list.push(entry);
+    else bySubject.set(entry.subject, [entry]);
+  }
+  const grouped = [...bySubject.entries()];
+
   async function state(stance: "like" | "dislike") {
     if (busy || !who || !what) return;
     setBusy(true);
@@ -140,24 +152,41 @@ export function Preferences({
         </button>
       </div>
 
-      {stated.length > 0 && (
+      {/*
+        * Grouped by subject, because two members disagreeing is the NORMAL case — it is the whole
+        * reason preferences are per member. One line per statement made "Ada likes rice noodles"
+        * and "Paige doesn't like rice noodles" two unrelated facts; grouped, they read as the
+        * sentence they are: *rice noodles — Ada likes it, Paige does not.*
+        *
+        * The subject stays in the select whatever has been said about it. A third member has to
+        * be able to speak, and an option that vanishes once somebody has an opinion is a dead end.
+        */}
+      {grouped.length > 0 && (
         <ul className="ingredients" style={{ marginTop: "0.6rem" }}>
-          {stated.map((entry) => (
-            <li key={entry.id}>
+          {grouped.map(([subject, entries]) => (
+            <li key={subject}>
               <span>
-                <strong>{entry.memberName}</strong>{" "}
-                {entry.stance === "like" ? "likes" : "doesn’t like"}{" "}
-                <strong>{entry.subject}</strong>
-                <span className="meta"> · stated, so it outranks what the ratings imply</span>
+                <strong>{subject}</strong>
+                {" — "}
+                {entries.map((entry, at) => (
+                  <span key={entry.id}>
+                    {at > 0 ? ", " : ""}
+                    {entry.memberName} {entry.stance === "like" ? "likes it" : "does not"}
+                    <button
+                      type="button"
+                      className="quiet"
+                      disabled={busy}
+                      aria-label={`withdraw ${entry.memberName}'s opinion of ${subject}`}
+                      onClick={() => withdraw(entry.id)}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+                {entries.length > 1 && entries.some((e) => e.stance === "like") && entries.some((e) => e.stance === "dislike") && (
+                  <span className="meta"> · a disagreement, which the suggestions will say out loud rather than average away</span>
+                )}
               </span>
-              <button
-                type="button"
-                className="quiet"
-                disabled={busy}
-                onClick={() => withdraw(entry.id)}
-              >
-                withdraw
-              </button>
             </li>
           ))}
         </ul>

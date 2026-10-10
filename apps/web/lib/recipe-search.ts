@@ -1,5 +1,6 @@
 import { maybeRow, rows } from "./rows";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { readAvoidedAllergens, type AllergenNote } from "./allergen-filter";
 
 /**
  * Search a household's recipes by title *and* by ingredient.
@@ -32,6 +33,14 @@ export interface SearchHit {
   recipe: RecipeRow;
   /** the ingredient line that matched, when the title did not */
   matchedIngredient: string | null;
+  /**
+   * Why this recipe carries an allergen warning, when it does.
+   *
+   * Only ever `unknown` notes reach a hit: an `excluded` recipe is removed, not annotated. A
+   * recipe shown *with a warning* is one somebody has to resolve by reading a label, and hiding
+   * it would teach them the app had done that for them (§71).
+   */
+  allergenNotes?: AllergenNote[];
 }
 
 const COLUMNS =
@@ -46,13 +55,31 @@ export interface SearchOptions {
   /** already trimmed; empty means "no search, just the filters" */
   query: string;
   filter: "make-again" | "untried" | "family-likes" | "kid-friendly" | null;
+  /**
+   * What the household avoids, from the seam (§71).
+   *
+   * Passed in rather than read here: `families` is a platform table. Defaulting to none keeps
+   * every existing caller behaving as it did — and **that default is exactly how this shipped
+   * broken**, so the two callers that browse now pass it, and the smoke run asserts a recipe
+   * naming an avoided allergen is absent from both.
+   */
+  avoidedAllergens?: readonly string[];
 }
 
 export async function searchRecipes(options: SearchOptions): Promise<{
   hits: SearchHit[];
   error: string | null;
+  /** how many the allergen filter removed — stated, because a silent absence is the failure */
+  hiddenByAllergen?: number;
 }> {
   const { supabase, familyId, query, filter } = options;
+
+  /*
+   * Read once, before either branch, so the list and the search cannot disagree about which
+   * recipes are excluded — they are two doors onto the same shelf, and the reported bug was found
+   * through the second one.
+   */
+  const allergens = await readAvoidedAllergens(supabase, familyId, options.avoidedAllergens ?? []);
 
   const base = () => {
     let builder = supabase
@@ -69,7 +96,7 @@ export async function searchRecipes(options: SearchOptions): Promise<{
   if (!query) {
     const { data, error } = await base().order("created_at", { ascending: false });
     if (error) return { hits: [], error: error.message };
-    return { hits: withFamilyLikes(data ?? [], new Map()), error: null };
+    return { hits: withFamilyLikes(data ?? [], new Map(), allergens), error: null, ...hidden(allergens, data ?? []) };
   }
 
   const pattern = `%${escapeForLike(query)}%`;
@@ -108,18 +135,31 @@ export async function searchRecipes(options: SearchOptions): Promise<{
   }
 
   return {
-    hits: withFamilyLikes([...(byTitle.data ?? []), ...ingredientOnly], matchedIngredients),
+    hits: withFamilyLikes([...(byTitle.data ?? []), ...ingredientOnly], matchedIngredients, allergens),
+    ...hidden(allergens, [...(byTitle.data ?? []), ...ingredientOnly]),
     error: null,
   };
+}
+
+/** how many of these the filter took out, so the absence is stated rather than silent */
+function hidden(allergens: Awaited<ReturnType<typeof readAvoidedAllergens>>, recipes: RecipeRow[]) {
+  return { hiddenByAllergen: recipes.filter((recipe) => allergens.excluded.has(recipe.id)).length };
 }
 
 function withFamilyLikes(
   recipes: RecipeRow[],
   matchedIngredients: Map<string, string>,
+  allergens: Awaited<ReturnType<typeof readAvoidedAllergens>>,
 ): SearchHit[] {
-  return recipes.map((recipe) => ({
+  return recipes
+    // removed, not demoted: an allergy is an exclusion and a ranking is the wrong instrument
+    .filter((recipe) => !allergens.excluded.has(recipe.id))
+    .map((recipe) => ({
     recipe,
     matchedIngredient: matchedIngredients.get(recipe.id) ?? null,
+    ...(allergens.byRecipe.get(recipe.id)?.length
+      ? { allergenNotes: allergens.byRecipe.get(recipe.id)! }
+      : {}),
   }));
 }
 
