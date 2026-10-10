@@ -57,7 +57,20 @@ export function Preferences({
   stated: StatedSoFar[];
 }) {
   const router = useRouter();
-  const [who, setWho] = useState(members[0]?.id ?? "");
+  /*
+   * Who is **derived** from who has not spoken yet, with an explicit override.
+   *
+   * It used to be plain state initialised to `members[0]`, and that is the best explanation for
+   * the report that a second member could not state theirs. The dropdown does not advance, so
+   * after Ada says she likes something, clicking the other stance states it *for Ada again* —
+   * and the route finds her existing row and flips it. One statement, not two, and the subject
+   * looks spent.
+   *
+   * Nobody is at fault for that: the control invited a second opinion and then silently applied
+   * it to the first person. Deriving the default means the obvious next action is the right one,
+   * and `chosen` keeps a deliberate choice from being overruled.
+   */
+  const [chosen, setChosen] = useState<string | null>(null);
   const [what, setWhat] = useState(subjects[0] ? `${subjects[0].kind}:${subjects[0].value}` : "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +81,17 @@ export function Preferences({
    * One entry per subject, each naming everyone who has spoken about it. Insertion-ordered by
    * first mention so the list does not reshuffle when somebody adds an opinion.
    */
+  /*
+   * The members who have not spoken about the subject currently selected — so the default is
+   * always somebody whose opinion would be *new*. Falls back to the whole roster once everybody
+   * has spoken, because changing your mind has to stay possible.
+   */
+  const selectedSubject = what.slice(what.indexOf(":") + 1);
+  const silent = members.filter(
+    (member) => !stated.some((entry) => entry.memberId === member.id && entry.subject === selectedSubject),
+  );
+  const who = chosen ?? silent[0]?.id ?? members[0]?.id ?? "";
+
   const bySubject = new Map<string, StatedSoFar[]>();
   for (const entry of stated) {
     const list = bySubject.get(entry.subject);
@@ -98,6 +122,9 @@ export function Preferences({
         setError(failed.error ?? `that did not save (${response.status})`);
         return;
       }
+      // cleared so the next default is recomputed from who has now spoken — which is what makes
+      // the obvious second action belong to the second person
+      setChosen(null);
       router.refresh();
     } catch {
       setError("No signal — that was not saved.");
@@ -128,16 +155,27 @@ export function Preferences({
 
   return (
     <div style={{ marginTop: "1rem" }}>
-      <p className="meta">Was it something in particular?</p>
+      <p className="meta">
+        Was it something in particular?
+        {silent.length === 0 && members.length > 1 && (
+          <> Everyone has said something about this one — choosing again changes their mind.</>
+        )}
+      </p>
       <div className="tabs" style={{ margin: 0, flexWrap: "wrap", alignItems: "center" }}>
-        <select value={who} onChange={(event) => setWho(event.target.value)} disabled={busy}>
+        <select value={who} onChange={(event) => setChosen(event.target.value)} disabled={busy}>
           {members.map((member) => (
             <option key={member.id} value={member.id}>
               {member.displayName}
             </option>
           ))}
         </select>
-        <select value={what} onChange={(event) => setWhat(event.target.value)} disabled={busy}>
+        <select
+          value={what}
+          // changing the subject clears the override: the default should follow the new subject's
+          // own silence rather than keeping a person picked for a different one
+          onChange={(event) => { setWhat(event.target.value); setChosen(null); }}
+          disabled={busy}
+        >
           {subjects.map((subject) => (
             <option key={`${subject.kind}:${subject.value}`} value={`${subject.kind}:${subject.value}`}>
               {subject.label}

@@ -456,6 +456,30 @@ models be good enough. Do not add a silent-save path.
   `echo "exit=${PIPESTATUS[0]}"` printed `exit=`. A fix written in the wrong dialect fails the same
   quiet way as the thing it was meant to prevent. One rule, two shapes: **a pipeline can hide the
   result you are measuring, whether by filtering the text or by replacing the status.**
+- **A probe owns its fixture or verifies it before reading — because a shared fixture another
+  test has already mutated fails *convincingly*.** Two bugs were reported, both plausible. Both
+  reproductions used smoke's shared `recipeId`, and the edit test a few hundred lines earlier
+  PATCHes that recipe to `ingredients: "2 cups flour"`. So the peanut and the rice noodles were
+  gone before either check ran.
+
+  **Both probes measured nothing, and both failed in exactly the shape of the reported bug.** The
+  allergen check reported *"still listed — the filter is not wired"* about a recipe with no
+  allergen in it. The preference check reported the subject missing from the dropdown because the
+  ingredient was no longer on the recipe. One of those bugs was real and one was not, and the
+  failing output was indistinguishable.
+
+  That coincidence is what makes this sharper than a check that cannot fail (one entry down).
+  A vacuous control is suspicious the moment you read it — it asserts something trivially true.
+  **A stale-fixture probe looks like evidence.** It produces the exact failure you went looking
+  for, which is the one result nobody re-examines, and it would have had me "fix" a bug that did
+  not exist while reporting the real one as confirmed by a test that proved nothing about it.
+
+  So: **a probe owns its fixture, or asserts the fixture's state before trusting the result.** The
+  cheap version is a dedicated row — these checks now create their own recipe. The cheaper version
+  still is one line: assert the thing you are about to read is actually there. *A probe that could
+  not have succeeded has measured nothing* already covers an empty database; this is its sibling,
+  where the data exists and is wrong because something else in the suite moved it.
+
 - **A smoke check that calls an endpoint proves the endpoint, and nothing else.** It is
   not evidence a feature exists and must never be allowed to stand in for one. Two of
   the last three things built — caption paste and screenshot upload — had **no way in
