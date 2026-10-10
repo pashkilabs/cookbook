@@ -60,3 +60,12 @@ export {
   type StatedPreference,
   type SubjectKind,
 } from "./preferences.js";
+export {
+  INSTACART_UNITS,
+  buildShoppingListRequest,
+  type InstacartLineItem,
+  type InstacartMeasurement,
+  type ShoppingListOptions,
+  type ShoppingListRequest,
+  type WithheldLine,
+} from "./instacart.js";

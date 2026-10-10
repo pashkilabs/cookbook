@@ -4322,3 +4322,98 @@ invisible in every other view, including the recipe page, which renders it faith
 before any catalog pass**: a catalog entry for `boneless` would make a parser bug permanent, and
 corrupt data upstream is worse than thin data downstream.
 
+## §73 — Exporting the shopping list to Instacart
+
+> ### Read this first
+>
+> **The in-app list stays the better artefact for shopping in person; the export is for somebody
+> who is not.** §72's catalog pass was justified on **aisle order for the weekly list**, and this
+> integration **does not inherit it** — their schema has no aisle concept. So the two lists are
+> for two different acts, and the export is not an upgrade of the list.
+
+`POST https://connect.instacart.com/idp/v1/products/products_link`, `Authorization: Bearer <key>`,
+response `{ products_link_url }` **and nothing else — no user data comes back**. Their matcher does
+the ingredient-to-product work; there is no cart state and no order lifecycle to hold.
+
+### The consolidated quantity, not the per-recipe breakdown
+
+Sending the breakdown would send cream twice — once for Tuesday, once for Friday — and their
+matcher would resolve two products or one product twice. **That throws away the single most
+valuable thing this app computes.** One pint across two days *is* the product; the breakdown is how
+it is explained, not what to buy. It goes in `instructions` as prose, which is the only place the
+Tuesday/Friday split survives.
+
+The field mapping falls out of a distinction `consolidate` already draws between `key` and `label`:
+
+| theirs | ours | why |
+|---|---|---|
+| `name` | the catalog item's canonical name, falling back to `label` | their matcher searches on it, so it wants the catalog's word |
+| `display_text` | `ShoppingLine.label` | **what the recipe called it.** The rename rule holds on their page too, or a household cannot check the list against the recipe |
+| `line_item_measurements[0]` | the package decision — `{quantity: count, unit: "package"}` | our answer to *how much to buy*, which is what a cart needs |
+| `line_item_measurements[1]` | `needed`, in base units | lets their matcher size a product itself; the field exists for exactly this |
+
+**`quantity`/`unit` on a LineItem were deprecated on 2026-03-18** in favour of
+`line_item_measurements`. A design written against the old fields would need redoing.
+
+### Units: no conversion, and an allow-list rather than a hope
+
+Checked before writing the mapper, because a conversion would have been a decision. It is not
+needed: **`millilitre`, `ml`, `gram` and `g` are all supported**, so our base units map straight
+through and nothing rounds.
+
+The real hazard is the other direction. Their docs say **"unsupported units cause quantity matching
+to fail"** — so a unit we invent does not error, it silently matches badly. Every unit is therefore
+checked against their published list **before sending**, and an unknown one is a refusal rather
+than a request. Same shape as the allergen matcher: the failure that must not happen quietly is
+the one that looks like a worse answer rather than no answer.
+
+### Pantry and ticks are excluded, and the ticks are a join
+
+`needed` is already net of the pantry — `apps/web/lib/shopping.ts` passes `deductPantry: true` —
+but a fully stocked item **stays on the list with `needed: 0`** and `inPantry: true`, so those are
+dropped rather than sent as a zero. A pantry entry with **no amount** is flagged and *not*
+deducted; those are excluded too, with **the count and the names stated**, the way the allergen
+filter states what it hid. Excluding something genuinely needed is also a failure, so the
+household has to be able to see what was withheld.
+
+**`shopping_ticks` live outside `consolidate` entirely.** The screen applies them; nothing in a
+`ShoppingLine` knows an item is ticked. So an export built from `consolidate` alone **re-buys the
+whole trolley**, and both halves are correct today — which is the shape four of this project's
+bugs have had. It gets the walk-the-whole-path test *before* the exporter is written, not a unit
+test per side.
+
+### The request body is fingerprinted over everything that changes it
+
+Their docs ask that URLs be reused and regenerated only when the content changes.
+`prompt-version.ts` is the precedent and **the failure mode is identical: a stale link served
+confidently.** That one happened because the key covered every input the *recipe* carried and
+omitted the prompt. So this fingerprint covers the whole request body — line items, title,
+instructions, measurements, the lot — and not a hand-picked subset of it.
+
+### `health_filters` is declined, not overlooked
+
+Their `filters` object accepts `health_filters` — `GLUTEN_FREE`, `VEGAN`, `KOSHER` and so on — and
+our avoided-allergens would map onto it in one line. **We do not send it.** Recorded here because a
+future reader will find the field, see it unused, and assume it was missed.
+
+Two reasons. The filter has already run on our side, so sending it buys nothing. And **§71 put
+allergens on the household to make them *unremarkable*, not to make them exportable** — "this
+household avoids peanuts" identifies nobody precisely because it stays here; attaching it to an
+outbound request to a third party is the thing that would make it worth protecting again. The
+decision that dissolved the health-data question is the decision that forbids this.
+
+Satisfied by construction today: no allergen field appears in a `ShoppingLine`, so the body carries
+recipe-derived names and quantities only — no member names, no ratings, no email. Worth asserting
+rather than assuming, because "by construction" is how the `avoided_allergens` column reached a
+select list that broke production.
+
+### The key
+
+`PASHKI_INSTACART_API_KEY`, Vercel server env, called from a route handler. Never a client bundle —
+the same rule as an inference credential, and its name belongs in `check-server-only` so a
+`"use client"` file importing it **fails the build** rather than relying on anyone remembering.
+`/api/health` reports presence and a 12-hex fingerprint, following `textKeyFingerprint`, so a
+mismatched key is a comparison rather than a guess.
+
+The affiliate programme exists. That is a commercial decision, not a technical one.
+

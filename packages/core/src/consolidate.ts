@@ -116,9 +116,15 @@ export function consolidate(
     let needed = bucket.totals[primary] ?? 0;
 
     const onHand = pantryIndex.get(bucket.key) ?? pantryIndex.get(normaliseName(bucket.label));
+    let pantryDeducted = false;
     if (onHand && deductPantry && onHand.amount != null) {
       const have = toBaseMeasure(onHand.amount, onHand.unit ?? null, bucket.item);
-      if (have && have.dimension === primary) needed = Math.max(0, needed - have.amount);
+      if (have && have.dimension === primary) {
+        needed = Math.max(0, needed - have.amount);
+        // recorded, because "the shortfall" and "we do not know" are opposite instructions to an
+        // export and `inPantry` cannot tell them apart (§73)
+        pantryDeducted = true;
+      }
     }
 
     const sellable = bucket.item && primary === bucket.item.dimension && needed > 0;
@@ -140,6 +146,7 @@ export function consolidate(
       leftoverDisplay: leftover > 0 ? formatMeasure(leftover, primary, system) : null,
       uses: bucket.uses,
       inPantry: Boolean(onHand),
+      pantryDeducted,
       otherDimensions: present
         .filter((d) => d !== primary)
         .map((d) => ({

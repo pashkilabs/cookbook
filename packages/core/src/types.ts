@@ -139,6 +139,16 @@ export interface ShoppingLine {
   uses: IngredientUse[];
   /** already on hand; kept on the list but flagged */
   inPantry: boolean;
+  /**
+   * Whether the pantry amount was actually subtracted from `needed`.
+   *
+   * `inPantry` alone cannot answer the question an export has to ask. A pantry entry with an
+   * amount reduces `needed`; one typed with no amount — "we have some rice" — is flagged and
+   * subtracted from nothing. Both leave `inPantry: true` and `needed > 0`, and they mean opposite
+   * things: the first is "buy the shortfall", the second is "we do not know whether to buy at
+   * all" (§73).
+   */
+  pantryDeducted: boolean;
   /** measures that couldn't merge into the primary dimension */
   otherDimensions: Array<{ dimension: Dimension; amount: number; display: string }>;
 }
