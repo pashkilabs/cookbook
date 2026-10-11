@@ -24,6 +24,7 @@
  * nothing must not read like a run that found nothing.
  */
 import { readFileSync } from "node:fs";
+import { foldForSearch, searchBranches } from "../../core/src/index.js";
 
 const id = process.env.KROGER_CLIENT_ID;
 const secret = process.env.KROGER_CLIENT_SECRET;
@@ -111,7 +112,9 @@ try {
    * would never use is a measurement of nothing — the eval/product divergence again, in a
    * measurement script this time.
    */
-  const { createCatalog, isStaple, normaliseName } = await import("../../core/src/index.js");
+  const { createCatalog, isStaple, normaliseName, searchBranches: _b, foldForSearch: _f } =
+    await import("../../core/src/index.js");
+  void _b; void _f;
   const { catalogItemsFromRows, INGREDIENT_COLUMNS, GROCERY_PACKAGE_COLUMNS } =
     await import("../../db/src/catalog.js");
   const catalog = createCatalog(
@@ -235,7 +238,22 @@ let aisled = 0;
 let withProducts = 0;
 
 for (const term of sample) {
-  const products = await search(term);
+  /*
+   * Branches and folding, which is what the design actually sends (§75).
+   *
+   * `searchBranches` splits a choice the recipe offered — no product is both honey and agave
+   * syrup — and `foldForSearch` spells a name the way a shelf does, `jalapeno` rather than
+   * `jalapeño`. The first branch to return anything wins, because the recipe's order is its
+   * preference and nothing here ranks products against each other.
+   */
+  let products: any[] | null = null;
+  let matchedBranch = term;
+  for (const branch of searchBranches(term)) {
+    const found = await search(foldForSearch(branch));
+    if (found === null) { products = null; break; }
+    if (found.length > 0) { products = found; matchedBranch = branch; break; }
+    products = found;
+  }
   if (products === null) {
     tally.unmeasured += 1;
     if (examples.unmeasured!.length < 6) examples.unmeasured!.push(`${term}  →  (503 after four attempts)`);
@@ -251,7 +269,7 @@ for (const term of sample) {
     }
   }
 
-  const words = significant(term);
+  const words = significant(matchedBranch);
   const describing = products.filter((product) => plausible(String(product.description ?? ""), words));
   let verdict: keyof typeof tally;
   if (products.length === 0) verdict = "none";

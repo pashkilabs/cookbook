@@ -63,6 +63,7 @@ export {
 export {
   INSTACART_UNITS,
   buildShoppingListRequest,
+  searchBranches,
   type InstacartLineItem,
   type InstacartMeasurement,
   type ShoppingListOptions,

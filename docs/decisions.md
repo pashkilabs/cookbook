@@ -4732,3 +4732,75 @@ continuation marker, or a measure word. A clean name is never a candidate howeve
 re-read it, which makes the repair idempotent — verified by running it twice and getting zero both
 times.
 
+## §76 — The stripped letter, and `or` as a choice
+
+### `normaliseName` deleted every letter outside a-z
+
+`jalapeño` → `jalape o`. `bräserad rödkål` → `br serad r dk l`. The character **removed, not
+replaced**, by `[^a-z0-9&\s-]` — a rule meant to drop punctuation that dropped the alphabet
+everybody else uses.
+
+**Scope, established before repairing anything: 0 rows corrupted.** `item_text` holds the parser's
+output and the parser was always right — 8 rows carry non-ASCII characters and every one is intact.
+So the premise this was opened with — *writing bad data on every import* — **was wrong**, and the
+`jalape o` first reported came from the measurement script calling `normaliseName` itself. The
+fourth measurement artefact in this exercise.
+
+Where it actually showed: `consolidate` sets a shopping line's `label` to
+`normaliseName(item) || item`, so **the list on screen read `jalape o`** for a recipe that said
+jalapeño. One visible place, no stored damage, nothing to repair — and invisible from inside the
+app until something outside it was asked to recognise the names (§75).
+
+`\p{L}` with the `u` flag is the whole fix. **Two call sites, not one:** `normaliseName` and
+`lightName` carried the identical regex, and the assertion that expected a single occurrence is
+what found the second. A find-and-replace that had assumed one would have left half the bug.
+
+And **not** a transliteration. `normaliseName` feeds display and bucket keys, where `jalapeño` is
+the right answer; `foldForSearch` folds accents for somebody else's search index, where the mark is
+noise and a shelf says `Jalapeno`. The §71 argument once more — when two callers want opposite
+things from one string, they get two functions, because the alternative is a function that is
+wrong for one of them forever.
+
+One consequence worth stating: `shopping_ticks.item_key` is derived from the consolidate key, so
+for those 8 items an existing tick stops matching and the line reappears unticked. Within one
+week, on eight items, and the alternative is leaving the names wrong.
+
+### `or` is a choice the recipe made
+
+Roughly a third of the names that found nothing were alternatives — `honey or agave syrup`,
+`english or hothouse cucumber`. **Not debris**: the recipe really did offer a choice and the name
+records it faithfully. No single search can match them, because no product is both.
+
+So `searchBranches` splits on a standalone `or` and the caller tries each branch. `cream of tartar`
+and `rack of lamb` are untouched, which is why the pattern needs whitespace on both sides.
+
+**When both match, the first wins — and the runners-up are carried, not dropped.** The recipe's
+order *is* its preference: a cook writing "honey or agave syrup" is asking for honey and saying
+agave will do, and reversing it, averaging it, or handing the household a choice they already made
+all discard information the recipe gave freely. The review screen names the alternatives — *"honey;
+or agave syrup"* — because the one case where the order is wrong is the shop being out of the
+first, which is exactly when somebody standing in it wants to know what else the recipe accepts.
+Same reasoning as `withheld`: what the machine decided is stated, so a person can overrule it.
+
+It is **not** a confidence ranking. §61 and §75 both measured that no confidence signal is
+available here, and "first as written" is a fact about the recipe rather than a judgement about the
+products.
+
+A trailing branch that only *qualifies* is not a branch: `avocado oil or other neutral oil with a
+high smoke point` offers one product and a description of what else would do, and
+`other neutral oil…` names nothing to search for.
+
+### What the two fixes bought, measured on the same population
+
+```
+before   usable 187 / 267   70%      nothing came back 61   23%
+after    usable 196 / 267   73%      nothing came back 53   20%
+```
+
+**Three points, and this delta is attributable** — same 267 names, before and after, which the
+earlier comparison was not. §75 estimated five to eight points from work of this kind; the honest
+figure for these two fixes is three, so that estimate was optimistic and the remaining 20% is
+harder than it looked. What is left is mostly genuine catalogue gaps (`guanciale`,
+`meat church holy gospel bbq rub`) and recipe-speak that is not a product (`lazy tzatziki`,
+`fried rice & store-bought yum yum sauce`) — neither of which more parser work touches.
+

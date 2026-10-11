@@ -31,7 +31,25 @@ export function normaliseName(input: string): string {
     .replace(/\([^)]*\)/g, " ")
     .replace(/,.*$/, "")
     .replace(PREP_RE, " ")
-    .replace(/[^a-z0-9&\s-]/g, " ")
+    /*
+     * Letters and numbers survive, punctuation does not — and **a letter is any letter**.
+     *
+     * This was `[^a-z0-9&\s-]`, which removed every character outside the English alphabet rather
+     * than only the punctuation it meant to. `jalapeño` became `jalape o` and `bräserad rödkål`
+     * became `br serad r dk l`: the letter *deleted*, not replaced.
+     *
+     * Nothing stored was corrupted — `item_text` holds the parser's output and that was always
+     * intact, 8 rows carrying non-ASCII and 0 damaged — but `consolidate` uses this for a shopping
+     * line's **label**, so the list on screen read `jalape o` for a recipe that said jalapeño.
+     * Invisible from inside the app, and found only when Kroger's catalogue was asked to recognise
+     * these names (§75).
+     *
+     * `\p{L}` with the `u` flag is the whole fix, and it is deliberately **not** a
+     * transliteration: this feeds display and bucket keys, where `jalapeño` is right, while
+     * `foldForSearch` does the folding an outside catalogue wants. One function cannot serve both
+     * — the §71 argument again, where two callers want opposite things from one string.
+     */
+    .replace(/[^\p{L}\p{N}&\s-]/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -46,7 +64,10 @@ export function lightName(input: string): string {
     .toLowerCase()
     .replace(/\([^)]*\)/g, " ")
     .replace(/,.*$/, "")
-    .replace(/[^a-z0-9&\s-]/g, " ")
+    // same fix as above: a letter outside a-z is still a letter, and this variant strips
+    // accents identically — two call sites, one bug, and the assertion that expected one
+    // occurrence is what found the second
+    .replace(/[^\p{L}\p{N}&\s-]/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -206,4 +227,22 @@ export function formatQuantity(value: number | null | undefined): string {
   if (!glyph && fraction > 0.07) return String(Math.round(value * 100) / 100);
   if (whole === 0) return glyph || "0";
   return `${whole}${glyph}`;
+}
+
+/**
+ * A name as an outside catalogue would spell it: accents folded to their base letter.
+ *
+ * Kroger lists `Jalapeno Peppers`, not `Jalapeño`, so a search term keeps the letter and loses the
+ * mark. Separate from `normaliseName` on purpose — that one feeds display, where the mark is
+ * correct, and this one feeds somebody else's search index, where it is noise.
+ *
+ * NFD splits a letter from its diacritic and the range drops the diacritics, so this needs no
+ * table of characters for anybody to keep up to date.
+ */
+export function foldForSearch(input: string): string {
+  return String(input ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
 }

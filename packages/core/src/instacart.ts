@@ -215,3 +215,60 @@ export function buildShoppingListRequest(
 
 /** grams and millilitres to one decimal: a cart does not need a thousandth of a gram */
 const round = (amount: number) => Math.round(amount * 10) / 10;
+
+/**
+ * A name offering a choice, split into the things it offers (§75).
+ *
+ * ---------------------------------------------------------------------------
+ * Why this is a design gap and not dirty data
+ * ---------------------------------------------------------------------------
+ *
+ * `honey or agave syrup`, `english or hothouse cucumber`,
+ * `avocado oil or other neutral oil with a high smoke point`. These are not parser debris — the
+ * recipe really did offer a choice, and the name is a faithful record of it. **No single search
+ * can match them**, because no product is both honey and agave syrup.
+ *
+ * So the search takes branches rather than a string, and the caller tries each. One branch that
+ * matches is the answer; that is the common case and it is what makes `honey or agave syrup`
+ * findable at all.
+ *
+ * ---------------------------------------------------------------------------
+ * When both match, the first wins — and the alternative is kept, not discarded
+ * ---------------------------------------------------------------------------
+ *
+ * **The recipe's order is its preference.** A cook who writes "honey or agave syrup" is asking for
+ * honey and saying agave will do; reversing that, or averaging it, or asking the household to
+ * choose between two things they already ranked, all lose information the recipe gave freely.
+ *
+ * The runners-up are **carried, not dropped**. The review screen names them — *"honey; or agave
+ * syrup"* — because the one case where order is wrong is the shop being out of the first, and that
+ * is exactly when somebody standing in it wants to know what the recipe would also accept. Same
+ * reasoning as `withheld`: a thing the machine decided is stated, so a person can overrule it.
+ *
+ * It is **not** a confidence score and nothing ranks the branches against each other. §61 and §75
+ * both measured that no confidence signal is available here, and "first as written" is a fact
+ * about the recipe rather than a judgement about the products.
+ */
+export function searchBranches(name: string): string[] {
+  /*
+   * Split only on a standalone `or`, and only where both sides have words. `salt or pepper` is a
+   * genuine choice; `cream of tartar` and `rack of lamb` must not be touched, which is why the
+   * pattern needs whitespace on both sides rather than a bare `or`.
+   */
+  const parts = name
+    .split(/\s+or\s+/i)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  if (parts.length < 2) return [name.trim()].filter(Boolean);
+
+  /*
+   * A trailing branch that only *qualifies* is not a branch.
+   *
+   * "avocado oil or other neutral oil with a high smoke point" offers one product and a
+   * description of what else would do; "other neutral oil with a high smoke point" is not a thing
+   * to search for. A branch has to name something, and `other`, `any` and `similar` say it does
+   * not.
+   */
+  const named = parts.filter((part) => !/^(?:other|another|any|some|similar|equivalent)\b/i.test(part));
+  return named.length > 0 ? named : [parts[0]!];
+}

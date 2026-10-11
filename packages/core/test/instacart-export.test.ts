@@ -4,6 +4,7 @@ import {
   consolidate,
   createCatalog,
   parseIngredientList,
+  searchBranches,
   type ShoppingLine,
 } from "../src/index.js";
 
@@ -116,5 +117,44 @@ describe("what the pantry means to an export", () => {
     );
     expect(body.line_items).toHaveLength(0);
     expect(body.withheld[0]).toMatchObject({ label: "rice", reason: "already have some" });
+  });
+});
+
+/*
+ * `or` is a choice the recipe made, not debris (§75).
+ *
+ * 23% of a real week's names found nothing in Kroger's catalogue, and roughly a third of those
+ * were alternatives: `honey or agave syrup`, `english or hothouse cucumber`. No single search can
+ * match them, because no product is both.
+ */
+describe("a name offering a choice", () => {
+  it("splits into the things it offers", () => {
+    expect(searchBranches("honey or agave syrup")).toEqual(["honey", "agave syrup"]);
+    expect(searchBranches("english or hothouse cucumber")).toEqual(["english", "hothouse cucumber"]);
+  });
+
+  it("puts the recipe's own first choice first, because the order is its preference", () => {
+    // a cook writing "honey or agave syrup" wants honey and will accept agave; reversing that
+    // loses information the recipe gave freely
+    expect(searchBranches("honey or agave syrup")[0]).toBe("honey");
+  });
+
+  it("drops a branch that only qualifies, because it names nothing to search for", () => {
+    expect(searchBranches("avocado oil or other neutral oil with a high smoke point"))
+      .toEqual(["avocado oil"]);
+  });
+
+  it("leaves a name alone when the 'or' is part of it", () => {
+    for (const name of ["cream of tartar", "rack of lamb", "orange juice", "oregano"]) {
+      expect(searchBranches(name), name).toEqual([name]);
+    }
+  });
+
+  it("returns one branch for a plain name, so a caller needs no special case", () => {
+    expect(searchBranches("double cream")).toEqual(["double cream"]);
+  });
+
+  it("never returns nothing, even for a name that is only qualifiers", () => {
+    expect(searchBranches("other neutral oil")).toEqual(["other neutral oil"]);
   });
 });
