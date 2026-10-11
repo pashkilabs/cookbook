@@ -255,6 +255,19 @@ function assertYear(year: number | null): number | null {
    * Replaces the whole set rather than toggling one, because that is what the screen edits: a
    * partial update invites two tabs disagreeing about which allergens are on.
    */
+  /**
+   * The store, validated by the CHECK on the column rather than here (§74).
+   *
+   * Same reasoning as `setAvoidedAllergens`: the constraint owns storage and a second list in the
+   * seam would be a second site to drift. Null clears it.
+   */
+  async function setKrogerLocation(locationId: string | null): Promise<Family> {
+    const family = await ownFamily();
+    const updated = await store.setKrogerLocation({ familyId: family.id, locationId });
+    if (!updated) throw new Error("no such household");
+    return updated;
+  }
+
   async function setAvoidedAllergens(allergens: readonly string[]): Promise<Family> {
     const family = await ownFamily();
     const updated = await store.setAvoidedAllergens({ familyId: family.id, allergens });
@@ -347,6 +360,7 @@ function assertYear(year: number | null): number | null {
     setMeasurementSystem,
     setTimezone,
     setAvoidedAllergens,
+    setKrogerLocation,
     inviteAdult,
     listInvitations,
     revokeInvitation,

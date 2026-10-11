@@ -14,6 +14,7 @@
  * tells it whether it is testing the commit it thinks it is.
  */
 import { anthropicModelMismatch, textWiringFault } from "@pashki/import";
+import { krogerConfig, krogerKeyFingerprint } from "@/lib/kroger";
 import { REQUIRED_MIGRATION } from "@/lib/schema-version";
 
 /** the prefix, never the key: enough to see which dialect the id has to belong to */
@@ -194,6 +195,21 @@ export async function GET() {
          * a server-side exception on a page rather than as anything a deploy noticed. This names
          * the missing migration, so the fix is one command rather than a diagnosis.
          */
+        /*
+         * **Which Kroger environment**, reported as a value rather than a boolean.
+         *
+         * A certification cart is not a production cart, and the two use different credentials —
+         * verified: a production key answers `invalid credentials` at `api-ce`. So "configured:
+         * true" is the wrong thing to report, for the same reason `tokenSigner: true` over an
+         * unparseable PEM was. *A shared secret set on both sides can still be two different
+         * secrets*, and here the two sides are two environments.
+         *
+         * The fingerprint is over the id and secret together, so the pair can be compared rather
+         * than guessed at — the reasoning behind `drainSecretFingerprint` and
+         * `textKeyFingerprint`, arriving where the wrong answer spends money.
+         */
+        krogerEnv: krogerConfig()?.environment ?? null,
+        krogerKeyFingerprint: await krogerKeyFingerprint(krogerConfig()),
         schema: await schemaState(),
       },
     },

@@ -33,6 +33,65 @@ export type Database = {
         }
         Relationships: []
       }
+      cart_exports: {
+        Row: {
+          body_fingerprint: string
+          created_at: string
+          deleted_at: string | null
+          environment: string
+          family_id: string
+          id: string
+          item_count: number
+          items: Json
+          line_keys: string[]
+          response_status: number | null
+          sent_at: string | null
+          status: string
+          updated_at: string
+          week_start: string
+        }
+        Insert: {
+          body_fingerprint: string
+          created_at?: string
+          deleted_at?: string | null
+          environment: string
+          family_id: string
+          id?: string
+          item_count?: number
+          items?: Json
+          line_keys?: string[]
+          response_status?: number | null
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          week_start: string
+        }
+        Update: {
+          body_fingerprint?: string
+          created_at?: string
+          deleted_at?: string | null
+          environment?: string
+          family_id?: string
+          id?: string
+          item_count?: number
+          items?: Json
+          line_keys?: string[]
+          response_status?: number | null
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          week_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cart_exports_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       devices: {
         Row: {
           account_id: string
@@ -121,6 +180,7 @@ export type Database = {
           created_at: string
           deleted_at: string | null
           id: string
+          kroger_location_id: string | null
           measurement_system: string
           name: string
           owner_account_id: string
@@ -132,6 +192,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           id?: string
+          kroger_location_id?: string | null
           measurement_system?: string
           name: string
           owner_account_id: string
@@ -143,6 +204,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           id?: string
+          kroger_location_id?: string | null
           measurement_system?: string
           name?: string
           owner_account_id?: string

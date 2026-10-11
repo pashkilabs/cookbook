@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { UnitsSetting } from "./units";
 import { TimezoneSetting } from "./timezone";
 import { AllergenSetting } from "./allergens";
+import { StoreSetting } from "./store";
+import { krogerConfig } from "@/lib/kroger";
 import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
 import { MEMBER_COLOURS, invitationState } from "@pashki/platform-client";
@@ -26,6 +28,7 @@ export default async function HouseholdPage() {
 
   const family = await platformStore().findFamilyForAccount(auth.user.id);
   if (!family) {
+
     return (
       <main>
         <h1>Household</h1>
@@ -51,6 +54,10 @@ export default async function HouseholdPage() {
    * passing check.
    */
   const tastes = await childTastes(supabase, auth.user.id, family.id);
+
+  // read here, not in the client component: `lib/kroger` holds a client secret and
+  // `check-server-only` would refuse it in a "use client" file
+  const krogerEnvironment = krogerConfig()?.environment ?? null;
 
   return (
     <main>
@@ -84,6 +91,15 @@ export default async function HouseholdPage() {
           one dinner gets cooked.
         </p>
         <AllergenSetting current={family.avoidedAllergens} />
+      </section>
+
+      <section style={{ marginBottom: "2rem" }}>
+        <h2>Where you shop</h2>
+        <p className="subtitle">
+          Pick a Kroger store and the week&rsquo;s shopping list can go to a cart there — with
+          shelf prices, and the aisle each thing is in at <em>that</em> store.
+        </p>
+        <StoreSetting current={family.krogerLocationId} environment={krogerEnvironment} />
       </section>
 
       <h2>Who eats here</h2>

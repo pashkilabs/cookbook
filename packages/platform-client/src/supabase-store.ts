@@ -108,7 +108,7 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
     async findFamilyForAccount(accountId: string): Promise<Family | null> {
       const owned = await supabase
         .from("families")
-        .select("id, name, owner_account_id, measurement_system, timezone, avoided_allergens")
+        .select("id, name, owner_account_id, measurement_system, timezone, avoided_allergens, kroger_location_id")
         .eq("owner_account_id", accountId)
         .is("deleted_at", null)
         .order("created_at", { ascending: true })
@@ -184,7 +184,7 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
         // standing between a mistyped id and another household's row
         .eq("id", input.familyId)
         .is("deleted_at", null)
-        .select("id, name, owner_account_id, measurement_system, timezone, avoided_allergens")
+        .select("id, name, owner_account_id, measurement_system, timezone, avoided_allergens, kroger_location_id")
         .maybeSingle();
       if (error) throw new Error(error.message);
       if (!data) return null;
@@ -195,6 +195,28 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
         measurementSystem: (data.measurement_system === "metric" ? "metric" : "us"),
         timezone: (data.timezone as string | null) || "UTC",
         avoidedAllergens: Array.isArray(data.avoided_allergens) ? (data.avoided_allergens as string[]) : [],
+        krogerLocationId: (data.kroger_location_id as string | null) ?? null,
+      };
+    },
+
+    async setKrogerLocation(input): Promise<Family | null> {
+      const { data, error } = await supabase
+        .from("families")
+        .update({ kroger_location_id: input.locationId })
+        .eq("id", input.familyId)
+        .is("deleted_at", null)
+        .select("id, name, owner_account_id, measurement_system, timezone, avoided_allergens, kroger_location_id")
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      if (!data) return null;
+      return {
+        id: data.id,
+        name: data.name,
+        ownerAccountId: data.owner_account_id,
+        measurementSystem: data.measurement_system === "metric" ? "metric" : "us",
+        timezone: (data.timezone as string | null) || "UTC",
+        avoidedAllergens: Array.isArray(data.avoided_allergens) ? (data.avoided_allergens as string[]) : [],
+        krogerLocationId: (data.kroger_location_id as string | null) ?? null,
       };
     },
 
@@ -210,7 +232,7 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
         .update({ avoided_allergens: allergens })
         .eq("id", input.familyId)
         .is("deleted_at", null)
-        .select("id, name, owner_account_id, measurement_system, timezone, avoided_allergens")
+        .select("id, name, owner_account_id, measurement_system, timezone, avoided_allergens, kroger_location_id")
         .maybeSingle();
       if (error) throw new Error(error.message);
       if (!data) return null;
@@ -221,6 +243,7 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
         measurementSystem: data.measurement_system === "metric" ? "metric" : "us",
         timezone: (data.timezone as string | null) || "UTC",
         avoidedAllergens: Array.isArray(data.avoided_allergens) ? (data.avoided_allergens as string[]) : [],
+        krogerLocationId: (data.kroger_location_id as string | null) ?? null,
       };
     },
 
@@ -231,7 +254,7 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
         // scoped by household id, like setMeasurementSystem: the service role bypasses RLS
         .eq("id", input.familyId)
         .is("deleted_at", null)
-        .select("id, name, owner_account_id, measurement_system, timezone, avoided_allergens")
+        .select("id, name, owner_account_id, measurement_system, timezone, avoided_allergens, kroger_location_id")
         .maybeSingle();
       if (error) throw new Error(error.message);
       if (!data) return null;
@@ -242,6 +265,7 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
         measurementSystem: (data.measurement_system === "metric" ? "metric" : "us"),
         timezone: (data.timezone as string | null) || "UTC",
         avoidedAllergens: Array.isArray(data.avoided_allergens) ? (data.avoided_allergens as string[]) : [],
+        krogerLocationId: (data.kroger_location_id as string | null) ?? null,
       };
     },
 
@@ -486,7 +510,7 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
           const created = await supabase
             .from("families")
             .insert({ name: input.householdName, owner_account_id: input.accountId })
-            .select("id, name, owner_account_id, measurement_system, timezone, avoided_allergens")
+            .select("id, name, owner_account_id, measurement_system, timezone, avoided_allergens, kroger_location_id")
             .single();
           if (created.error) throw created.error;
           return toFamily(created.data);
@@ -568,6 +592,7 @@ function toFamily(row: {
   measurement_system?: string | null;
   timezone?: string | null;
   avoided_allergens?: string[] | null;
+  kroger_location_id?: string | null;
 }): Family {
   return {
     id: row.id,
@@ -582,6 +607,8 @@ function toFamily(row: {
     // same reasoning again: a row from before the column is a household that avoids nothing,
     // which is not wrong — it is unchanged
     avoidedAllergens: Array.isArray(row.avoided_allergens) ? row.avoided_allergens : [],
+    // a row from before the column is a household that has not picked a store, which is not wrong
+    krogerLocationId: row.kroger_location_id ?? null,
   };
 }
 

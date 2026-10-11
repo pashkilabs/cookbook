@@ -51,6 +51,14 @@ export interface Family {
    * special-category data to produce an identical answer.
    */
   avoidedAllergens: string[];
+  /**
+   * The Kroger store this household shops at, or null (§74).
+   *
+   * A household setting beside `timezone` and `measurementSystem`, and required before any product
+   * search: §75 measured that the aisle in a product response is **this store's** aisle, which is
+   * what makes the export worth having.
+   */
+  krogerLocationId: string | null;
 }
 
 /** Kept in step with `packages/core`'s own union rather than imported, so the seam stays free of it. */
@@ -340,6 +348,8 @@ export interface PlatformStore {
    * allergens are on.
    */
   setAvoidedAllergens(input: { familyId: string; allergens: readonly string[] }): Promise<Family | null>;
+  /** the store, validated by a CHECK on the column rather than here */
+  setKrogerLocation(input: { familyId: string; locationId: string | null }): Promise<Family | null>;
   setMeasurementSystem(input: {
     familyId: string;
     system: MeasurementSystem;
@@ -539,6 +549,7 @@ export interface PlatformClient {
    * site to drift.
    */
   setAvoidedAllergens(allergens: readonly string[]): Promise<Family>;
+  setKrogerLocation(locationId: string | null): Promise<Family>;
   removeMember(memberId: string): Promise<void>;
 
   /**

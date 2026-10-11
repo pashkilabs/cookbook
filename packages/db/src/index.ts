@@ -46,7 +46,10 @@ export const APP_TABLES = [
   "shortlist_entries",
   "pantry_items",
   "shopping_ticks",
+  "cart_exports",
   "photos",
+  // what has been sent to a Kroger cart, because the cart itself cannot be read (§74)
+  "cart_exports",
   "import_jobs",
   "import_cache",
 ] as const;

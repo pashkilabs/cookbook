@@ -116,6 +116,7 @@ export function createPlatformRouter(options: PlatformRouterOptions): PlatformRo
               // needs them on every screen, and a second round trip per screen is a worse shape
               measurementSystem: session.family.measurementSystem,
               avoidedAllergens: session.family.avoidedAllergens,
+              krogerLocationId: session.family.krogerLocationId,
               timezone: session.family.timezone,
             },
             members: session.members.map((member) => ({

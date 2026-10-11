@@ -74,7 +74,10 @@ export async function PATCH(request: Request) {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return Response.json({ error: "sign in first" }, { status: 401 });
 
-  let body: { measurementSystem?: unknown; timezone?: unknown; avoidedAllergens?: unknown };
+  let body: {
+    measurementSystem?: unknown; timezone?: unknown; avoidedAllergens?: unknown;
+    krogerLocationId?: unknown;
+  };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -121,6 +124,27 @@ export async function PATCH(request: Request) {
     } catch (thrown) {
       return Response.json(
         { error: thrown instanceof Error ? thrown.message : "those were refused" },
+        { status: 400 },
+      );
+    }
+  }
+
+  /*
+   * The store. Validated for shape here and for *value* by the CHECK on the column — a
+   * free-text column would happily hold a URL, and §74's probe needs a store id that is a store
+   * id. Null clears it.
+   */
+  if (body.krogerLocationId !== undefined) {
+    const id = body.krogerLocationId;
+    if (id !== null && (typeof id !== "string" || !/^\d{6,10}$/.test(id))) {
+      return Response.json({ error: "krogerLocationId must be a Kroger store id, or null" }, { status: 400 });
+    }
+    try {
+      const family = await platformClient(auth.user.id).setKrogerLocation(id as string | null);
+      return Response.json({ krogerLocationId: family.krogerLocationId });
+    } catch (thrown) {
+      return Response.json(
+        { error: thrown instanceof Error ? thrown.message : "that store was refused" },
         { status: 400 },
       );
     }
