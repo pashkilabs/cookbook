@@ -654,6 +654,26 @@ guessing.
   hazard this project has already paid for. **A guard, not a reminder** — which is what a rule
   that has now failed five times against people who know it actually needs.
 
+  **Sixth instance, and the guard worked and did not prevent it.** Code whose seam select included
+  `kroger_location_id` shipped before the migration reached hosted — but the stamp was correct this
+  time, so `/api/health` said `MISSING 20261011090000_kroger_export` with the fixing command
+  instead of a false `ok`. A diagnosis in one curl rather than an afternoon, and still an outage.
+
+  **Prevention turns out to be cheap**, which is worth knowing because the diagnosis had been
+  treated as the ceiling. `applied_migration_versions` is readable with the **service role** the
+  project already holds — no management token — so diffing local filenames against hosted takes a
+  second. Verified it would have fired: at that commit, local had the migration and hosted did not.
+
+  `scripts/check-migrations-pushed.mjs` does it, and **deliberately not inside `pnpm check`.**
+  During normal work the migration exists locally first — schema, then code, then push both — so a
+  check refusing any local-but-not-hosted migration would fail on every machine mid-feature, and a
+  check that fails routinely is one people learn to ignore. That is worse than no check.
+
+  So it is a *pre-push* question, and `pnpm ship` runs it and then pushes — **which removes the
+  ordering decision rather than policing it.** That is the actual fix: the asymmetry was that one
+  half deploys itself and the other is remembered, so the answer is one command that does both in
+  order. The health check stays the backstop for a push that comes from somewhere else.
+
 - **Verifying that A works and that B works is not verifying that A hands off to B.** Asked
   whether future weeks could be planned, I checked two things: the planner navigates weeks
   (it does) and the shortlist is week-scoped (it is). Both true, and I reported the feature

@@ -90,7 +90,18 @@ export async function POST(request: Request) {
   const unavailable: Array<{ key: string; label: string; reason: string }> = [];
 
   for (const line of candidates) {
-    const found = await findProducts(config, token, line.label, family.krogerLocationId);
+    /*
+     * `line.key` **is** the search term §73's mapping asks for: `consolidate` sets it to the
+     * catalog item's key when the ingredient resolved, and to `normaliseName(text)` when it did
+     * not. So one expression gives the catalog's word where there is one and the recipe's where
+     * there is not — which is what `buildShoppingListRequest` already does for Instacart.
+     *
+     * `ShoppingLine` does not expose the catalog item itself, and that is fine: the key carries
+     * the only part of it a search needs.
+     */
+    const found = await findProducts(
+      config, token, line.key.replace(/-/g, " "), family.krogerLocationId,
+    );
     if (found === null) {
       // the provider, not the catalogue: said apart so it cannot read as "they do not stock it"
       unavailable.push({ key: line.key, label: line.label, reason: "Kroger did not answer" });

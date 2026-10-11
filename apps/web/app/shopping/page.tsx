@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
+import { ToCart } from "./to-cart";
+import { krogerConfig } from "@/lib/kroger";
 import { buildShoppingWeek } from "@/lib/shopping";
 import { addWeeks, isIsoDate, startOfWeek, todayIso, weekDays, weekLabel } from "@/lib/week";
 import { ShoppingList } from "./shopping-list";
@@ -40,6 +42,13 @@ export default async function ShoppingPage({
     weekDays(weekStart),
     family.measurementSystem,
   );
+
+  // read server-side: `lib/kroger` holds a client secret and `check-server-only` would refuse
+
+  // it in a "use client" file
+
+  const krogerEnvironment = krogerConfig()?.environment ?? null;
+
 
   return (
     <main>
@@ -83,6 +92,12 @@ export default async function ShoppingPage({
           ticked={[...week.ticked]}
         />
       )}
+      {/*
+        * The way in. Nine capabilities have shipped here with no path through them, and the
+        * display of a thing is not the control for it (§69, §73).
+        */}
+      <ToCart weekStart={weekStart} environment={krogerEnvironment} />
+
     </main>
   );
 }

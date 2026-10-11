@@ -82,6 +82,30 @@ export async function appToken(config: KrogerConfig): Promise<string | null> {
   return body.access_token ?? null;
 }
 
+/**
+ * Categories that are not food, so a grocery line must never resolve to one.
+ *
+ * Found on the real list, not theorised: `sesame oil` matched **Neutrogena Light Sesame Formula
+ * Body Oil** at $13.99 and `coconut oil` matched **Banana Boat Deep Tanning Dry Oil** — both
+ * ranked first, both carrying a price and an aisle, both about to be proposed as groceries. §75
+ * said a substring matcher produces its false confidence where it claims to be sure; this is what
+ * that costs when money is attached.
+ *
+ * `categories` was in the response the whole time. Filtering `Beauty` also **promotes the right
+ * product**: `Nutiva Organic Virgin Coconut Oil` was second behind the sun cream.
+ *
+ * A deny-list and not an allow-list, deliberately, and the reasoning is the opposite of
+ * `isStaple`'s. There, a missed entry failed invisibly, so an allow-list was safer. Here the
+ * residue is **shown** — every proposal carries its categories to the review screen — so a
+ * category this list has not heard of arrives in front of a person rather than slipping past.
+ * The filter improves the default; the review catches what it missed.
+ */
+const NON_FOOD = new Set([
+  "beauty", "personal care", "health", "home decor", "household essentials", "cleaning products",
+  "baby", "pet care", "pets", "office, school, & crafts", "hardware", "apparel", "toys",
+  "electronics", "garden & patio", "automotive", "sports & outdoors", "tobacco",
+]);
+
 export interface KrogerProduct {
   upc: string;
   description: string;
@@ -89,6 +113,8 @@ export interface KrogerProduct {
   aisle: string | null;
   size: string | null;
   priceCents: number | null;
+  /** theirs, verbatim, so a review screen can show what a filter could not judge */
+  categories: string[];
 }
 
 const asProduct = (raw: any): KrogerProduct => {
@@ -100,8 +126,14 @@ const asProduct = (raw: any): KrogerProduct => {
     aisle: raw?.aisleLocations?.[0]?.description ?? null,
     size: item?.size ?? null,
     priceCents: typeof price === "number" ? Math.round(price * 100) : null,
+    categories: Array.isArray(raw?.categories) ? raw.categories.map(String) : [],
   };
 };
+
+/** every category is non-food — not "some", because a thing can be in two aisles */
+const isNonFood = (product: KrogerProduct) =>
+  product.categories.length > 0 &&
+  product.categories.every((category) => NON_FOOD.has(category.toLowerCase()));
 
 /**
  * Candidate products for one ingredient name.
@@ -118,6 +150,14 @@ const asProduct = (raw: any): KrogerProduct => {
 export async function findProducts(
   config: KrogerConfig,
   token: string,
+  /**
+   * **The catalog's canonical name**, falling back to what the recipe wrote.
+   *
+   * §75 recorded this and the first version of the propose route broke it anyway: searching
+   * `spring onions` finds nothing while the catalog's `green onion` finds the product, because the
+   * alias has been there all along. Passing the label is a measurement — and now a *feature* — of
+   * a search term the product would never use.
+   */
   name: string,
   locationId: string,
 ): Promise<{ branch: string; products: KrogerProduct[] } | null> {
@@ -134,7 +174,10 @@ export async function findProducts(
     // 5xx is the provider, not an answer about the ingredient; the caller decides whether to retry
     if (!response.ok) return null;
     const body = (await response.json()) as { data?: any[] };
-    const products = (body.data ?? []).map(asProduct).filter((product) => product.upc);
+    const all = (body.data ?? []).map(asProduct).filter((product) => product.upc);
+    // non-food dropped rather than demoted: a grocery line resolving to sun cream is not a
+    // ranking problem, and leaving it in the list invites the tap it exists to prevent
+    const products = all.filter((product) => !isNonFood(product));
     if (products.length > 0) return { branch, products };
   }
   return { branch: name, products: [] };
