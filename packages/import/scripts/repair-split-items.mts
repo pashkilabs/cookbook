@@ -58,10 +58,49 @@ const rows = await rest(
   "recipe_ingredients?select=id,item_text,amount,unit,note,recipe_id,recipes(title)&deleted_at=is.null&limit=2000",
 );
 
-const broken = rows.filter(
-  (row) => (row.item_text ?? "").trim() && !isStaple(row.item_text) && !namesSomething(row.item_text),
-);
-console.log(`${rows.length} rows; ${broken.length} where item_text names no food\n`);
+/*
+ * Two detections now, because the second class is wider than the first.
+ *
+ *   names no food   the `boneless` class: an item made entirely of modifier words.
+ *   re-parses       any row whose reconstructed line parses to a *different* item under the
+ *   differently     current parser — which catches the §74 class (`15oz can whole kernel corn`,
+ *                   `+ 2 tablespoons red wine vinegar`) without anybody enumerating it.
+ *
+ * The second is the general form and would have caught the first. It is also the honest one: it
+ * asks "does today's parser disagree with what is stored", which is the actual question whenever
+ * a parser is fixed and rows predate the fix.
+ */
+const broken = rows.filter((row) => {
+  const text = (row.item_text ?? "").trim();
+  if (!text || isStaple(text)) return false;
+  if (!namesSomething(text)) return true;
+  /*
+   * **Debris, not disagreement.** The detection was "today's parser reads this differently", which
+   * is right on a first pass and wrong on a second: re-parsing an already-correct name applies the
+   * modifier rules again, so `whole kernel corn` became `kernel corn` and `whole bone-in pork
+   * butt` lost its `whole`. Running it until it reported zero looked like convergence and was
+   * **erosion** — a repair that changes its own output will keep changing it.
+   *
+   * So a row qualifies only when the stored item carries something that is **not part of a food
+   * name**: a digit, leading punctuation, a continuation marker, or a measure word standing where
+   * a food should be. That bounds the repair to the damage and makes it idempotent — a clean name
+   * is never a candidate, however the parser would re-read it.
+   */
+  const debris =
+    /\d/.test(text) ||
+    /^[^A-Za-z(]/.test(text) ||
+    /^\(/.test(text) ||
+    /\(\s*$|^\s*\)/.test(text) ||
+    /^(?:plus|and|or)\b/i.test(text) ||
+    /\b(?:oz|lb|lbs|kg|ml|inch)\b/i.test(text);
+  if (!debris) return false;
+
+  const unwrapped = (row.note ?? "").trim().replace(/^\((.*)\)$/s, "$1");
+  const original = [row.item_text, unwrapped].filter(Boolean).join(", ");
+  const reparsed = parseIngredientLine([row.amount ?? "", row.unit ?? "", original].join(" ").trim());
+  return Boolean(reparsed?.item) && reparsed!.item !== text;
+});
+console.log(`${rows.length} rows; ${broken.length} that today's parser reads differently\n`);
 
 let changed = 0;
 for (const row of broken) {
@@ -82,11 +121,25 @@ for (const row of broken) {
     continue;
   }
   console.log(`  ${(row.recipes?.title ?? "?").slice(0, 28).padEnd(30)} ${JSON.stringify(row.item_text)} → ${JSON.stringify(parsed.item)}`);
-  console.log(`      note ${JSON.stringify(row.note)} → ${JSON.stringify(parsed.note ?? null)}`);
+  /*
+   * The note is tidied, because reconstruction is lossy at the seams.
+   *
+   * `"ginger ("` came back as `ginger` with the note `", freshly grated (Note 3"` — the item is
+   * right and the note has acquired a leading comma and an orphaned bracket from being taken
+   * apart and put back together. A note is read by people, so it is cleaned rather than left as
+   * evidence of the process that produced it.
+   */
+  const note = (parsed.note ?? "")
+    .replace(/^[\s,;]+/, "")
+    .replace(/[\s,;]+$/, "")
+    .replace(/\(([^()]*)$/, "$1")
+    .replace(/^([^()]*)\)/, "$1")
+    .trim();
+  console.log(`      note ${JSON.stringify(row.note)} → ${JSON.stringify(note || null)}`);
   if (write) {
     await rest(`recipe_ingredients?id=eq.${row.id}`, {
       method: "PATCH",
-      body: JSON.stringify({ item_text: parsed.item, note: parsed.note ?? null }),
+      body: JSON.stringify({ item_text: parsed.item, note }),
     });
   }
   changed += 1;

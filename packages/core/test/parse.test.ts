@@ -489,3 +489,102 @@ describe("a comma before the noun is not a preparation note", () => {
     expect(parse("1 cup half & half")?.item).toContain("half");
   });
 });
+
+/*
+ * regression: a size or a continuation marker left glued to the front of the food.
+ *
+ * Found by asking Kroger's catalogue about the real library (§74): 30% of searches returned
+ * nothing, and most of those were names no catalogue could match because they are not the name of
+ * a food — `-inch piece peeled fresh gingerroot`, `15oz can whole kernel corn`,
+ * `+ 2 tablespoons red wine vinegar`. The same class as `boneless`, and wrong in the shopping list
+ * and the allergen matcher today regardless of whether any export ships.
+ *
+ * `TRAILING_NOTES` has always handled the end of a line. Each of these is the same idea arriving
+ * at the **front**, which is where this parser has been caught before.
+ */
+describe("a size on the front of the food belongs in the note", () => {
+  const parse = (line: string) => parseIngredientLine(line);
+
+  it("moves a parenthesised pack size off the name", () => {
+    const parsed = parse("2 cans (14 oz/400 ml) unsweetened coconut milk");
+    expect(parsed?.item).toBe("unsweetened coconut milk");
+    expect(parsed?.amount).toBe(2);
+    expect(parsed?.note ?? "").toContain("14 oz/400 ml");
+  });
+
+  it("moves a parenthesised each-size off the name", () => {
+    expect(parse("2 packages (3 ounces each) chicken-flavor ramen noodles")?.item)
+      .toBe("chicken-flavor ramen noodles");
+  });
+
+  it("moves a parenthesised weight range off the name", () => {
+    expect(parse("1 (6 to 9 lbs) whole bone-in pork butt")?.item).toBe("whole bone-in pork butt");
+  });
+
+  it("moves a bare pack size off the name, spaced or not", () => {
+    expect(parse("1 15oz can whole kernel corn")?.item).toBe("whole kernel corn");
+    expect(parse("2 4oz cans diced green chiles")?.item).toBe("diced green chiles");
+    expect(parse("1 24 oz jar tomato basil pasta sauce")?.item).toBe("tomato basil pasta sauce");
+    expect(parse("1 24-oz jar spaghetti sauce")?.item).toBe("spaghetti sauce");
+  });
+
+  it("moves a weight range and a cut word off the name", () => {
+    expect(parse("1 3- to 4-lb tri-tip")?.item).toBe("tri-tip");
+    expect(parse("1 5.3 oz wheel boursin cheese with garlic & fine herbs")?.item)
+      .toBe("boursin cheese with garlic & fine herbs");
+    expect(parse("1 22 oz package of trader joe's orange chicken")?.item)
+      .toBe("trader joe's orange chicken");
+  });
+
+  it("moves a measured piece off the name", () => {
+    expect(parse("1 1-inch piece peeled fresh gingerroot")?.item).toBe("peeled fresh gingerroot");
+    expect(parse("1 thumb-sized piece of ginger")?.item).toBe("ginger");
+    /*
+     * The amount is taken as 1 and the unit is orphaned, so `inch of butter` is what is left. This
+     * case was first written into the "does not eat a size" guard — a *don't change this* list —
+     * which was simply the wrong place for a case I wanted changed. Worth noting: a test filed
+     * under the wrong intent argues for the behaviour it was meant to forbid.
+     */
+    expect(parse("1 inch of butter")?.item).toBe("butter");
+  });
+
+  it("does not eat a size that IS the food", () => {
+    // the rule must not strip a name that happens to start with a measure word
+    for (const [line, item] of [
+      ["2 celery stalks", "celery stalks"],
+      ["1 lb ground beef", "ground beef"],
+      ["3 cans tomatoes", "tomatoes"],
+    ] as const) {
+      expect(parse(line)?.item, line).toBe(item);
+    }
+  });
+});
+
+describe("a continuation marker is not part of the food", () => {
+  const parse = (line: string) => parseIngredientLine(line);
+
+  // these had NO amount at all, so the shopping list was missing the quantity as well as
+  // carrying a nonsense name
+  it("reads a line that begins with + or plus", () => {
+    const plus = parse("+ 2 tablespoons red wine vinegar");
+    expect(plus?.item).toBe("red wine vinegar");
+    expect(plus?.amount).toBe(2);
+    // the canonical unit is `tbsp`, which is what every other tablespoon line in this suite
+    // returns — my expectation was wrong about the vocabulary, not the parser
+    expect(plus?.unit).toBe("tbsp");
+
+    const spelled = parse("plus 1 teaspoon sesame oil");
+    expect(spelled?.item).toBe("sesame oil");
+    expect(spelled?.amount).toBe(1);
+  });
+
+  it("strips a leading colon, which is a heading's leftover punctuation", () => {
+    expect(parse(": red and yellow bell pepper")?.item).toBe("red and yellow bell pepper");
+  });
+
+  it("leaves a plus in the middle alone, because that is two ingredients", () => {
+    // `parseIngredientLine` returns ONE ingredient by design; splitting a line into two rows is
+    // not its job, so this stays visible rather than being silently halved
+    expect(parse("2 celery stalks + 3-4 carrots")?.item).toContain("celery stalks");
+  });
+});

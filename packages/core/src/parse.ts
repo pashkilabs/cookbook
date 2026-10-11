@@ -3,6 +3,15 @@ import { CONTAINER_WORDS, canonicalUnit, containerWord } from "./units.js";
 import { expandFractions, readNumber, stripTags } from "./text.js";
 
 const NUMBER = String.raw`\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:[.,]\d+)?`;
+
+/**
+ * Words naming a *portion* rather than a food, which may follow a size on the front of a line.
+ *
+ * Kept apart from `CONTAINER_WORDS`: a can is a thing you buy and a piece is a thing you cut, and
+ * only the second belongs here. The list is short on purpose — a word missing from it stays in the
+ * ingredient name, which is the recoverable direction.
+ */
+const CUT_WORDS = new Set(["piece", "pieces", "wheel", "wedge", "knob", "chunk", "chunks", "slab", "fillet", "fillets"]);
 const LEADING_BULLETS = /^[\u25a1\u25aa\u2022\u2023\u25e6\u25cf\u25cb\u2610\u2611▢□•·*\-–—]+\s*/;
 
 /**
@@ -62,6 +71,23 @@ export function parseIngredientLine(raw: string): ParsedIngredient | null {
       note: (citrus[1] ?? "").toLowerCase(),
       raw: original,
     };
+  }
+
+  /*
+   * A **continuation marker**, stripped before anything else is read.
+   *
+   * `+ 2 tablespoons red wine vinegar` and `plus 1 teaspoon sesame oil` are lines continuing the
+   * one above, and a leading `:` is a heading's leftover punctuation. Each left the whole line
+   * sitting in the ingredient name — so these rows carried a nonsense name **and no amount at
+   * all**, which means the shopping list was missing the quantity as well as the food.
+   *
+   * Only at the very start, and only followed by whitespace: `salt + pepper` keeps its plus,
+   * because a plus in the middle is two ingredients and splitting a line into two rows is not
+   * this function's job.
+   */
+  {
+    const continuation = /^\s*(?:\+|plus\b|\/|:)\s+/i.exec(text);
+    if (continuation) text = text.slice(continuation[0].length).trim();
   }
 
   let amount: number | null = null;
@@ -203,6 +229,75 @@ export function parseIngredientLine(raw: string): ParsedIngredient | null {
     rest = rest.slice(vague[0].length).trim();
     amount = null;
     unitWord = null;
+  }
+
+  /*
+   * A **pack size** on the front of the food, which is not part of its name.
+   *
+   * `TRAILING_NOTES` has always handled the end of a line. Every case here is the same idea
+   * arriving at the **front**, which is where this parser has been caught before — and they were
+   * found by asking Kroger's catalogue about the real library (§74): 30% of searches returned
+   * nothing, and most were names no catalogue could match because they name a size rather than a
+   * food. `15oz can whole kernel corn`, `24-oz jar spaghetti sauce`, `3- to 4-lb tri-tip`,
+   * `1-inch piece peeled fresh gingerroot`.
+   *
+   * Three shapes, one rule: a parenthesised group, a bare measure, or a sized piece — each
+   * optionally followed by a container or cut word and an `of`. Moved to the note rather than
+   * dropped, because "14 oz/400 ml" is exactly what somebody in a shop wants to read.
+   *
+   * **It only fires when a measure was already established**, which is what stops it eating a
+   * name. `2 celery stalks` has its count in `amount` and nothing left to strip; `1 lb ground
+   * beef` has consumed the pound already. The guard is the same one the spent-container rule
+   * below uses, for the same reason.
+   */
+  if (amount !== null) {
+    // a parenthesised size: "(14 oz/400 ml)", "(3 ounces each)", "(6 to 9 lbs)"
+    const parenthesised = /^\(([^)]*\d[^)]*)\)\s*/.exec(rest);
+    if (parenthesised) {
+      leadingNote = [leadingNote, (parenthesised[1] ?? "").trim()].filter(Boolean).join(", ");
+      rest = rest.slice(parenthesised[0].length).trim();
+    }
+
+    /*
+     * A bare size, spaced or glued or hyphenated or a range, optionally with a container or cut
+     * word: "15oz can", "24 oz jar", "24-oz jar", "3- to 4-lb", "5.3 oz wheel", "1-inch piece".
+     *
+     * The unit must be a real measure word — an alternation of the abbreviations seen in the wild
+     * rather than `[a-z]+`, because `2 large eggs` would otherwise lose its eggs.
+     */
+    const SIZE_UNIT = String.raw`(?:oz|ounces?|lb|lbs|pounds?|g|kg|ml|l|inch|inches|")`;
+    const size = new RegExp(
+      String.raw`^(${NUMBER})\s*-?\s*(?:to\s*(?:${NUMBER})\s*-?\s*)?${SIZE_UNIT}\b\.?` +
+        String.raw`(?:\s+([a-zA-Z]+))?\s+(?:of\s+)?`,
+      "i",
+    ).exec(rest);
+    if (size) {
+      const follower = (size[2] ?? "").toLowerCase();
+      // only swallow the following word when it is a container or a cut, never a food
+      const keepsFollower = follower !== "" && !CONTAINER_WORDS.has(follower) && !CUT_WORDS.has(follower);
+      const consumed = keepsFollower ? size[0].slice(0, size[0].lastIndexOf(follower)) : size[0];
+      leadingNote = [leadingNote, consumed.trim().replace(/\s+of$/, "")].filter(Boolean).join(", ");
+      rest = rest.slice(consumed.length).trim();
+    }
+
+    /*
+     * An **orphaned** measure word: "1 inch of butter" takes the 1 as the amount and leaves
+     * `inch of butter`. Narrow on purpose — a bare measure word followed by `of`, nothing else —
+     * because `2 heads of garlic` and `1 can of tomatoes` must keep their heads and cans, and
+     * both are handled elsewhere as the containers they are.
+     */
+    const orphaned = new RegExp(String.raw`^(?:oz|ounces?|lb|lbs|pounds?|g|kg|ml|l|inch|inches)\b\.?\s+of\s+`, "i").exec(rest);
+    if (orphaned) {
+      leadingNote = [leadingNote, orphaned[0].trim().replace(/\s+of$/, "")].filter(Boolean).join(", ");
+      rest = rest.slice(orphaned[0].length).trim();
+    }
+
+    // "thumb-sized piece of ginger", "egg-sized piece of butter"
+    const sized = /^[a-zA-Z]+-sized\s+(?:piece|pieces|knob|chunk)\s+(?:of\s+)?/i.exec(rest);
+    if (sized) {
+      leadingNote = [leadingNote, sized[0].trim().replace(/\s+of$/, "")].filter(Boolean).join(", ");
+      rest = rest.slice(sized[0].length).trim();
+    }
   }
 
   /*

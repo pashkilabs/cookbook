@@ -260,7 +260,7 @@ for (const term of sample) {
   else verdict = "unmatched";
 
   tally[verdict] += 1;
-  if (examples[verdict]!.length < 6) {
+  if (examples[verdict]!.length < 12) {
     examples[verdict]!.push(
       `${term}  →  ${products.slice(0, 3).map((p) => String(p.description ?? "?")).join(" | ") || "(nothing)"}`,
     );

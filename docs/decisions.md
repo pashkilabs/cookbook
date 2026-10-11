@@ -3180,6 +3180,11 @@ explanation or it does not work at all.
 
 ## §61 — Self-consistency is not confidence, and this project will reach for it again
 
+> **Second instance: §75.** A substring matcher produced its false confidence exactly where it
+> claimed certainty — parmesan returned for red pepper flakes, with the correct products in the
+> same result set and discarded. Two searches for a confidence signal, two findings that none is
+> available, by unrelated mechanisms.
+
 Recorded as its own decision rather than as a footnote to components, because the
 defect is in the *method* and the method is reusable. Anything built this way
 inherits the blind spot.
@@ -4324,10 +4329,14 @@ corrupt data upstream is worse than thin data downstream.
 
 ## §73 — Exporting the shopping list to Instacart
 
-> ### Read this first
+> ### Read this first — and then read §75
 >
-> **The in-app list stays the better artefact for shopping in person; the export is for somebody
-> who is not.** §72's catalog pass was justified on **aisle order for the weekly list**, and this
+> **Superseded for Kroger: §75 measured real store aisles in the product response, so that export
+> is the better artefact for shopping in person.** What follows is true of *Instacart*, which is
+> aisle-blind, and the two integrations are therefore not interchangeable.
+>
+> **For Instacart the in-app list stays the better artefact for shopping in person; the export is
+> for somebody who is not.** §72's catalog pass was justified on **aisle order for the weekly list**, and this
 > integration **does not inherit it** — their schema has no aisle concept. So the two lists are
 > for two different acts, and the export is not an upgrade of the list.
 
@@ -4596,4 +4605,130 @@ at money.
 `families.kroger_location_id`, beside `timezone`, `measurement_system` and `avoided_allergens` — a
 household setting, written through the seam, no client grant, picked once on `/household`. Required
 for product search and for pricing, so it comes before any matching.
+
+## §75 — What the Kroger measurement found
+
+### Aisle reverses §73 — read this first
+
+**§73 says aisle order does not survive an export. §75 supersedes that for Kroger.** A reader
+meeting them side by side should know which is current and why.
+
+**38 of 38 products carried `aisleLocations`**, and they are **real aisles in the household's own
+store** — PRODUCE, AISLE 6, MEAT, DAIRY, PRODUCE TABLE 4 — resolved against the `locationId` the
+household picked. That is what makes it better rather than merely present: §72's catalog pass
+carries a *category average*, a generic aisle name true of supermarkets in general, while this is
+the aisle somebody will actually walk past. So the export stops being the lesser artefact: for
+shopping in person it becomes the better one, and §72's work is strengthened rather than discarded.
+
+Instacart (§73) remains aisle-blind. The two integrations are therefore **not** interchangeable
+and should not be described as alternatives.
+
+### There is no confidence tier, and this is the second time
+
+The bucket claiming certainty held this:
+
+```
+red-pepper flakes → Kroger® Grated Parmesan Cheese and Red Pepper Flakes Shaker
+```
+
+Parmesan. And `Smart Way™ Crushed Red Pepper` and `McCormick Crushed Red Pepper` were **in the
+same result set**, discarded for lacking the word "flakes". One search, a wrong product promoted
+and the right ones thrown away — and it happened in the one category that was supposed to be safe
+to act on unreviewed.
+
+So a substring matcher produces its false confidence **exactly where it claims to be sure**, which
+means the useful split is *something to show / nothing to show*, never *sure / unsure*. Every match
+is a proposal; the review screen is the mechanism rather than a precaution.
+
+**§61 is the first instance** — self-consistency across runs of one model at temperature zero is
+not confidence — and this is the second, reached by a completely different mechanism. Two searches
+for a confidence signal, two findings that none exists. A third proposal to rank, gate or
+auto-accept on confidence should have to explain why it is not the third.
+
+### The three measurement corrections, and why examples are not optional
+
+Every one was caught by a **printed example**. Not one was caught by the number, and in each case
+the number was plausible.
+
+| the number said | the examples said |
+|---|---|
+| 4% confident | `boneless, skinless chicken thighs` scored a **miss** against `Heritage Farm® Boneless Skinless Chicken Thighs` — our comma survived the word split, and `bell peper` missed three correct bell peppers on a typo in the recipe. A fact about my matcher, not the catalogue. |
+| 68% usable | `avocados → three avocado products` was filed as "ambiguous" alongside `bay → Bays English Muffins`. A choice of brand and a failure to understand the word, scored identically. |
+| 30% nothing | `scallions` scored a miss against `Green Onions` — because the run searched **the recipe's words** where the design sends **the catalog's canonical name**, which has held that alias all along. A measurement of a search term the product would never use is a measurement of nothing. |
+
+The last is the eval-versus-product divergence (§ the model-swap entry), arriving inside a
+measurement script. The first two are plain wrongness that a summary statistic cannot show.
+
+**So: every measurement script this project writes prints examples beside its number.** `ripeness`
+does, `measure-components` does, and this one only told the truth because it did. A number is a
+claim; the examples are the only thing that lets anybody check it.
+
+A fourth correction, of a different kind: a **503** killed the first run outright, and the version
+before it would have counted the term as "nothing found" — a provider hiccup presented as a fact
+about the catalogue. Per-term retry now, with survivors reported apart and **excluded from the
+denominator**, because dividing by the whole sample deflates every percentage by the provider's
+bad minute.
+
+### The ceiling, measured on the whole population
+
+267 distinct non-staple names, every one asked:
+
+```
+confident — one product     19 / 267    7%
+a choice of variants       168 / 267   63%
+USABLE                     187 / 267   70%
+unmatched — wrong results   19 / 267    7%
+nothing came back           61 / 267   23%
+```
+
+**Honest limit on this figure: the repair's effect is unattributed.** The before-run sampled 54
+terms and the after-run asked all 267, so the two are different populations and the difference
+between them is not a delta. A stride sample over a list that changed is not a before-and-after —
+my own sequencing error, and the fix was to stop sampling rather than to compare.
+
+What the remaining 23% is made of, which is what decides whether more parser work pays:
+
+- **Still debris, roughly a third** — `-inch piece gingerroot`, `coarsely chicken`,
+  `each oregano`, `flour 2 tbsp butter`, `brown butter peaches 3 tbsp unsalted butter`.
+- **Structural, roughly a third** — `honey or agave syrup`, `english or hothouse cucumber`,
+  `avocado oil or other neutral oil with a high smoke point`. **An alternative can never match a
+  single search**, and that is a design gap rather than dirty data: the search should split on
+  `or` and try each branch.
+- **Genuine catalogue gaps, the rest** — `guanciale`, `meat church holy gospel bbq rub`,
+  `grey goose vodka`, `lazy tzatziki`. Not ours to fix and not worth chasing.
+
+So more parser work buys perhaps **five to eight points, not twenty**. Worth doing because the
+debris is wrong in the shopping list and the allergen matcher regardless, but it is not the lever
+that makes this feature good.
+
+### A new finding: a non-ASCII character is being stripped
+
+```
+jalape o          dl japansk soja          grillade padrones och citronhalvor
+br serad r dk l med ppelmust och l ksallad med sumac
+```
+
+**`jalapeño` is stored as `jalape o`.** The `ñ` is gone, not replaced — and the Swedish recipes in
+this library have lost every å, ä and ö the same way. This is not a matching problem: those names
+are wrong on the recipe page, wrong on the shopping list, and wrong to the allergen matcher, and it
+was invisible until something outside the app was asked to recognise them.
+
+Separate work, and worth its own entry once the cause is found — the two candidates are the
+extraction path and `normaliseName`, and *which* it is should be established by printing the shape
+rather than reasoned about.
+
+### Parser repair: the detection had to be bounded, because convergence was erosion
+
+32 rows were repaired through the fixed parser. The detection started as *"today's parser reads
+this differently"*, which is right for one pass and wrong for the next: re-parsing an
+**already-correct** name applies the modifier rules again, so `whole kernel corn` became
+`kernel corn` and `whole bone-in pork butt` lost its `whole`. Running until the count reached zero
+looked like convergence and **was erosion** — a repair that changes its own output will keep
+changing it, and reaching zero is what that looks like from outside.
+
+Both were restored, and the detection is now bounded to rows whose stored name carries something
+that is **not part of a food name**: a digit, leading punctuation, an unbalanced bracket, a
+continuation marker, or a measure word. A clean name is never a candidate however the parser would
+re-read it, which makes the repair idempotent — verified by running it twice and getting zero both
+times.
 
