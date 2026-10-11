@@ -4417,7 +4417,92 @@ mismatched key is a comparison rather than a guess.
 
 The affiliate programme exists. That is a commercial decision, not a technical one.
 
-## §74 — Kroger: endpoints confirmed by probe, matching unmeasured
+## §74 — Kroger: aisle data reverses §73, and there is no confidence tier
+
+> ### Measured, against a real store
+>
+> **Aisle: yes — 38 of 38 products carried `aisleLocations`, and they are real store aisles.**
+> PRODUCE, AISLE 6, MEAT, DAIRY, PRODUCE TABLE 4. Not a generic category: the aisle in *this
+> household's own store*, which is better than the catalog's own aisle data. **§73's conclusion
+> reverses** — the export becomes better than the in-app list for shopping in person, not worse.
+>
+> **Matching: 70% usable, and "usable" does not mean "right".** Searching the catalog's canonical
+> name against store 03400732: a single plausible product 4%, a choice of variants 67%, nothing at
+> all 30%, wrong results 0%.
+
+### "Confident" is not a category, and the measurement is what proved it
+
+The single-match bucket was supposed to be the safe one. It contains this:
+
+```
+red-pepper flakes → Kroger® Grated Parmesan Cheese and Red Pepper Flakes Shaker
+```
+
+That is **parmesan cheese**, and the two correct products — `Smart Way™ Crushed Red Pepper`,
+`McCormick Crushed Red Pepper` — were in the same result set and *excluded* for lacking the word
+"flakes". So the one bucket claiming certainty held a wrong product **and** discarded the right
+ones, in the same search.
+
+A substring matcher produces its false confidence precisely where it claims to be sure. So §74's
+design stands and gets sharper: **there is no confidence tier to build on.** Every match is a
+proposal, the review screen is not caution but the mechanism, and the three-way split that
+mattered turns out to be *something to show / nothing to show*, not *sure / unsure*.
+
+Same family as §61 measuring that self-consistency is not confidence — a different mechanism
+reaching the same place, and the second time this project has looked for a confidence signal and
+found that none exists.
+
+### The 30% gap is mostly ours
+
+What came back empty:
+
+```
+-inch piece gingerroot    coarsely chicken    a pinch white pepper
+24 oz jar tomato basil pasta sauce            crushed cornflakes
+```
+
+`coarsely chicken` and `-inch piece gingerroot` are **parser failures**, the `boneless` class
+again (§72) — an ingredient name no catalogue on earth could match because it is not the name of a
+food. So a meaningful share of the unmatchable is **our own data quality, not Kroger's catalogue**,
+and the ceiling is above 70% without touching the matcher.
+
+Which sets the order of work: **the parser debris before the matcher.** It raises the ceiling for
+free, it is the side we control, and it is a bug in its own right regardless of whether this
+integration ships.
+
+### Two corrections the measurement needed before it was worth anything
+
+**The first classifier filed correct answers as failures.** It required every significant word of
+*our* term in theirs, so `boneless, skinless chicken thighs` scored a miss against
+`Heritage Farm® Boneless Skinless Chicken Thighs` — our comma survived the split — and `bell peper`
+missed three correct bell peppers on a typo in the recipe. The headline said 4% confident and that
+was a fact about the matcher, not the catalogue. The printed examples caught it; the number alone
+would not have.
+
+**And the first run searched the wrong words.** It used the recipe's own text where §73's design
+sends *the catalog's canonical name* — so `scallions` scored a miss against `Green Onions` while
+the catalog has held that alias all along. **A measurement of a search term the product would never
+use is a measurement of nothing**: the eval-versus-product divergence, in a measurement script
+this time. Searching the canonical name collapsed 394 distinct terms to 270 and took wrong results
+from 12% to zero.
+
+### A 503 is not a failure to match
+
+One `PRODUCT-4109-500 Service Unavailable` killed the first run outright, and the version before
+that would have filed it as "nothing found" — a provider hiccup masquerading as a fact about the
+catalogue. Per-term retry, and what survives four attempts is reported **apart** from the figures
+and excluded from the denominator, because dividing by the whole sample would deflate every
+percentage by the provider's bad minute.
+
+### The credentials are production, not certification
+
+The design said certification first; the key Stephen created is a production key — `api-ce` answers
+`invalid credentials` and `api.kroger.com` returns a token. **For this measurement production is
+the right place and CE would have been wrong**: a match rate against a certification catalogue is a
+fact about a test fixture. `product.compact` is read-only, so no cart and no money were reachable.
+CE still matters for the cart write, which is the only part that spends anything.
+
+## §74a — Kroger: endpoints confirmed by probe
 
 Open, free, self-service, certification environment first (`api-ce.kroger.com/v1/`). What it buys
 over §73's parked Instacart builder: **shelf prices** — the first thing here that could answer "is
