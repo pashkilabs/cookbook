@@ -573,6 +573,29 @@ try {
             ? "the remove button is still in the row at rest"
             : "both absent, as intended",
       );
+      /*
+       * Where the planner's title goes, which depends on the day.
+       *
+       * The plan-it walk puts its meal mid-week, so for most of the week this row is NOT today
+       * and its title must point at the recipe. Asserted both ways round where it can be: the
+       * recipe href is always present (the panel carries one), and the cook href appears only on
+       * today's row — so on a day that is not today, "tap to cook" must be absent.
+       */
+      const isToday = midweek === new Date().toISOString().slice(0, 10);
+      record(
+        "the planner links to the recipe with the plan entry, so scaled servings survive",
+        weekText.includes(`/recipes/${recipeId}?planned=`),
+        foundDetail(weekText, `/recipes/${recipeId}?planned=`),
+      );
+      record(
+        isToday
+          ? "today's meal title opens cook mode"
+          : "a future meal does not offer cook mode from its title",
+        isToday
+          ? weekText.includes(`/cook/${recipeId}?planned=`) && weekText.includes("tap to cook")
+          : !weekText.includes("tap to cook"),
+        isToday ? foundDetail(weekText, "tap to cook") : "no cook cue on a day that is not today",
+      );
       record(
         "and the row's disclosure starts closed",
         weekText.includes('aria-expanded="false"'),

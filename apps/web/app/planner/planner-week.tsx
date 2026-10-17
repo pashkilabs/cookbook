@@ -6,6 +6,7 @@ import { useState } from "react";
 import { ServingsField } from "./servings-field";
 import { Cooked, type CookMember } from "./cooked";
 import { SectionHeader } from "@/components/harvest";
+import { useDragToDay } from "./use-drag-to-day";
 
 /**
  * The week, and the writes that arrange it.
@@ -67,6 +68,30 @@ export function PlannerWeek(props: {
    * and the row at rest is the thing worth reading, so the default for all seven is closed.
    */
   const [openEntry, setOpenEntry] = useState<string | null>(null);
+
+  /*
+   * Press and hold a meal, drag to another day, pause to settle; swipe left to send it to next
+   * week. Both write through the same routes the select and the ✕ already use, so a drag is a
+   * second way to reach one behaviour rather than a second implementation of it.
+   *
+   * The select stays, and not only as a fallback: it is the keyboard path, the mouse path, and
+   * what a dropped gesture degrades to.
+   */
+  const drag = useDragToDay({
+    onMoveToDate: (entryId, date) => {
+      void call(`move-${entryId}`, `/api/plan-entries/${entryId}`, "PATCH", { date });
+    },
+    onSendToNextWeek: (entryId) => {
+      const entry = props.placed.find((candidate) => candidate.id === entryId);
+      if (!entry) return;
+      void call(`move-${entryId}`, `/api/plan-entries/${entryId}`, "PATCH", {
+        date: shiftDays(entry.date, 7),
+      });
+    },
+    // nothing is draggable while a write is in flight, for the reason every other control here is
+    // disabled: two moves racing would leave the week disagreeing with the database
+    enabled: busy === null,
+  });
 
   /*
    * `finally`, for the reason `shopping-list.tsx` documents at length: an offline `fetch`
@@ -232,7 +257,20 @@ export function PlannerWeek(props: {
         {props.days.map((day) => {
           const forDay = props.placed.filter((entry) => entry.date === day.date);
           return (
-            <section key={day.date} className={day.date === props.today ? "h-day-row is-today" : "h-day-row"}>
+            <section
+              key={day.date}
+              /* measured on drag start, in document coordinates — see lib/drag-geometry.ts */
+              ref={(node) => drag.register(day.date, node)}
+              className={
+                [
+                  "h-day-row",
+                  day.date === props.today ? "is-today" : "",
+                  drag.settledOn === day.date ? "is-settled" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")
+              }
+            >
               {/*
                 * The date block §4.4 asks for: three-letter weekday over the day of the month.
                 * `aria-hidden`, with the whole date in the row's own label — "SUN 18" read as two
@@ -271,7 +309,21 @@ export function PlannerWeek(props: {
               {forDay.map((entry) => {
                 const isOpen = openEntry === entry.id;
                 return (
-                <div className={isOpen ? "h-day-entry is-open" : "h-day-entry"} key={entry.id}>
+                <div
+                  key={entry.id}
+                  data-entry-id={entry.id}
+                  className={
+                    [
+                      "h-day-entry",
+                      isOpen ? "is-open" : "",
+                      drag.dragging === entry.id ? "is-dragging" : "",
+                      drag.dragging === entry.id && drag.sendingNext ? "is-sending-next" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")
+                  }
+                  {...drag.handlers}
+                >
                   {/*
                     * The whole row is the disclosure, and the title is still a link.
                     *
@@ -294,8 +346,40 @@ export function PlannerWeek(props: {
                   />
                   <div className="h-day-meal">
                     <div className="h-day-text">
-                      {/* carries the plan entry, so the recipe opens at the servings it was planned for */}
-                      <Link className="h-day-title" href={`/recipes/${entry.recipe.id}?planned=${entry.id}`}>
+                      {/*
+                        * ---------------------------------------------------------------------
+                        * Today's title opens cook mode. Every other day's opens the recipe.
+                        * ---------------------------------------------------------------------
+                        *
+                        * The intent is right — on the planner the decision is already made, so
+                        * the next action is cooking rather than reading. But that is true *of
+                        * tonight*. Thursday's dinner is four days away and nobody is standing at
+                        * a hob: it is something you check, or shop for, or change your mind
+                        * about. And Monday's, already eaten, is something you look back at.
+                        * Sending all three to a step-by-step screen would be right once in seven.
+                        *
+                        * `today` is already `todayIso(family.timezone)`, computed on the server
+                        * and passed in — the household's day, not the device's, which is the
+                        * split that column exists to close.
+                        *
+                        * **The cost is that one control does two things**, and this project's own
+                        * rule is that nothing on screen should be a claim a person cannot check.
+                        * So the difference is *said*: today's row carries "tap to cook" on its
+                        * meta line. A conditional destination with a visible cue is a different
+                        * thing from one you have to learn.
+                        *
+                        * `?planned=` on both, or the scaled servings are lost on the way — a
+                        * meal planned for nine opening as a recipe for four is the worst way for
+                        * this to be wrong, because nothing on the screen would look wrong.
+                        */}
+                      <Link
+                        className="h-day-title"
+                        href={
+                          day.date === props.today
+                            ? `/cook/${entry.recipe.id}?planned=${entry.id}`
+                            : `/recipes/${entry.recipe.id}?planned=${entry.id}`
+                        }
+                      >
                         {entry.recipe.title}
                       </Link>
                       {/*
@@ -323,6 +407,8 @@ export function PlannerWeek(props: {
                         */}
                       <p className="h-day-meta h-day-facts">
                         {entry.recipe.time_minutes !== null && <span>{entry.recipe.time_minutes} min</span>}
+                        {/* the cue for the title's other destination — said, not learned */}
+                        {day.date === props.today && <span className="h-day-cook-cue">tap to cook</span>}
                         <Cooked
                           entryId={entry.id}
                           familyId={props.familyId}
@@ -353,6 +439,17 @@ export function PlannerWeek(props: {
                     */}
                   {isOpen && (
                   <div className="h-day-panel" id={`entry-${entry.id}`}>
+                    {/*
+                      * The way to the recipe page, which the title used to be.
+                      *
+                      * Only *today's* title was repointed, so on six days in seven this is a
+                      * second route to the same place — and it is here anyway, because the row is
+                      * the disclosure and a reader should not have to know which day it is to
+                      * find out where a tap goes.
+                      */}
+                    <Link className="h-chip" href={`/recipes/${entry.recipe.id}?planned=${entry.id}`}>
+                      Open the recipe
+                    </Link>
                     <ServingsField
                       entryId={entry.id}
                       scale={entry.scale}

@@ -85,6 +85,26 @@ function ratio(a, b) {
 }
 
 /*
+ * ---------------------------------------------------------------------------
+ * The limitation, stated because §80 says a guard's assertion is not its subject
+ * ---------------------------------------------------------------------------
+ *
+ * This list is maintained by hand, and **nothing checks that it matches the stylesheet.** A pair
+ * written here as `planned-text on planned-bg` passes happily while the rule it claims to describe
+ * says `color: var(--primary)` — which is 3.67:1 on that ground and fails. That happened once, to
+ * the "tap to cook" cue, within minutes of this file being extended: the table was right about a
+ * pairing the CSS was not using, so the check reported a pass about a declaration that did not
+ * exist.
+ *
+ * Closing it properly needs a cascade — which foreground actually lands on which ground is a
+ * question only a browser can answer, and that is the thing no check here has. So the honest
+ * position is that this guard is only as good as this list, every entry has to be read against the
+ * rule it names, and **a new pair is written by looking at the CSS rather than at the intention.**
+ *
+ * `check-palette-roles` is the partial backstop: it cannot see pairs, but it does refuse a text
+ * role used as a fill and a surface role used as text, which rules out the worst of the
+ * mismatches without knowing what sits on what.
+ *
  * What each screen paints. A new surface adds its pairs here — the whole value of this file is
  * that the list is explicit, because nothing can infer which foreground lands on which background
  * from a stylesheet.
@@ -163,6 +183,8 @@ const PAIRS = [
   ["week: cooked mark edge, unmarked", "border-strong", "surface", "ui"],
   ["week: cooked mark, marked", "on-secondary", "checked", "text"],
   ["week: cooked mark on today's row", "text-muted", "planned-bg", "text"],
+  /* the "tap to cook" cue sits on today's row, which is the clay tint — not on parchment */
+  ["week: tap-to-cook cue on today", "planned-text", "planned-bg", "text"],
   // the shared primitives, which every screen paints
   ["primary button label", "on-primary", "primary", "text"],
   ["secondary button label", "on-secondary", "secondary", "text"],
