@@ -147,6 +147,18 @@ const PAIRS = [
   ["shop: by-meal portion", "text-body", "surface", "text"],
   ["shop: dashed pantry edge", "checkbox-edge", "surface", "ui"],
   ["shop: aisle eyebrow", "text-muted", "surface", "text"],
+  /*
+   * The bridge rules in `globals.css`, which the Harvest pair table had never covered — and that
+   * omission is why two near-black fills survived every check. A guard's blind spot is a list,
+   * and this list was "the classes I wrote" rather than "the rules that paint".
+   */
+  ["bridge: primary button label", "on-primary", "primary", "text"],
+  ["bridge: secondary (outlined olive) label", "secondary", "surface", "text"],
+  ["bridge: secondary outline", "secondary", "surface", "ui"],
+  ["bridge: secondary label on the app ground", "secondary", "bg", "text"],
+  ["bridge: chip at rest", "chip-text", "chip-bg", "text"],
+  ["bridge: chip selected (clay)", "planned-text", "planned-bg", "text"],
+  ["bridge: chip accent edge on hover", "primary", "chip-bg", "ui"],
   // the shared primitives, which every screen paints
   ["primary button label", "on-primary", "primary", "text"],
   ["secondary button label", "on-secondary", "secondary", "text"],

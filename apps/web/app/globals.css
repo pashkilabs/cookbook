@@ -297,10 +297,18 @@ button, a.button {
   font-size: 0.95rem;
   font-weight: 500;
   cursor: pointer;
-  border: 1px solid var(--ink);
+  border: 1px solid var(--primary);
   border-radius: var(--radius-sm);
-  background: var(--ink);
-  color: var(--paper);
+  /*
+   * A primary action is terracotta. It was `--ink` — which is the bridge alias for `--text`,
+   * `palette.bark` — so every plain button and `.button` link in the app rendered near-black.
+   * `tokens.ts` contains no black at all, and using a TEXT role as a fill is the exact mirror of
+   * the terracotta-as-text error `check-contrast` caught going the other way. The palette was
+   * already earthy; this one rule reached past it, and an element selector carried it to 10 bare
+   * buttons, 12 `.button` links and every screen.
+   */
+  background: var(--primary);
+  color: var(--on-primary);
   text-decoration: none;
   white-space: nowrap;
   transition: opacity 0.15s ease;
@@ -308,9 +316,9 @@ button, a.button {
 button:hover, a.button:hover { opacity: 0.88; }
 
 button.quiet, a.button.quiet {
-  background: var(--card);
-  color: var(--ink-soft);
-  border-color: var(--line-strong);
+  background: transparent;
+  color: var(--secondary);
+  border-color: var(--secondary);
 }
 button[disabled] { opacity: 0.5; cursor: progress; }
 
@@ -441,13 +449,13 @@ ul.verdicts li {
   padding: 0.35rem 0.8rem;
   border-radius: 99px;
   font-size: 0.85rem;
-  border: 1px solid var(--line-strong);
-  background: var(--card);
-  color: var(--ink-soft);
+  border: 1px solid transparent;
+  background: var(--chip-bg);
+  color: var(--chip-text);
   text-decoration: none;
 }
-.chip:hover { border-color: var(--accent); color: var(--accent); }
-.chip.on { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.chip:hover { border-color: var(--primary); }
+.chip.on { background: var(--planned-bg); border-color: var(--planned-bg); color: var(--planned-text); }
 
 .row { display: flex; gap: var(--s3); flex-wrap: wrap; }
 .row > div { flex: 1; min-width: 7rem; }

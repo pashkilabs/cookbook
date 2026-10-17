@@ -233,17 +233,36 @@
  * different costume. The column gives the bar its own height and lets only the region above it
  * scroll.
  */
+/*
+ * A docked bar is **pinned**, and the page is padded so it covers nothing.
+ *
+ * This was a flex column with `min-height: 100dvh` and a non-shrinking bar — the sticky-footer
+ * layout, which pins the bar only on a page shorter than the viewport. On every real screen the
+ * bar rendered at the end of the document, so reaching the tabs meant scrolling the whole list.
+ * The bar existed and was never docked.
+ *
+ * `position: fixed` is what §1 asks for, and the `padding-bottom` here is what makes it a *docked
+ * bar* rather than the floating CTA §5 forbids: content ends above the bar instead of sliding
+ * under it. A fixed bar without the padding is the same defect wearing the opposite costume —
+ * the last row of every list permanently hidden.
+ *
+ * One value covers both bars because no screen has both: the tab bar and the action bar are each
+ * 84px, and `/recipes/[id]` is the only page with an action bar and it has no tabs.
+ */
 .h-docked-page {
-  display: flex;
-  flex-direction: column;
   min-height: 100dvh;
+  padding-bottom: calc(var(--size-tab-bar) + env(safe-area-inset-bottom));
 }
 .h-docked-page > main { flex: 1; min-height: 0; }
 
 .h-docked,
 .h-tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
   display: flex;
-  flex-shrink: 0;
   box-sizing: border-box;
   min-height: var(--size-docked-action-bar);
   padding: var(--space-sm);
@@ -254,11 +273,20 @@
 }
 
 .h-docked {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
   display: flex;
+  box-sizing: border-box;
   gap: 10px;
   align-items: center;
   padding: var(--space-md) var(--space-lg);
   padding-bottom: max(var(--space-xl), env(safe-area-inset-bottom));
+  /* it was transparent while it sat in the flow; pinned over content it needs its own ground */
+  background: var(--surface);
+  border-top: 1px solid var(--border);
 }
 .h-docked > * { flex: 1; }
 
