@@ -960,7 +960,43 @@
 .h-day-entry.is-sending-next { transform: translateX(-10px); }
 
 /* the settled day, which is a decision about to be made — clay, as everything planned is */
-.h-day-row.is-settled { box-shadow: inset 0 0 0 2px var(--primary); }
+/*
+ * The settled row: a tint over the whole row as well as the ring.
+ *
+ * The ring alone was 2px and spans 32..370px on a 390px screen — a thumb on the handle leaves
+ * most of it visible, but the hand covers rows *below* during a downward drag, and the ring is
+ * the first thing to disappear. A filled row is visible in peripheral vision and at the edge of
+ * a hand; the ring stays for precision where the row is not occluded.
+ *
+ * Clay, because that is this system's one meaning for "planned" and a settle is a plan about to
+ * be made.
+ */
+.h-day-row.is-settled {
+  box-shadow: inset 0 0 0 2px var(--primary);
+  background: var(--planned-bg);
+}
+
+/*
+ * The readout, fixed to the top — away from the hand, which is the whole point. See the component
+ * for why a highlight cannot do this job: the handle is the date block, so the thumb is on the
+ * only thing that identifies the row.
+ */
+.h-drag-status {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  padding: var(--space-md) var(--space-xl);
+  padding-top: calc(var(--space-md) + env(safe-area-inset-top));
+  background: var(--primary);
+  color: var(--on-primary);
+  font-size: var(--type-label-size);
+  font-weight: var(--type-label-weight);
+  text-align: center;
+  /* a name can be long and the day must survive it */
+  overflow-wrap: anywhere;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .h-day-entry.is-sending-next { transform: none; }

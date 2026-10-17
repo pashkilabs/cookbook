@@ -751,6 +751,37 @@ guessing.
   Count the boundaries when adding a value, not when a bug is reported. Three is the trigger:
   `apps/web/test/section-round-trip.test.ts` is the template.
 
+- **`flex: 1` does not mean a flex child can shrink: `min-width` defaults to `auto`, which floors
+  it at min-content.** So a `flex: 1` cell holding one unbreakable ingredient name — or a button
+  with `white-space: nowrap` — widens its row past the viewport, the *page* becomes wider than the
+  screen, and because the mobile layout viewport grows to the content, every `position: fixed`
+  element sizes to a width that is not the screen. The docked bars go wrong as a consequence of a
+  cell nobody was looking at. **`min-width: 0` is the opt-out and it is needed on every flex child
+  that holds text.**
+
+  It was live on thirteen screens, and the measured case was the score grid: **270px available**
+  inside a day row on a 390px phone — the viewport less the week's 20px gutters, the row's 12px
+  padding and the 44px date block with its gap — against **340px needed** for a 5rem name column
+  plus five 44px buttons. 70px over, the last column cut off on every row.
+
+  **The ratio is the useful part.** Grepping for the naive cause — a non-wrapping `display: flex`
+  — returned **38 rules and almost all were noise**, because a non-wrapping flex row only overflows
+  if its children *cannot shrink*. Narrowing to "no child rule carries `min-width: 0`" cut it to
+  10, of which about half were genuine. So the lesson is about the shape of the search rather than
+  the fix: **the obvious grep for a layout bug is nearly all false positives, and the real pattern
+  is narrower than the symptom suggests.** A guard written off the naive pattern would have failed
+  on 38 rules from the first run and been switched off the same day — the `check-migrations-pushed`
+  argument arriving in CSS.
+
+  No guard exists for this, deliberately and with a reason rather than from neglect: which
+  foreground actually overflows which container is a layout question, and layout needs a browser.
+  There is none here — `jsdom` has no layout engine — so the honest position is that the *causes*
+  are fixed and audited, and only a device confirms the result. The real fixes are
+  `min-width: 0`, `flex-wrap` on strips holding a variable number of controls, and
+  `overflow-wrap: break-word` on the body. **Never `overflow-x: hidden`**, which makes the symptom
+  invisible while the layout viewport stays too wide — fixing the thing you can see and keeping the
+  thing that breaks the bars.
+
 - **One failure, two consequences, and a guard built for one of them reads as coverage for both.**
   An offline `fetch` **rejects**, and that one fact kills the pending flag *and* leaves the screen
   silent. `check-busy-guarded` was built from a real incident for the first, is mutation-tested,

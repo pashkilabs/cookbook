@@ -267,6 +267,42 @@ export function PlannerWeek(props: {
         )}
       </section>
 
+      {/*
+        * ---------------------------------------------------------------------------
+        * Where the drag's feedback goes, and why it is not on the row
+        * ---------------------------------------------------------------------------
+        *
+        * The handle is the date block, and **the date block is the only thing on a row that says
+        * which day it is.** So the thumb holding the gesture covers the identifier: a highlight
+        * can tell you *a* row is selected and cannot tell you it is Thursday, which is the single
+        * question the gesture has to answer before you let go.
+        *
+        * Worse for a downward drag, which is most of them — the hand and forearm cover the bottom
+        * of the screen, so the row being settled on is behind the hand that is settling on it. A
+        * 2px inset ring is a weak signal fully occluded and a useless one partially.
+        *
+        * So the readout is **fixed to the top of the viewport**, above the hand for any downward
+        * drag, and it says the day **in words**. That also makes it legible rather than
+        * inferable: "Thursday 22" is not something a colour can express, and the alternative was
+        * asking somebody to count rows while their thumb was on the counter.
+        *
+        * It is a status readout during a gesture, not a floating action — §5 forbids the latter
+        * and this disappears the moment the pointer is released.
+        */}
+      {drag.dragging && (
+        <div className="h-drag-status" role="status" aria-live="polite">
+          {(() => {
+            const entry = props.placed.find((candidate) => candidate.id === drag.dragging);
+            const title = entry?.recipe.title ?? "This meal";
+            if (drag.sendingNext) return `${title} → next week`;
+            const day = props.days.find((candidate) => candidate.date === drag.settledOn);
+            return day
+              ? `${title} → ${day.weekday} ${day.label}`
+              : `${title} — hold over a day to choose it`;
+          })()}
+        </div>
+      )}
+
       <div className="h-week">
         {props.days.map((day) => {
           const forDay = props.placed.filter((entry) => entry.date === day.date);
