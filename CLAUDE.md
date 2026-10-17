@@ -736,3 +736,21 @@ guessing.
 
   Count the boundaries when adding a value, not when a bug is reported. Three is the trigger:
   `apps/web/test/section-round-trip.test.ts` is the template.
+
+- **A reference screen is evidence of what the app looked like, not of what it should offer.**
+  Five findings across four screens, written up as **decisions §78** with the discriminator table.
+  A mockup and an implementation disagree in exactly three ways and they want opposite responses:
+  a **styling choice** (the reference omits a live feature — keep it); **the app lying** (the
+  reference faithfully reproduces something already broken, like the dead `lunch` chip or a timer
+  row for a duration no column holds — check the schema before building the control); and
+  **deliberately elsewhere** (the app answers that question in another place on purpose — the
+  second shopping list, leftovers, shared ingredients).
+
+  The third is the one a redesign gets wrong, because **from outside it is identical to the
+  first** — the reference shows something at a position and the screen does not have it there, and
+  the instinct is *they missed this, add it*. Acting on it produces a **duplicate**, not a fix:
+  two implementations of one question, which then drift. And the reason is **not in the screen** —
+  a relocation leaves no trace where it moved *from*, so it lives in a decision record, which is
+  not what anybody reads while restyling a component. Hence the habit that actually works: **put
+  the reason in the component**, and before adding anything the reference shows, search for the
+  *question it answers* elsewhere in the app rather than for the control.

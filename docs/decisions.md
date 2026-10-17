@@ -4891,3 +4891,91 @@ browser may refuse on low battery. A badge reading "Screen on" above a phone abo
 count-of-people rule's shape — a claim on screen that the person cannot check and the app has not
 verified — so state starts `null`, the indicator renders only on a lock actually held, and a
 `release` event clears it rather than leaving the badge lying.
+
+## §78 — How to read a reference screen
+
+A reference screen is **evidence of what the app looked like, not of what it should offer.**
+
+That sentence started as a caveat about one dead chip and ended up producing five findings across
+four screens, so it is written down properly here. It is the most transferable thing the Harvest
+work produced, and it will matter most to whoever does the *next* redesign — who will arrive with a
+new set of mockups and the same instinct to treat them as a specification.
+
+A mockup and an implementation disagree in exactly three ways. They look similar from outside and
+they want opposite responses.
+
+### 1. A styling choice — the reference omits something the app has
+
+The screen shows less than the app does. Keep the feature, restyle it, move on.
+
+The Harvest recipe screen shows a title, chips, ingredients and a method. The live screen also
+carries the palate note, the energy estimate with its partial-coverage caveat, substitutions,
+component splitting, per-member ratings, pairing, scaling and remove. None of that is in the
+reference and all of it survived, because **a mockup is drawn from one recipe on one afternoon**
+and an omission is far more likely to mean "not in this frame" than "delete this".
+
+The tell: the *app* has it and the *reference* does not. Default to keeping it.
+
+### 2. The app lying — the reference shows something the app cannot do
+
+The screen shows a control that looks live and is not, or the mockup faithfully reproduces a
+control that was already broken when it was drawn.
+
+- The **`lunch` drill-down chip.** `recipes.course` has seven values and `lunch` is not one of
+  them, so the chip could never match a recipe. It was in the reference because it was in the app.
+- The **timer row** in cook mode (§4.3). `recipe_steps` has no duration column, so "shown when a
+  step has a duration" describes a condition that is never true.
+
+The tell: the reference shows it, and the schema cannot support it. **Check the columns before
+building the control.** Where the data genuinely does not exist, say so as an exclusion with its
+reason — §77 does this for cook mode — rather than building a control that will be empty forever.
+A field nobody can fill is §54's "a schema field is not a request" wearing a designer's clothes.
+
+### 3. Deliberately elsewhere — the app does this, in another place, on purpose
+
+**This is the dangerous one**, and the reason it gets its own section.
+
+- **"Add N to list"** on the recipe screen. There is no list to add to: the shopping list is
+  *derived* from `plan_entries`, and that derivation is the product. A second list would be a
+  second thing consolidation cannot see.
+- **Leftovers** on the week's day meta line ("makes Mon lunch"). The shopping list owns leftovers
+  because only it knows package sizes, so only it knows what is actually spare. `alongside.tsx`
+  says so in as many words.
+- **Shared ingredients** beside a day ("shares cream with Fri"), and a suggestion beside an empty
+  day. Both live in §67's footnote *below* the week, and `alongside.tsx`'s header argues
+  specifically against the move: below the week the cook has already committed and it reads as
+  "and while you're at it"; beside the day it reads as "are you sure". A warning is more forceful
+  than a display, and this is a display.
+
+**From outside, this is indistinguishable from category 1.** In both cases the reference shows
+something at a position and the screen does not have it there. The instinct is identical — *they
+missed this, add it* — and acting on that instinct does not produce a missing feature, it produces
+a **duplicate**: two implementations of one question, which then drift. That is the shape that gave
+this project two parsers disagreeing, and it is strictly worse than either answer alone.
+
+What makes it hard is that **the reason is not in the screen.** A deliberate relocation leaves no
+trace at the place it was moved *from* — there is nothing on the recipe page explaining why it has
+no "add to list", because the explanation is about the shopping page. The reason lives in a
+decision record, and a decision record is not what somebody reads while restyling a component.
+
+So the practical rule, in order:
+
+1. **Before adding anything the reference shows and the screen lacks, search for the capability
+   elsewhere in the app.** Not for the control — for the *question it answers*. "Leftovers" will
+   not be found by grepping the recipe page.
+2. **Put the reason where the next person will look**, which is the component, not the decision
+   log. `alongside.tsx` carrying its own placement argument in its header is why that one was
+   caught; nothing else would have been.
+3. **If it genuinely is not anywhere, it is category 1 or 2** — and the schema tells you which.
+
+### The discriminators, in one place
+
+| | app has it | reference shows it | response |
+|---|---|---|---|
+| 1 · styling choice | yes, here | no | keep and restyle |
+| 2 · the app lying | appears to | yes | check the schema; exclude with a reason |
+| 3 · elsewhere on purpose | yes, **somewhere else** | yes, here | find the decision; do not duplicate |
+
+Category 2 is caught by reading the schema. Category 3 is caught only by looking for the answer
+somewhere other than where the mockup put the question — which nobody does unless they have been
+told to, which is what this section is.
