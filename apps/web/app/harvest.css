@@ -441,3 +441,165 @@
 }
 .h-planit-head { display: flex; justify-content: space-between; align-items: center; font-size: var(--type-label-size); }
 .h-planit-days { display: flex; justify-content: space-between; gap: var(--space-xs); }
+/* today, as a ring rather than a fill — a fill is the planned state and must stay unambiguous */
+.h-day.is-today { box-shadow: 0 0 0 2px var(--highlight); }
+
+/* --- screen 3: cook mode (§4.3) ------------------------------------------ */
+
+/*
+ * The dark role tokens arrive on `.h-cook` from the generated stylesheet, so everything below
+ * reads the same `var(--surface)` the light screens do and resolves dark here. Nothing in this
+ * section names a colour.
+ */
+.h-cook {
+  display: flex;
+  flex-direction: column;
+  /* dvh, not vh: a mobile browser's toolbars change the viewport, and a nav bar pushed off the
+     bottom of a cooking screen is the one control that must always be reachable */
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.h-cook-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-xl) var(--space-xl) var(--space-md);
+}
+.h-cook-head-right { display: flex; align-items: center; gap: var(--space-sm); }
+.h-cook-title {
+  margin: 2px 0 0;
+  font-family: var(--font-display);
+  font-size: var(--type-display-s-size);
+  font-weight: var(--type-display-s-weight);
+  line-height: var(--type-display-s-line);
+  color: var(--text);
+}
+.h-cook-awake {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--chip-bg);
+  color: var(--chip-text);
+  font-size: var(--type-chip-size);
+  font-weight: var(--type-chip-weight);
+}
+.h-cook-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-touch-min);
+  height: var(--size-touch-min);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text);
+  flex: none;
+}
+.h-cook-close:hover { background: var(--surface-sunken); }
+
+.h-cook-progress { padding: 0 var(--space-xl) var(--space-lg); }
+.h-cook-bars { display: flex; gap: 4px; }
+.h-cook-bars span {
+  flex: 1;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunken);
+}
+.h-cook-bars span.is-done { background: var(--primary); }
+.h-cook-count { margin: var(--space-sm) 0 0; font-size: var(--type-meta-size); color: var(--text-muted); }
+.h-cook-servings { color: var(--text-muted); }
+
+.h-cook-step { flex: 1; padding: 0 var(--space-xl) var(--space-xxl); }
+.h-cook-number {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-step-number-size);
+  font-weight: var(--type-step-number-weight);
+  line-height: var(--type-step-number-line);
+  color: var(--primary);
+}
+.h-cook-text {
+  margin: var(--space-md) 0 0;
+  font-size: var(--type-cook-body-size);
+  font-weight: var(--type-cook-body-weight);
+  line-height: var(--type-cook-body-line);
+  /* the long-form step, which is what `textBody` exists for — see the tokens.ts addition */
+  color: var(--text-body);
+}
+.h-cook-nosteps { margin: 0; font-size: var(--type-body-l-size); color: var(--text-muted); }
+.h-cook-nosteps a { color: var(--primary); }
+
+.h-cook-ingredients {
+  margin-top: var(--space-xxl);
+  padding: var(--space-lg);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+.h-cook-ingredients ul { margin: var(--space-sm) 0 0; padding: 0; list-style: none; }
+.h-cook-ingredients li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--type-body-l-size);
+  line-height: var(--type-body-l-line);
+  color: var(--text-body);
+}
+.h-cook-ingredients li:last-child { border-bottom: 0; }
+.h-cook-ingredients li strong { flex: none; color: var(--text); }
+.h-cook-note { color: var(--text-muted); }
+.h-cook-section {
+  margin: var(--space-md) 0 0;
+  font-family: var(--font-display);
+  font-size: var(--type-display-s-size);
+  font-weight: var(--type-display-s-weight);
+  color: var(--text);
+}
+
+/*
+ * 60px, which §3 specifies for cook mode alone — and the reason is the hands. Every other button
+ * in the system is 44; this is the one screen where somebody is reaching past a hot pan, and the
+ * docked nav is sticky rather than fixed so a long ingredient list scrolls under it.
+ */
+.h-cook-nav {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  gap: 10px;
+  padding: var(--space-md) var(--space-xl);
+  padding-bottom: max(var(--space-xl), env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+.h-cook-back,
+.h-cook-next {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--size-button-large);
+  border-radius: var(--radius-pill);
+  font-size: var(--type-label-size);
+  font-weight: var(--type-label-weight);
+  font-family: inherit;
+  cursor: pointer;
+}
+.h-cook-back {
+  flex: 0 0 38%;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text);
+}
+.h-cook-back:disabled { opacity: 0.4; cursor: default; }
+.h-cook-next {
+  flex: 1;
+  border: 0;
+  background: var(--primary);
+  color: var(--on-primary);
+  text-decoration: none;
+}
+.h-cook-next:active { background: var(--primary-pressed); }

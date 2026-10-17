@@ -4804,3 +4804,73 @@ harder than it looked. What is left is mostly genuine catalogue gaps (`guanciale
 `meat church holy gospel bbq rub`) and recipe-speak that is not a product (`lazy tzatziki`,
 `fried rice & store-bought yum yum sauce`) — neither of which more parser work touches.
 
+
+## §77 — Cook mode is incomplete by decision, and contrast is the half of "does it read" that needs no eyes
+
+**Two of §4.3's seven features are excluded by §5, not missing.** The handoff asks cook mode for a
+*"For this step" ingredient card with amounts* and an *optional timer row, shown when a step has a
+duration*. `recipe_steps` carries `position` and `text` — no duration, no name, nothing tying an
+ingredient line to a step — so both need a schema change, and §5's last bullet puts "backend,
+schema and AI pipeline changes" out of scope. The handoff anticipates this precisely: §1 names
+*per-step ingredient mapping* as its own example of a gap to "degrade gracefully" around.
+
+So the degradation is the **whole** ingredient list, at the planned scale, with the recipe's own
+headings — labelled *"All ingredients"*, because labelling it "FOR THIS STEP" would be the lie.
+This screen genuinely does not know which ingredients belong to step 4. A per-step card nobody can
+fill is worse than no card, and smoke asserts the phrase is **absent**: a check that the app is not
+claiming something it cannot know.
+
+Reversed by two columns — `recipe_steps.duration_seconds`, and a step↔ingredient join. Neither is
+worth inventing from an ingredient list; §64 established that a list cannot express method, and a
+mapping guessed by a model would put the wrong amount in front of somebody holding a knife.
+
+**Always dark means dark in the markup the server sent.** The obvious implementation stamps
+`data-theme="dark"` on the root from a client effect, and it flashes: the server sends a light
+document, the browser paints it, hydration turns it over. On the one screen somebody opens and then
+stands still in front of, in a kitchen, that is a flash of a light theme in a dark room. Role
+tokens are custom properties, so the generated stylesheet emits a fourth block scoped to `.h-cook`
+— no effect, no JavaScript, nothing to restore on exit, and generated from the same `themes.dark`
+as the other two rather than hand-copied.
+
+That addition **moved an existing measurement's boundary.** `check-theme-complete` found the
+attribute block by slicing from `:root[data-theme="dark"]` to the end of the file, and `.h-cook` is
+emitted last — so the new block was *inside* the old slice, and a token present in `.h-cook` and
+missing from `[data-theme="dark"]` satisfied a check reading both at once. The guard kept
+answering; the question underneath it had changed. Blocks are now extracted by matching braces, and
+the lesson is §54a's with the direction reversed: **adding a site can invalidate a measurement that
+never mentioned it.** Ask what an existing check assumed about there being nothing after the thing
+it was looking for.
+
+**Contrast is arithmetic, so it is not a thing to say "I could not verify" about.**
+`check-theme-complete` proves construction and cannot speak to legibility, and cook mode makes
+legibility the question rather than a nicety — dark is a product surface there, so no system
+preference will ever route a household around a bad pair. A browser is the only thing that can
+compute a cascade and a person is the only thing that can say whether type *looks* right, but WCAG
+2.1 §1.4.3 and §1.4.11 are two hex values and a formula. `scripts/check-contrast.mjs` computes 29
+pairs across all three themes from the **generated stylesheet** — the artifact that ships, not the
+TypeScript it came from — and is mutation-tested six ways.
+
+It found one thing, in **both** themes, and it is not a cook-mode bug.
+
+> `borderStrong` — the handoff's *"open/unselected outlines"* — scores **1.63:1 light** and
+> **1.58:1 dark** against the surface it outlines. §1.4.11 asks 3:1 of a boundary that identifies a
+> control. The same palette's `checkboxEdge` scores **3.57** and **6.98**, so a stronger outline
+> already exists inside the system.
+
+Two controls are affected and the sharper one is not the button. Cook mode's **Back** is identified
+by a 12.56:1 label regardless. **`DayCircle`'s open and suggested states draw a *meaning* with that
+edge** — dashed is an offer, solid is a decision, which is the distinction §67 rests on — so an
+invisible boundary loses *information*, not only definition.
+
+Left as the handoff specified it and **recorded rather than fixed quietly**, because changing what a
+role token means across every screen is a design decision. Both pairs are exempt in the checker **by
+name, with the measured ratio written down**: an exemption recording 1.55 fails if the pair ever gets
+worse, which is the difference between a known limitation and an ignored warning. A check that fails
+routinely is one people learn to ignore — the reason `check-migrations-pushed` sits outside
+`pnpm check`.
+
+**"Screen on" reports the lock, never the request.** The Screen Wake Lock API may be absent, and a
+browser may refuse on low battery. A badge reading "Screen on" above a phone about to sleep is the
+count-of-people rule's shape — a claim on screen that the person cannot check and the app has not
+verified — so state starts `null`, the indicator renders only on a lock actually held, and a
+`release` event clears it rather than leaving the badge lying.

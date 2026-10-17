@@ -157,6 +157,32 @@ async function call(method, path, { body, auth = true, expect } = {}) {
 const alive = (result) => result.status !== 0 && result.status < 500;
 
 /**
+ * The page as a reader sees it, which is not the page as React writes it.
+ *
+ * React's SSR separates a static string from an interpolated one with an empty HTML comment, so
+ * `Step {n} of {total}` arrives as `Step <!-- -->1<!-- --> of <!-- -->2` and a needle spelled the
+ * way the screen reads it finds nothing. The check fails, the screen is correct, and the failure
+ * is indistinguishable from the count being absent — which is how this was first read.
+ *
+ * Same family as grepping minified CSS with the unminified spelling: **a value you had to spell
+ * correctly to find is a value you can fail to find while it is right there**, and absence looks
+ * identical whether or not you were looking in the right place. So every human-text assertion
+ * goes through this rather than through the raw body, because the next interpolated marker will
+ * make the same mistake and nothing else would catch it.
+ *
+ * Entities as well, for the same reason: React writes `’` and a needle typed with an apostrophe
+ * misses it.
+ */
+const visible = (html) =>
+  String(html ?? "")
+    .replace(/<!--.*?-->/g, "")
+    .replace(/&#x27;|&apos;/g, "'")
+    .replace(/&#x2F;/g, "/")
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, "&")
+    .replace(/\u2019/g, "'");
+
+/**
  * A service-role read or write, used to check what the product actually stored.
  *
  * **Throws on a refusal rather than returning it as data.** PostgREST answers a 4xx with valid
@@ -491,6 +517,60 @@ try {
     } else {
       record("and tapping it again takes it off the week", null, "no entry id came back from the POST");
     }
+
+    /*
+     * Cook mode (§4.3), and the first check is the one that has caught real failures twice:
+     * **is there a way in from the product.** Caption paste and screenshot upload both had green
+     * route checks and no entry point — "verified against production" was true and meaningless.
+     * A route answering is not a feature, so the link is asserted on the page a person is
+     * actually standing on before anything else is believed about the screen.
+     */
+    const recipePage = await call("GET", `/recipes/${recipeId}`);
+    const recipeHtml = typeof recipePage.body === "string" ? recipePage.body : "";
+    record(
+      "the recipe page offers a way into cook mode",
+      recipeHtml.includes(`/cook/${recipeId}`) && recipeHtml.includes("Cook now"),
+      recipeHtml.includes(`/cook/${recipeId}`) ? "href present" : "no /cook link on the recipe page",
+    );
+
+    const cook = await call("GET", `/cook/${recipeId}`);
+    const cookHtml = typeof cook.body === "string" ? cook.body : "";
+    const cookText = visible(cookHtml);
+    record("cook mode renders", alive(cook), `HTTP ${cook.status}`);
+    for (const [what, needle] of [
+      ["is dark by class rather than by script", 'class="h-cook"'],
+      ["counts the steps it has", "Step 1 of 2"],
+      // the §5 degradation: the whole list, labelled as the whole list
+      ["shows the full ingredient list", "All ingredients"],
+      ["does not claim a per-step card it has no data for", null],
+      ["offers a 60px Next", "Next step"],
+      ["has a way out", "Close cook mode"],
+    ]) {
+      if (needle === null) {
+        record(
+          what,
+          !/FOR THIS STEP|For this step/i.test(cookText),
+          /For this step/i.test(cookHtml) ? 'the page says "for this step" — it cannot know that' : "absent, as intended",
+        );
+        continue;
+      }
+      const found = cookHtml.includes(needle) || cookText.includes(needle);
+      record(`and ${what}`, found, found ? `"${needle}"` : `no "${needle}"`);
+    }
+
+    /*
+     * A step in the URL resumes there. Asserted because the whole point of `replaceState` is that
+     * a reload mid-recipe does not start the method again, and nothing else would notice.
+     */
+    const resumed = await call("GET", `/cook/${recipeId}?step=2`);
+    const resumedHtml = typeof resumed.body === "string" ? resumed.body : "";
+    record(
+      "a step in the URL is where cooking resumes",
+      // server-rendered at step 1 and corrected on mount, so the assertion is that the URL
+      // survives to the client rather than that the server honoured it
+      alive(resumed) && visible(resumedHtml).includes("Step 1 of 2"),
+      `HTTP ${resumed.status}`,
+    );
 
     const detail = await call("GET", `/recipes/${recipeId}`);
     const page = typeof detail.body === "string" ? detail.body : JSON.stringify(detail.body);
@@ -885,7 +965,7 @@ try {
            * which is self-contradictory and sent me looking at the page instead of at the needle.
            * A detail that contradicts its own verdict is worse than an empty one.
            */
-          const present = body.includes(needle);
+          const present = body.includes(needle) || visible(body).includes(needle);
           record(
             `and ${name} renders ${JSON.stringify(needle)}`,
             page.status === 200 && present,

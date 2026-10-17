@@ -155,8 +155,33 @@
   }
 }
 
-/* an explicit choice, and cook mode, which is always dark */
+/* an explicit choice */
 :root[data-theme="dark"] {
+  --bg: #1C1915;
+  --surface: #28231E;
+  --surface-sunken: #3A332C;
+  --border: #4A4239;
+  --border-strong: #4A4239;
+  --text: #EEE6D8;
+  --text-body: #DCD2C2;
+  --text-muted: #B8AC9B;
+  --primary: #E0855A;
+  --primary-pressed: #C96F45;
+  --on-primary: #1C1915;
+  --secondary: #A3B58A;
+  --on-secondary: #1C1915;
+  --highlight: #E3B04F;
+  --on-highlight: #1C1915;
+  --chip-bg: #3A332C;
+  --chip-text: #A3B58A;
+  --planned-bg: #3A332C;
+  --planned-text: #E0855A;
+  --checkbox-edge: #B8AC9B;
+  --checked: #A3B58A;
+}
+
+/* cook mode is always dark, in the markup the server sent — see css.ts for why not JS */
+.h-cook {
   --bg: #1C1915;
   --surface: #28231E;
   --surface-sunken: #3A332C;

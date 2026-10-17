@@ -527,6 +527,21 @@ models be good enough. Do not add a silent-save path.
   there, and absence is the one result that looks the same whether you were looking in the right
   place or not.
 
+  **A third costume, and this one is the renderer's spelling rather than mine.** A smoke check for
+  `"Step 1 of 2"` failed against a page that says exactly that, because React's SSR separates a
+  static string from an interpolated one with an empty HTML comment:
+  `Step <!-- -->1<!-- --> of <!-- -->2`. The check failed, the screen was right, and *absence of
+  the needle was indistinguishable from absence of the count* — which is how I first read it. Two
+  more in the same run: `:root{` found nothing in dev output spelled `:root {`, and a probe written
+  to print the shape created no recipe and printed an empty string, so it measured nothing while
+  looking like an answer.
+
+  So the rule now has a mechanism rather than a resolution. **Every human-text assertion in smoke
+  goes through `visible()`**, which strips comments and entities, because the next interpolated
+  marker will make the same mistake and nothing else would catch it. And when a grep returns
+  nothing, the next move is to grep the *property* and print the value, or enumerate what spellings
+  actually exist in the file — never to report the absence.
+
 - **A schema field is not a request, and a field nobody scores stays empty forever.**
   `steps` was in the extraction schema with a description, and `EXTRACTION_INSTRUCTIONS`
   was eight sentences every one of which was about ingredients. Every caption came back

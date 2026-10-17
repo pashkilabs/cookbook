@@ -36,6 +36,7 @@ export interface PlanDay {
   entryId: string | null;
   /** the weekday spelled out — the state is appended here, not by the caller */
   name: string;
+  isToday: boolean;
 }
 
 export function PlanIt({ recipeId, weekLabel, days }: { recipeId: string; weekLabel: string; days: PlanDay[] }) {
@@ -91,6 +92,7 @@ export function PlanIt({ recipeId, weekLabel, days }: { recipeId: string; weekLa
             key={day.date}
             letter={day.letter}
             date={day.dayOfMonth}
+            className={day.isToday ? "is-today" : undefined}
             state={day.entryId ? "planned" : "open"}
             /*
              * `DayCircle`'s contract is one control, one name — "Monday 19, planned" — so the
@@ -98,7 +100,7 @@ export function PlanIt({ recipeId, weekLabel, days }: { recipeId: string; weekLa
              * gets seven identical controls and `aria-pressed` alone to tell them apart, and a
              * colour is not an answer to "which days is this on".
              */
-            name={`${day.name} ${day.dayOfMonth}, ${day.entryId ? "planned" : "not planned"}`}
+            name={`${day.isToday ? "Today, " : ""}${day.name} ${day.dayOfMonth}, ${day.entryId ? "planned" : "not planned"}`}
             onSelect={busy ? undefined : () => toggle(day)}
           />
         ))}

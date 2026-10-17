@@ -324,8 +324,12 @@ export default async function RecipePage({
     "planned days",
   );
   const entryByDate = new Map(plannedDays.map((row) => [row.date as string, row.id as string]));
+  const today = todayIso(family.timezone);
   const planDays: PlanDay[] = weekDays(weekStart).map((date) => ({
     date,
+    // in the household's timezone, like every other date decision here — a browser clock would
+    // put today on a different circle for anybody whose device zone differs from the household's
+    isToday: date === today,
     // the initial, which is what the reference's circles carry — and `weekdayName` is the one
     // place a day's name is spelled, so Tuesday and Thursday cannot drift apart from each other
     letter: weekdayName(date).charAt(0),
@@ -810,6 +814,15 @@ export default async function RecipePage({
         * The subjects offered are *this recipe's own*, so nothing invites an opinion about
         * something that is not in front of you.
         */}
+      {/*
+        * `CookTonight` sits beside the panel rather than inside it: tapping today's circle does
+        * the same thing, and this is the labelled one-tap version for somebody who has already
+        * decided. Kept because it is a live feature — the restyle does not get to drop one — and
+        * because "tap the circle with a ring round it" is a thing you have to notice first.
+        */}
+      <div className="h-row-quiet" style={{ marginTop: "var(--space-lg)" }}>
+        <CookTonight recipeId={recipe.id} today={today} />
+      </div>
       <PlanIt recipeId={recipe.id} weekLabel={weekLabel(weekStart)} days={planDays} />
 
       <Preferences
@@ -843,7 +856,17 @@ export default async function RecipePage({
         shortlisted={shortlistRows.some((row) => row.week_start === weekStart)}
         shortlistedNext={shortlistRows.some((row) => row.week_start === nextWeekStart)}
       />
-      <CookTonight recipeId={recipe.id} today={todayIso(family.timezone)} />
+      {/*
+        * The reference's "Cook now", and it is the primary because it is the only action here that
+        * is about the next ten minutes rather than about the week.
+        *
+        * `?planned=` is carried through so cook mode shows the amounts this page is showing. A
+        * cook screen quietly reverting to the unscaled recipe is the worst way for this to be
+        * wrong, because nothing on it would look wrong.
+        */}
+      <PrimaryLink href={planned ? `/cook/${recipe.id}?planned=${planned}` : `/cook/${recipe.id}`}>
+        Cook now
+      </PrimaryLink>
     </DockedActionBar>
     </div>
   );

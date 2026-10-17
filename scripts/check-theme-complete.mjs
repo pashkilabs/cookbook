@@ -33,11 +33,38 @@ try {
   process.exit(2);
 }
 
-const mediaDark = generated.slice(generated.indexOf("@media"), generated.indexOf(':root[data-theme="dark"]'));
-const attrDark = generated.slice(generated.indexOf(':root[data-theme="dark"]'));
-if (!mediaDark.includes("prefers-color-scheme") || attrDark.length < 50) {
-  console.error("COULD NOT MEASURE: the generated stylesheet has no recognisable dark blocks.");
-  process.exit(2);
+/** the text between a selector's own braces, so three adjacent blocks cannot read as one */
+function ruleBody(css, selector) {
+  const at = css.indexOf(selector);
+  if (at === -1) return null;
+  const open = css.indexOf("{", at);
+  if (open === -1) return null;
+  let depth = 0;
+  for (let i = open; i < css.length; i += 1) {
+    if (css[i] === "{") depth += 1;
+    else if (css[i] === "}") {
+      depth -= 1;
+      if (depth === 0) return css.slice(open + 1, i);
+    }
+  }
+  return null;
+}
+
+const SITES = [
+  ["system dark", "@media (prefers-color-scheme: dark)"],
+  ['[data-theme="dark"]', ':root[data-theme="dark"]'],
+  // the surface that is dark unconditionally, which makes this the one that cannot be a fallback
+  ["cook mode (.h-cook)", ".h-cook"],
+];
+
+const darkSites = [];
+for (const [label, selector] of SITES) {
+  const body = ruleBody(generated, selector);
+  if (body === null || body.length < 50) {
+    console.error(`COULD NOT MEASURE: the generated stylesheet has no recognisable "${label}" block (${selector}).`);
+    process.exit(2);
+  }
+  darkSites.push([label, body]);
 }
 
 const problems = [];
@@ -59,8 +86,9 @@ const referenced = new Set(
 
 for (const token of [...referenced].sort()) {
   const declaration = new RegExp(`--${token}\\s*:`);
-  if (!declaration.test(mediaDark)) problems.push(`--${token} is not redefined for system dark`);
-  if (!declaration.test(attrDark)) problems.push(`--${token} is not redefined for [data-theme="dark"] — cook mode is always dark`);
+  for (const [label, body] of darkSites) {
+    if (!declaration.test(body)) problems.push(`--${token} is not redefined for ${label}`);
+  }
 }
 
 if (problems.length > 0) {
@@ -69,4 +97,8 @@ if (problems.length > 0) {
   process.exit(1);
 }
 
-console.log(`every one of the ${referenced.size} role tokens harvest.css uses resolves in both dark blocks.`);
+console.log(
+  `every one of the ${referenced.size} role tokens harvest.css uses resolves in all ${darkSites.length} dark sites: ` +
+    darkSites.map(([label]) => label).join(", ") +
+    ".",
+);

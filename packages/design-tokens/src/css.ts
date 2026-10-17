@@ -78,8 +78,29 @@ export function tokensCss(): string {
       .map((line) => `  ${line}`)
       .join("\n")}\n}`,
     "",
-    "/* an explicit choice, and cook mode, which is always dark */",
+    "/* an explicit choice */",
     block(':root[data-theme="dark"]', themeVars("dark")),
+    "",
+    /*
+     * Cook mode, which is always dark — and must be dark *without JavaScript*.
+     *
+     * The obvious implementation is a client component stamping `data-theme="dark"` on the root
+     * on mount. That works and it **flashes**: the server sends a light document, the browser
+     * paints it, and hydration turns the screen over. On a screen somebody opens with wet hands
+     * in a kitchen, at the one moment they are standing still, that flash is the whole first
+     * impression — and it is a flash of a light theme in a dark room.
+     *
+     * Role tokens are custom properties, so redefining them on a container cascades to
+     * everything inside it. Scoping the dark set to `.h-cook` makes the surface dark in the
+     * markup the server already sent: no flash, no effect, no JavaScript, and nothing to restore
+     * on the way out — closing cook mode unmounts the container and the page is light again.
+     *
+     * Generated from the same `themes.dark` as the other two blocks rather than written out,
+     * which is the whole reason this file exists. A hand-copied dark palette for one screen is
+     * how a surface drifts from the system it belongs to.
+     */
+    "/* cook mode is always dark, in the markup the server sent — see css.ts for why not JS */",
+    block(".h-cook", themeVars("dark")),
     "",
   ].join("\n");
 }
