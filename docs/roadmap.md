@@ -376,6 +376,29 @@ eval fixture wants the same.
    closed rather than silently opening the table, and
    `assert_rls_invariants()` refuses any client write policy on a platform table.
 
+8. **A metric shopping list falls back to a US package.** `pnpm smoke` fails
+   `and reads in one system throughout` with `imperial on a metric page: 8 oz`.
+   Diagnosed: **four `grocery_packages` rows are labelled "8 oz" with no metric
+   counterpart**, so an ingredient whose only package is a US one renders that
+   package on a metric page. §28 split `grocery_packages.system` precisely so two
+   markets never mix in one purchase, and this is the gap on the other side of that
+   split — not a mixing bug but a *missing row* bug, where the fallback is worse
+   than an absence would be.
+
+   The wrong answer looks right, which is why it belongs here: "8 oz" is a
+   plausible quantity, and a household reading a metric list has no way to tell it
+   came from a market they are not shopping in. `metricPackageCoverage` exists and
+   is the thing to run; the fix is bounded — add the metric rows, or make an
+   ingredient with no package in the household's market offer **no package advice**
+   rather than the other market's, which is what `packages: null` already means
+   everywhere else.
+
+   **Not caused by the Harvest UI work, and not proven to pre-date it** — only the
+   first is established. The diff touched no unit, formatting, consolidation or
+   shopping code and CSS cannot alter scraped text, so the cause is elsewhere; but
+   the earlier local run logs had been cleaned up, so "it was already failing"
+   is an assumption rather than a measurement.
+
 ### Fails loudly when it fails
 
 8. **`registerDevice`'s revoked-device path.** Untested.
