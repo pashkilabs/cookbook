@@ -131,22 +131,19 @@ const PAIRS = [
 ];
 
 /*
- * Known and measured, not ignored. Each entry records the ratio at the time it was accepted; a
- * pair that gets worse than its recorded value fails even though it is exempt.
+ * Empty, and worth keeping rather than deleting.
  *
- * Both of these are the same token — `borderStrong`, which the handoff labels "open/unselected
- * outlines" — and both are a palette decision rather than a defect in a screen. Worth knowing:
- * the same palette's `checkboxEdge` scores 3.57 light and 6.98 dark, so a stronger outline is
- * available inside the system the moment this is wanted.
+ * It held two entries — both the same token, `borderStrong`, at 1.63:1 light and 1.58:1 dark
+ * against §1.4.11's 3:1. They are gone because the token was **retargeted** to this palette's
+ * `checkboxEdge` pair (3.57 light, 6.98 dark) rather than because the threshold moved: a checkbox
+ * edge and an unselected day circle are the same visual job, so the role name stayed honest. See
+ * the header of `tokens.ts`.
  *
- * The day circle is the sharper of the two. `DayCircle` draws a *meaning* with this edge —
- * dashed is an offer, solid is a decision — so an invisible boundary loses information rather
- * than only definition. The Back button is identified by a 12.56:1 label regardless.
+ * The mechanism stays for the next one. An exemption must record the **measured ratio**, so that
+ * a known limitation still fails when it gets worse — the difference between accepting a number
+ * and ignoring a warning.
  */
-const EXEMPT = new Map([
-  ["cook: Back button outline", { floor: 1.55, why: "identified by its 12.56:1 label; borderStrong is the handoff's outline token" }],
-  ["day circle, open outline", { floor: 1.55, why: "borderStrong; the dashed/solid distinction rides on it — flagged, not fixed quietly" }],
-]);
+const EXEMPT = new Map();
 
 const NEED = { text: TEXT, large: LARGE, ui: UI, decorative: 0 };
 const THEMES = [
@@ -186,5 +183,7 @@ if (failures.length > 0) {
 }
 console.log(
   `${PAIRS.length} colour pairs × ${THEMES.length} themes meet WCAG AA, ` +
-    `with ${EXEMPT.size} recorded exemption(s) holding at their measured floor.`,
+    (EXEMPT.size === 0
+      ? "with no exemptions."
+      : `with ${EXEMPT.size} recorded exemption(s) holding at their measured floor.`),
 );

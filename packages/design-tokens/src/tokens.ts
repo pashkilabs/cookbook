@@ -24,6 +24,31 @@
  * Recorded here rather than applied quietly because a future reader diffing this against the
  * bundle should find the reasoning instead of a discrepancy.
  *
+ * **Added: `themes.*.borderStrong` now points at the checkbox edge.**
+ *
+ * The second addition, and this one came from a measurement rather than from a gap. `borderStrong`
+ * mapped to `stone`/`ashEdge` and scored **1.63:1 in light and 1.58:1 in dark** against the
+ * surface it outlines — WCAG 2.1 §1.4.11 asks **3:1** of a boundary that identifies a control.
+ * Retargeted to the `checkboxEdge` pair already in this palette: **3.57:1 light, 6.98:1 dark**.
+ *
+ * Light is the tighter of the two and the one that decides this: 3.57 clears 3:1 with little
+ * room, which is the honest figure to hold rather than the comfortable dark one.
+ *
+ * The role name stays truthful because **a checkbox edge and an unselected day circle are the
+ * same visual job** — the outline of a control that is not currently chosen. The palette already
+ * drew that distinction and gave checkboxes the stronger value; "open/unselected outlines" simply
+ * did not get it, which reads as an oversight rather than a decision once the two are measured
+ * side by side.
+ *
+ * It matters most where the edge carries *meaning*. `DayCircle` draws dashed for an offer and
+ * solid for a decision — §67's distinction — so an invisible boundary loses **information**, not
+ * only definition. Cook mode's `Back` was always identified by a 12.56:1 label; the day circles
+ * were not identified by anything else.
+ *
+ * `palette.stone` and `palette.ashEdge` are left in place, unreferenced by any theme role. They
+ * are the handoff's values and a future decision may want them; deleting them would make this
+ * file diverge from the bundle for no gain. `scripts/check-contrast.mjs` holds the measurement.
+ *
  * **Web does not emit the native-only scales.** `space`, `radius` and `size` are numbers for
  * StyleSheet; the CSS generator turns them into `px`. There is no second copy of either.
  */
@@ -93,7 +118,8 @@ export const themes = {
     surface: palette.parchment,
     surfaceSunken: palette.oatDeep,
     border: palette.hairline,
-    borderStrong: palette.stone,
+    // see the header: 3.57:1, where `stone` was 1.63 — §1.4.11 wants 3 for a control's boundary
+    borderStrong: palette.checkboxEdge,
     text: palette.bark,
     textBody: palette.bodyInk,
     textMuted: palette.loam,
@@ -116,7 +142,8 @@ export const themes = {
     surface: palette.castIron,
     surfaceSunken: palette.ashWood,
     border: palette.ashEdge,
-    borderStrong: palette.ashEdge,
+    // 6.98:1, where `ashEdge` was 1.58 — the same retarget as light, see the header
+    borderStrong: palette.oatmeal,
     text: palette.linen,
     // was `palette.linen`, which collapsed the heading/body step that light has (see the header)
     textBody: palette.linenSoft,

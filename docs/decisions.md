@@ -4862,12 +4862,29 @@ by a 12.56:1 label regardless. **`DayCircle`'s open and suggested states draw a 
 edge** — dashed is an offer, solid is a decision, which is the distinction §67 rests on — so an
 invisible boundary loses *information*, not only definition.
 
-Left as the handoff specified it and **recorded rather than fixed quietly**, because changing what a
-role token means across every screen is a design decision. Both pairs are exempt in the checker **by
-name, with the measured ratio written down**: an exemption recording 1.55 fails if the pair ever gets
-worse, which is the difference between a known limitation and an ignored warning. A check that fails
-routinely is one people learn to ignore — the reason `check-migrations-pushed` sits outside
-`pnpm check`.
+**Decided: retargeted, not exempted.** `themes.*.borderStrong` now points at the `checkboxEdge`
+pair — **3.57:1 light, 6.98:1 dark** — and both pairs are *gated* rather than recorded. Reverting
+the mapping fails `pnpm check` in all three themes, which is the proof the exemption could never
+have given.
+
+Light is the figure to hold: **3.57 clears 3:1 with little room**, where dark has margin to spare.
+Quoting the comfortable number would have been the same mistake as reporting a single run as a
+baseline (§72).
+
+The role name stays truthful because **a checkbox edge and an unselected day circle are the same
+visual job** — the outline of a control that is not currently chosen. This palette already drew
+that distinction and gave checkboxes the stronger value; "open/unselected outlines" simply did not
+get it, which reads as an oversight rather than a decision once the two sit side by side.
+
+`palette.stone` and `palette.ashEdge` stay in the file, referenced by no theme role. They are the
+handoff's values and a future decision may want them; deleting them would make `tokens.ts` diverge
+from the bundle for no gain.
+
+The **exemption mechanism** stays in `check-contrast.mjs` with an empty map, because the next
+accepted limitation needs it: an exemption must record the **measured ratio**, so a known
+limitation still fails when it gets worse. That is the difference between accepting a number and
+ignoring a warning — and the reason a check that fails routinely is one people learn to ignore is
+the same reason `check-migrations-pushed` sits outside `pnpm check`.
 
 **"Screen on" reports the lock, never the request.** The Screen Wake Lock API may be absent, and a
 browser may refuse on low battery. A badge reading "Screen on" above a phone about to sleep is the
