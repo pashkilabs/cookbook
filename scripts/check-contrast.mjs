@@ -114,6 +114,29 @@ const PAIRS = [
   ["cook: Back button outline", "border-strong", "surface", "ui"],
   ["cook: ingredient divider", "border", "surface", "decorative"],
   ["cook: no-method note", "text-muted", "bg", "text"],
+  // the week plan (§4.4)
+  ["week: day-of-month", "text", "bg", "large"],
+  ["week: weekday letters", "text-muted", "bg", "text"],
+  ["week: recipe name", "text", "surface", "large"],
+  ["week: time meta", "text-muted", "surface", "text"],
+  ["week: recipe name on today", "text", "planned-bg", "large"],
+  ["week: time meta on today", "text-muted", "planned-bg", "text"],
+  ["week: + Add dinner label", "text-muted", "surface", "text"],
+  ["week: + Add dinner dashed edge", "border-strong", "surface", "ui"],
+  ["week: thumbnail initial", "text-muted", "surface-sunken", "text"],
+  ["week: alongside footnote text", "text-muted", "surface", "text"],
+  ["week: alongside suggestion", "text-body", "surface", "text"],
+  /*
+   * Every site that uses the accent as TEXT rather than as a fill, which is the audit this file
+   * was missing. The palette specifies terracotta as a fill with white on it, so these are an
+   * extension of the token — and in light it clears AA on parchment (4.67) and fails on both the
+   * app ground (4.24) and the sunken one (3.77). Nothing may paint it on those two.
+   */
+  ["accent as link text, on a card", "primary", "surface", "text"],
+  ["tab bar current label", "primary", "surface", "text"],
+  ["week: + Add dinner hover label", "text", "surface", "text"],
+  ["week: + Add dinner hover label on today", "text", "planned-bg", "text"],
+  ["week: + Add dinner hover edge", "primary", "planned-bg", "ui"],
   // the shared primitives, which every screen paints
   ["primary button label", "on-primary", "primary", "text"],
   ["secondary button label", "on-secondary", "secondary", "text"],

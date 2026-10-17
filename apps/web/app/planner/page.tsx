@@ -15,6 +15,8 @@ import {
 } from "@/lib/week";
 import { PlannerWeek } from "./planner-week";
 import { AlongsideThisWeek } from "./alongside";
+import { Chip, Eyebrow, IconLink, TabBar } from "@/components/harvest";
+import { weekSummary } from "@/lib/week-summary";
 import { readAvoidedAllergens } from "@/lib/allergen-filter";
 import { alongsideThisWeek } from "@/lib/alongside";
 import type { CookMember } from "./cooked";
@@ -192,31 +194,94 @@ export default async function PlannerPage({
     family.avoidedAllergens,
   );
 
+  /*
+   * The thumbnails §4.4 asks for, by the same two-round-trip pattern the recipe list uses: one
+   * read for the rows, one `createSignedUrls` for every path together. Signed as the person
+   * viewing, so the storage policy authorises it rather than a service role.
+   *
+   * `source` photographs are excluded here as they are there — a grid of index cards where dish
+   * photographs should be is useless to somebody scanning a week (§56).
+   */
+  const photoFor = new Map<string, string>();
+  const plannedIds = [...new Set(placed.map((entry) => entry.recipe.id))];
+  if (plannedIds.length > 0) {
+    const photos = rows(
+      await supabase
+        .from("photos")
+        .select("recipe_id, storage_path")
+        .eq("family_id", family.id)
+        .neq("source", "source")
+        .in("recipe_id", plannedIds)
+        .is("deleted_at", null),
+      "photos",
+    );
+    const paths = [...new Set((photos ?? []).map((row) => row.storage_path as string))];
+    if (paths.length > 0) {
+      const { data: signed } = await supabase.storage.from("recipe-photos").createSignedUrls(paths, 600);
+      const urlFor = new Map((signed ?? []).map((entry) => [entry.path, entry.signedUrl]));
+      for (const row of photos ?? []) {
+        const url = urlFor.get(row.storage_path as string);
+        if (url && !photoFor.has(row.recipe_id as string)) photoFor.set(row.recipe_id as string, url);
+      }
+    }
+  }
+
+  /*
+   * ---------------------------------------------------------------------------
+   * The two summary chips (§4.4), and why one of them says "at least"
+   * ---------------------------------------------------------------------------
+   *
+   * "5 of 7 dinners" counts **days with a meal on them**, not plan entries — that is the number a
+   * person arrives at by looking at the week, and the count-of-people rule is that nothing on
+   * screen may be a figure nobody can check. Two meals on Tuesday is still one Tuesday.
+   *
+   * The time total is a sum of `time_minutes`, and that column is nullable: a week with three
+   * timed recipes and two untimed ones would otherwise report a confident total that is simply
+   * too small, with nothing on the screen to suggest it. Same shape as the calorie estimate,
+   * solved the same way (§43) — a partial total says **at least**, and a complete one does not.
+   * Understating silently is the failure mode; saying so is not.
+   */
+  // the household's own week, so "back to this week" knows where it is going — and a household
+  // west of Greenwich does not get sent to last week at 11pm
+  const thisWeek = startOfWeek(todayIso(family.timezone));
+  const { daysWithAMeal, cookTime } = weekSummary(placed, days);
+
   return (
+    <div className="h-docked-page">
     <main>
-      <div className="bar">
-        <div>
-          <h1>{weekLabel(weekStart)}</h1>
-          <p className="subtitle" style={{ margin: 0 }}>{family.name}</p>
+      <header className="h-week-head">
+        <div className="h-week-nav">
+          <IconLink label={`The week before ${weekLabel(weekStart)}`} href={`/planner?week=${addWeeks(weekStart, -1)}`}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M15 5l-7 7 7 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </IconLink>
+          <div className="h-week-label">
+            <Eyebrow>Week plan</Eyebrow>
+            <h1 className="h-title">{weekLabel(weekStart)}</h1>
+          </div>
+          <IconLink label={`The week after ${weekLabel(weekStart)}`} href={`/planner?week=${addWeeks(weekStart, 1)}`}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </IconLink>
         </div>
-        <div className="tabs" style={{ margin: 0 }}>
-          <Link className="chip" href={`/planner?week=${addWeeks(weekStart, -1)}`}>
-            ← Previous
-          </Link>
-          <Link className="chip" href="/planner">
-            This week
-          </Link>
-          <Link className="chip" href={`/planner?week=${addWeeks(weekStart, 1)}`}>
-            Next →
-          </Link>
-          <Link className="button" href={`/shopping?week=${weekStart}`}>
-            Shopping
-          </Link>
-          <Link className="button" href="/recipes">
-            Recipes
-          </Link>
+        <div className="h-chips">
+          <Chip>
+            {daysWithAMeal} of {days.length} dinners
+          </Chip>
+          {cookTime && <Chip tone="clay">{cookTime}</Chip>}
+          {/*
+            * "This week" earns its place only when the week being read is not this one — a chip
+            * that navigates to where you already are is a control with nothing behind it.
+            */}
+          {weekStart !== thisWeek && (
+            <Link className="h-chip" href="/planner">
+              Back to this week
+            </Link>
+          )}
         </div>
-      </div>
+      </header>
 
       {(entries.error || shortlist.error) && (
         <p className="error">
@@ -236,11 +301,25 @@ export default async function PlannerPage({
         partsByRecipe={partsByRecipe}
         waiting={waiting}
         warnings={warnings}
+        photoFor={Object.fromEntries(photoFor)}
       />
 
+      {/*
+        * §67's footnote, and it stays a footnote.
+        *
+        * §4.4 asks instead for a suggestion *beside an empty day* — "Suggest: Texas Twinkies
+        * (uses Tue jalapeños)". That is this same data in a more forceful position, and
+        * `alongside.tsx` argues against the move in its own header: below the week, the cook has
+        * already committed and it reads as "and while you're at it"; beside the day it reads as
+        * "are you sure". A warning is more forceful than a display and this is a display.
+        *
+        * It is **allowed to say nothing**, and on most weeks it will — base overlap fires on
+        * about one plan entry in six. A footnote reporting silence is correct; an absent one is
+        * indistinguishable from one that failed to load, which is why it always renders.
+        */}
       <AlongsideThisWeek alongside={alongside} weekStart={weekStart} />
-
-
     </main>
+    <TabBar current="week" />
+    </div>
   );
 }

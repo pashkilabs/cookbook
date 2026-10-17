@@ -242,13 +242,15 @@
 
 .h-docked,
 .h-tabbar {
+  display: flex;
   flex-shrink: 0;
   box-sizing: border-box;
   min-height: var(--size-docked-action-bar);
-  background: var(--surface);
-  border-top: 1px solid var(--border);
+  padding: var(--space-sm);
   /* the home-indicator inset on iOS, and nothing extra where there is none */
   padding-bottom: max(var(--space-xl), env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-top: 1px solid var(--border);
 }
 
 .h-docked {
@@ -262,11 +264,7 @@
 
 /* --- tab bar ------------------------------------------------------------- */
 
-.h-tabbar {
-  display: flex;
-  padding: var(--space-sm) var(--space-sm);
-  padding-bottom: max(var(--space-xl), env(safe-area-inset-bottom));
-}
+
 .h-tabbar a {
   flex: 1;
   display: flex;
@@ -603,3 +601,154 @@
   text-decoration: none;
 }
 .h-cook-next:active { background: var(--primary-pressed); }
+
+/* --- screen 4: week plan (§4.4) ------------------------------------------ */
+
+.h-week-head { padding: var(--space-xl) var(--space-xl) var(--space-md); }
+.h-week-nav { display: flex; align-items: center; gap: var(--space-md); }
+.h-week-label { flex: 1; text-align: center; }
+
+.h-week { display: flex; flex-direction: column; gap: var(--space-sm); padding: 0 var(--space-xl); }
+
+.h-day-row {
+  display: flex;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+/* today, as the clay tint the planned chips use — one meaning, one colour across the system */
+.h-day-row.is-today { background: var(--planned-bg); }
+
+.h-day-date {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 44px;
+  padding: 6px 0;
+  border-radius: var(--radius-thumb);
+  background: var(--bg);
+}
+.h-day-date span {
+  font-size: var(--type-eyebrow-size);
+  font-weight: var(--type-eyebrow-weight);
+  letter-spacing: var(--type-eyebrow-tracking);
+  color: var(--text-muted);
+}
+.h-day-date strong {
+  font-family: var(--font-display);
+  font-size: var(--type-display-m-size);
+  font-weight: var(--type-display-m-weight);
+  line-height: 1.1;
+  color: var(--text);
+}
+
+.h-day-body { flex: 1; min-width: 0; }
+/* two meals on one day is a real state (§41 offers more servings, it does not refuse a second) */
+.h-day-entry + .h-day-entry { margin-top: var(--space-md); padding-top: var(--space-md); border-top: 1px solid var(--border); }
+.h-day-meal { display: flex; align-items: flex-start; gap: var(--space-md); }
+.h-day-text { flex: 1; min-width: 0; }
+.h-day-title {
+  display: block;
+  font-family: var(--font-display);
+  font-size: var(--type-display-m-size);
+  font-weight: var(--type-display-m-weight);
+  line-height: var(--type-display-m-line);
+  color: var(--text);
+  text-decoration: none;
+}
+.h-day-title:hover { text-decoration: underline; }
+.h-day-meta { margin: 2px 0 0; font-size: var(--type-meta-size); color: var(--text-muted); }
+
+.h-day-thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-thumb);
+  object-fit: cover;
+  background: var(--surface-sunken);
+}
+.h-day-thumb.is-empty { font-family: var(--font-display); font-size: 22px; color: var(--text-muted); }
+
+/* dashed, because an offer is dashed and a decision is solid — the grammar DayCircle uses */
+.h-add-dinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--size-touch-min);
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--radius-thumb);
+  color: var(--text-muted);
+  font-size: var(--type-label-size);
+  font-weight: var(--type-label-weight);
+  text-decoration: none;
+}
+/*
+ * The edge takes the accent and the label takes full contrast.
+ *
+ * Tinting the *label* terracotta fails on the clay today-row — 3.67:1 against 4.5 — because an
+ * add-dinner button sits on two different grounds depending on the day. A boundary needs only
+ * 3:1, which terracotta clears on both, so the accent goes where the looser threshold is and the
+ * text goes to `--text`, which clears everywhere. Hover still reads as a change: muted darkens.
+ */
+.h-add-dinner:hover { border-color: var(--primary); color: var(--text); }
+
+.h-waiting { padding: 0 var(--space-xl); margin-top: var(--space-xxl); }
+
+/*
+ * Said to a screen reader, invisible on screen. Each day row carries its full date here while the
+ * date block beside it is `aria-hidden` — "SUN", "18" read as two fragments before a recipe name
+ * is noise, and a heading is what lets somebody jump between days.
+ *
+ * `clip-path` rather than `display: none`, which would remove it from the accessibility tree too.
+ */
+.h-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/*
+ * §67's footnote. Sunken, bordered at the top, below the week — a band that reads as "and while
+ * you're at it" rather than as a verdict, which is the placement `alongside.tsx` argues for.
+ *
+ * It always renders, and on most weeks it says nothing. That is the correct output, not a degraded
+ * one: an absent block is indistinguishable from one that failed to load.
+ */
+.h-alongside {
+  margin: var(--space-xxl) var(--space-xl) 0;
+  padding: var(--space-lg);
+  border-radius: var(--radius-card);
+  /*
+   * Parchment, not the sunken ground, and the reason is measured: terracotta as *text* reads at
+   * 3.77:1 on `surface-sunken` and 4.67 on `surface`. The palette specifies terracotta as a fill
+   * with white on it ("4.8:1"), so using it for a link is an extension of the token, and it only
+   * clears AA on one of the three grounds. The band still reads as sunken by its top border and
+   * its position below the week.
+   */
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+.h-alongside p { margin: var(--space-sm) 0 0; font-size: var(--type-meta-size); color: var(--text-muted); }
+.h-alongside a { color: var(--primary); }
+.h-alongside-list { margin: var(--space-md) 0 0; padding: 0; list-style: none; }
+.h-alongside-list li {
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--type-body-size);
+  color: var(--text-body);
+}
+.h-alongside-list li:last-child { border-bottom: 0; }
+/* the shared ingredients, which are the whole point — named, so a cook can judge the guess */
+.h-alongside-list .meta { color: var(--text-muted); }

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Alongside } from "@/lib/alongside";
+import { Eyebrow } from "@/components/harvest";
 
 /**
  * A footnote on the week: what else is worth cooking, and why.
@@ -28,8 +29,12 @@ export function AlongsideThisWeek({
   const nothing = alongside.sharesABase.length === 0;
 
   return (
-    <section className="alongside">
-      <h2>Alongside this week</h2>
+    <section className="h-alongside">
+      {/*
+        * An eyebrow rather than a heading, which is the §4 grammar for a quiet band — and the
+        * right weight for a block whose correct answer, most weeks, is "nothing".
+        */}
+      <Eyebrow>Alongside this week</Eyebrow>
 
       {alongside.sharesABase.length > 0 ? (
         <>
@@ -38,7 +43,7 @@ export function AlongsideThisWeek({
             Whether it really is one thing you could cook once is for you to see — the shared
             ingredients are listed so you can tell.
           </p>
-          <ul className="ingredients">
+          <ul className="h-alongside-list">
             {alongside.sharesABase.map((suggestion) => (
               <li key={suggestion.id}>
                 <span>

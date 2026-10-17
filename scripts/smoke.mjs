@@ -891,7 +891,24 @@ try {
     const MARKERS = {
       // a screen may assert more than one, so a block added to it is covered rather than
       // riding on a marker that was already passing
-      "/planner": ["Waiting for a day", "Alongside this week"],
+      "/planner": [
+        "Waiting for a day",
+        /*
+         * §67's footnote, asserted PRESENT rather than asserted non-empty.
+         *
+         * It is allowed to say nothing and on most weeks it does — base overlap fires on about
+         * one plan entry in six. What must never happen is the block vanishing, because an absent
+         * footnote is indistinguishable from one that failed to load. So the heading is the
+         * marker and its contents are not: a check demanding a suggestion would fail on a quiet
+         * week, and a check that fails routinely is one people learn to ignore.
+         */
+        "Alongside this week",
+        // the Harvest week (§4.4): the summary chips, the day rows, and the dashed empty day
+        "dinners",
+        "h-day-row",
+        "+ Add dinner",
+        "h-week",
+      ],
       /*
        * The Harvest restyle, asserted rather than assumed (§4.1).
        *

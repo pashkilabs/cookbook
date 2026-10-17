@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ServingsField } from "./servings-field";
 import { Cooked, type CookMember } from "./cooked";
+import { SectionHeader } from "@/components/harvest";
 
 /**
  * The week, and the writes that arrange it.
@@ -48,6 +49,8 @@ export function PlannerWeek(props: {
    * knows things the ratings do not.
    */
   warnings: Record<string, Array<{ displayName: string; value: string; count: number }>>;
+  /** signed thumbnail URLs by recipe id — plain data, for the reason `membersByRecipe` gives */
+  photoFor: Record<string, string>;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -165,8 +168,8 @@ export function PlannerWeek(props: {
         </div>
       )}
 
-      <section>
-        <h2>Waiting for a day</h2>
+      <section id="waiting" className="h-waiting">
+        <SectionHeader>Waiting for a day</SectionHeader>
         {props.waiting.length === 0 ? (
           <p className="meta">
             Nothing shortlisted for this week. Mark a recipe <em>make this week</em> from{" "}
@@ -220,26 +223,83 @@ export function PlannerWeek(props: {
         )}
       </section>
 
-      <div className="week">
+      <div className="h-week">
         {props.days.map((day) => {
           const forDay = props.placed.filter((entry) => entry.date === day.date);
           return (
-            <section key={day.date} className={day.date === props.today ? "day today" : "day"}>
-              <h3>
-                {day.weekday} <span className="meta">{day.label}</span>
-              </h3>
+            <section key={day.date} className={day.date === props.today ? "h-day-row is-today" : "h-day-row"}>
+              {/*
+                * The date block §4.4 asks for: three-letter weekday over the day of the month.
+                * `aria-hidden`, with the whole date in the row's own label — "SUN 18" read as two
+                * fragments before a recipe name is noise, the same reasoning `DayCircle` carries.
+                */}
+              <div className="h-day-date" aria-hidden="true">
+                <span>{day.weekday.slice(0, 3).toUpperCase()}</span>
+                <strong>{day.label.replace(/[^0-9]/g, "")}</strong>
+              </div>
 
-              {forDay.length === 0 && <p className="meta">—</p>}
+              <div className="h-day-body">
+                <h3 className="h-sr-only">
+                  {day.weekday} {day.label}
+                  {day.date === props.today ? ", today" : ""}
+                </h3>
+
+              {/*
+                * An empty day is an invitation, not a dash (§4.4).
+                *
+                * It points at the waiting list when something is waiting and at the recipe list
+                * when nothing is, because those are the two real next moves — a button that
+                * opens a picker this app does not have would be a control with nothing behind it.
+                * Dashed rather than filled, which is the same grammar `DayCircle` uses: an offer
+                * is dashed, a decision is solid.
+                */}
+              {forDay.length === 0 && (
+                <Link
+                  className="h-add-dinner"
+                  href={props.waiting.length > 0 ? "#waiting" : "/recipes"}
+                  aria-label={`Add dinner for ${day.weekday} ${day.label}`}
+                >
+                  + Add dinner
+                </Link>
+              )}
 
               {forDay.map((entry) => (
-                <div className="entry" key={entry.id}>
-                  {/* carries the plan entry, so the recipe opens at the servings it was planned for */}
-                  <Link href={`/recipes/${entry.recipe.id}?planned=${entry.id}`}>{entry.recipe.title}</Link>
-                  {entry.recipe.time_minutes && (
-                    <p className="meta" style={{ margin: "0.15rem 0 0.4rem" }}>
-                      {entry.recipe.time_minutes} min
-                    </p>
-                  )}
+                <div className="h-day-entry" key={entry.id}>
+                  <div className="h-day-meal">
+                    <div className="h-day-text">
+                      {/* carries the plan entry, so the recipe opens at the servings it was planned for */}
+                      <Link className="h-day-title" href={`/recipes/${entry.recipe.id}?planned=${entry.id}`}>
+                        {entry.recipe.title}
+                      </Link>
+                      {/*
+                        * §4.4 asks this line to carry "leftovers, shared ingredients" as well as
+                        * the time. It carries the time.
+                        *
+                        * Both of the others already live somewhere, for recorded reasons, and
+                        * putting a second copy here would be a second answer to one question —
+                        * the way two parsers came to drift. **Leftovers** are the shopping list's,
+                        * because only it knows package sizes, so only it knows what is actually
+                        * spare; `alongside.tsx` says so in as many words. **Shared ingredients**
+                        * are §67's footnote below the week, and its header argues specifically
+                        * against moving them beside a day.
+                        *
+                        * So this is the reference asking for something the app deliberately keeps
+                        * elsewhere, which is a third thing a reference screen can be — not a
+                        * styling choice, and not the app lying either.
+                        */}
+                      {entry.recipe.time_minutes !== null && (
+                        <p className="h-day-meta">{entry.recipe.time_minutes} min</p>
+                      )}
+                    </div>
+                    {/* no text over it, ever (§5) — the thumbnail sits beside the name */}
+                    {props.photoFor[entry.recipe.id] ? (
+                      <img className="h-day-thumb" src={props.photoFor[entry.recipe.id]} alt="" />
+                    ) : (
+                      <span className="h-day-thumb is-empty" aria-hidden="true">
+                        {entry.recipe.title.trim().charAt(0).toUpperCase() || "?"}
+                      </span>
+                    )}
+                  </div>
                   <span className="scale">
                     <ServingsField
                       entryId={entry.id}
@@ -310,6 +370,7 @@ export function PlannerWeek(props: {
                   </span>
                 </div>
               ))}
+              </div>
             </section>
           );
         })}
