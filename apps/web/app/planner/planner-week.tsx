@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ServingsField } from "./servings-field";
 import { Cooked, type CookMember } from "./cooked";
 import { SectionHeader } from "@/components/harvest";
@@ -68,6 +68,20 @@ export function PlannerWeek(props: {
    * and the row at rest is the thing worth reading, so the default for all seven is closed.
    */
   const [openEntry, setOpenEntry] = useState<string | null>(null);
+  /*
+   * Bring an opened panel into view, because the page's `padding-bottom` reserves room at the
+   * END of the document and says nothing about a panel that grows in the middle of it. Expanding
+   * the sixth row put its controls behind the docked tab bar with nothing to scroll to, since
+   * the page was already as long as it was going to get.
+   *
+   * `block: "nearest"` scrolls the minimum needed and leaves a panel already in view alone;
+   * `.h-day-panel`'s `scroll-margin-bottom` is what keeps the bar's height out of the way, which
+   * is the property that exists for exactly this and is better than arithmetic here.
+   */
+  const panel = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (openEntry && panel.current) panel.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [openEntry]);
 
   /*
    * Press and hold a meal, drag to another day, pause to settle; swipe left to send it to next
@@ -276,9 +290,37 @@ export function PlannerWeek(props: {
                 * `aria-hidden`, with the whole date in the row's own label — "SUN 18" read as two
                 * fragments before a recipe name is noise, the same reasoning `DayCircle` carries.
                 */}
-              <div className="h-day-date" aria-hidden="true">
+              {/*
+                * The date block is also the drag handle, and that is a correction.
+                *
+                * The gesture was bound to the whole entry with `touch-action: auto` restored on
+                * its links — so pressing the **meal name**, which is the row's largest target
+                * and the obvious thing to press, did nothing: iOS claimed the long-press for its
+                * own link callout and fired `pointercancel`. "Press and hold does nothing" was
+                * accurate about the only place anybody would try.
+                *
+                * Making the title draggable would ask one element to mean tap-to-cook,
+                * long-press-to-drag and tap-elsewhere-to-expand. A handle is the honest answer:
+                * not a link, not selectable text, already `aria-hidden`, 44px wide, at the left
+                * edge where a thumb rests. `-webkit-touch-callout` and `user-select` are off on
+                * it, which is what stops iOS taking the press first.
+                */}
+              <div
+                className="h-day-date"
+                data-entry-id={forDay[0]?.id}
+                aria-hidden="true"
+                {...(forDay.length === 1 ? drag.handlers : {})}
+              >
                 <span>{day.weekday.slice(0, 3).toUpperCase()}</span>
                 <strong>{day.label.replace(/[^0-9]/g, "")}</strong>
+                {/* a grip, so the handle is discoverable rather than a thing to be told about */}
+                {forDay.length === 1 && (
+                  <svg className="h-grip" width="14" height="6" viewBox="0 0 14 6" aria-hidden="true">
+                    <circle cx="2" cy="2" r="1" fill="currentColor" />
+                    <circle cx="7" cy="2" r="1" fill="currentColor" />
+                    <circle cx="12" cy="2" r="1" fill="currentColor" />
+                  </svg>
+                )}
               </div>
 
               <div className="h-day-body">
@@ -322,7 +364,6 @@ export function PlannerWeek(props: {
                       .filter(Boolean)
                       .join(" ")
                   }
-                  {...drag.handlers}
                 >
                   {/*
                     * The whole row is the disclosure, and the title is still a link.
@@ -438,7 +479,7 @@ export function PlannerWeek(props: {
                     * fewer controls at rest rather than smaller ones.
                     */}
                   {isOpen && (
-                  <div className="h-day-panel" id={`entry-${entry.id}`}>
+                  <div className="h-day-panel" id={`entry-${entry.id}`} ref={panel}>
                     {/*
                       * The way to the recipe page, which the title used to be.
                       *

@@ -251,7 +251,12 @@
  */
 .h-docked-page {
   min-height: 100dvh;
-  padding-bottom: calc(var(--size-tab-bar) + env(safe-area-inset-bottom));
+  /*
+   * The bar's own height plus a gap. `--size-tab-bar` is its `min-height`, and its padding can
+   * take it slightly past that, so clearing exactly the token leaves the last row flush against
+   * the border — which reads as cut off. `space-xl` is the breathing room.
+   */
+  padding-bottom: calc(var(--size-tab-bar) + env(safe-area-inset-bottom) + var(--space-xl));
 }
 .h-docked-page > main { flex: 1; min-height: 0; }
 
@@ -895,6 +900,8 @@
 .h-day-panel {
   position: relative;
   z-index: 1;
+  /* what `scrollIntoView` must leave clear: the docked bar plus the home-indicator inset */
+  scroll-margin-bottom: calc(var(--size-tab-bar) + env(safe-area-inset-bottom) + var(--space-md));
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-sm);
@@ -915,12 +922,34 @@
  * It is scoped to the entry rather than the row, so the row's own padding and the day's empty
  * space still scroll normally. A list you cannot scroll is worse than a list you cannot drag.
  */
-.h-day-entry { touch-action: none; }
-/* the select, the ✕ and the title are not drag surfaces: a pointer down on them must behave */
-.h-day-entry select,
-.h-day-entry button,
-.h-day-entry a { touch-action: auto; }
+/*
+ * The handle is the drag surface, and the entry is not.
+ *
+ * Binding the gesture to the whole entry meant the meal *name* was the obvious target and the one
+ * place it could not work: a link gets `touch-action: auto`, iOS takes the long-press for its own
+ * callout, and `pointercancel` kills the drag before the hold timer fires. Nothing in the code
+ * logs anything; the report was simply "press and hold does nothing".
+ *
+ * Three properties, and all three are needed on iOS:
+ *
+ *   touch-action: none          stops the browser deciding this is a scroll before `pointermove`
+ *   -webkit-touch-callout: none stops the press-and-hold preview/callout taking the gesture
+ *   user-select: none           stops the press turning into a text selection with handles
+ *
+ * The first was there; the other two were not, and their absence is the half of this that would
+ * have broken the handle too.
+ */
+.h-day-date[data-entry-id] {
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: grab;
+}
+.h-day-date[data-entry-id]:active { cursor: grabbing; }
+.h-grip { margin-top: 3px; color: var(--text-muted); }
 
+.h-day-row.is-dragging-from .h-day-date { opacity: 0.5; }
 .h-day-entry.is-dragging {
   opacity: 0.65;
   /* lifted, so it reads as held rather than as broken */
@@ -936,3 +965,70 @@
 @media (prefers-reduced-motion: reduce) {
   .h-day-entry.is-sending-next { transform: none; }
 }
+
+/* --- the score grid, which did not fit ----------------------------------- */
+
+/*
+ * `flex-basis: 100%` on every child, so this is a column inside the panel's wrapping flex row.
+ * Without it a long paragraph sits as a flex item and refuses to wrap — which is why the
+ * explanatory text ran off the edge rather than breaking onto a second line.
+ */
+.h-scores { flex: 0 0 100%; min-width: 0; }
+.h-scores > p { margin: var(--space-sm) 0 0; }
+
+.h-score-row { margin-top: var(--space-sm); }
+.h-score-who {
+  display: block;
+  margin-bottom: 4px;
+  font-size: var(--type-meta-size);
+  color: var(--text-muted);
+}
+
+/*
+ * Five buttons sharing the width. `flex: 1` with `min-width: 0` is the whole fix: they shrink to
+ * whatever is there instead of summing to more than the screen, so the page can never be made
+ * wider than the viewport by a household with five members.
+ */
+.h-score-buttons { display: flex; gap: var(--space-sm); }
+.h-score {
+  flex: 1;
+  min-width: 0;
+  height: var(--size-touch-min);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-thumb);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--type-label-size);
+  font-weight: var(--type-label-weight);
+  cursor: pointer;
+}
+/* the chosen score, olive — the `have` grammar this system uses for a settled choice */
+.h-score.is-on { border-color: var(--checked); background: var(--checked); color: var(--on-secondary); }
+.h-score:disabled { opacity: 0.5; cursor: default; }
+
+.h-keep-parts { display: flex; flex-wrap: wrap; gap: var(--space-sm); margin-top: var(--space-sm); }
+.h-chip.is-on { background: var(--planned-bg); color: var(--planned-text); border-color: var(--planned-bg); }
+
+/* --- horizontal overflow: the causes, not a hidden scrollbar -------------- */
+
+/*
+ * `overflow-x: hidden` on the body would make these invisible rather than absent, and a page that
+ * is wider than the screen is still wider than the screen — the layout viewport grows, `position:
+ * fixed` sizes to it, and everything shifts. So these are the causes.
+ *
+ * **`flex: 1` is not enough.** A flex item's `min-width` defaults to `auto`, which floors it at
+ * its *min-content* width — so a `flex: 1` cell holding one long unbroken ingredient name, or a
+ * button with `white-space: nowrap`, cannot shrink past that and pushes the row wider than the
+ * page. `min-width: 0` is the opt-out, and it is needed on every flex child that holds text.
+ */
+.h-cook-ingredients li > span,
+.h-meal-items li > span,
+.h-buy-name,
+.h-day-title { min-width: 0; overflow-wrap: anywhere; }
+
+.h-section > :first-child { min-width: 0; }
+
+/* two short labels today, and a longer pair tomorrow stacks instead of widening the page */
+.h-docked { flex-wrap: wrap; }
+.h-docked > * { min-width: 0; }

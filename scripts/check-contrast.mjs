@@ -185,6 +185,10 @@ const PAIRS = [
   ["week: cooked mark on today's row", "text-muted", "planned-bg", "text"],
   /* the "tap to cook" cue sits on today's row, which is the clay tint — not on parchment */
   ["week: tap-to-cook cue on today", "planned-text", "planned-bg", "text"],
+  ["week: score button, unchosen", "text", "surface", "text"],
+  ["week: score button edge", "border-strong", "surface", "ui"],
+  ["week: score button, chosen", "on-secondary", "checked", "text"],
+  ["week: member name above scores", "text-muted", "surface", "text"],
   // the shared primitives, which every screen paints
   ["primary button label", "on-primary", "primary", "text"],
   ["secondary button label", "on-secondary", "secondary", "text"],

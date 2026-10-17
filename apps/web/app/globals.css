@@ -80,6 +80,13 @@ body {
   color: var(--ink);
   background: var(--paper);
   -webkit-font-smoothing: antialiased;
+  /*
+   * A long unbroken string must break rather than set the page's width — a URL pasted into a
+   * method step, a 40-character ingredient name. This is a real fix: the text wraps. `overflow-x:
+   * hidden` would have made the symptom invisible while the layout viewport stayed too wide, and
+   * `position: fixed` sizes to the layout viewport.
+   */
+  overflow-wrap: break-word;
 }
 
 main {
@@ -430,7 +437,10 @@ ul.verdicts li {
   gap: var(--s4); padding: var(--s2) 0; border-bottom: 1px solid var(--line);
   flex-wrap: wrap;
 }
-.scale { display: flex; gap: var(--s1); }
+.scale { display: flex;
+  /* the panel's control strip — a servings field, a Move select and two buttons. They wrap
+     rather than widening the page, which is what they did on a 390px phone. */
+  flex-wrap: wrap; gap: var(--s1); }
 .scale button { min-width: var(--tap); padding: 0.35rem 0; }
 
 /* ---------------------------------------------------------------------------

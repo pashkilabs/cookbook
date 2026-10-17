@@ -247,40 +247,53 @@ export function Cooked({
 
       {/* the grid, which is what crushed the row — five buttons per member */}
       {(
-        <div>
+        <div className="h-scores">
+          {/*
+            * The name ABOVE its scores, not beside them, and the arithmetic decides it.
+            *
+            * Inside a day row on a 390px phone there are **270px**: the viewport less the week's
+            * 20px gutters, the row's 12px padding and the 44px date block with its gap. A name
+            * column at 5rem plus five 44px buttons and their gaps needs **340px**, so the "5"
+            * was cut off on every row — and no size makes five targets both tappable and visible
+            * beside a name. Same constraint as the row at rest: fewer things per line, not
+            * smaller ones.
+            *
+            * With the name on its own line the buttons share what is left — 47.6px each here,
+            * 33.6px at 320px — and because they flex rather than sit at a fixed width they
+            * **cannot overflow at any viewport**. That is the part that matters: the old row did
+            * not merely look tight, it made the page wider than the screen.
+            */}
           {members.map((member) => (
-            <div key={member.id} style={{ display: "flex", gap: "var(--s2)", alignItems: "baseline" }}>
-              <span className="meta" style={{ minWidth: "5rem" }}>{member.displayName}</span>
-              {[1, 2, 3, 4, 5].map((score) => (
-                <button
-                  key={score}
-                  type="button"
-                  className={scores[member.id] === score ? "button" : "quiet"}
-                  disabled={busy}
-                  aria-label={`${member.displayName}: ${score} of 5`}
-                  onClick={() => rate(member.id, score)}
-                >
-                  {score}
-                </button>
-              ))}
+            <div key={member.id} className="h-score-row">
+              <span className="h-score-who">{member.displayName}</span>
+              <div className="h-score-buttons">
+                {[1, 2, 3, 4, 5].map((score) => (
+                  <button
+                    key={score}
+                    type="button"
+                    className={scores[member.id] === score ? "h-score is-on" : "h-score"}
+                    disabled={busy}
+                    aria-label={`${member.displayName}: ${score} of 5`}
+                    onClick={() => rate(member.id, score)}
+                  >
+                    {score}
+                  </button>
+                ))}
+              </div>
             </div>
           ))}
-          <p className="meta">
-            Nothing here is required — the meal is recorded either way.
-          </p>
+          <p className="h-day-meta">Nothing here is required — the meal is recorded either way.</p>
         </div>
       )}
       {parts.length > 0 && (
-        <div>
-          <p className="meta">
-            Made extra of a part? Keep it for next time:
-          </p>
-          <div className="tabs">
+        <div className="h-scores">
+          <p className="h-day-meta">Made extra of a part? Keep it for next time:</p>
+          <div className="h-keep-parts">
             {parts.map((part) => (
               <button
                 key={part}
                 type="button"
-                className={kept.includes(part) ? "button" : "quiet"}
+                className={kept.includes(part) ? "h-chip is-on" : "h-chip"}
                 disabled={busy || kept.includes(part)}
                 onClick={() => keep(part)}
               >
@@ -296,7 +309,7 @@ export function Cooked({
             * still binds: components index the ingredient list and the inference never sees the
             * method, so the app does not know which steps make this part.
             */}
-          <p className="meta">
+          <p className="h-day-meta">
             Next time this is planned it comes off your shopping list. The app does not know
             which steps make it, so you will still need to find that in the method yourself —
             the saving is the shopping, not the cooking.
@@ -304,7 +317,7 @@ export function Cooked({
         </div>
       )}
 
-      {error && <p className="meta">{error}</p>}
+      {error && <p className="h-day-meta">{error}</p>}
     </div>
   );
 }
