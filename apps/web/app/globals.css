@@ -23,34 +23,51 @@
  */
 
 :root {
-  --ink: #211d18;
-  --ink-soft: #4a423a;
-  --muted: #7a7065;
-  --line: #e7dfd4;
-  --line-strong: #d6cabb;
-  --paper: #faf7f2;
-  --card: #ffffff;
-  --accent: #a4471f;
-  --accent-soft: #f4e8e0;
-  --danger: #8c2f14;
+  /* ---------------------------------------------------------------------------
+   * A bridge, not the end state.
+   *
+   * 706 lines of rules below were written against `--ink`, `--paper`, `--accent` and the rest.
+   * Phase 1's job is to put Harvest underneath them, not to rewrite every rule — so each old name
+   * is now an **alias onto a generated token**, every hex is gone, and every existing screen draws
+   * from `tokens.ts` without a single rule changing.
+   *
+   * Phase 2 replaces these aliases screen by screen as each is restyled. An alias that outlives
+   * that is a name nobody can map back to a token, so the list should shrink to nothing — and
+   * `check-hex-literals` is what stops it being refilled with literals in the meantime.
+   * ------------------------------------------------------------------------- */
 
-  --s1: 0.25rem;
-  --s2: 0.5rem;
-  --s3: 0.75rem;
-  --s4: 1rem;
-  --s5: 1.5rem;
-  --s6: 2rem;
-  --s7: 3rem;
+  --ink: var(--text);
+  --ink-soft: var(--text-body);
+  --muted: var(--text-muted);
+  --line: var(--border);
+  --line-strong: var(--border-strong);
+  --paper: var(--bg);
+  --card: var(--surface);
+  --accent: var(--primary);
+  --accent-soft: var(--planned-bg);
+  --danger: var(--primary-pressed);
 
-  --radius: 8px;
-  --radius-sm: 5px;
-  --shadow: 0 1px 2px rgba(33, 29, 24, 0.04), 0 4px 16px rgba(33, 29, 24, 0.04);
+  /* the 4px scale maps onto Harvest's, which is the same scale with names rather than numbers */
+  --s1: var(--space-xs);
+  --s2: var(--space-sm);
+  --s3: var(--space-md);
+  --s4: var(--space-lg);
+  --s5: var(--space-xl);
+  --s6: var(--space-xxl);
+  --s7: 48px;
 
-  --serif: ui-serif, Georgia, "Iowan Old Style", "Times New Roman", serif;
-  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --radius: var(--radius-card);
+  --radius-sm: var(--radius-thumb);
+  --tap: var(--size-touch-min);
 
-  /* one-handed: nothing tappable is smaller than this */
-  --tap: 2.75rem;
+  --serif: var(--font-display);
+  --sans: var(--font-body);
+
+  /* Harvest has no shadow but the segmented thumb: cards are flat (§3) */
+  --shadow: none;
+
+  --tile: var(--surface-sunken);
+  --tile-ink: var(--text-muted);
 }
 
 * { box-sizing: border-box; }
@@ -341,7 +358,7 @@ section { margin-bottom: var(--s6); }
 .substitution .cost,
 .substitution .notfor { display: block; color: var(--muted); }
 .substitution .ratio { color: var(--fg); }
-.substitution .notfor { color: var(--danger, #a33); font-weight: 500; margin-top: 0.15rem; }
+.substitution .notfor { color: var(--danger, var(--primary-pressed)); font-weight: 500; margin-top: 0.15rem; }
 
 /* An estimate, sitting above the list it was computed from rather than claiming to be a fact. */
 .meta.energy {
@@ -567,14 +584,14 @@ ul.facts li + li::before {
  * the point of storing a word: this block can change without a data migration.
  * ------------------------------------------------------------------------- */
 
-.dot.clay, .swatch.clay { background: #b4531f; }
-.dot.olive, .swatch.olive { background: #6b7a3a; }
-.dot.teal, .swatch.teal { background: #2f7d78; }
-.dot.plum, .swatch.plum { background: #7d3f6a; }
-.dot.indigo, .swatch.indigo { background: #40518f; }
-.dot.mustard, .swatch.mustard { background: #a87a12; }
-.dot.rose, .swatch.rose { background: #b04a5f; }
-.dot.slate, .swatch.slate { background: #55606b; }
+.dot.clay, .swatch.clay { background: var(--member-clay); }
+.dot.olive, .swatch.olive { background: var(--member-olive); }
+.dot.teal, .swatch.teal { background: var(--member-teal); }
+.dot.plum, .swatch.plum { background: var(--member-plum); }
+.dot.indigo, .swatch.indigo { background: var(--member-indigo); }
+.dot.mustard, .swatch.mustard { background: var(--member-mustard); }
+.dot.rose, .swatch.rose { background: var(--member-rose); }
+.dot.slate, .swatch.slate { background: var(--member-slate); }
 
 ul.roster { list-style: none; padding: 0; margin: 0 0 var(--s6); }
 ul.roster li {
@@ -629,9 +646,9 @@ label.servings .meta { font-size: 0.75rem; color: var(--muted); }
   display: grid;
   gap: 0.5rem;
   padding: 0.75rem;
-  border: 1px solid var(--line, #e2d9cc);
+  border: 1px solid var(--line, var(--border));
   border-radius: 0.75rem;
-  background: var(--card, #fff);
+  background: var(--card, var(--surface));
   color: inherit;
   text-decoration: none;
   font-family: Georgia, "Times New Roman", serif;
@@ -640,7 +657,7 @@ label.servings .meta { font-size: 0.75rem; color: var(--muted); }
 
 .tile:hover,
 .tile:focus-visible {
-  border-color: var(--ink, #4a3f33);
+  border-color: var(--ink, var(--text-body));
 }
 
 .tile img {
@@ -648,12 +665,12 @@ label.servings .meta { font-size: 0.75rem; color: var(--muted); }
   display: block;
 }
 
-@media (prefers-color-scheme: dark) {
-  .tile {
-    --tile: #2a241d;
-    --tile-ink: #b9a992;
-  }
-}
+/*
+ * No dark override here any more. `--tile` and `--tile-ink` alias `--surface-sunken` and
+ * `--text-muted`, which the generated stylesheet already redefines for dark — in a media query
+ * guarded against an explicit light choice, and again under `[data-theme="dark"]` so cook mode
+ * and a toggle both win. One definition, three states, none of them here.
+ */
 
 /*
  * A blend, which must not look like a recipe somebody has cooked.

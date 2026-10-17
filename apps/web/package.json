@@ -19,7 +19,8 @@
     "react-dom": "^19.0.0",
     "@pashki/core": "workspace:*",
     "@pashki/db": "workspace:*",
-    "@pashki/import": "workspace:*"
+    "@pashki/import": "workspace:*",
+    "@pashki/design-tokens": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",

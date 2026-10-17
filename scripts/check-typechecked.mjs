@@ -23,7 +23,12 @@ import { readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const ROOT = resolve(".");
-const PROJECTS = ["apps/web", "packages/core", "packages/db", "packages/import", "packages/platform-client"];
+const PROJECTS = [
+  "apps/web", "packages/core", "packages/db", "packages/import", "packages/platform-client",
+  // added with the package: a project missing from this list has every file reported as checked
+  // by nothing, which is this guard noticing a new package rather than a new hole
+  "packages/design-tokens",
+];
 
 /*
  * Not ours and not checkable: dependency trees, build output, and Supabase's own scratch

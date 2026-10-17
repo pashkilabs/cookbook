@@ -1,3 +1,4 @@
+import { palette } from "@pashki/design-tokens";
 import { siteUrl } from "@/lib/site-url";
 
 /**
@@ -55,7 +56,14 @@ export async function sendInvitationEmail(invitation: InvitationEmail): Promise<
       html:
         `<p>${who} has invited you to share the recipes in <strong>${household}</strong>.</p>` +
         `<p><a href="${link}">Accept the invitation</a></p>` +
-        `<p style="color:#7a7065;font-size:14px">The link works once and expires in seven days. ` +
+        /*
+         * The token value, interpolated — not a hex literal and not an exemption.
+         *
+         * An email client cannot read a CSS custom property, so the colour has to be inline. But
+         * this is TypeScript, so it can import the token rather than copy it, which keeps one
+         * source of truth and needs no hole in `check-hex-literals`.
+         */
+        `<p style="color:${palette.loam};font-size:14px">The link works once and expires in seven days. ` +
         `If you weren't expecting this, ignore it — nothing happens until you follow the link.</p>`,
     }),
     signal: AbortSignal.timeout(20_000),

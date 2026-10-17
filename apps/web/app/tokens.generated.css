@@ -1,0 +1,181 @@
+/* GENERATED from packages/design-tokens/src/tokens.ts — do not edit by hand. */
+/* Regenerate with: pnpm --filter @pashki/design-tokens gen:css */
+
+:root {
+  --colour-oat: #F3ECDF;
+  --colour-parchment: #FBF7F0;
+  --colour-oat-deep: #E8DFD0;
+  --colour-hairline: #DED3C2;
+  --colour-stone: #CFC3B0;
+  --colour-bark: #2B2620;
+  --colour-body-ink: #4A433B;
+  --colour-loam: #6A6055;
+  --colour-checkbox-edge: #8C8174;
+  --colour-terracotta: #B4532A;
+  --colour-terracotta-deep: #8E3F1E;
+  --colour-olive: #56653F;
+  --colour-olive-deep: #3E4A2D;
+  --colour-turmeric: #D9A23B;
+  --colour-sage-tint: #DDE3D0;
+  --colour-clay-tint: #F0D9C8;
+  --colour-espresso: #1C1915;
+  --colour-cast-iron: #28231E;
+  --colour-ash-wood: #3A332C;
+  --colour-ash-edge: #4A4239;
+  --colour-linen: #EEE6D8;
+  --colour-oatmeal: #B8AC9B;
+  --colour-linen-soft: #DCD2C2;
+  --colour-ember: #E0855A;
+  --colour-moss: #A3B58A;
+  --colour-turmeric-dark: #E3B04F;
+  --member-clay: #B4531F;
+  --member-olive: #6B7A3A;
+  --member-teal: #2F7D78;
+  --member-plum: #7D3F6A;
+  --member-indigo: #40518F;
+  --member-mustard: #A87A12;
+  --member-rose: #B04A5F;
+  --member-slate: #55606B;
+  
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 20px;
+  --space-xxl: 28px;
+  --radius-checkbox: 7px;
+  --radius-thumb: 12px;
+  --radius-input: 14px;
+  --radius-card: 16px;
+  --radius-card-large: 20px;
+  --radius-sheet: 22px;
+  --radius-pill: 999px;
+  --size-touch-min: 44px;
+  --size-button: 44px;
+  --size-button-large: 60px;
+  --size-input: 48px;
+  --size-segmented: 38px;
+  --size-checkbox: 24px;
+  --size-day-circle-w: 42px;
+  --size-day-circle-h: 52px;
+  --size-tab-bar: 84px;
+  --size-docked-action-bar: 84px;
+  --size-hero-image: 250px;
+  --shadow-segmented-thumb: 0 1px 2px rgba(43,38,32,0.15);
+  --font-display: var(--font-display-loaded), "Fraunces", Georgia, "Times New Roman", serif;
+  --font-body: var(--font-body-loaded), "Nunito Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --type-display-x-l-size: 30px;
+  --type-display-x-l-weight: 600;
+  --type-display-x-l-line: 1.1;
+  --type-display-l-size: 28px;
+  --type-display-l-weight: 600;
+  --type-display-l-line: 1.1;
+  --type-display-m-size: 22px;
+  --type-display-m-weight: 600;
+  --type-display-m-line: 1.15;
+  --type-display-s-size: 20px;
+  --type-display-s-weight: 600;
+  --type-display-s-line: 1.2;
+  --type-step-number-size: 56px;
+  --type-step-number-weight: 600;
+  --type-step-number-line: 1;
+  --type-cook-body-size: 26px;
+  --type-cook-body-weight: 400;
+  --type-cook-body-line: 1.35;
+  --type-body-l-size: 16px;
+  --type-body-l-weight: 400;
+  --type-body-l-line: 1.45;
+  --type-body-size: 15px;
+  --type-body-weight: 400;
+  --type-body-line: 1.5;
+  --type-label-size: 15px;
+  --type-label-weight: 700;
+  --type-label-line: 1.2;
+  --type-meta-size: 13px;
+  --type-meta-weight: 400;
+  --type-meta-line: 1.35;
+  --type-chip-size: 12px;
+  --type-chip-weight: 700;
+  --type-chip-line: 1.2;
+  --type-eyebrow-size: 12px;
+  --type-eyebrow-weight: 700;
+  --type-eyebrow-line: 1.2;
+  --type-eyebrow-tracking: 1.2px;
+  --type-tab-size: 11px;
+  --type-tab-weight: 600;
+  --type-tab-line: 1.2;
+  
+  --bg: #F3ECDF;
+  --surface: #FBF7F0;
+  --surface-sunken: #E8DFD0;
+  --border: #DED3C2;
+  --border-strong: #CFC3B0;
+  --text: #2B2620;
+  --text-body: #4A433B;
+  --text-muted: #6A6055;
+  --primary: #B4532A;
+  --primary-pressed: #8E3F1E;
+  --on-primary: #FFFFFF;
+  --secondary: #56653F;
+  --on-secondary: #FFFFFF;
+  --highlight: #D9A23B;
+  --on-highlight: #2B2620;
+  --chip-bg: #DDE3D0;
+  --chip-text: #3E4A2D;
+  --planned-bg: #F0D9C8;
+  --planned-text: #8E3F1E;
+  --checkbox-edge: #8C8174;
+  --checked: #56653F;
+}
+
+/* system dark, unless an explicit light choice says otherwise */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1C1915;
+    --surface: #28231E;
+    --surface-sunken: #3A332C;
+    --border: #4A4239;
+    --border-strong: #4A4239;
+    --text: #EEE6D8;
+    --text-body: #DCD2C2;
+    --text-muted: #B8AC9B;
+    --primary: #E0855A;
+    --primary-pressed: #C96F45;
+    --on-primary: #1C1915;
+    --secondary: #A3B58A;
+    --on-secondary: #1C1915;
+    --highlight: #E3B04F;
+    --on-highlight: #1C1915;
+    --chip-bg: #3A332C;
+    --chip-text: #A3B58A;
+    --planned-bg: #3A332C;
+    --planned-text: #E0855A;
+    --checkbox-edge: #B8AC9B;
+    --checked: #A3B58A;
+  }
+}
+
+/* an explicit choice, and cook mode, which is always dark */
+:root[data-theme="dark"] {
+  --bg: #1C1915;
+  --surface: #28231E;
+  --surface-sunken: #3A332C;
+  --border: #4A4239;
+  --border-strong: #4A4239;
+  --text: #EEE6D8;
+  --text-body: #DCD2C2;
+  --text-muted: #B8AC9B;
+  --primary: #E0855A;
+  --primary-pressed: #C96F45;
+  --on-primary: #1C1915;
+  --secondary: #A3B58A;
+  --on-secondary: #1C1915;
+  --highlight: #E3B04F;
+  --on-highlight: #1C1915;
+  --chip-bg: #3A332C;
+  --chip-text: #A3B58A;
+  --planned-bg: #3A332C;
+  --planned-text: #E0855A;
+  --checkbox-edge: #B8AC9B;
+  --checked: #A3B58A;
+}
