@@ -7,7 +7,8 @@ import { scaleIngredientAmounts, servingsForScale } from "@/lib/planner";
 import { userClient } from "@/lib/supabase-server";
 import { maybeRow, rows } from "@/lib/rows";
 import { platformStore } from "@/lib/platform";
-import { startOfWeek, addWeeks, todayIso } from "@/lib/week";
+import { startOfWeek, addWeeks, todayIso, weekDays, weekLabel, weekdayName } from "@/lib/week";
+import { PlanIt, type PlanDay } from "./plan-it";
 import { ShortlistButton } from "../shortlist-button";
 import { CookTonight } from "../cook-tonight";
 import { RemoveRecipe } from "./remove";
@@ -17,6 +18,7 @@ import { PhotoUpload } from "../photo-upload";
 import { PalateNotes } from "./palate";
 import { SplitButton } from "../blend/split";
 import { componentsKeyFor, palateNotesFor } from "@/lib/tastes";
+import { Chip, IconLink, DockedActionBar, PrimaryLink, SecondaryLink } from "@/components/harvest";
 import { allergenSentence, readAvoidedAllergens } from "@/lib/allergen-filter";
 import { linkify } from "./linkify";
 import { Substitution } from "./substitution";
@@ -304,6 +306,35 @@ export default async function RecipePage({
   );
 
   /*
+   * This recipe's own days this week, for the plan-it panel.
+   *
+   * Scoped to `recipe_id` — the panel answers "is THIS on Thursday", not "is anything". And to
+   * `family_id` as well, for the reason the planned-entry read above gives: a row arriving from
+   * somewhere else is not this household's.
+   */
+  const plannedDays = rows(
+    await supabase
+      .from("plan_entries")
+      .select("id, date")
+      .eq("family_id", family.id)
+      .eq("recipe_id", recipe.id)
+      .gte("date", weekStart)
+      .lte("date", weekDays(weekStart)[6]!)
+      .is("deleted_at", null),
+    "planned days",
+  );
+  const entryByDate = new Map(plannedDays.map((row) => [row.date as string, row.id as string]));
+  const planDays: PlanDay[] = weekDays(weekStart).map((date) => ({
+    date,
+    // the initial, which is what the reference's circles carry — and `weekdayName` is the one
+    // place a day's name is spelled, so Tuesday and Thursday cannot drift apart from each other
+    letter: weekdayName(date).charAt(0),
+    dayOfMonth: Number(date.slice(8, 10)),
+    entryId: entryByDate.get(date) ?? null,
+    name: weekdayName(date),
+  }));
+
+  /*
    * Only when nobody in the household has rated it.
    *
    * Not a gate on the *feature* — §59 keeps the two ungated in principle — but a gate on this
@@ -317,16 +348,24 @@ export default async function RecipePage({
       : [];
 
   return (
+    <div className="h-docked-page">
     <main>
-      <p className="subtitle" style={{ marginBottom: "0.75rem" }}>
-        <Link href="/recipes">← {family.name}</Link>
-      </p>
+      {/*
+        * Back as a 44px circle over the photograph (§4.2), not a text breadcrumb above it.
+        *
+        * `IconLink` requires a label, so it cannot ship nameless — which is the failure an
+        * icon-only control has and a text link does not.
+        */}
 
       {/*
         * The photograph leads. It is what a person recognises the dish by, and putting it under
         * the title made it look like an attachment to a database row.
         */}
-      {photoUrl && (
+      <div className="h-hero">
+        <IconLink label={`Back to ${family.name}`} href="/recipes" className="h-hero-back">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+        </IconLink>
+      {photoUrl ? (
         // eslint-disable-next-line @next/next/no-img-element -- a signed URL expires; the
         // optimiser would cache one past its life
         <img
@@ -336,7 +375,13 @@ export default async function RecipePage({
           width={photo.data?.width ?? undefined}
           height={photo.data?.height ?? undefined}
         />
+      ) : (
+        /* one wash for a missing image, not a placeholder tint — see the Phase 0 recon */
+        <span className="h-hero-empty" aria-hidden="true">
+          {recipe.title.trim().charAt(0).toUpperCase() || "?"}
+        </span>
       )}
+      </div>
 
       {/* the placement Stephen was reaching for: an existing recipe with no picture had no way
           to get one, on any screen. Labelled by what it does to the recipe you can see. */}
@@ -369,58 +414,97 @@ export default async function RecipePage({
 
       <PhotoUpload recipeId={recipe.id} label={photoUrl ? "Replace the photo" : "Add a photo"} />
 
-      <div className="bar" style={{ marginBottom: "1.5rem" }}>
-        <div>
-          {/*
-        * Above everything, because the point of it is the decision to cook — not a footnote
-        * discovered after reading the method. Worded as §71 requires: what it saw, quoted, and
-        * never the word "safe".
+      {/*
+        * The parchment sheet, overlapping the hero by 22px (§4.2).
+        *
+        * It is what makes the photograph part of the page rather than a banner above it — the
+        * recipe begins on paper laid over the picture. `--radius-sheet` is the token for the
+        * corner, and the negative margin is the overlap the reference draws.
         */}
-      {allergenNotes.length > 0 && (
-        <section className="allergen-warning">
-          {allergenNotes.map((note) => (
-            <p key={`${note.allergen}-${note.because}`}>
-              <strong>{allergenSentence(note)}</strong>
+      <div className="h-sheet">
+        {/*
+          * Above everything, because the point of it is the decision to cook — not a footnote
+          * discovered after reading the method. Worded as §71 requires: what it saw, quoted, and
+          * never the word "safe".
+          *
+          * It is at the top of the sheet now rather than nested inside the old header bar's title
+          * column, which is where a careless insertion had put it: a <section> inside a flex child
+          * meant to hold an <h1>. It rendered, which is why nothing noticed.
+          */}
+        {allergenNotes.length > 0 && (
+          <section className="allergen-warning">
+            {allergenNotes.map((note) => (
+              <p key={`${note.allergen}-${note.because}`}>
+                <strong>{allergenSentence(note)}</strong>
+              </p>
+            ))}
+            <p className="meta">
+              Your household avoids {andList(family.avoidedAllergens.map((a) => (a === "tree-nut" ? "tree nuts" : a)))},
+              so this is hidden from the recipe list and from search. It reads ingredient lists, so
+              it cannot see inside a jar.
             </p>
-          ))}
-          <p className="meta">
-            Your household avoids {andList(family.avoidedAllergens.map((a) => (a === "tree-nut" ? "tree nuts" : a)))},
-            so this is hidden from the recipe list and from search. It reads ingredient lists, so
-            it cannot see inside a jar.
-          </p>
-        </section>
-      )}
+          </section>
+        )}
 
-      <h1>{recipe.title}</h1>
-          <ul className="facts">
-            {[
-              recipe.source_name,
-              recipe.servings ? `serves ${recipe.servings}` : null,
-              recipe.time_minutes ? `${recipe.time_minutes} min` : null,
-              recipe.times_made ? `made ${recipe.times_made}×` : null,
-              recipe.visibility === "public" ? "published" : null,
-            ]
-              .filter(Boolean)
-              .map((fact) => <li key={String(fact)}>{fact}</li>)}
-          </ul>
+        {/*
+          * Chips: what the recipe IS. Drawn from the classification the app already has — course,
+          * cuisine, dish form, protein — rather than from a tag column it does not.
+          *
+          * "Will make again · 3" in the reference has no number behind it: `make_again` is a
+          * boolean, so this says the state and invents nothing.
+          */}
+        <div className="h-chips">
+          {recipe.time_minutes && <Chip>{recipe.time_minutes} min</Chip>}
+          {recipe.cuisine && <Chip>{recipe.cuisine}</Chip>}
+          {recipe.dish_form && <Chip>{String(recipe.dish_form)}</Chip>}
+          {recipe.principal_protein && <Chip>{String(recipe.principal_protein)}</Chip>}
+          {recipe.make_again === true && <Chip tone="clay">Make again</Chip>}
+          {recipe.times_made > 0 && <Chip tone="clay">Made {recipe.times_made}×</Chip>}
         </div>
-        <div className="tabs" style={{ margin: 0 }}>
-          <ShortlistButton
-            recipeId={recipe.id}
-            weekStart={weekStart}
-            nextWeekStart={nextWeekStart}
-            shortlisted={shortlistRows.some((row) => row.week_start === weekStart)}
-            shortlistedNext={shortlistRows.some((row) => row.week_start === nextWeekStart)}
-          />
-          {/*
-            * First, because it is the commonest thing somebody wants from a recipe they have
-            * just opened at 5pm — and it used to cost four screens (§ tonight).
-            */}
-          <CookTonight recipeId={recipe.id} today={todayIso(family.timezone)} />
+
+        <h1 className="h-recipe-title">{recipe.title}</h1>
+
+        {/*
+          * Source attribution on every imported recipe (§4.2), and it is the one part of this
+          * screen with a reason beyond style: §open lists the copyright posture as unsettled, and
+          * a link back to whoever wrote it is the least this can do meanwhile.
+          *
+          * The domain is shown rather than the full URL — "instagram.com" is what tells somebody
+          * where it came from, and a 200-character share link is not.
+          */}
+        {(recipe.source_name || recipe.source_url) && (
+          <p className="h-source">
+            {recipe.source_url ? (
+              <a href={recipe.source_url} target="_blank" rel="noopener noreferrer">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></svg>
+                {recipe.source_name ? `From ${recipe.source_name}` : "Source"}
+                {(() => {
+                  try {
+                    return ` · ${new URL(recipe.source_url).hostname.replace(/^www\./, "")}`;
+                  } catch {
+                    // a stored URL that will not parse is still worth attributing by name
+                    return "";
+                  }
+                })()}
+              </a>
+            ) : (
+              <span className="meta">From {recipe.source_name}</span>
+            )}
+          </p>
+        )}
+
+        {/*
+          * The actions that were a row of five buttons in the header.
+          *
+          * Edit, Pair and Remove stay here as quiet links; the two a person actually came for —
+          * cook it, or put it on the week — are in the docked bar at the foot, which is where §3
+          * puts a primary action and where a thumb is.
+          */}
+        <div className="h-row-quiet">
           <Link className="button quiet" href={`/recipes/blend?from=${recipe.id}`}>
             Pair this with…
           </Link>
-          <Link className="button" href={`/recipes/${recipe.id}/edit`}>
+          <Link className="button quiet" href={`/recipes/${recipe.id}/edit`}>
             Edit
           </Link>
           <RemoveRecipe recipeId={recipe.id} title={recipe.title} />
@@ -726,11 +810,41 @@ export default async function RecipePage({
         * The subjects offered are *this recipe's own*, so nothing invites an opinion about
         * something that is not in front of you.
         */}
+      <PlanIt recipeId={recipe.id} weekLabel={weekLabel(weekStart)} days={planDays} />
+
       <Preferences
         members={members.map((member) => ({ id: member.id, displayName: member.displayName }))}
         subjects={preferenceSubjects}
         stated={statedPreferences}
       />
     </main>
+
+    {/*
+      * The docked bar (§4.2), and one deliberate deviation from the reference.
+      *
+      * It asks for "Add N to list" beside "Cook now". **This app has no list to add to**: the
+      * shopping list is *derived* from what is planned — `buildShoppingWeek` reads `plan_entries`
+      * — and that derivation is the whole product. One pint of cream across Tuesday and Friday
+      * exists because the list is computed from a week, not accumulated by taps.
+      *
+      * So the secondary action is the real one: put it on the week, and the ingredients follow.
+      * An "Add to list" button would have to either create a plan entry (which is what
+      * "Make this week" already is) or write a second kind of list that consolidation could not
+      * see — and that second list is precisely what this app exists instead of.
+      *
+      * `ShortlistButton` and `CookTonight` are the existing controls, unchanged in behaviour and
+      * moved to where a thumb is.
+      */}
+    <DockedActionBar>
+      <ShortlistButton
+        recipeId={recipe.id}
+        weekStart={weekStart}
+        nextWeekStart={nextWeekStart}
+        shortlisted={shortlistRows.some((row) => row.week_start === weekStart)}
+        shortlistedNext={shortlistRows.some((row) => row.week_start === nextWeekStart)}
+      />
+      <CookTonight recipeId={recipe.id} today={todayIso(family.timezone)} />
+    </DockedActionBar>
+    </div>
   );
 }

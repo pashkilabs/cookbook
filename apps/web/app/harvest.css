@@ -369,3 +369,75 @@
 }
 .recipes .card-body { min-width: 0; }
 .recipes .card-actions { margin-top: var(--space-sm); }
+
+/* --- screen 2: recipe detail (§4.2) -------------------------------------- */
+
+.h-hero {
+  position: relative;
+  height: var(--size-hero-image);
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+.h-hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.h-hero-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  font-family: var(--font-display);
+  font-size: 64px;
+}
+/*
+ * The back control sits over the photograph on an opaque parchment circle, not on the image.
+ *
+ * §5 forbids text over darkened photos, and an icon is the same problem in miniature: a stroke
+ * over an unknown picture can land on anything. An opaque disc is legible against every image
+ * there will ever be, which a translucent one is not.
+ */
+.h-hero-back { position: absolute; top: var(--space-xxl); left: var(--space-lg); z-index: 1; }
+
+.h-sheet {
+  position: relative;
+  margin: calc(-1 * var(--radius-sheet)) 0 0;
+  padding: var(--space-xxl) var(--space-xl) var(--space-xl);
+  border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+  background: var(--surface);
+}
+
+.h-chips { display: flex; flex-wrap: wrap; gap: var(--space-sm); margin-bottom: var(--space-md); }
+
+.h-recipe-title {
+  margin: 0 0 var(--space-xs);
+  font-family: var(--font-display);
+  font-size: var(--type-display-l-size);
+  font-weight: var(--type-display-l-weight);
+  line-height: var(--type-display-l-line);
+  color: var(--text);
+}
+
+.h-source { margin: 0 0 var(--space-lg); font-size: var(--type-meta-size); }
+.h-source a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+.h-source a:hover { text-decoration: underline; }
+
+.h-row-quiet { display: flex; flex-wrap: wrap; gap: var(--space-sm); align-items: center; }
+
+.h-planit {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: var(--space-lg) 0;
+  padding: var(--space-lg);
+  border-radius: var(--radius-card);
+  /* the sunken ground, so the panel reads as inset into the sheet rather than stacked on it */
+  background: var(--bg);
+}
+.h-planit-head { display: flex; justify-content: space-between; align-items: center; font-size: var(--type-label-size); }
+.h-planit-days { display: flex; justify-content: space-between; gap: var(--space-xs); }

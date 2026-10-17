@@ -433,6 +433,65 @@ try {
      * catalog lost a figure it had — which is how the estimate would degrade in practice, quietly
      * and while still rendering something plausible.
      */
+    /*
+     * The plan-it panel, walked in order rather than audited in parts (the three-boundary rule).
+     *
+     * A day crosses four boundaries here: a tap posts a date, the route writes a `plan_entries`
+     * row, the page reads the week back and renders that day as planned, and the circle then
+     * carries the row's id so a second tap can delete it. Every hop has its own test and **no
+     * component test can see the join** — which is where all four of this project's worst bugs
+     * have lived.
+     *
+     * Asserted on the accessible name, not the class, because the name is the thing that has to
+     * be right: "Thursday 23, planned" is a claim about state that a fill colour cannot make.
+     *
+     * Mid-week on purpose. `family.timezone` decides which Monday the page is showing, and this
+     * script computes its date in UTC — a boundary day could legitimately fall in the week either
+     * side, which would read as a broken join. Wednesday survives a shift in both directions.
+     */
+    const midweek = (() => {
+      const now = new Date();
+      const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+      monday.setUTCDate(monday.getUTCDate() - ((monday.getUTCDay() + 6) % 7) + 2);
+      return monday.toISOString().slice(0, 10);
+    })();
+    const planned = await call("POST", "/api/plan-entries", { body: { recipeId, date: midweek } });
+    const entryId = planned.body?.id ?? planned.body?.entry?.id ?? null;
+    record("plan the recipe on a day this week", planned.status === 200, `HTTP ${planned.status} ${JSON.stringify(planned.body ?? "").slice(0, 80)}`);
+
+    const dayName = new Date(`${midweek}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "long", timeZone: "UTC" });
+    const wanted = `${dayName} ${Number(midweek.slice(8, 10))}, planned`;
+    const afterPlan = await call("GET", `/recipes/${recipeId}`);
+    const planHtml = typeof afterPlan.body === "string" ? afterPlan.body : "";
+    record(
+      "and that day reads back as planned on the recipe page",
+      planHtml.includes(`aria-label="${wanted}"`),
+      !planHtml.includes("h-planit")
+        ? "the panel did not render at all"
+        : planHtml.includes(`aria-label="${wanted}"`)
+          ? `"${wanted}"`
+          : `panel rendered without "${wanted}"`,
+    );
+
+    /*
+     * And off again, which is the hop that would fail silently.
+     *
+     * The id reaching the circle is the only way a second tap can unplan anything; render it with
+     * a null id and the panel looks identical and quietly plans a duplicate instead.
+     */
+    if (entryId) {
+      const removed = await call("DELETE", `/api/plan-entries/${entryId}`);
+      const afterRemove = await call("GET", `/recipes/${recipeId}`);
+      const removeHtml = typeof afterRemove.body === "string" ? afterRemove.body : "";
+      record(
+        "and tapping it again takes it off the week",
+        removed.status === 200 && removeHtml.includes(`aria-label="${dayName} ${Number(midweek.slice(8, 10))}, not planned"`),
+        `DELETE ${removed.status}`,
+      );
+    } else {
+      record("and tapping it again takes it off the week", null, "no entry id came back from the POST");
+    }
+
     const detail = await call("GET", `/recipes/${recipeId}`);
     const page = typeof detail.body === "string" ? detail.body : JSON.stringify(detail.body);
     record("the recipe page renders", alive(detail), `HTTP ${detail.status}`);
@@ -793,7 +852,12 @@ try {
         // the parts control, and the preference control that sits with the ratings. A recipe this
         // run just created has no partition and no stated preferences, so a working render must
         // offer both — which is the assertion that each is REACHABLE, not that the page is 200.
-        ["Parts of this recipe", "Was it something in particular?"],
+        [
+          "Parts of this recipe", "Was it something in particular?",
+          // the Harvest restyle (§4.2): the overlapping sheet, and the docked actions that
+          // replaced a header row of five buttons
+          "h-sheet", "h-docked",
+        ],
       ],
       ["/recipes/[id]/edit", `/recipes/${recipeId}/edit`, null],
       ["/recipes/blend?from=", `/recipes/blend?from=${recipeId}`, null],

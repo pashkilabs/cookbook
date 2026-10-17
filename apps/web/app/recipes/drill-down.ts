@@ -14,9 +14,11 @@ export const COURSES = [
   { key: "soup", label: "Soup", field: "dish_form" },
   { key: "salad", label: "Salad", field: "dish_form" },
   { key: "main", label: "Mains", field: "course" },
+  { key: "side", label: "Sides", field: "course" },
   { key: "dessert", label: "Desserts", field: "course" },
   { key: "drink", label: "Drinks", field: "course" },
   { key: "breakfast", label: "Breakfast/Brunch", field: "course" },
+  { key: "snack", label: "Snacks", field: "course" },
 ] as const;
 
 /*
@@ -30,9 +32,14 @@ export const COURSES = [
  * The Harvest handoff asks for a Lunch segment, which is presumably why: the app's own UI offered
  * one. Putting it back needs a migration, which §5 excludes, so it is removed rather than faked.
  *
- * **And the axis has a gap the other way:** `side` holds 5 recipes and `snack` is valid, and
- * neither has a chip — so those are unreachable by drill-down. Adding them changes what the
- * screen offers, which is a product decision rather than a restyle, so it is reported not done.
+ * **And the axis had a gap the other way**, now closed: `side` and `snack` are valid courses and
+ * neither had a chip, so two of the seven were unreachable — `side` with five recipes in it. That
+ * is the lunch bug's shape without the schema excuse, so the fix is the same size as the bug: one
+ * line each.
+ *
+ * Why the list was missing them is the same reason it offered `lunch`: **the reference screens
+ * record what the app looked like, not what it should offer.** A chip list drawn from a screenshot
+ * inherits the screenshot's gaps.
  */
 
 /**
