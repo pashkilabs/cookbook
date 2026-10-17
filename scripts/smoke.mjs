@@ -173,6 +173,21 @@ const alive = (result) => result.status !== 0 && result.status < 500;
  * Entities as well, for the same reason: React writes `’` and a needle typed with an apostrophe
  * misses it.
  */
+/**
+ * A detail that cannot contradict its own verdict.
+ *
+ * `record` prints its detail whichever way the check went, so a detail *computed* as though the
+ * check failed reads `ok … no "Wed · " chip` — which is exactly as confusing as the inverse this
+ * script was already corrected for, where a failing marker read `FAIL … found`.
+ *
+ * I have now written that backwards three times in one body of work: once in the marker loop,
+ * once in the plan-it walk, once here. Three is not a discipline problem, it is a missing helper
+ * — the same conclusion as a rule that has failed five times needing a guard rather than a
+ * reminder. Pass the text and the needle and the wording follows from the answer.
+ */
+const foundDetail = (text, needle, missing) =>
+  String(text ?? "").includes(needle) ? `"${needle}"` : (missing ?? `no "${needle}"`);
+
 const visible = (html) =>
   String(html ?? "")
     .replace(/<!--.*?-->/g, "")
@@ -492,11 +507,42 @@ try {
     record(
       "and that day reads back as planned on the recipe page",
       planHtml.includes(`aria-label="${wanted}"`),
-      !planHtml.includes("h-planit")
-        ? "the panel did not render at all"
-        : planHtml.includes(`aria-label="${wanted}"`)
-          ? `"${wanted}"`
-          : `panel rendered without "${wanted}"`,
+      planHtml.includes("h-planit")
+        ? foundDetail(planHtml, `aria-label="${wanted}"`, `panel rendered without "${wanted}"`)
+        : "the panel did not render at all",
+    );
+
+    /*
+     * Plan → shopping list, walked while the entry exists.
+     *
+     * This is the product's central join and the one claim its description makes: give a recipe a
+     * day and the list writes itself. Three boundaries — a plan entry, `buildShoppingWeek`'s
+     * consolidation, and the row on screen — so it gets one walk rather than three component
+     * tests, and it is placed here because the plan-it check above has just created a real entry
+     * and is about to remove it. A probe owns its fixture.
+     */
+    const monday = (() => {
+      const d = new Date(`${midweek}T12:00:00Z`);
+      d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+      return d.toISOString().slice(0, 10);
+    })();
+    const list = await call("GET", `/shopping?week=${monday}`);
+    const listText = visible(typeof list.body === "string" ? list.body : "");
+    record(
+      "a planned recipe puts its ingredients on that week's shopping list",
+      alive(list) && listText.includes("double cream"),
+      alive(list)
+        ? foundDetail(listText, "double cream", "the list rendered without the planned recipe's ingredient")
+        : `HTTP ${list.status}`,
+    );
+    record(
+      "and says which day takes it, which is what consolidation is for",
+      // the day chip: "Wed · 1 pint". Asserted on the weekday rather than the amount, because
+      // the amount depends on the household's measurement system and the day does not.
+      listText.includes(`${dayName.slice(0, 3)} · `),
+      listText.includes("h-buy-split")
+        ? foundDetail(listText, `${dayName.slice(0, 3)} · `)
+        : "no split row at all",
     );
 
     /*
@@ -530,7 +576,7 @@ try {
     record(
       "the recipe page offers a way into cook mode",
       recipeHtml.includes(`/cook/${recipeId}`) && recipeHtml.includes("Cook now"),
-      recipeHtml.includes(`/cook/${recipeId}`) ? "href present" : "no /cook link on the recipe page",
+      foundDetail(recipeHtml, `/cook/${recipeId}`, "no /cook link on the recipe page"),
     );
 
     const cook = await call("GET", `/cook/${recipeId}`);
@@ -555,7 +601,7 @@ try {
         continue;
       }
       const found = cookHtml.includes(needle) || cookText.includes(needle);
-      record(`and ${what}`, found, found ? `"${needle}"` : `no "${needle}"`);
+      record(`and ${what}`, found, foundDetail(found ? needle : "", needle));
     }
 
     /*
@@ -917,6 +963,13 @@ try {
        * renders the old markup is a restyle that did not happen, and nothing else would notice.
        */
       "/recipes": ["Tonight", "for dinner?", 'aria-label="Main"'],
+      /*
+       * The Harvest shopping list (§4.5). The segmented control and the aisle rows are asserted;
+       * the consolidation chips are not, because a week with no overlapping ingredient has none
+       * and that is a correct list rather than a broken screen — the same reasoning as the
+       * alongside footnote one entry up.
+       */
+      "/shopping": ["By aisle", "By meal", "h-buy", "in the trolley"],
       // two markers, so the allergen control is covered rather than riding on one that already
       // passed — the §71 setting is the whole reason this screen matters now
       "/household": ["Where you cook", "What you avoid"],

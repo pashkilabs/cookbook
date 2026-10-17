@@ -137,6 +137,16 @@ const PAIRS = [
   ["week: + Add dinner hover label", "text", "surface", "text"],
   ["week: + Add dinner hover label on today", "text", "planned-bg", "text"],
   ["week: + Add dinner hover edge", "primary", "planned-bg", "ui"],
+  // shopping (§4.5)
+  ["shop: item name", "text", "surface", "text"],
+  ["shop: package amount", "text", "surface", "text"],
+  ["shop: counts and notes", "text-muted", "surface", "text"],
+  ["shop: a ticked line, struck through", "text-muted", "surface", "text"],
+  ["shop: day portion chip", "planned-text", "planned-bg", "text"],
+  ["shop: spare chip", "chip-text", "chip-bg", "text"],
+  ["shop: by-meal portion", "text-body", "surface", "text"],
+  ["shop: dashed pantry edge", "checkbox-edge", "surface", "ui"],
+  ["shop: aisle eyebrow", "text-muted", "surface", "text"],
   // the shared primitives, which every screen paints
   ["primary button label", "on-primary", "primary", "text"],
   ["secondary button label", "on-secondary", "secondary", "text"],

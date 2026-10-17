@@ -752,3 +752,58 @@
 .h-alongside-list li:last-child { border-bottom: 0; }
 /* the shared ingredients, which are the whole point — named, so a cook can judge the guess */
 .h-alongside-list .meta { color: var(--text-muted); }
+
+/* --- screen 5: shopping (§4.5) ------------------------------------------- */
+
+.h-shop-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-xl) var(--space-xl) var(--space-md);
+}
+.h-shop-count { margin: 2px 0 0; font-size: var(--type-meta-size); color: var(--text-muted); }
+.h-share-said { font-size: var(--type-chip-size); font-weight: var(--type-chip-weight); }
+.h-shop-views { padding: 0 var(--space-xl) var(--space-lg); }
+
+.h-aisle { padding: 0 var(--space-xl); margin-bottom: var(--space-xl); }
+
+.h-buy { display: flex; align-items: flex-start; gap: var(--space-sm); padding: var(--space-md) 0; border-bottom: 1px solid var(--border); }
+.h-buy:last-child { border-bottom: 0; }
+/* the checkbox is a label and wraps what is crossed off, so it takes the row's width */
+.h-buy > .h-check { flex: 1; min-width: 0; align-items: flex-start; }
+.h-buy-what { flex: 1; min-width: 0; }
+.h-buy-top { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-md); }
+.h-buy-name { font-size: var(--type-body-l-size); line-height: var(--type-body-l-line); color: var(--text); }
+/*
+ * The package decision, loud and on the right. "1 pint" beside "Tue ½ cup · Fri 1 cup" is the
+ * whole product: one pint bought instead of two half-pints and waste.
+ */
+.h-buy-amount { flex: none; font-size: var(--type-body-l-size); font-weight: 700; color: var(--text); }
+.h-buy-of { margin: 2px 0 0; font-size: var(--type-meta-size); color: var(--text-muted); }
+.h-buy-split { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin-top: var(--space-sm); }
+
+/* struck through and muted, which is the `have` state's half of §3 that lives on the row */
+.h-buy.is-ticked .h-buy-name,
+.h-buy.is-ticked .h-buy-amount { text-decoration: line-through; color: var(--text-muted); }
+.h-buy.is-ticked .h-buy-split { opacity: 0.5; }
+
+.h-check-pantry { padding-top: var(--space-md); border-top: 1px solid var(--border); }
+
+.h-meal { padding: 0 var(--space-xl); margin-bottom: var(--space-xl); }
+.h-meal-items { margin: var(--space-sm) 0 0; padding: 0; list-style: none; }
+.h-meal-items li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--type-body-l-size);
+  color: var(--text-body);
+}
+.h-meal-items li:last-child { border-bottom: 0; }
+.h-meal-items li.is-ticked { text-decoration: line-through; color: var(--text-muted); }
+.h-meal-items li strong { flex: none; color: var(--text); }
+
+.h-spare { padding: 0 var(--space-xl); margin-bottom: var(--space-xl); }
+.h-pantry-chips { display: flex; flex-wrap: wrap; gap: var(--space-sm); margin: var(--space-md) 0 0; padding: 0; list-style: none; }

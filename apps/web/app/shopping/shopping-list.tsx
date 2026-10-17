@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { formatCountable, pluralise, type ShoppingLine } from "@pashki/core";
+import { Checkbox, Chip, Eyebrow, SectionHeader, SegmentedControl } from "@/components/harvest";
+import { byMeal } from "@/lib/by-meal";
+import { weekdayName } from "@/lib/week";
+import { ShareList } from "./share";
 
 /**
  * The list, and the two things you can do to it while standing in a shop.
@@ -29,6 +33,7 @@ export function ShoppingList(props: {
   const [ticked, setTicked] = useState(new Set(props.ticked));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [view, setView] = useState<"aisle" | "meal">("aisle");
 
   /*
    * `finally`, and the whole list depends on it.
@@ -102,98 +107,247 @@ export function ShoppingList(props: {
 
   const total = props.byAisle.reduce((sum, group) => sum + group.lines.length, 0);
 
+  /*
+   * ---------------------------------------------------------------------------
+   * "Pantry · check before you go" is §73's unresolved case, not every pantry line
+   * ---------------------------------------------------------------------------
+   *
+   * `inPantry` alone cannot decide this, and splitting on it would hide a real shortfall from the
+   * buy list. §73 drew the distinction that matters: a pantry entry **with** an amount reduces
+   * `needed`, so what is left on the line is the shortfall and it belongs in its aisle. One typed
+   * **without** an amount — "we have some rice" — is flagged and subtracted from nothing, which
+   * means *we do not know whether to buy at all*.
+   *
+   * That second case is exactly what a dashed checkbox says. The primitive's three states were
+   * written with the dashed one meaning **unresolved** rather than unchecked, and this is the
+   * first screen where a genuinely unresolved thing exists to put in it.
+   */
+  const toCheck = props.byAisle.flatMap((group) =>
+    group.lines.filter((line) => line.inPantry && !line.pantryDeducted),
+  );
+  const checkKeys = new Set(toCheck.map((line) => line.key));
+  const aisles = props.byAisle
+    .map((group) => ({ ...group, lines: group.lines.filter((line) => !checkKeys.has(line.key)) }))
+    .filter((group) => group.lines.length > 0);
+  const meals = byMeal(aisles);
+
+  /*
+   * What the share sheet gets: the aisle view as text, which is the view that answers "what do I
+   * buy". Package decisions included, because they are the point — and the household's own item
+   * names only, no recipe titles and nothing about who likes what.
+   */
+  const shareText = [
+    `Shopping · ${total} ${total === 1 ? "item" : "items"}`,
+    ...aisles.flatMap((group) => [
+      "",
+      group.aisle.toUpperCase(),
+      ...group.lines.map((line) => `- ${line.packagesDisplay ?? line.neededDisplay ?? ""} ${line.label}`.trim()),
+    ]),
+  ].join("\n");
+
+  const day = (date: string | null) => (date ? weekdayName(date).slice(0, 3) : null);
+
+  const lineRow = (line: ShoppingLine) => {
+    const isTicked = ticked.has(line.key);
+    const inPantry = line.inPantry;
+    return (
+      <div className={isTicked ? "h-buy is-ticked" : "h-buy"} key={line.key}>
+        {/*
+          * The checkbox *wraps* what is being crossed off, because `Checkbox` is a `<label>` —
+          * so the whole name-and-amount block is the hit target, which is what a thumb in aisle
+          * four needs. "Have it" stays outside it: a button nested in a label would toggle the
+          * tick as well as itself.
+          *
+          * `onToggle` omitted rather than a `disabled` prop, which is this primitive's API — it
+          * disables the real input when nothing can happen.
+          */}
+        <Checkbox
+          state={isTicked ? "have" : "need"}
+          {...(busy === null ? { onToggle: () => void toggleTick(line) } : {})}
+          label={`Got ${line.label}`}
+        >
+        <div className="h-buy-what">
+          <div className="h-buy-top">
+            <span className="h-buy-name">{line.label}</span>
+            {/*
+              * The package decision, on the right and loud (§4.5). It is the product: "1 pint"
+              * beside "Tue ½ cup, Fri 1 cup" is one pint bought instead of two half-pints.
+              *
+              * Catalog names are singular and core pluralises, so the two branches ask for
+              * different forms rather than sharing a string — "a bag of potatoes" is plural
+              * whatever the count, while a bare quantity agrees with its number.
+              */}
+            <strong className="h-buy-amount">
+              {line.packagesDisplay
+                ? line.packagesDisplay
+                : line.dimension === "count"
+                  ? formatCountable(line.needed, line.label)
+                  : line.neededDisplay || ""}
+            </strong>
+          </div>
+
+          {line.packagesDisplay && (
+            <p className="h-buy-of">of {pluralise(line.label)}</p>
+          )}
+
+          {/* each meal's portion, and what survives — clay, which is the planned tint (§4.5) */}
+          {(line.uses.length > 0 || line.leftoverDisplay) && (
+            <div className="h-buy-split">
+              {line.uses.map((use, index) => (
+                /*
+                 * The day, which is what §4.5 asks for and what a shop actually needs. The
+                 * recipe name moves to "By meal" rather than being dropped — that is what the
+                 * segmented control is *for*, and it is the thing that makes this trade safe
+                 * instead of a loss. `title` on the wrapper covers a desktop hover; the By-meal
+                 * view covers everybody else.
+                 */
+                <span key={index} title={`${use.label} takes ${use.display || "some"}`}>
+                  <Chip tone="clay">
+                    {day(typeof use.groupKey === "string" ? use.groupKey : null) ?? use.label}
+                    {" · "}
+                    {use.display || "some"}
+                  </Chip>
+                </span>
+              ))}
+              {line.leftoverDisplay && <Chip tone="sage">{line.leftoverDisplay} spare</Chip>}
+            </div>
+          )}
+
+          {line.otherDimensions.length > 0 && (
+            <p className="h-buy-of">also {line.otherDimensions.map((other) => other.display).join(", ")}</p>
+          )}
+        </div>
+        </Checkbox>
+
+        <button
+          type="button"
+          className="h-chip"
+          disabled={busy !== null}
+          title={inPantry ? "Take it out of the pantry" : "I already have this"}
+          onClick={() => togglePantry(line)}
+        >
+          {inPantry ? "Not in pantry" : "Have it"}
+        </button>
+      </div>
+    );
+  };
+
   return (
     <>
       {error && <p className="error">{error}</p>}
 
-      <p className="subtitle">
-        {total} {total === 1 ? "item" : "items"} for {props.plannedCount}{" "}
-        {props.plannedCount === 1 ? "meal" : "meals"} · {ticked.size} in the trolley
-      </p>
+      <div className="h-shop-head">
+        <div>
+          <Eyebrow>Shopping</Eyebrow>
+          <p className="h-shop-count">
+            {total} {total === 1 ? "item" : "items"} from {props.plannedCount}{" "}
+            {props.plannedCount === 1 ? "meal" : "meals"} · {ticked.size} in the trolley
+          </p>
+        </div>
+        <ShareList text={shareText} />
+      </div>
 
-      {props.byAisle.map((group) => (
-        <section key={group.aisle} className="aisle">
-          <h2>{group.aisle}</h2>
-          {group.lines.map((line) => {
-            const isTicked = ticked.has(line.key);
-            const inPantry = line.inPantry;
-            return (
-              <div className={isTicked ? "line ticked" : "line"} key={line.key}>
-                <label className="tick">
-                  <input
-                    type="checkbox"
-                    checked={isTicked}
-                    disabled={busy !== null}
-                    onChange={() => toggleTick(line)}
-                    aria-label={`Got ${line.label}`}
-                  />
-                </label>
+      <div className="h-shop-views">
+        <SegmentedControl
+          segments={[
+            { value: "aisle", label: "By aisle" },
+            { value: "meal", label: "By meal" },
+          ]}
+          value={view}
+          onChange={setView}
+          label="How to read the list"
+        />
+      </div>
 
-                <div className="what">
-                  <p className="buy">
-                    {/* the package decision, said plainly */}
-                    {/*
-                      Catalog names are singular; core pluralises. "a bag of potatoes" is plural
-                      whatever the count, while a bare quantity agrees with its number — which is
-                      why the two branches ask for different forms rather than sharing one string.
-                    */}
-                    {line.packagesDisplay ? (
-                      <>
-                        <strong>{line.packagesDisplay}</strong>{" "}
-                        <span className="meta">of {pluralise(line.label)}</span>
-                      </>
-                    ) : line.dimension === "count" ? (
-                      <strong>{formatCountable(line.needed, line.label)}</strong>
-                    ) : (
-                      <>
-                        <strong>{line.neededDisplay || line.label}</strong>{" "}
-                        {line.neededDisplay && <span className="meta">{line.label}</span>}
-                      </>
-                    )}
-                    {inPantry && <span className="chip pantry">in the pantry</span>}
-                  </p>
-
-                  {/* what each meal takes out of it, and what survives */}
-                  <p className="split">
-                    {line.uses.map((use, index) => (
-                      <span key={index}>
-                        {use.label} takes {use.display || "some"}
-                      </span>
-                    ))}
-                    {line.leftoverDisplay && (
-                      <span className="spare">{line.leftoverDisplay} spare</span>
-                    )}
-                  </p>
-
-                  {line.otherDimensions.length > 0 && (
-                    <p className="meta">
-                      also {line.otherDimensions.map((other) => other.display).join(", ")}
-                    </p>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  className="quiet"
-                  disabled={busy !== null}
-                  title={inPantry ? "Take it out of the pantry" : "I already have this"}
-                  onClick={() => togglePantry(line)}
-                >
-                  {inPantry ? "Not in pantry" : "Have it"}
-                </button>
-              </div>
-            );
-          })}
+      {/*
+        * By meal shows portions and **never a package**, because the pint belongs to the week
+        * rather than to any one dinner — see `lib/by-meal.ts`. The tick is keyed on the
+        * consolidated line, so crossing cream off under Tuesday crosses it off under Friday: you
+        * bought the cream once.
+        */}
+      {view === "meal" ? (
+        meals.length === 0 ? (
+          <p className="meta">Nothing planned this week, so there is nothing to read by meal.</p>
+        ) : (
+          meals.map((group) => (
+            <section key={`${group.date ?? ""}-${group.meal}`} className="h-meal">
+              <Eyebrow>
+                {group.date ? `${weekdayName(group.date)} · ` : ""}
+                {group.meal}
+              </Eyebrow>
+              <ul className="h-meal-items">
+                {group.items.map((item) => (
+                  <li key={`${item.key}-${item.portion}`} className={ticked.has(item.key) ? "is-ticked" : undefined}>
+                    <span>
+                      {item.label}
+                      {item.inPantry && <span className="h-buy-of"> · in the pantry</span>}
+                    </span>
+                    <strong>{item.portion}</strong>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))
+        )
+      ) : (
+        aisles.map((group) => (
+        <section key={group.aisle} className="h-aisle">
+          <Eyebrow>{group.aisle}</Eyebrow>
+          {group.lines.map((line) => lineRow(line))}
         </section>
-      ))}
+      )))}
+
+
+      {/*
+        * "Pantry · check before you go" (§4.5), and the dashed state is load-bearing here rather
+        * than decorative.
+        *
+        * Every line in this section is §73's withheld case: a pantry entry with no recorded
+        * amount, so the list genuinely **cannot know** whether to buy. Dashed means unresolved,
+        * not unchecked, and this is the first screen where something truly unresolved exists.
+        *
+        * The live action is the one that already existed — take it out of the pantry and it goes
+        * back on the buy list — so the checkbox says that in words rather than implying a
+        * "confirmed" state nothing records. A control whose meaning a person has to guess is the
+        * same failure as a figure they cannot check.
+        */}
+      {toCheck.length > 0 && view === "aisle" && (
+        <section className="h-aisle h-check-pantry">
+          <Eyebrow>Pantry · check before you go</Eyebrow>
+          <p className="h-buy-of">
+            You said you have these, without an amount — so the list has not decided for you.
+            Look before you leave, and tick anything you have run out of to put it back on.
+          </p>
+          {toCheck.map((line) => (
+            <div className="h-buy" key={line.key}>
+              <Checkbox
+                state="check-pantry"
+                {...(busy === null ? { onToggle: () => void togglePantry(line) } : {})}
+                label={`I have run out of ${line.label} — put it back on the list`}
+              >
+                <div className="h-buy-what">
+                  <div className="h-buy-top">
+                    <span className="h-buy-name">{line.label}</span>
+                    <strong className="h-buy-amount">
+                      {line.dimension === "count"
+                        ? formatCountable(line.needed, line.label)
+                        : line.neededDisplay || ""}
+                    </strong>
+                  </div>
+                </div>
+              </Checkbox>
+            </div>
+          ))}
+        </section>
+      )}
 
       {props.suggestions.length > 0 && (
-        <section>
-          <h2>Uses up the spare</h2>
-          <p className="subtitle" style={{ marginBottom: "0.75rem" }}>
+        <section className="h-spare">
+          <SectionHeader>Uses up the spare</SectionHeader>
+          <p className="h-buy-of">
             {props.leftovers.map((line) => `${line.leftoverDisplay} ${line.label}`).join(" · ")}
           </p>
-          <ul className="waiting">
+          <ul className="h-alongside-list">
             {props.suggestions.map((suggestion) => (
               <li key={suggestion.id}>
                 <Link href={`/recipes/${suggestion.id}`}>{suggestion.title}</Link>
@@ -207,18 +361,18 @@ export function ShoppingList(props: {
       )}
 
       {props.pantry.length > 0 && (
-        <section>
-          <h2>Pantry</h2>
-          <p className="subtitle" style={{ marginBottom: "0.75rem" }}>
+        <section className="h-spare">
+          <SectionHeader>Pantry</SectionHeader>
+          <p className="h-buy-of">
             Things you already have. They stay on the list, marked, so you can see what a meal
             needs even when you are not buying it.
           </p>
-          <ul className="chips">
+          <ul className="h-pantry-chips">
             {props.pantry.map((item) => (
               <li key={item.id}>
                 <button
                   type="button"
-                  className="chip"
+                  className="h-chip"
                   disabled={busy !== null}
                   onClick={async () => {
                     if (await call(`pantry-${item.id}`, "/api/pantry", "DELETE", { id: item.id })) {

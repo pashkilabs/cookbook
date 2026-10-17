@@ -7,6 +7,7 @@ import { krogerConfig } from "@/lib/kroger";
 import { buildShoppingWeek } from "@/lib/shopping";
 import { addWeeks, isIsoDate, startOfWeek, todayIso, weekDays, weekLabel } from "@/lib/week";
 import { ShoppingList } from "./shopping-list";
+import { IconLink, TabBar } from "@/components/harvest";
 
 /**
  * One week, one trip.
@@ -51,18 +52,30 @@ export default async function ShoppingPage({
 
 
   return (
+    <div className="h-docked-page">
     <main>
-      <div className="bar">
-        <div>
-          <h1>Shopping</h1>
-          <p className="subtitle" style={{ margin: 0 }}>{weekLabel(weekStart)}</p>
+      {/*
+        * The week arrows live in the header; the counts and the share button are inside
+        * `ShoppingList`, because both are derived from the lines it already holds and passing a
+        * total down only to display it would be two places that can disagree about one number.
+        */}
+      <header className="h-week-head">
+        <div className="h-week-nav">
+          <IconLink label={`The week before ${weekLabel(weekStart)}`} href={`/shopping?week=${addWeeks(weekStart, -1)}`}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M15 5l-7 7 7 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </IconLink>
+          <div className="h-week-label">
+            <h1 className="h-title">{weekLabel(weekStart)}</h1>
+          </div>
+          <IconLink label={`The week after ${weekLabel(weekStart)}`} href={`/shopping?week=${addWeeks(weekStart, 1)}`}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </IconLink>
         </div>
-        <div className="tabs" style={{ margin: 0 }}>
-          <Link className="chip" href={`/shopping?week=${addWeeks(weekStart, -1)}`}>← Previous</Link>
-          <Link className="chip" href={`/shopping?week=${addWeeks(weekStart, 1)}`}>Next →</Link>
-          <Link className="button" href={`/planner?week=${weekStart}`}>Planner</Link>
-        </div>
-      </div>
+      </header>
 
       {error && <p className="error">Could not build the list: {error}</p>}
 
@@ -97,7 +110,8 @@ export default async function ShoppingPage({
         * display of a thing is not the control for it (§69, §73).
         */}
       <ToCart weekStart={weekStart} environment={krogerEnvironment} />
-
     </main>
+    <TabBar current="shopping" />
+    </div>
   );
 }
