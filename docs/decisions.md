@@ -5024,3 +5024,60 @@ The palette already knew both implicitly — `plannedText` is mapped differently
 so it reads on the clay tint, and `checkboxEdge` was given a stronger value than `borderStrong`
 precisely because an unchecked checkbox is identified by its edge. The palette knew; the table did
 not say; and what a table does not say is what gets implemented wrong.
+
+## §80 — One failure, two consequences, and a guard built for one of them
+
+Nine of twenty-nine client `try`-blocks awaited a `fetch` with **no `catch`**. Offline, each one
+rejected unhandled and the screen said nothing: the control came back enabled, the work was gone,
+and there was no message. Among them **sign-in** — a person with no signal got no explanation at
+all — and the **recipe form**, where a recipe somebody had just typed was silently not saved.
+`CLAUDE.md`'s first paragraph says this app must work with no signal.
+
+**The diagnosis is the transferable half, and it is not "we forgot a catch".**
+
+An offline `fetch` **rejects** rather than returning. That single fact has *two* consequences:
+
+1. a reset placed after the `await` never runs, so the pending flag stays set and every control
+   gated on it dies — the shopping list lost its whole page to one bad tap in aisle four;
+2. nothing catches the rejection, so the screen never speaks.
+
+`check-busy-guarded.mjs` was built for the first, from a real incident, and is mutation-tested. It
+asks whether the flag is cleared in a `finally` — and a `try`/`finally` with no `catch` **satisfies
+it completely**. Nine files passed a guard written about the exact failure they were exhibiting,
+because the guard asked about one of its two consequences.
+
+And the second is the worse one. A dead screen is *visibly* wrong; a screen that silently discards
+a write looks like it worked.
+
+> **When a failure has more than one consequence, a guard for one reads as coverage for both.**
+
+This is the sharpest version yet of a shape this project keeps meeting. It is not *a mechanism
+that was right and unused* (§CLAUDE.md, three instances) — the mechanism was right and **used**,
+running green on every build. It is not a stale proxy (§54a), because the guard still measures
+exactly what it always measured. It is narrower and more dangerous than either: **a guard's
+existence is read as coverage of its subject, when it is only coverage of its assertion.** Nobody
+re-reads a passing check to ask what it does not say.
+
+`check-offline-said.mjs` closes the second consequence: a client `try` that awaits a `fetch` has a
+`catch`. Narrow on purpose — every such fetch here is user-initiated and silence is never the right
+answer — and zero matches is *could not measure*, not a pass.
+
+**The question asked of the others.** There are twenty guards now, and this question had never been
+put to any of them, so it was. For each: *what failure does this guard, and does that failure have
+a second consequence nothing checks?* Three candidates looked real and all three came back clean
+**today**:
+
+| guard | the second consequence | result |
+|---|---|---|
+| `check-client-props` | a function is not the only non-serialisable prop — a `Map`, `Set` or `Date` fails identically | **0** such props declared in any client component |
+| `check-hex-literals` | a hex literal not only ignores the theme, it escapes `check-contrast`, which reads the token table — and `member-colours.ts` is exempt | member colours paint `.dot` and `.swatch` backgrounds only; **no text on them**, so no pair escapes |
+| `check-tests-run` | a test that *runs* and asserts nothing is the same failure as one that never runs | **0** of 1305 `it()` blocks contain no `expect` |
+
+Clean, and worth recording as clean: an audit that finds nothing because it was run is a different
+fact from one that finds nothing because it was not. The latent narrowness in `check-client-props`
+stays a known limit — its own header already says it reads annotations rather than call sites.
+
+**So the question joins the list of things to ask when writing a guard**, beside *which files does
+nothing check?* and *how many caches does this invalidate?*: **which consequences of this failure
+does my assertion not cover?** A guard that answers one of two is not half a guard — it is a guard
+that makes the other half invisible.

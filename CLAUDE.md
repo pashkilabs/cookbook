@@ -751,6 +751,24 @@ guessing.
   Count the boundaries when adding a value, not when a bug is reported. Three is the trigger:
   `apps/web/test/section-round-trip.test.ts` is the template.
 
+- **One failure, two consequences, and a guard built for one of them reads as coverage for both.**
+  An offline `fetch` **rejects**, and that one fact kills the pending flag *and* leaves the screen
+  silent. `check-busy-guarded` was built from a real incident for the first, is mutation-tested,
+  and a `try`/`finally` with **no `catch`** satisfies it completely — so **9 of 29** client
+  try-blocks passed a guard written about the exact failure they were exhibiting. Sign-in gave a
+  person with no signal no explanation; the recipe form discarded a typed recipe in silence. The
+  second consequence is the worse one: a dead screen is *visibly* wrong, a silently dropped write
+  looks like it worked (decisions §80, `check-offline-said.mjs`).
+
+  Not *a mechanism right and unused* — this one was used, green on every build. Not a stale proxy
+  either; it still measures what it always measured. **A guard's existence gets read as coverage
+  of its subject when it is only coverage of its assertion**, and nobody re-reads a passing check
+  to ask what it does not say. So the question belongs beside *which files does nothing check?*
+  and *how many caches does this invalidate?* — **which consequences of this failure does my
+  assertion not cover?** Asked of all twenty guards once: three looked real, all three clean
+  today, recorded as clean because an audit that finds nothing by running is a different fact from
+  one that finds nothing by not running.
+
 - **"Confirmed served" must name the host, or it has confirmed nothing in particular.** Five
   screens were reported green with smoke at 175 of 175 while production served the *previous*
   palette — zero `.h-` rules, zero Harvest tokens, no Fraunces, still `--ink` and `--paper`. Both
