@@ -311,3 +311,61 @@
   font-family: var(--font-body);
   font-size: var(--type-body-l-size);
 }
+
+/* --- screen 1: recipes home (§4.1) --------------------------------------- */
+
+.h-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-display-xl-size);
+  font-weight: var(--type-display-xl-weight);
+  line-height: var(--type-display-xl-line);
+  color: var(--text);
+}
+
+/*
+ * Cards: parchment, no shadow, no coloured side border (§3).
+ *
+ * The flat card is the one deliberate loss from the old visual system — it had a two-layer soft
+ * shadow — and §3 is explicit. What separates a card from the page now is the ground: parchment
+ * on oat, which is the whole reason Harvest has two warm neutrals instead of one.
+ */
+.recipes .card {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: var(--space-lg);
+  align-items: start;
+  padding: var(--space-lg);
+  margin: 0 0 var(--space-md);
+  border: 0;
+  border-radius: var(--radius-card-large);
+  background: var(--surface);
+  box-shadow: none;
+  text-decoration: none;
+  color: var(--text);
+}
+.recipes .card h2 {
+  margin: 0 0 var(--space-xs);
+  font-family: var(--font-display);
+  font-size: var(--type-display-m-size);
+  font-weight: var(--type-display-m-weight);
+  line-height: var(--type-display-m-line);
+}
+.recipes .card-photo {
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: var(--radius-thumb);
+}
+/* the missing-image state: one wash, not three placeholder tints (§ recon) */
+.recipes .card-photo.none {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+  font-family: var(--font-display);
+  font-size: 28px;
+}
+.recipes .card-body { min-width: 0; }
+.recipes .card-actions { margin-top: var(--space-sm); }

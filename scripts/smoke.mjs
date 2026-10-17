@@ -753,7 +753,14 @@ try {
       // a screen may assert more than one, so a block added to it is covered rather than
       // riding on a marker that was already passing
       "/planner": ["Waiting for a day", "Alongside this week"],
-      "/recipes": "Tonight",
+      /*
+       * The Harvest restyle, asserted rather than assumed (§4.1).
+       *
+       * "Tonight" was already here; the other two are the header question that replaced the
+       * household name, and the docked tab bar that replaced five header links. A restyle that
+       * renders the old markup is a restyle that did not happen, and nothing else would notice.
+       */
+      "/recipes": ["Tonight", "for dinner?", 'aria-label="Main"'],
       // two markers, so the allergen control is covered rather than riding on one that already
       // passed — the §71 setting is the whole reason this screen matters now
       "/household": ["Where you cook", "What you avoid"],
@@ -807,10 +814,18 @@ try {
       );
       if (marker) {
         for (const needle of Array.isArray(marker) ? marker : [marker]) {
+          /*
+           * The detail must say whether the needle was FOUND, not whether the page answered.
+           *
+           * It printed "found" for any 200, so a failing marker check read `FAIL … — found`,
+           * which is self-contradictory and sent me looking at the page instead of at the needle.
+           * A detail that contradicts its own verdict is worse than an empty one.
+           */
+          const present = body.includes(needle);
           record(
             `and ${name} renders ${JSON.stringify(needle)}`,
-            page.status === 200 && body.includes(needle),
-            page.status === 200 ? "found" : `HTTP ${page.status}`,
+            page.status === 200 && present,
+            page.status !== 200 ? `HTTP ${page.status}` : present ? "found" : "NOT in the page",
           );
         }
       } else {

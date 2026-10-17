@@ -4,6 +4,7 @@ import { UnitsSetting } from "./units";
 import { TimezoneSetting } from "./timezone";
 import { AllergenSetting } from "./allergens";
 import { StoreSetting } from "./store";
+import { SignOutButton } from "../recipes/sign-out";
 import { krogerConfig } from "@/lib/kroger";
 import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
@@ -102,6 +103,13 @@ export default async function HouseholdPage() {
         <StoreSetting current={family.krogerLocationId} environment={krogerEnvironment} />
       </section>
 
+      {/*
+        * Signing out lives here now, not in the recipes header.
+        *
+        * It is an account action rather than navigation, and it sat beside four links a thumb
+        * reaches for in a kitchen. One tab away, at the foot of the screen that holds the other
+        * account-shaped settings.
+        */}
       <h2>Who eats here</h2>
       <p className="subtitle">
         Everyone you add can have their own opinion of a recipe. Children get a name and a colour
@@ -172,6 +180,10 @@ export default async function HouseholdPage() {
           ))}
         </section>
       )}
+      <section style={{ marginTop: "2rem" }}>
+        <SignOutButton />
+      </section>
+
     </main>
   );
 }

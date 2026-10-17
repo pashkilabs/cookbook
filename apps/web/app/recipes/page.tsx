@@ -12,7 +12,13 @@ import { ShortlistButton } from "./shortlist-button";
 import { Filters, FILTERS, type FilterKey } from "./filters";
 import { COURSES, PROTEINS } from "./drill-down";
 import { keepKidFriendly } from "@/lib/tastes";
+/*
+ * Still imported for the no-household branch below, where signing out is the only way out of a
+ * dead end. It left the main header — that is an account action and belongs on /household — but
+ * removing it from a screen somebody can be stranded on would be a different bug.
+ */
 import { SignOutButton } from "./sign-out";
+import { Chip, SecondaryLink, TabBar } from "@/components/harvest";
 
 /**
  * The household's recipes, with the prototype's three filters.
@@ -201,28 +207,41 @@ export default async function RecipesPage({
     }
   }
 
+  /*
+   * The date, in the household's timezone — not the device's.
+   *
+   * `today` already came from `todayIso(family.timezone)`, and this only formats it. A browser
+   * would happily say Friday to somebody whose household reads Saturday, which is the split the
+   * timezone column exists to close.
+   */
+  const dateLine = new Date(`${today}T12:00:00Z`).toLocaleDateString("en-US", {
+    weekday: "long", month: "short", day: "numeric", timeZone: "UTC",
+  });
+
   return (
+    <div className="h-docked-page">
     <main>
-      <div className="bar">
+      {/*
+        * The question the screen answers, asked in the header (§4).
+        *
+        * It replaced the household name and the signed-in email, which told somebody what they
+        * already knew. The five links that were here are the tab bar now — navigation belongs in
+        * one place, and `Import` stays because §4 puts it here and it is the one action this
+        * screen offers that is not about a recipe already in it.
+        *
+        * Signing out moved to /household, one tab away: it is an account action, it was never in
+        * the reference, and a destructive-ish control beside four navigation links is the kind of
+        * thing a thumb finds by accident.
+        */}
+      <div className="h-section" style={{ alignItems: "center" }}>
         <div>
-          <h1>{family.name}</h1>
-          <p className="subtitle" style={{ margin: 0 }}>{auth.user.email}</p>
+          <p className="meta" style={{ margin: 0 }}>{dateLine}</p>
+          <h1 className="h-title">What&rsquo;s for dinner?</h1>
         </div>
-        <div className="tabs" style={{ margin: 0 }}>
-          <Link className="button" href="/planner">
-            Planner
-          </Link>
-          <Link className="button quiet" href="/household">
-            Household
-          </Link>
-          <Link className="button" href="/recipes/import">
-            Import
-          </Link>
-          <Link className="button" href="/recipes/new">
-            Add a recipe
-          </Link>
-          <SignOutButton />
-        </div>
+        <SecondaryLink href="/recipes/import">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+          Import
+        </SecondaryLink>
       </div>
 
       <Tonight today={today} meals={tonight} waiting={waitingTonight} />
@@ -303,13 +322,19 @@ export default async function RecipesPage({
           )}
           <div className="card-body">
           <h2>{recipe.title}</h2>
+          {/*
+            * `make_again` is a **state, not a count** — it is a boolean, and the reference's
+            * "Will make again · 3" has no number behind it. A chip says the state and invents
+            * nothing; §4's count would have needed schema §5 excludes.
+            */}
+          {recipe.make_again === true && <Chip tone="clay">Make again</Chip>}
           <p className="meta" style={{ margin: 0 }}>
             {[
               recipe.source_name,
               recipe.servings ? `serves ${recipe.servings}` : null,
               recipe.time_minutes ? `${recipe.time_minutes} min` : null,
+              // "made 6×", which is §4's count and the one it asks for that already exists
               recipe.times_made ? `made ${recipe.times_made}×` : "untried",
-              recipe.make_again === true ? "make again" : null,
               recipe.visibility === "public" ? "published" : null,
             ]
               .filter(Boolean)
@@ -343,5 +368,12 @@ export default async function RecipesPage({
       ))}
       </div>
     </main>
+    {/*
+      * Docked, never floating (§3, §5). `.h-docked-page` reserves its height so the last recipe
+      * can be reached — a bar without that covers the final row, which is the bug a floating
+      * button has in a different costume.
+      */}
+    <TabBar current="recipes" />
+    </div>
   );
 }

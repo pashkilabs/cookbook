@@ -393,6 +393,12 @@ eval fixture wants the same.
    rather than the other market's, which is what `packages: null` already means
    everywhere else.
 
+   **It is intermittent**, which is itself diagnostic: it failed one local smoke run
+   and passed the next two with no code change between them. So it depends on which
+   recipes a run happens to plan, and therefore on which catalog items the list
+   reaches — exactly what a missing-package gap looks like. `metricPackageCoverage`
+   answers it deterministically and a smoke run does not.
+
    **Not caused by the Harvest UI work, and not proven to pre-date it** — only the
    first is established. The diff touched no unit, formatting, consolidation or
    shopping code and CSS cannot alter scraped text, so the cause is elsewhere; but

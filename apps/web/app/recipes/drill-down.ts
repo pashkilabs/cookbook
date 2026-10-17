@@ -17,8 +17,23 @@ export const COURSES = [
   { key: "dessert", label: "Desserts", field: "course" },
   { key: "drink", label: "Drinks", field: "course" },
   { key: "breakfast", label: "Breakfast/Brunch", field: "course" },
-  { key: "lunch", label: "Lunch", field: "course" },
 ] as const;
+
+/*
+ * `{ key: "lunch", field: "course" }` was here and **could never match a recipe**.
+ *
+ * `recipes.course` has a CHECK allowing breakfast, starter, main, side, dessert, drink and snack —
+ * no lunch — so the chip queried a value the column cannot hold. Verified rather than reasoned:
+ * nothing in the library has it, and nothing can be written with it. A filter that always returns
+ * nothing is worse than an absent one, because it reads as "we own no lunches".
+ *
+ * The Harvest handoff asks for a Lunch segment, which is presumably why: the app's own UI offered
+ * one. Putting it back needs a migration, which §5 excludes, so it is removed rather than faked.
+ *
+ * **And the axis has a gap the other way:** `side` holds 5 recipes and `snack` is valid, and
+ * neither has a chip — so those are unreachable by drill-down. Adding them changes what the
+ * screen offers, which is a product decision rather than a restyle, so it is reported not done.
+ */
 
 /**
  * Fixed order so chips do not reshuffle as recipes arrive; which of them *appear* is decided by
