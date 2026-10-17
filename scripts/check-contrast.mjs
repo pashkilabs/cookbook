@@ -189,8 +189,6 @@ const PAIRS = [
   ["week: score button edge", "border-strong", "surface", "ui"],
   ["week: score button, chosen", "on-secondary", "checked", "text"],
   ["week: member name above scores", "text-muted", "surface", "text"],
-  ["week: drag readout", "on-primary", "primary", "text"],
-  ["week: settled row title", "text", "planned-bg", "large"],
   // the shared primitives, which every screen paints
   ["primary button label", "on-primary", "primary", "text"],
   ["secondary button label", "on-secondary", "secondary", "text"],

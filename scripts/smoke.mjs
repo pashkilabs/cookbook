@@ -605,11 +605,6 @@ try {
        * no log and no failed request — so this is the only part of that report a check can reach.
        */
       record(
-        "the drag handler is bound to the planned entry",
-        weekText.includes(`data-entry-id="${entryId ?? ""}"`) || /data-entry-id="[0-9a-f-]{36}"/.test(weekText),
-        foundDetail(weekText, "data-entry-id", "no data-entry-id on any row — the handler cannot find an entry"),
-      );
-      record(
         "and the row's disclosure starts closed",
         weekText.includes('aria-expanded="false"'),
         foundDetail(weekText, 'aria-expanded="false"'),

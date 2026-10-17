@@ -5081,3 +5081,74 @@ stays a known limit — its own header already says it reads annotations rather 
 nothing check?* and *how many caches does this invalidate?*: **which consequences of this failure
 does my assertion not cover?** A guard that answers one of two is not half a guard — it is a guard
 that makes the other half invisible.
+
+## §81 — Drag-to-another-day: attempted and withdrawn
+
+The gesture is gone. The **Move select** is how a meal moves between days, and it always was the
+keyboard path, the mouse path and the accessible path.
+
+**What happened.** Press and hold a meal, drag to another day, pause to settle; swipe left for next
+week. Built as pure geometry plus a thin pointer layer. It failed twice on the phone it was for:
+
+1. **Pressing the meal name did nothing.** The gesture was bound to the whole entry with
+   `touch-action: auto` restored on its links — and the name is the row's largest target, so iOS
+   claimed the long-press for its link callout and fired `pointercancel`. Diagnosable, and fixed by
+   moving the handle to the date block with `-webkit-touch-callout: none` and `user-select: none`,
+   neither of which had been there.
+2. **Pressing the handle selected text.** All four properties verified **served, on the right
+   node**: `.h-day-date[data-entry-id]` carries `touch-action: none`, `-webkit-touch-callout: none`,
+   `-webkit-user-select: none` and `user-select: none` in the production stylesheet, and the
+   production HTML confirms the date block renders with `data-entry-id` so the selector matches.
+
+No cause could be named for the second. The bar set before any further attempt was *a specific
+cause in the served CSS* — a missing property, or rules landing on a node the handle does not
+render as — and both were checked and false. "The documented properties are present" was where the
+previous two attempts already stood, and it is not a cause.
+
+So this is withdrawn rather than parked: **a gesture that fails on the device somebody actually
+uses is worse than no gesture**, because it is a control that appears to exist. The one-meal-per-day
+limitation of the handle goes with it, having been contingent on the gesture surviving.
+
+### The three findings, which are worth more than the feature was
+
+**1. The handle covered the identifier, and that is a design constraint rather than an iOS one.**
+The drag handle was the date block, and the date block is the *only* thing on a row that says which
+day it is. So the thumb holding the gesture covered the label for the thing being held. A highlight
+can report that *a* row is selected and can never report that it is Thursday — which is the single
+question the gesture has to answer before release — and counting rows is unavailable because the
+counter is under the thumb.
+
+This would have applied on **any** platform, native included. It generalises past dragging:
+**when a control's target is also the only label for that target, the control cannot report its own
+outcome.** The fix was a readout fixed to the top of the viewport naming the day in words, away
+from the hand — which is also the answer for any gesture whose feedback would otherwise sit under
+the finger making it.
+
+**2. Safari in an in-app browser claims a long-press before the page sees it, and the web defences
+are advisory.** `touch-action`, `-webkit-touch-callout` and `user-select` are the documented
+answers, they were all present, and the press still became a text selection. This is **a genuine
+case for native** rather than a thing to keep attempting: a long-press gesture competing with the
+platform's own long-press is a competition the page does not get to win, and no amount of CSS
+changes who arbitrates.
+
+**3. The `min-width: auto` chain, which is the valuable find and had nothing to do with the
+gesture.** `flex: 1` does not mean a flex child can shrink — `min-width` defaults to `auto`,
+flooring it at min-content — so one unbreakable ingredient name widens its row past the viewport,
+the page becomes wider than the screen, the mobile layout viewport grows to the content, and every
+`position: fixed` element sizes to a width that is not the screen. **The docked bars break because
+of a cell nobody was looking at.** Live on thirteen screens; measured at 340px needed inside 270px
+available. Recorded in full in `CLAUDE.md`, along with the ratio that is the transferable part: the
+naive grep returned 38 rules and was almost all noise, because a non-wrapping flex row only
+overflows if its children *cannot* shrink.
+
+### What is kept
+
+`apps/web/lib/drag-geometry.ts` and its **29 tests**, with nothing calling it, and a header saying
+so in capitals. `dropTargetAt`, `confirmDrop`, `gestureIntent`, `dwell` and `autoScrollVelocity` are
+correct, framework-free arithmetic with no DOM in them — including the stale-rect answer, which is
+confirm-at-drop rather than re-measuring on scroll, and is a decision that would be re-derived from
+nothing if the file went. If a native app ever exists, the gesture belongs there and this is the half
+that will not need rewriting.
+
+**Deleting it would throw away the part that worked because the part that could not work was
+removed.** `check-typechecked` and the vitest config both still cover it, so it cannot rot silently.

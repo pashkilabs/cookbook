@@ -6,7 +6,6 @@ import { useEffect, useRef, useState } from "react";
 import { ServingsField } from "./servings-field";
 import { Cooked, type CookMember } from "./cooked";
 import { SectionHeader } from "@/components/harvest";
-import { useDragToDay } from "./use-drag-to-day";
 
 /**
  * The week, and the writes that arrange it.
@@ -82,30 +81,6 @@ export function PlannerWeek(props: {
   useEffect(() => {
     if (openEntry && panel.current) panel.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [openEntry]);
-
-  /*
-   * Press and hold a meal, drag to another day, pause to settle; swipe left to send it to next
-   * week. Both write through the same routes the select and the ✕ already use, so a drag is a
-   * second way to reach one behaviour rather than a second implementation of it.
-   *
-   * The select stays, and not only as a fallback: it is the keyboard path, the mouse path, and
-   * what a dropped gesture degrades to.
-   */
-  const drag = useDragToDay({
-    onMoveToDate: (entryId, date) => {
-      void call(`move-${entryId}`, `/api/plan-entries/${entryId}`, "PATCH", { date });
-    },
-    onSendToNextWeek: (entryId) => {
-      const entry = props.placed.find((candidate) => candidate.id === entryId);
-      if (!entry) return;
-      void call(`move-${entryId}`, `/api/plan-entries/${entryId}`, "PATCH", {
-        date: shiftDays(entry.date, 7),
-      });
-    },
-    // nothing is draggable while a write is in flight, for the reason every other control here is
-    // disabled: two moves racing would leave the week disagreeing with the database
-    enabled: busy === null,
-  });
 
   /*
    * `finally`, for the reason `shopping-list.tsx` documents at length: an offline `fetch`
@@ -267,59 +242,13 @@ export function PlannerWeek(props: {
         )}
       </section>
 
-      {/*
-        * ---------------------------------------------------------------------------
-        * Where the drag's feedback goes, and why it is not on the row
-        * ---------------------------------------------------------------------------
-        *
-        * The handle is the date block, and **the date block is the only thing on a row that says
-        * which day it is.** So the thumb holding the gesture covers the identifier: a highlight
-        * can tell you *a* row is selected and cannot tell you it is Thursday, which is the single
-        * question the gesture has to answer before you let go.
-        *
-        * Worse for a downward drag, which is most of them — the hand and forearm cover the bottom
-        * of the screen, so the row being settled on is behind the hand that is settling on it. A
-        * 2px inset ring is a weak signal fully occluded and a useless one partially.
-        *
-        * So the readout is **fixed to the top of the viewport**, above the hand for any downward
-        * drag, and it says the day **in words**. That also makes it legible rather than
-        * inferable: "Thursday 22" is not something a colour can express, and the alternative was
-        * asking somebody to count rows while their thumb was on the counter.
-        *
-        * It is a status readout during a gesture, not a floating action — §5 forbids the latter
-        * and this disappears the moment the pointer is released.
-        */}
-      {drag.dragging && (
-        <div className="h-drag-status" role="status" aria-live="polite">
-          {(() => {
-            const entry = props.placed.find((candidate) => candidate.id === drag.dragging);
-            const title = entry?.recipe.title ?? "This meal";
-            if (drag.sendingNext) return `${title} → next week`;
-            const day = props.days.find((candidate) => candidate.date === drag.settledOn);
-            return day
-              ? `${title} → ${day.weekday} ${day.label}`
-              : `${title} — hold over a day to choose it`;
-          })()}
-        </div>
-      )}
-
       <div className="h-week">
         {props.days.map((day) => {
           const forDay = props.placed.filter((entry) => entry.date === day.date);
           return (
             <section
               key={day.date}
-              /* measured on drag start, in document coordinates — see lib/drag-geometry.ts */
-              ref={(node) => drag.register(day.date, node)}
-              className={
-                [
-                  "h-day-row",
-                  day.date === props.today ? "is-today" : "",
-                  drag.settledOn === day.date ? "is-settled" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")
-              }
+              className={day.date === props.today ? "h-day-row is-today" : "h-day-row"}
             >
               {/*
                 * The date block §4.4 asks for: three-letter weekday over the day of the month.
@@ -327,36 +256,15 @@ export function PlannerWeek(props: {
                 * fragments before a recipe name is noise, the same reasoning `DayCircle` carries.
                 */}
               {/*
-                * The date block is also the drag handle, and that is a correction.
+                * The date block §4.4 asks for: three-letter weekday over the day of the month.
+                * `aria-hidden`, with the whole date in the row's own heading — "SUN", "18" read
+                * as two fragments before a recipe name is noise.
                 *
-                * The gesture was bound to the whole entry with `touch-action: auto` restored on
-                * its links — so pressing the **meal name**, which is the row's largest target
-                * and the obvious thing to press, did nothing: iOS claimed the long-press for its
-                * own link callout and fired `pointercancel`. "Press and hold does nothing" was
-                * accurate about the only place anybody would try.
-                *
-                * Making the title draggable would ask one element to mean tap-to-cook,
-                * long-press-to-drag and tap-elsewhere-to-expand. A handle is the honest answer:
-                * not a link, not selectable text, already `aria-hidden`, 44px wide, at the left
-                * edge where a thumb rests. `-webkit-touch-callout` and `user-select` are off on
-                * it, which is what stops iOS taking the press first.
+                * It briefly carried a drag handle. See decisions §81 for why that was withdrawn.
                 */}
-              <div
-                className="h-day-date"
-                data-entry-id={forDay[0]?.id}
-                aria-hidden="true"
-                {...(forDay.length === 1 ? drag.handlers : {})}
-              >
+              <div className="h-day-date" aria-hidden="true">
                 <span>{day.weekday.slice(0, 3).toUpperCase()}</span>
                 <strong>{day.label.replace(/[^0-9]/g, "")}</strong>
-                {/* a grip, so the handle is discoverable rather than a thing to be told about */}
-                {forDay.length === 1 && (
-                  <svg className="h-grip" width="14" height="6" viewBox="0 0 14 6" aria-hidden="true">
-                    <circle cx="2" cy="2" r="1" fill="currentColor" />
-                    <circle cx="7" cy="2" r="1" fill="currentColor" />
-                    <circle cx="12" cy="2" r="1" fill="currentColor" />
-                  </svg>
-                )}
               </div>
 
               <div className="h-day-body">
@@ -387,20 +295,7 @@ export function PlannerWeek(props: {
               {forDay.map((entry) => {
                 const isOpen = openEntry === entry.id;
                 return (
-                <div
-                  key={entry.id}
-                  data-entry-id={entry.id}
-                  className={
-                    [
-                      "h-day-entry",
-                      isOpen ? "is-open" : "",
-                      drag.dragging === entry.id ? "is-dragging" : "",
-                      drag.dragging === entry.id && drag.sendingNext ? "is-sending-next" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")
-                  }
-                >
+                <div key={entry.id} className={isOpen ? "h-day-entry is-open" : "h-day-entry"}>
                   {/*
                     * The whole row is the disclosure, and the title is still a link.
                     *

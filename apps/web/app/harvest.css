@@ -912,95 +912,15 @@
 }
 .h-cooked-panel { display: flex; flex-wrap: wrap; gap: var(--space-sm); align-items: center; width: 100%; }
 
-/* --- item 4: drag a meal to another day ---------------------------------- */
-
 /*
- * `touch-action: none` is the line that makes any of this possible. Without it the browser decides
- * a vertical gesture is a scroll before `pointermove` is dispatched, and `preventDefault` does
- * nothing visible — the gesture simply never starts and there is nothing in the code to blame.
+ * The drag-to-another-day gesture lived here and was withdrawn — see decisions §81. It failed
+ * twice on the device it was for, and the second failure was text selection on a handle carrying
+ * `touch-action: none`, `-webkit-touch-callout: none` and `user-select: none`, all four verified
+ * served on the right node. The select is the way a meal moves.
  *
- * It is scoped to the entry rather than the row, so the row's own padding and the day's empty
- * space still scroll normally. A list you cannot scroll is worse than a list you cannot drag.
+ * `lib/drag-geometry.ts` is kept deliberately: 29 tests of framework-free arithmetic that a native
+ * app could use, where the platform does not fight the gesture.
  */
-/*
- * The handle is the drag surface, and the entry is not.
- *
- * Binding the gesture to the whole entry meant the meal *name* was the obvious target and the one
- * place it could not work: a link gets `touch-action: auto`, iOS takes the long-press for its own
- * callout, and `pointercancel` kills the drag before the hold timer fires. Nothing in the code
- * logs anything; the report was simply "press and hold does nothing".
- *
- * Three properties, and all three are needed on iOS:
- *
- *   touch-action: none          stops the browser deciding this is a scroll before `pointermove`
- *   -webkit-touch-callout: none stops the press-and-hold preview/callout taking the gesture
- *   user-select: none           stops the press turning into a text selection with handles
- *
- * The first was there; the other two were not, and their absence is the half of this that would
- * have broken the handle too.
- */
-.h-day-date[data-entry-id] {
-  touch-action: none;
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  user-select: none;
-  cursor: grab;
-}
-.h-day-date[data-entry-id]:active { cursor: grabbing; }
-.h-grip { margin-top: 3px; color: var(--text-muted); }
-
-.h-day-row.is-dragging-from .h-day-date { opacity: 0.5; }
-.h-day-entry.is-dragging {
-  opacity: 0.65;
-  /* lifted, so it reads as held rather than as broken */
-  box-shadow: 0 6px 16px rgb(0 0 0 / 18%);
-  border-radius: var(--radius-thumb);
-  cursor: grabbing;
-}
-.h-day-entry.is-sending-next { transform: translateX(-10px); }
-
-/* the settled day, which is a decision about to be made — clay, as everything planned is */
-/*
- * The settled row: a tint over the whole row as well as the ring.
- *
- * The ring alone was 2px and spans 32..370px on a 390px screen — a thumb on the handle leaves
- * most of it visible, but the hand covers rows *below* during a downward drag, and the ring is
- * the first thing to disappear. A filled row is visible in peripheral vision and at the edge of
- * a hand; the ring stays for precision where the row is not occluded.
- *
- * Clay, because that is this system's one meaning for "planned" and a settle is a plan about to
- * be made.
- */
-.h-day-row.is-settled {
-  box-shadow: inset 0 0 0 2px var(--primary);
-  background: var(--planned-bg);
-}
-
-/*
- * The readout, fixed to the top — away from the hand, which is the whole point. See the component
- * for why a highlight cannot do this job: the handle is the date block, so the thumb is on the
- * only thing that identifies the row.
- */
-.h-drag-status {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 20;
-  padding: var(--space-md) var(--space-xl);
-  padding-top: calc(var(--space-md) + env(safe-area-inset-top));
-  background: var(--primary);
-  color: var(--on-primary);
-  font-size: var(--type-label-size);
-  font-weight: var(--type-label-weight);
-  text-align: center;
-  /* a name can be long and the day must survive it */
-  overflow-wrap: anywhere;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .h-day-entry.is-sending-next { transform: none; }
-}
 
 /* --- the score grid, which did not fit ----------------------------------- */
 

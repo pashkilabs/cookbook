@@ -751,6 +751,21 @@ guessing.
   Count the boundaries when adding a value, not when a bug is reported. Three is the trigger:
   `apps/web/test/section-round-trip.test.ts` is the template.
 
+- **A long-press gesture competes with the platform's own long-press, and the page does not
+  arbitrate.** Drag-a-meal-to-another-day was attempted and withdrawn (decisions §81) after failing
+  twice on the device it was for — the second time selecting text on a handle carrying
+  `touch-action: none`, `-webkit-touch-callout: none` and `user-select: none`, **all four verified
+  served on the right node** in the production stylesheet and HTML. Those are the documented
+  defences and they are advisory in an in-app Safari. Treat this as a case for native, not as a
+  thing to attempt a third time; a gesture that fails on the device somebody actually uses is worse
+  than no gesture, because it is a control that appears to exist.
+
+  The transferable half is not about touch. **When a control's target is also the only label for
+  that target, the control cannot report its own outcome.** The handle was the date block, and the
+  date block is the only thing on a row saying which day it is — so the thumb covered the answer to
+  the one question the gesture had to settle before release. That is a design constraint on any
+  platform, and the fix is a readout placed where the hand is not, naming the target in words.
+
 - **`flex: 1` does not mean a flex child can shrink: `min-width` defaults to `auto`, which floors
   it at min-content.** So a `flex: 1` cell holding one unbreakable ingredient name — or a button
   with `white-space: nowrap` — widens its row past the viewport, the *page* becomes wider than the

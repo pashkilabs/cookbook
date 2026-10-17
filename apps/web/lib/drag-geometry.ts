@@ -1,6 +1,21 @@
 /**
  * The arithmetic behind dragging a planned meal to another day — and none of the browser.
  *
+ * ---------------------------------------------------------------------------
+ * NOTHING CALLS THIS, and that is deliberate. Do not delete it.
+ * ---------------------------------------------------------------------------
+ *
+ * The gesture it was written for was **attempted and withdrawn** (decisions §81): it failed twice
+ * on the phone it was for, the second time by selecting text on a handle that carried
+ * `touch-action: none`, `-webkit-touch-callout: none` and `user-select: none` — all four verified
+ * served, on the right node, in production. Safari in an in-app browser claims a long-press before
+ * the page sees it, and every web defence against that is advisory.
+ *
+ * What is below is 29 tests of correct, framework-free arithmetic with no DOM in it. If a native
+ * app ever exists, the gesture belongs there — where the platform does not fight it — and this is
+ * the half that will not need rewriting. Deleting it would throw away the part that worked
+ * because the part that could not work was removed.
+ *
  * Every function here is pure and over numbers. That split is deliberate: a gesture that *feels*
  * wrong degrades to the Move select and somebody shrugs, but a gesture that drops Wednesday's
  * dinner on Thursday writes to the database, changes the shopping list, and reports success. The
