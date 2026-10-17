@@ -93,6 +93,12 @@ export function Roster({
       }
       router.refresh();
       return true;
+    } catch {
+      // an offline fetch REJECTS rather than returning: without this the person sees
+      // nothing at all and the promise rejects unhandled. `finally` protected the busy
+      // flag and nothing protected the message.
+      setError("No signal — that was not saved. Try it again in a moment.");
+      return false;
     } finally {
       setBusy(false);
     }

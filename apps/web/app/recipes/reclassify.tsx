@@ -43,6 +43,11 @@ export function ReclassifyButton({ recipeId }: { recipeId: string }) {
       const values = Object.values(body?.classification ?? {}).filter(Boolean);
       setOutcome(values.length > 0 ? `Now: ${values.join(" · ")}` : "No change — it could not tell.");
       router.refresh();
+    } catch {
+      // an offline fetch REJECTS rather than returning: without this the person sees
+      // nothing at all and the promise rejects unhandled. `finally` protected the busy
+      // flag and nothing protected the message.
+      setError("No signal — that was not saved. Try it again in a moment.");
     } finally {
       setBusy(false);
     }

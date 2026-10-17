@@ -94,6 +94,11 @@ export function SignInForm() {
       });
       const body = (await response.json().catch(() => ({}))) as { message?: string };
       setNotice(body.message ?? "If that address needs confirming, a new link is on its way.");
+    } catch {
+      // an offline fetch REJECTS rather than returning: without this the person sees
+      // nothing at all and the promise rejects unhandled. `finally` protected the busy
+      // flag and nothing protected the message.
+      setError("No signal — could not reach the server. Check your connection and try again.");
     } finally {
       setBusy(false);
     }

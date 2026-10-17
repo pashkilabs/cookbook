@@ -46,6 +46,11 @@ export function ImportFlow() {
       setDraft(body.draft);
       setPhoto(body.photo ?? null);
       setFromCache(body.fromCache ?? false);
+    } catch {
+      // an offline fetch REJECTS rather than returning: without this the person sees
+      // nothing at all and the promise rejects unhandled. `finally` protected the busy
+      // flag and nothing protected the message.
+      setError("No signal — nothing was imported. Try it again in a moment.");
     } finally {
       setBusy(false);
     }

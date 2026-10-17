@@ -93,6 +93,11 @@ export function RecipeForm(
       const id = props.mode === "edit" ? props.recipeId : body.id;
       router.push(`/recipes/${id}`);
       router.refresh();
+    } catch {
+      // an offline fetch REJECTS rather than returning: without this the person sees
+      // nothing at all and the promise rejects unhandled. `finally` protected the busy
+      // flag and nothing protected the message.
+      setError("No signal — the recipe was not saved. Nothing you typed is lost; try again in a moment.");
     } finally {
       setBusy(false);
     }

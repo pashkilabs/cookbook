@@ -48,6 +48,11 @@ export function RemoveRecipe({ recipeId, title }: { recipeId: string; title: str
             }
             router.push("/recipes");
             router.refresh();
+          } catch {
+            // an offline fetch REJECTS rather than returning: without this the person sees
+            // nothing at all and the promise rejects unhandled. `finally` protected the busy
+            // flag and nothing protected the message.
+            setError("No signal — it was not removed. Try it again in a moment.");
           } finally {
             setBusy(false);
           }

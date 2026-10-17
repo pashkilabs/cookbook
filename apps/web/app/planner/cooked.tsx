@@ -105,6 +105,11 @@ export function Cooked({
       // opened on marking, closed on unmarking: the scores are about a meal that happened
       onCooked?.(cooked);
       router.refresh();
+    } catch {
+      // an offline fetch REJECTS rather than returning: without this the person sees
+      // nothing at all and the promise rejects unhandled. `finally` protected the busy
+      // flag and nothing protected the message.
+      setError("No signal — that was not saved. Try it again in a moment.");
     } finally {
       setBusy(false);
     }
@@ -147,6 +152,13 @@ export function Cooked({
         }
       }
       setScores((current) => ({ ...current, [memberId]: score }));
+    } catch {
+      /*
+       * postgrest-js converts a failed fetch into `{ error }` rather than rejecting, so this is
+       * belt and braces — and it is here because *verifying* that is a claim about a dependency's
+       * internals, where a `catch` is three lines and never wrong.
+       */
+      setError("No signal — that score was not saved. Try it again in a moment.");
     } finally {
       setBusy(false);
     }
