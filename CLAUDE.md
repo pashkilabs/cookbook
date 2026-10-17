@@ -737,6 +737,38 @@ guessing.
   Count the boundaries when adding a value, not when a bug is reported. Three is the trigger:
   `apps/web/test/section-round-trip.test.ts` is the template.
 
+- **"Confirmed served" must name the host, or it has confirmed nothing in particular.** Five
+  screens were reported green with smoke at 175 of 175 while production served the *previous*
+  palette — zero `.h-` rules, zero Harvest tokens, no Fraunces, still `--ink` and `--paper`. Both
+  statements were true and one of them was never about the deployment: **every** check ran against
+  `127.0.0.1:3000`. `pnpm smoke:local` is `smoke.mjs http://127.0.0.1:3000`, and `pnpm check` and
+  every guard read local *files*.
+
+  The phrase is what did the damage. "Confirmed served", "verified in a browser", "as served" —
+  each **concealed** the gap rather than omitting it, because they sound like claims about a
+  deployment and are claims about a laptop. A host-less verification reads as stronger than it is,
+  which an honest "I could not check" never does. So: **name the host in the sentence**, every
+  time, or do not use the word verified.
+
+  **Third instance of a mechanism that was right and unused — and the first where the mechanism
+  was built in the same session it then went unused.** `EXTRACTOR_VERSION` sat unturned through
+  two releases; `promptKey` fingerprinted every input except the prompt; and `pnpm ship` exists
+  precisely for "one half deploys itself and the other is remembered", was built earlier in this
+  very session, and was used **zero times across ten commits**. That is a worse shape than the
+  first two: a tool whose own commit message argues for it, ignored by its author within the hour.
+  A mechanism you just built is one you are *most* likely to skip, because the reasoning feels
+  discharged by having written it.
+
+  `pnpm ship` stays outside `pnpm check` — a check that refuses every mid-feature tree would fail
+  routinely, and that argument is still right. What it left behind was that **nothing asked the
+  question at all.** So `scripts/check-shipped.mjs` asks it, and is the one guard here that
+  **never fails**: it prints `AHEAD OF DEPLOYED BY N COMMITS` and the undeployed subjects, out of
+  `/api/health`'s own mouth, and exits 0 always. It runs at the end of `pnpm check`, inside the
+  success branch, so the line lands directly under the words "check passed" — the point being that
+  "green" and "ahead by 10" are impossible to read together and call it done. It would have fired
+  at all ten commits, and prints `DEPLOYMENT UNKNOWN` rather than silence when it cannot reach the
+  site, because the failure it exists for *was* a silence that looked like a pass.
+
 - **A reference screen is evidence of what the app looked like, not of what it should offer.**
   Five findings across four screens, written up as **decisions §78** with the discriminator table.
   A mockup and an implementation disagree in exactly three ways and they want opposite responses:
