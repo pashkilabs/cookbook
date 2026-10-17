@@ -639,6 +639,8 @@
 .h-week { display: flex; flex-direction: column; gap: var(--space-sm); padding: 0 var(--space-xl); }
 
 .h-day-row {
+  /* the full-row disclosure button is positioned against this */
+  position: relative;
   display: flex;
   gap: var(--space-md);
   padding: var(--space-md);
@@ -835,3 +837,67 @@
 
 .h-spare { padding: 0 var(--space-xl); margin-bottom: var(--space-xl); }
 .h-pantry-chips { display: flex; flex-wrap: wrap; gap: var(--space-sm); margin: var(--space-md) 0 0; padding: 0; list-style: none; }
+
+/* --- item 3: the day row at rest, and what waits behind a tap ------------ */
+
+/*
+ * The whole row is the expander, beneath the content rather than wrapping it.
+ *
+ * `inset: 0` with no background, so it is invisible and the row looks exactly as §4.4 draws it.
+ * The title link and the cooked mark are lifted above it; everything else is inert decoration and
+ * a tap on it opens the panel.
+ */
+.h-day-expand {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-card);
+  background: transparent;
+  cursor: pointer;
+}
+.h-day-expand:hover { background: var(--planned-bg); opacity: 0.45; }
+.h-day-row.is-open .h-day-expand:hover { background: transparent; }
+
+/* above the expander, so a tap on the title opens the recipe and a tap beside it opens the row */
+.h-day-row .h-day-title,
+.h-day-row .h-day-facts { position: relative; z-index: 1; }
+.h-day-title { width: fit-content; }
+
+/* "35 min · Cooked" — a line of facts about the meal, costing height rather than width */
+.h-day-facts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs); }
+
+.h-cooked-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 0;
+  padding: 3px 9px 3px 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--type-chip-size);
+  font-weight: var(--type-chip-weight);
+  cursor: pointer;
+}
+/* olive fill and the tick, which is the `have` state's grammar everywhere else in the system */
+.h-cooked-mark.is-on { border-color: var(--checked); background: var(--checked); color: var(--on-secondary); }
+.h-cooked-mark svg { opacity: 0.45; }
+.h-cooked-mark.is-on svg { opacity: 1; }
+
+.h-day-panel {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: center;
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border);
+}
+.h-cooked-panel { display: flex; flex-wrap: wrap; gap: var(--space-sm); align-items: center; width: 100%; }

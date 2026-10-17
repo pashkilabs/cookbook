@@ -62,6 +62,11 @@ export function PlannerWeek(props: {
     scale: number;
   } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  /*
+   * One row open at a time. A week with four panels expanded is the same crowding one level up —
+   * and the row at rest is the thing worth reading, so the default for all seven is closed.
+   */
+  const [openEntry, setOpenEntry] = useState<string | null>(null);
 
   /*
    * `finally`, for the reason `shopping-list.tsx` documents at length: an offline `fetch`
@@ -263,8 +268,30 @@ export function PlannerWeek(props: {
                 </Link>
               )}
 
-              {forDay.map((entry) => (
-                <div className="h-day-entry" key={entry.id}>
+              {forDay.map((entry) => {
+                const isOpen = openEntry === entry.id;
+                return (
+                <div className={isOpen ? "h-day-entry is-open" : "h-day-entry"} key={entry.id}>
+                  {/*
+                    * The whole row is the disclosure, and the title is still a link.
+                    *
+                    * An absolutely-positioned button beneath the content, with the link and the
+                    * cooked mark lifted above it — rather than a `<button>` wrapping a `<Link>`,
+                    * which is invalid and would make every tap on the title do both things. Both
+                    * controls stay in the tab order, and a row at rest holds exactly what §4.4
+                    * asks for: the date, the title, the time and the photograph.
+                    *
+                    * A chevron would be a fifth thing competing for the same width, so the hint
+                    * is the row's own affordance and the control is `aria-expanded`.
+                    */}
+                  <button
+                    type="button"
+                    className="h-day-expand"
+                    aria-expanded={isOpen}
+                    aria-controls={`entry-${entry.id}`}
+                    aria-label={`${isOpen ? "Hide" : "Show"} what you can do with ${entry.recipe.title}`}
+                    onClick={() => setOpenEntry(isOpen ? null : entry.id)}
+                  />
                   <div className="h-day-meal">
                     <div className="h-day-text">
                       {/* carries the plan entry, so the recipe opens at the servings it was planned for */}
@@ -287,9 +314,27 @@ export function PlannerWeek(props: {
                         * elsewhere, which is a third thing a reference screen can be — not a
                         * styling choice, and not the app lying either.
                         */}
-                      {entry.recipe.time_minutes !== null && (
-                        <p className="h-day-meta">{entry.recipe.time_minutes} min</p>
-                      )}
+                      {/*
+                        * The meta line, which is where the cooked mark belongs — "35 min ·
+                        * Cooked" is a line of facts about the meal, and it costs vertical space
+                        * rather than competing with the thumbnail for width. Four 44px controls
+                        * beside a 56px photograph and a 44px date block left 170px for a title
+                        * on a phone, which is what overcrowded actually meant.
+                        */}
+                      <p className="h-day-meta h-day-facts">
+                        {entry.recipe.time_minutes !== null && <span>{entry.recipe.time_minutes} min</span>}
+                        <Cooked
+                          entryId={entry.id}
+                          familyId={props.familyId}
+                          recipeId={entry.recipe.id}
+                          cookedAt={entry.cookedAt}
+                          members={props.membersByRecipe[entry.recipe.id] ?? []}
+                          parts={props.partsByRecipe[entry.recipe.id] ?? []}
+                          disabled={busy !== null}
+                          expanded={isOpen}
+                          onCooked={(cooked) => setOpenEntry(cooked ? entry.id : null)}
+                        />
+                      </p>
                     </div>
                     {/* no text over it, ever (§5) — the thumbnail sits beside the name */}
                     {props.photoFor[entry.recipe.id] ? (
@@ -300,7 +345,14 @@ export function PlannerWeek(props: {
                       </span>
                     )}
                   </div>
-                  <span className="scale">
+                  {/*
+                    * Everything you can *do* to the meal, absent until asked for — not shrunk.
+                    * Shrinking was the wrong fix: four controls at 44px each do not fit beside a
+                    * photograph on a phone at any size that is still tappable, so the answer is
+                    * fewer controls at rest rather than smaller ones.
+                    */}
+                  {isOpen && (
+                  <div className="h-day-panel" id={`entry-${entry.id}`}>
                     <ServingsField
                       entryId={entry.id}
                       scale={entry.scale}
@@ -327,15 +379,6 @@ export function PlannerWeek(props: {
                       * looking at then — asking them to open the recipe later is why there were
                       * two ratings against twenty-eight planned dinners.
                       */}
-                    <Cooked
-                      entryId={entry.id}
-                      familyId={props.familyId}
-                      recipeId={entry.recipe.id}
-                      cookedAt={entry.cookedAt}
-                      members={props.membersByRecipe[entry.recipe.id] ?? []}
-                      parts={props.partsByRecipe[entry.recipe.id] ?? []}
-                      disabled={busy !== null}
-                    />
                     <select
                       aria-label="Move to another day"
                       className="quiet"
@@ -365,11 +408,13 @@ export function PlannerWeek(props: {
                       title="Take it off this day — it goes back to the waiting list"
                       onClick={() => call(`remove-${entry.id}`, `/api/plan-entries/${entry.id}`, "DELETE")}
                     >
-                      ✕
+                      Take it off
                     </button>
-                  </span>
+                  </div>
+                  )}
                 </div>
-              ))}
+                );
+              })}
               </div>
             </section>
           );

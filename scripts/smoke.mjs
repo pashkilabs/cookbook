@@ -546,6 +546,41 @@ try {
     );
 
     /*
+     * Item 3: what the day row holds AT REST, asserted by absence.
+     *
+     * The fix is not "the panel exists" — it is that four controls are *not* in the row until
+     * asked for, and a presence check cannot see that. So this asserts the planned row carries
+     * the title and the cooked mark, and carries **neither** the Move select nor the remove
+     * button. Checked here because the plan-it walk has just put a real meal on a real day; with
+     * no planned entry the row renders "+ Add dinner" and every absence below would pass
+     * vacuously, which is a probe that could not have failed.
+     */
+    const week = await call("GET", `/planner?week=${monday}`);
+    const weekText = visible(typeof week.body === "string" ? week.body : "");
+    const hasRow = weekText.includes("Smoke Test Pie") && weekText.includes("h-cooked-mark");
+    record(
+      "the planned meal is on the planner's day row",
+      alive(week) && hasRow,
+      alive(week) ? foundDetail(weekText, "Smoke Test Pie", "no planned row to measure — the absences below would pass vacuously") : `HTTP ${week.status}`,
+    );
+    if (hasRow) {
+      record(
+        "and the row at rest does not carry Move or remove",
+        !weekText.includes("Move to another day") && !weekText.includes("Take it off"),
+        weekText.includes("Move to another day")
+          ? "the Move select is still in the row at rest"
+          : weekText.includes("Take it off")
+            ? "the remove button is still in the row at rest"
+            : "both absent, as intended",
+      );
+      record(
+        "and the row's disclosure starts closed",
+        weekText.includes('aria-expanded="false"'),
+        foundDetail(weekText, 'aria-expanded="false"'),
+      );
+    }
+
+    /*
      * And off again, which is the hop that would fail silently.
      *
      * The id reaching the circle is the only way a second tap can unplan anything; render it with
@@ -954,6 +989,15 @@ try {
         "h-day-row",
         "+ Add dinner",
         "h-week",
+        /*
+         * Item 3: the row at rest. `aria-expanded="false"` asserts the disclosure exists AND is
+         * closed — which is the whole fix, since a panel rendered open on every row is the
+         * overcrowding it was built to remove. And the cooked mark, because it is the one control
+         * that must survive at rest: moving it behind a tap cost two ratings against twenty-eight
+         * planned dinners the last time.
+         */
+        'aria-expanded="false"',
+        "h-cooked-mark",
       ],
       /*
        * The Harvest restyle, asserted rather than assumed (§4.1).

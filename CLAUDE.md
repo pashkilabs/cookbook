@@ -542,6 +542,20 @@ models be good enough. Do not add a silent-save path.
   nothing, the next move is to grep the *property* and print the value, or enumerate what spellings
   actually exist in the file — never to report the absence.
 
+  **Reach for the print before the grep, not after.** Three more unearned answers in a single
+  round, each caught only by printing: `--include=*.tsx` glob-expanded in zsh so the grep never
+  ran and "0 files" was nothing at all; `.h-docked` prefix-matched `.h-docked-page` and reported
+  the wrong rule's body; and selector-exact matching found no `.h-tabbar{` in production because
+  **the minifier had merged it into `.h-docked,.h-tabbar{`**. A fourth, smaller: `color:` inside
+  `border-color:` made my own probe report a violation that was not there — the same regex flaw I
+  had just fixed in a guard, repeated in the probe checking it.
+
+  Every one was a guess about a *spelling* — of a glob, a selector boundary, a minifier's output,
+  a property name — and in every case the absence looked identical to a finding. So the habit is
+  the inverse of the instinct: **print the thing, then search what came back.** `grep -o` the
+  property and read its value; list the selectors that actually exist before matching one; quote
+  the glob. The grep is for confirming a shape you have already seen, not for discovering one.
+
 - **A schema field is not a request, and a field nobody scores stays empty forever.**
   `steps` was in the extraction schema with a description, and `EXTRACTION_INSTRUCTIONS`
   was eight sentences every one of which was about ingredients. Every caption came back

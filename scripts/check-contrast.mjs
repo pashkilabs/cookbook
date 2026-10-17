@@ -159,6 +159,10 @@ const PAIRS = [
   ["bridge: chip at rest", "chip-text", "chip-bg", "text"],
   ["bridge: chip selected (clay)", "planned-text", "planned-bg", "text"],
   ["bridge: chip accent edge on hover", "primary", "chip-bg", "ui"],
+  ["week: cooked mark, unmarked", "text-muted", "surface", "text"],
+  ["week: cooked mark edge, unmarked", "border-strong", "surface", "ui"],
+  ["week: cooked mark, marked", "on-secondary", "checked", "text"],
+  ["week: cooked mark on today's row", "text-muted", "planned-bg", "text"],
   // the shared primitives, which every screen paints
   ["primary button label", "on-primary", "primary", "text"],
   ["secondary button label", "on-secondary", "secondary", "text"],

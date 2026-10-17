@@ -47,6 +47,8 @@ export function Cooked({
   members,
   parts,
   disabled,
+  expanded = false,
+  onCooked,
 }: {
   entryId: string;
   familyId: string;
@@ -56,11 +58,28 @@ export function Cooked({
   /** the recipe's components, so a surplus can be kept against the part it is */
   parts: string[];
   disabled: boolean;
+  /**
+   * Whether the row holding this is open.
+   *
+   * The **mark** is always visible and the **scores** are not. Moving the mark behind a tap is
+   * what cost two ratings against twenty-eight planned dinners the last time it lived away from
+   * the day: the moment a household knows something was cooked is the evening it was cooked, and
+   * this is the screen they are looking at then. The score grid is five buttons per member and is
+   * what crushed the row, so that half waits to be asked for — and it always did, behind "Who
+   * liked it?", so nothing has moved further away than it already was.
+   */
+  expanded?: boolean;
+  /**
+   * Marking a meal cooked asks the row to open, so the scores are in front of somebody at the one
+   * moment rating is cheapest. That behaviour was `setOpen(cooked)` before the row owned the
+   * disclosure, and losing it in the refactor would have quietly undone the thing the 2-ratings-
+   * against-28-dinners measurement bought.
+   */
+  onCooked?: (cooked: boolean) => void;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [open, setOpen] = useState(false);
   const [kept, setKept] = useState<string[]>([]);
   const [scores, setScores] = useState<Record<string, number | null>>(
     Object.fromEntries(members.map((m) => [m.id, m.score])),
@@ -84,7 +103,7 @@ export function Cooked({
         return;
       }
       // opened on marking, closed on unmarking: the scores are about a meal that happened
-      setOpen(cooked);
+      onCooked?.(cooked);
       router.refresh();
     } finally {
       setBusy(false);
@@ -163,45 +182,59 @@ export function Cooked({
     }
   };
 
+  /*
+   * The mark, and it is the same control in both states rather than two different ones — a tick
+   * that fills. Two buttons swapping places under a thumb is how somebody taps "undo" meaning
+   * "cooked it".
+   */
+  const mark = (
+    <button
+      type="button"
+      className={cookedAt ? "h-cooked-mark is-on" : "h-cooked-mark"}
+      disabled={disabled || busy}
+      aria-pressed={Boolean(cookedAt)}
+      title={cookedAt ? "This was not cooked after all" : "Record that this was cooked"}
+      onClick={() => setCooked(!cookedAt)}
+    >
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M5 12l5 5 9-10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      {busy ? "…" : cookedAt ? "Cooked" : "Cooked it"}
+    </button>
+  );
+
   if (!cookedAt) {
     return (
-      <div>
-        <button
-          type="button"
-          className="quiet"
-          disabled={disabled || busy}
-          title="Record that this was cooked"
-          onClick={() => setCooked(true)}
-        >
-          {busy ? "…" : "Cooked it"}
-        </button>
-        {error && <p className="meta">{error}</p>}
-      </div>
+      <>
+        {mark}
+        {error && <p className="h-day-meta">{error}</p>}
+      </>
+    );
+  }
+
+  if (!expanded) {
+    /*
+     * Closed and cooked: the mark, plus a quiet note when somebody still has no score. The prompt
+     * is kept rather than dropped — it is the only thing that turns a cooked meal into a rating —
+     * but it points at the row's own disclosure instead of opening a grid in place.
+     */
+    return (
+      <>
+        {mark}
+        {members.some((m) => scores[m.id] == null) && (
+          <span className="h-day-meta">· who liked it?</span>
+        )}
+        {error && <p className="h-day-meta">{error}</p>}
+      </>
     );
   }
 
   return (
-    <div>
-      <span className="meta">
-        Cooked{" "}
-        <button
-          type="button"
-          className="quiet"
-          disabled={disabled || busy}
-          title="This was not cooked after all"
-          onClick={() => setCooked(false)}
-        >
-          undo
-        </button>
-      </span>
+    <div className="h-cooked-panel">
+      {mark}
 
-      {!open && members.some((m) => scores[m.id] == null) && (
-        <button type="button" className="quiet" disabled={busy} onClick={() => setOpen(true)}>
-          Who liked it?
-        </button>
-      )}
-
-      {open && (
+      {/* the grid, which is what crushed the row — five buttons per member */}
+      {(
         <div>
           {members.map((member) => (
             <div key={member.id} style={{ display: "flex", gap: "var(--s2)", alignItems: "baseline" }}>

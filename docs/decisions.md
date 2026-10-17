@@ -4979,3 +4979,48 @@ So the practical rule, in order:
 Category 2 is caught by reading the schema. Category 3 is caught only by looking for the answer
 somewhere other than where the mockup put the question — which nobody does unless they have been
 told to, which is what this section is.
+
+## §79 — Contrast and role are different questions, and this project now asks both
+
+`button, a.button { background: var(--ink) }` painted every plain button in the app near-black.
+`--ink` is the bridge alias for `--text`, which is `palette.bark` — and `tokens.ts` contains **no
+black at all**. An element selector carried it to ten bare buttons, twelve `.button` links, and
+every screen: search, the pantry chips, everything Stephen was looking at.
+
+**A contrast check cannot see this, and that is the point worth keeping.** Near-black behind white
+text scores about 13:1. It is perfectly legible, it passes AA with enormous room, and it is simply
+not this product's palette. `check-contrast` was running at the time, over 54 pairs, and had
+nothing to object to — correctly. The question it asks is *can this be read*, and the answer was
+yes.
+
+So the instrument was wrong, not weak. The right question is about **role**: is each token being
+used for the job it names? `scripts/check-palette-roles.mjs` asks it, in both directions, because
+**the spec was silent on both**:
+
+| | | |
+|---|---|---|
+| terracotta as **text** | specified as "primary action (white text, 4.8:1)" — a figure about white *on* terracotta | clears AA on parchment alone; three of four grounds fail |
+| bark as a **fill** | specified as the text token; nothing says it is not a ground | invisible to contrast, visible to everybody |
+
+The two errors are mirror images and the project found them by opposite means — the first by
+measuring a pair, the second by somebody looking at a screen. One guard each:
+
+- **`check-contrast`** — 61 pairs × 3 themes, WCAG 2.1 §1.4.3 and §1.4.11. Asks *does it read*.
+- **`check-palette-roles`** — asks *is it the right token*. Three groups: a **surface** is never
+  text, a **text** role is never a fill, and **accents are legitimately both** — terracotta fills a
+  button and tints a link, olive fills a secondary and outlines one. Without that middle group it
+  would flag every link in the app and be switched off inside a week, which is the
+  `check-migrations-pushed` argument again: a check that fails routinely is one people learn to
+  ignore.
+
+It **resolves bridge aliases**, which is the only reason it catches anything at all — the bug was
+spelled `var(--ink)`, not `var(--text)`, and a guard that knew only role names would have read the
+offending rule and found nothing wrong with it.
+
+**What a future palette should state, since this one did not.** A hex and a one-line use is not
+enough to use a token safely. Two things are missing from the table and both cost a defect here:
+**which side of a declaration a role belongs on**, and **which grounds a text role is safe on**.
+The palette already knew both implicitly — `plannedText` is mapped differently per theme precisely
+so it reads on the clay tint, and `checkboxEdge` was given a stronger value than `borderStrong`
+precisely because an unchecked checkbox is identified by its edge. The palette knew; the table did
+not say; and what a table does not say is what gets implemented wrong.
