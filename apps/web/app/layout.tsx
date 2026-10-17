@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Fraunces, Nunito_Sans } from "next/font/google";
 import "./tokens.generated.css";
 import "./globals.css";
+import "./harvest.css";
 
 /*
  * Webfonts, and this is a **reversal** of a recorded decision rather than a gap.

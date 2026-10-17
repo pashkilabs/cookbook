@@ -510,6 +510,23 @@ models be good enough. Do not add a silent-save path.
   test that passes while the real input is unchanged is the same class as a test that
   never runs — it is counted.
 
+  **The same failure in a new costume: searching for a shape instead of printing it.** Verifying
+  that the Harvest tokens reached the browser, I grepped the served stylesheet for
+  `--text:#2B2620` and `--primary:#B4532A` and got **zero**, and reported the tokens as not being
+  served. They were. Two mistakes at once, and both were about assuming a shape:
+
+  - **Minified against unminified.** I searched the spelling production emits — no space after the
+    colon — against a dev-mode stylesheet that keeps the space. `grep "clip-path:inset(50%)"`
+    found nothing for the same reason, minutes after I had already been caught by it once.
+  - **The first of several.** I checked `grep -oE '/_next/static/css/[^"]+' | head -1`, and a page
+    can load more than one stylesheet. Checking *a* file and reporting on *the* file.
+
+  The fix both times was to grep the **property** and print what came back —
+  `grep -oE "clip-path: *[^;}]+"` — rather than grep a guessed value and read absence as fact. A
+  value you had to spell correctly to find is a value you can fail to find while it is right
+  there, and absence is the one result that looks the same whether you were looking in the right
+  place or not.
+
 - **A schema field is not a request, and a field nobody scores stays empty forever.**
   `steps` was in the extraction schema with a description, and `EXTRACTION_INSTRUCTIONS`
   was eight sentences every one of which was about ingredients. Every caption came back

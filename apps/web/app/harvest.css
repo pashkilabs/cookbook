@@ -1,0 +1,313 @@
+/* ---------------------------------------------------------------------------
+ * Harvest primitives (§3). Every value is a token — `check-hex-literals` enforces it.
+ *
+ * Classes rather than inline styles, because that is how this app is written and because a style
+ * attribute cannot carry a media query, a focus ring or a pressed state. The reference wireframes
+ * use inline styles; they are wireframes.
+ * ------------------------------------------------------------------------- */
+
+/* --- buttons ------------------------------------------------------------- */
+
+.h-primary,
+.h-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  height: var(--size-button);
+  padding: 0 var(--space-xl);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-body);
+  font-size: var(--type-label-size);
+  font-weight: var(--type-label-weight);
+  line-height: var(--type-label-line);
+  text-decoration: none;
+  cursor: pointer;
+  /* a tap on a phone should not also select the label */
+  user-select: none;
+}
+
+.h-primary.is-large,
+.h-secondary.is-large {
+  height: var(--size-button-large);
+  font-size: 18px;
+}
+
+.h-primary {
+  border: 0;
+  background: var(--primary);
+  color: var(--on-primary);
+}
+.h-primary:hover { background: var(--primary-pressed); }
+.h-primary:disabled { opacity: 0.5; cursor: default; }
+
+.h-secondary {
+  border: 1.5px solid var(--secondary);
+  background: transparent;
+  color: var(--secondary);
+}
+.h-secondary:hover { background: var(--chip-bg); }
+.h-secondary:disabled { opacity: 0.5; cursor: default; }
+
+.h-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-touch-min);
+  height: var(--size-touch-min);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+.h-icon:hover { border-color: var(--border-strong); }
+
+/*
+ * A visible focus ring on every control, and it is not negotiable.
+ *
+ * `:focus-visible` so a mouse press does not draw one but a keyboard tab does. Two of these
+ * controls are circles with an icon and no text, and a keyboard user who cannot see where they are
+ * cannot use the screen at all.
+ */
+.h-primary:focus-visible,
+.h-secondary:focus-visible,
+.h-icon:focus-visible,
+.h-segmented button:focus-visible,
+.h-day:focus-visible,
+.h-tabbar a:focus-visible,
+.h-check input:focus-visible + .h-check-box {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* --- chips --------------------------------------------------------------- */
+
+.h-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-xs) 10px;
+  border-radius: var(--radius-pill);
+  font-size: var(--type-chip-size);
+  font-weight: var(--type-chip-weight);
+  line-height: var(--type-chip-line);
+  white-space: nowrap;
+}
+.h-chip.is-sage { background: var(--chip-bg); color: var(--chip-text); }
+.h-chip.is-clay { background: var(--planned-bg); color: var(--planned-text); }
+/* dark text on turmeric, always — §2 forbids white on it and the token pair is the enforcement */
+.h-chip.is-turmeric { background: var(--highlight); color: var(--on-highlight); }
+
+/* --- segmented control --------------------------------------------------- */
+
+.h-segmented {
+  display: flex;
+  padding: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunken);
+}
+.h-segmented button {
+  flex: 1;
+  height: var(--size-segmented);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.h-segmented button.is-selected {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 700;
+  box-shadow: var(--shadow-segmented-thumb);
+}
+
+/* --- checkbox ------------------------------------------------------------ */
+
+.h-check {
+  display: flex;
+  gap: var(--space-md);
+  align-items: flex-start;
+  padding: 10px 0;
+  cursor: pointer;
+}
+.h-check:not(:last-child) { border-bottom: 1px solid var(--surface-sunken); }
+
+/*
+ * The real input, hidden from sight and not from the keyboard or a screen reader.
+ *
+ * Not `display: none` and not `visibility: hidden` — both remove it from the accessibility tree
+ * and from the tab order, which is the whole point of having it. A 1px clipped box stays focusable.
+ */
+.h-check input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.h-check-box {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-checkbox);
+  height: var(--size-checkbox);
+  border-radius: var(--radius-checkbox);
+  box-sizing: border-box;
+}
+.h-check.is-need .h-check-box { border: 2px solid var(--checkbox-edge); }
+.h-check.is-have .h-check-box { background: var(--checked); color: var(--on-secondary); }
+/* dashed means unresolved, not unchecked — a pantry item nobody recorded an amount for (§73) */
+.h-check.is-check-pantry .h-check-box { border: 2px dashed var(--checkbox-edge); }
+
+.h-check-body { flex: 1; font-size: var(--type-body-l-size); line-height: var(--type-body-l-line); }
+.h-check.is-have .h-check-body { color: var(--text-muted); text-decoration: line-through; }
+
+/* --- day circle ---------------------------------------------------------- */
+
+.h-day {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-day-circle-w);
+  height: var(--size-day-circle-h);
+  border-radius: 21px;
+  background: transparent;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.h-day strong { font-size: 15px; color: var(--text); font-weight: 600; }
+.h-day.is-open { border: 1.5px solid var(--border-strong); }
+.h-day.is-suggested { border: 1.5px dashed var(--border-strong); }
+.h-day.is-planned { border: 0; background: var(--primary); color: var(--on-primary); }
+.h-day.is-planned strong { color: var(--on-primary); font-weight: 700; }
+
+/* --- section header and eyebrow ------------------------------------------ */
+
+.h-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-md);
+}
+.h-section h1,
+.h-section h2,
+.h-section h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--type-display-s-weight);
+}
+.h-section h1 { font-size: var(--type-display-xl-size); line-height: var(--type-display-xl-line); }
+.h-section h2 { font-size: var(--type-display-s-size); line-height: var(--type-display-s-line); }
+.h-section h3 { font-size: 17px; }
+
+.h-eyebrow {
+  font-size: var(--type-eyebrow-size);
+  font-weight: var(--type-eyebrow-weight);
+  line-height: var(--type-eyebrow-line);
+  letter-spacing: var(--type-eyebrow-tracking);
+  text-transform: uppercase;
+  color: var(--secondary);
+  padding: var(--space-md) 0 var(--space-xs);
+}
+
+/* --- docked bars --------------------------------------------------------- */
+
+/*
+ * The page shape a docked bar needs.
+ *
+ * Without this the bar covers the last row, which is the bug a floating button has wearing a
+ * different costume. The column gives the bar its own height and lets only the region above it
+ * scroll.
+ */
+.h-docked-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+.h-docked-page > main { flex: 1; min-height: 0; }
+
+.h-docked,
+.h-tabbar {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  min-height: var(--size-docked-action-bar);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  /* the home-indicator inset on iOS, and nothing extra where there is none */
+  padding-bottom: max(var(--space-xl), env(safe-area-inset-bottom));
+}
+
+.h-docked {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: var(--space-md) var(--space-lg);
+  padding-bottom: max(var(--space-xl), env(safe-area-inset-bottom));
+}
+.h-docked > * { flex: 1; }
+
+/* --- tab bar ------------------------------------------------------------- */
+
+.h-tabbar {
+  display: flex;
+  padding: var(--space-sm) var(--space-sm);
+  padding-bottom: max(var(--space-xl), env(safe-area-inset-bottom));
+}
+.h-tabbar a {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: var(--size-touch-min);
+  text-decoration: none;
+  color: var(--text-muted);
+  font-size: var(--type-tab-size);
+  font-weight: var(--type-tab-weight);
+}
+.h-tabbar a svg { stroke-width: 1.8; }
+.h-tabbar a.is-current { color: var(--primary); font-weight: 700; }
+.h-tabbar a.is-current svg { stroke-width: 2.2; }
+
+/* --- inputs -------------------------------------------------------------- */
+
+/*
+ * 16px, so iOS does not zoom the page when a field takes focus.
+ *
+ * Smaller text in a form field is the single most common cause of a mobile page lurching on
+ * focus, and the token says 16 for exactly this reason.
+ */
+.h-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: var(--size-input);
+  padding: 0 var(--space-lg);
+  border-radius: var(--radius-input);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.h-field input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  outline: none;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--type-body-l-size);
+}
