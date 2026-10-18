@@ -994,7 +994,33 @@
 .h-today-head { padding: var(--space-xxl) var(--space-xl) 0; }
 .h-today-date { margin: 0; font-size: 14px; color: var(--text-muted); }
 
-.h-slot { padding: var(--space-lg) var(--space-xl) 0; }
+.h-slot-tabs { padding: var(--space-lg) var(--space-xl) var(--space-sm); }
+
+/*
+ * "No breakfast planned." The left bar is the reference's, and it is what makes this read as a
+ * statement about the plan rather than as a card somebody failed to fill — the accent edge where
+ * a photograph would be on a planned meal.
+ */
+.h-today-empty {
+  margin: var(--space-sm) var(--space-xl) 0;
+  padding: var(--space-lg);
+  border-radius: var(--radius-card-large);
+  border-left: 3px solid var(--primary);
+  background: var(--surface);
+}
+.h-today-empty-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-display-s-size);
+  font-weight: var(--type-display-s-weight);
+  line-height: var(--type-display-s-line);
+  color: var(--text);
+}
+.h-today-empty p { margin: var(--space-sm) 0 0; font-size: var(--type-body-l-size); line-height: var(--type-body-l-line); color: var(--text-body); }
+.h-today-empty a { color: var(--planned-text); }
+
+/* the meal card carries the gutter now that the screen shows one slot, not four */
+.h-meal-card { margin-left: var(--space-xl); margin-right: var(--space-xl); }
 
 .h-meal-card {
   margin-top: var(--space-sm);
@@ -1105,16 +1131,24 @@
 .h-board-name:hover { text-decoration: underline; }
 .h-board-chips { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin-top: 4px; }
 
-/* the quiet states — untried, and a lukewarm score — on the sunken ground, as the reference has */
+/*
+ * The third chip kind — a lukewarm score, an untried count, "nobody has rated it".
+ *
+ * `chipQuietBg` / `chipQuietText` rather than `surface-sunken` / `text-muted`, which is what this
+ * was. Same colours; the difference is that the palette now names them as a chip, so
+ * `check-palette-roles` sees a chip role rather than a surface used as one — and a future theme
+ * can move the quiet chip without moving every sunken panel with it.
+ */
 .h-chip-quiet {
   display: inline-flex;
   align-items: center;
   padding: 3px 9px;
   border-radius: var(--radius-pill);
-  background: var(--surface-sunken);
-  color: var(--text-muted);
+  background: var(--chip-quiet-bg);
+  color: var(--chip-quiet-text);
   font-size: var(--type-chip-size);
   font-weight: var(--type-chip-weight);
+  white-space: nowrap;
 }
 
 /* outlined olive: a secondary action, which is what adding something to a list is */

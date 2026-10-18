@@ -41,6 +41,8 @@ export interface LeaderboardRecipe {
   id: string;
   title: string;
   timesMade: number;
+  /** carried so a caller can scope by slot before ranking; this file does not read it */
+  course?: string | null;
 }
 
 export interface LeaderboardRow {

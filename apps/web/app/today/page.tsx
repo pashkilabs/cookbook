@@ -6,6 +6,7 @@ import { platformStore } from "@/lib/platform";
 import { startOfWeek, todayIso, weekDays } from "@/lib/week";
 import { buildShoppingWeek } from "@/lib/shopping";
 import { leaderboard, type Rating } from "@/lib/leaderboard";
+import { SLOTS, hourIn, isSlot, showsOnSlot, slotForHour, type Slot } from "@/lib/slots";
 import { readAvoidedAllergens } from "@/lib/allergen-filter";
 import { servingsForScale } from "@/lib/planner";
 import { Eyebrow, TabBar } from "@/components/harvest";
@@ -30,7 +31,12 @@ import { TodayPlan, type PlannedMeal, type Suggestion } from "./today-plan";
  *
  * `/recipes` keeps its own heading and becomes what its name says: the library.
  */
-export default async function TodayPage() {
+export default async function TodayPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ slot?: string }>;
+}) {
+  const asked = (await searchParams).slot;
   const supabase = await userClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) redirect("/sign-in");
@@ -57,7 +63,7 @@ export default async function TodayPage() {
       .is("deleted_at", null),
     supabase
       .from("recipes")
-      .select("id, title, times_made")
+      .select("id, title, times_made, course")
       .eq("family_id", family.id)
       .is("deleted_at", null),
     supabase
@@ -74,12 +80,28 @@ export default async function TodayPage() {
    */
   const allergens = await readAvoidedAllergens(supabase, family.id, family.avoidedAllergens ?? []);
 
+  /*
+   * ---------------------------------------------------------------------------
+   * The tab, chosen on the server
+   * ---------------------------------------------------------------------------
+   *
+   * A hand-picked tab arrives as `?slot=`; otherwise the hour decides. Read here rather than in a
+   * client effect, because deriving it after hydration makes the tab **flip** in front of
+   * somebody — and read from `family.timezone`, which is the zone `todayIso` above already used,
+   * so the date in the header and the tab beneath it cannot disagree.
+   */
+  const slot: Slot = isSlot(asked) ? asked : slotForHour(hourIn(family.timezone));
+
   const catalogue = rows(recipeRows, "recipes").map((row) => ({
     id: row.id as string,
     title: row.title as string,
+    course: (row.course as string | null) ?? null,
     timesMade: Number(row.times_made ?? 0),
   }));
   const offerable = catalogue.filter((recipe) => !allergens.excluded.has(recipe.id));
+  /* the tab scopes the leaderboard, which is the whole of fault 2: the slot set what a `+` wrote
+     and not what the screen showed, so choosing breakfast offered dinners */
+  const inSlot = offerable.filter((recipe) => showsOnSlot(recipe.course, slot));
 
   const ratings: Rating[] = rows(ratingRows, "ratings").map((row) => ({
     recipeId: row.recipe_id as string,
@@ -87,10 +109,30 @@ export default async function TodayPage() {
     score: Number(row.score),
   }));
 
-  const board = leaderboard(offerable, ratings, members);
+  const board = leaderboard(inSlot, ratings, members);
+  /*
+   * When nothing in this course has been rated the tab still lists the recipes, chipped "nobody
+   * has rated it" — an unranked list is useful and an absent section is not. Capped, because
+   * "every unrated dinner" is sixty rows and the link below goes to the library.
+   */
+  const unrated =
+    board.length > 0
+      ? []
+      : inSlot.slice(0, 8).map((recipe) => ({
+          id: recipe.id,
+          title: recipe.title,
+          liked: 0,
+          rated: 0,
+          untried: members.length,
+          lukewarm: [] as Array<{ name: string; score: number }>,
+          timesMade: recipe.timesMade,
+        }));
   const hiddenByAllergen = catalogue.length - offerable.length;
 
-  const meals: PlannedMeal[] = rows(planned, "today's meals").map((row) => {
+  const meals: PlannedMeal[] = rows(planned, "today's meals")
+    // only this tab's meal: the screen is scoped to a slot, header to leaderboard
+    .filter((row) => row.slot === slot)
+    .map((row) => {
     const recipe = row.recipes as unknown as {
       id: string;
       title: string;
@@ -163,7 +205,7 @@ export default async function TodayPage() {
    * somebody deciding what to eat (§56).
    */
   const photoFor = new Map<string, string>();
-  const wanted = [...new Set([...meals.map((meal) => meal.recipeId), ...board.map((row) => row.id)])];
+  const wanted = [...new Set([...meals.map((meal) => meal.recipeId), ...board.map((row) => row.id), ...unrated.map((row) => row.id)])];
   if (wanted.length > 0) {
     const photos = rows(
       await supabase
@@ -187,7 +229,7 @@ export default async function TodayPage() {
     }
   }
 
-  const suggestions: Suggestion[] = board.map((row) => ({
+  const suggestions: Suggestion[] = [...board, ...unrated].map((row) => ({
     id: row.id,
     title: row.title,
     liked: row.liked,
@@ -210,26 +252,13 @@ export default async function TodayPage() {
           weekStart={weekStart}
           meals={meals}
           suggestions={suggestions}
+          slot={slot}
+          slotTotal={inSlot.length}
+          anyRated={board.length > 0}
           memberCount={members.length}
           stillToBuy={stillToBuy}
           photoFor={Object.fromEntries(photoFor)}
         />
-
-        {/*
-          * Said, not omitted — the distinction this project keeps having to draw. "Nobody has
-          * rated anything yet" and an absent section look identical and mean opposite things, and
-          * with 10 rated recipes of 66 the empty case is a real state rather than a theoretical
-          * one.
-          */}
-        {suggestions.length === 0 && (
-          <section className="h-today-quiet">
-            <Eyebrow>What everyone likes</Eyebrow>
-            <p>
-              Nobody has rated anything yet, so there is nothing to count. Mark a meal cooked on{" "}
-              <Link href="/planner">the week</Link> and the scores go with it.
-            </p>
-          </section>
-        )}
 
         {hiddenByAllergen > 0 && (
           <p className="h-today-hidden">

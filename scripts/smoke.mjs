@@ -634,6 +634,35 @@ try {
       d.setUTCDate(d.getUTCDate() + 1);
       return d.toISOString().slice(0, 10);
     })();
+    /*
+     * The tab scopes the screen, which is the whole of fault 2 — v1's slot set what got written
+     * and not what got shown, so choosing breakfast offered dinners. Asserted by difference: the
+     * two tabs must not render the same heading.
+     */
+    /*
+     * Breakfast is asserted on the THIRD empty state rather than on a heading: this household owns
+     * no breakfast recipes, so there is nothing to rank and nothing to list, and the honest screen
+     * says "No breakfasts in your recipes yet". Asserting the heading here would have demanded a
+     * leaderboard for a course with no members — a check that can only pass on somebody else's
+     * data.
+     */
+    for (const [tab, wanted] of [["breakfast", "No breakfasts in your recipes yet"], ["dinner", "Dinners everyone likes"]]) {
+      const page = await call("GET", `/today?slot=${tab}`);
+      const text = visible(typeof page.body === "string" ? page.body : "");
+      record(
+        `the ${tab} tab shows ${tab} content and says so`,
+        page.status === 200 && text.includes(wanted),
+        page.status === 200 ? foundDetail(text, wanted) : `HTTP ${page.status}`,
+      );
+    }
+    const dinnerTab = visible(String((await call("GET", "/today?slot=dinner")).body ?? ""));
+    const snackTab = visible(String((await call("GET", "/today?slot=snack")).body ?? ""));
+    record(
+      "and two tabs do not render the same screen",
+      dinnerTab !== snackTab,
+      dinnerTab === snackTab ? "both tabs rendered byte-identical output" : "they differ",
+    );
+
     const breakfast = await call("POST", "/api/plan-entries", {
       body: { recipeId, date: otherDay, slot: "breakfast" },
     });
@@ -1114,7 +1143,16 @@ try {
        * screen — the same mistake the alongside footnote's marker was written to avoid, repeated
        * one screen later. The heading is in both states; the chips are in neither reliably.
        */
-      "/today": ["Today", "+ Add breakfast", "+ Add dinner", "What everyone likes"],
+      /*
+       * Today v2. The four slot tabs are always present, so they are the stable markers; the
+       * leaderboard's heading now carries the slot's plural ("Dinners everyone likes"), so the
+       * old "What everyone likes" marker is gone with the thing it asserted.
+       *
+       * The v1 markers "+ Add breakfast" / "+ Add dinner" went with the dashed slot buttons the
+       * tabs replaced — a marker for a removed control fails loudly, which is the right direction
+       * for a deletion.
+       */
+      "/today": ["Today", "Bkfst", "Lunch", "Snack", "h-segmented", "Household ·"],
       /*
        * The Harvest shopping list (§4.5). The segmented control and the aisle rows are asserted;
        * the consolidation chips are not, because a week with no overlapping ingredient has none

@@ -28,6 +28,10 @@
   --colour-ember: #E0855A;
   --colour-moss: #A3B58A;
   --colour-turmeric-dark: #E3B04F;
+  --colour-sage-shade: #36402A;
+  --colour-clay-shade: #45301F;
+  --colour-moss-light: #CBD8B0;
+  --colour-ember-light: #F0BF9E;
   --member-clay: #B4531F;
   --member-olive: #6B7A3A;
   --member-teal: #2F7D78;
@@ -124,6 +128,8 @@
   --chip-text: #3E4A2D;
   --planned-bg: #F0D9C8;
   --planned-text: #8E3F1E;
+  --chip-quiet-bg: #E8DFD0;
+  --chip-quiet-text: #6A6055;
   --checkbox-edge: #8C8174;
   --checked: #56653F;
 }
@@ -146,10 +152,12 @@
     --on-secondary: #1C1915;
     --highlight: #E3B04F;
     --on-highlight: #1C1915;
-    --chip-bg: #3A332C;
-    --chip-text: #A3B58A;
-    --planned-bg: #3A332C;
-    --planned-text: #E0855A;
+    --chip-bg: #36402A;
+    --chip-text: #CBD8B0;
+    --planned-bg: #45301F;
+    --planned-text: #F0BF9E;
+    --chip-quiet-bg: #3A332C;
+    --chip-quiet-text: #B8AC9B;
     --checkbox-edge: #B8AC9B;
     --checked: #A3B58A;
   }
@@ -172,10 +180,12 @@
   --on-secondary: #1C1915;
   --highlight: #E3B04F;
   --on-highlight: #1C1915;
-  --chip-bg: #3A332C;
-  --chip-text: #A3B58A;
-  --planned-bg: #3A332C;
-  --planned-text: #E0855A;
+  --chip-bg: #36402A;
+  --chip-text: #CBD8B0;
+  --planned-bg: #45301F;
+  --planned-text: #F0BF9E;
+  --chip-quiet-bg: #3A332C;
+  --chip-quiet-text: #B8AC9B;
   --checkbox-edge: #B8AC9B;
   --checked: #A3B58A;
 }
@@ -197,10 +207,12 @@
   --on-secondary: #1C1915;
   --highlight: #E3B04F;
   --on-highlight: #1C1915;
-  --chip-bg: #3A332C;
-  --chip-text: #A3B58A;
-  --planned-bg: #3A332C;
-  --planned-text: #E0855A;
+  --chip-bg: #36402A;
+  --chip-text: #CBD8B0;
+  --planned-bg: #45301F;
+  --planned-text: #F0BF9E;
+  --chip-quiet-bg: #3A332C;
+  --chip-quiet-text: #B8AC9B;
   --checkbox-edge: #B8AC9B;
   --checked: #A3B58A;
 }

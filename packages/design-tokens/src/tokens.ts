@@ -49,6 +49,37 @@
  * are the handoff's values and a future decision may want them; deleting them would make this
  * file diverge from the bundle for no gain. `scripts/check-contrast.mjs` holds the measurement.
  *
+ * **Added: four dark tints, two chip-quiet roles, and `borderStrong` retargeted (above).**
+ *
+ * The third correction, and the same shape as `linenSoft`: **the dark palette was minted with
+ * fewer tints than the light one, so roles doubled up.** `chipBg` and `plannedBg` were *both*
+ * `ashWood`, which meant the "5 of 5 liked it" chip and the "made 6×" chip had the same
+ * background in dark and differed only by text colour. Light has two visibly different fills —
+ * `sageTint` against `clayTint` — so the chip system had two kinds in light and one in dark.
+ *
+ *   sageShade  #36402A   the dark sage tint — chip background
+ *   clayShade  #45301F   the dark clay tint — planned background
+ *   mossLight  #CBD8B0   text on sageShade,  7.27:1 (was moss on ashWood, 5.64)
+ *   emberLight #F0BF9E   text on clayShade,  7.46:1 (was ember on ashWood, 4.54)
+ *
+ * Measured, because a tint pair wants the right instrument. WCAG contrast is **luminance only**
+ * and says these two fills differ by 1.13:1, which reads alarming and is the wrong question —
+ * "can somebody tell two fills apart" is perceptual. By CIE76 the new dark pair is **ΔE 16.6**
+ * against light's existing **ΔE 11**, so the dark chips end up *more* distinguishable than the
+ * light ones they were modelled on. A concern computed with the wrong metric was nearly reported
+ * as a defect.
+ *
+ * **`chipQuietBg` / `chipQuietText`** are new roles with no new colours: the third chip kind — a
+ * lukewarm score, an untried count, "nobody has rated it" — had been hard-coded against
+ * `surface-sunken` and `text-muted` by a screen rather than named by the palette. `oatDeep`/`loam`
+ * at 4.65:1 and `ashWood`/`oatmeal` at 5.57:1, which are the values that were already being used;
+ * naming them is what lets `check-palette-roles` see them as a chip rather than as a surface.
+ *
+ * **`plannedBg` in dark is a change to a live token, not an addition.** It also paints the
+ * planner's today row, which becomes warm brown in dark — correct, since that row is clay in
+ * light, and the collapse is precisely why it was previously indistinguishable from any other
+ * card.
+ *
  * **Web does not emit the native-only scales.** `space`, `radius` and `size` are numbers for
  * StyleSheet; the CSS generator turns them into `px`. There is no second copy of either.
  */
@@ -86,6 +117,11 @@ export const palette = {
   ember: '#E0855A',      // primary action in dark — espresso text on it
   moss: '#A3B58A',
   turmericDark: '#E3B04F',
+  // dark tints, so a chip kind is a background rather than only a text colour — see the header
+  sageShade: '#36402A',  // the dark sage tint
+  clayShade: '#45301F',  // the dark clay tint
+  mossLight: '#CBD8B0',  // text on sageShade,  7.27:1
+  emberLight: '#F0BF9E', // text on clayShade,  7.46:1
 } as const;
 
 /**
@@ -134,6 +170,9 @@ export const themes = {
     chipText: palette.oliveDeep,
     plannedBg: palette.clayTint,
     plannedText: palette.terracottaDeep,
+    // the third chip kind: a lukewarm score, an untried count, nobody has rated it. 4.65:1
+    chipQuietBg: palette.oatDeep,
+    chipQuietText: palette.loam,
     checkboxEdge: palette.checkboxEdge,
     checked: palette.olive,
   },
@@ -155,10 +194,14 @@ export const themes = {
     onSecondary: palette.espresso,
     highlight: palette.turmericDark,
     onHighlight: palette.espresso,
-    chipBg: palette.ashWood,
-    chipText: palette.moss,
-    plannedBg: palette.ashWood,
-    plannedText: palette.ember,
+    // both were `ashWood`, which is the collapse the header describes
+    chipBg: palette.sageShade,
+    chipText: palette.mossLight,
+    plannedBg: palette.clayShade,
+    plannedText: palette.emberLight,
+    // 5.57:1, and the values a screen was already hard-coding before the palette named them
+    chipQuietBg: palette.ashWood,
+    chipQuietText: palette.oatmeal,
     checkboxEdge: palette.oatmeal,
     checked: palette.moss,
   },
