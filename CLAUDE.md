@@ -754,6 +754,26 @@ guessing.
   Count the boundaries when adding a value, not when a bug is reported. Three is the trigger:
   `apps/web/test/section-round-trip.test.ts` is the template.
 
+- **A threshold is only meaningful inside the range the data actually occupies.** Measured across
+  every household: **0 of 46 ratings in the real one are a 1 or a 2** — the scores are 11 threes, 16
+  fours, 19 fives, and the only sub-3 anywhere is a single 2 written during a demo household's setup
+  session. So `AVOIDS = 2.5` is not improbable, it is **arithmetically out of range** of any mean of
+  a 3–5 distribution, and `warningsFor` produced **0 warnings** when run against the real data.
+
+  But the *binding* gate was one nobody predicted: `ENOUGH_TO_SAY = 6` ratings within a single
+  dimension, against **0 patterns and 32 readings all `too-few`** — 46 ratings over 10 recipes × 3
+  dimensions × 5 members fragments into buckets of one. **A count threshold is the same question
+  asked about volume instead of value**, and it fails first.
+
+  The converse matters as much: a threshold *inside* the range works fine. `>= 4` excludes 5 of 10
+  recipes, a clean half. So the lesson is not "thresholds are suspect" — it is that **4 discriminates
+  on a 3–5 scale and 2.5 cannot**, and only counting the values tells you which you have written.
+
+  §82 is this from the other side: there a **label** interpreted a value nobody gives, here a
+  **threshold** compares one. Both come from a spec written against what the column permits rather
+  than what the rows contain. **Count the values before writing a label about them or a threshold
+  against them** — one query answers both (decisions §82, §83).
+
 - **`tsc` cannot know Next's page contract, so a green `pnpm check` is not evidence that it
   builds.** `export { SLOTS }` from `app/today/page.tsx` — a leftover re-export nothing imported —
   is **valid TypeScript**. It compiled, passed `tsc`, passed all 215 tests, passed every boundary

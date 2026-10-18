@@ -5218,3 +5218,92 @@ feature rather than about the data.
   saying breakfast — the app lying in the database, which outlasts the screen.
 - **Still-to-buy comes from `buildShoppingWeek`**, the function the shopping screen renders, so a
   card saying "3 things" above a list showing five is not expressible.
+
+## §83 — The bottom of the rating scale, measured
+
+**Nothing is changed by this entry.** It records a measurement and what it implies, and the
+implication for §71 is that the call it already made was right.
+
+### The finding
+
+**0 of 46 ratings in the real household are a 1 or a 2.** The scores are 11 threes, 16 fours and
+19 fives. Including soft-deleted rows, and across every household in the database, there is exactly
+**one** rating below 3 — a single 2 in *The Demo Household*, written in the same second its row was
+created, on the day that household was created, in one of the three minutes that contain all six of
+its ratings. That is a setup session, not a family recording an opinion about food they ate.
+
+So after eight weeks and forty-six ratings, **no human has used the bottom two points of this
+scale.**
+
+### The proposed mechanism is refuted, and the real one is more specific
+
+The hypothesis was that rating happens *after* cooking, and a household cooks what it expects to
+like — so the bottom would be structurally unreachable. Measured against `plan_entries.cooked_at`:
+
+| | |
+|---|---|
+| ratings written **after** the meal was marked cooked | 10 |
+| ratings written **before** it was marked cooked | 20 |
+| ratings for a recipe never marked cooked at all | 16 |
+| rated recipes never even planned | 2 of 10 |
+
+So rating does **not** follow cooking here. What it does follow is sharper: the 46 ratings arrived
+in **12 sittings across 11 days over eight weeks, and all 12 rated exactly one recipe** — 5 members
+× 1 recipe, then 5 × 1, then 2 × 1, and so on. That is the shape of the `Cooked` score grid: five
+buttons per member, one recipe at a time, the whole table in one go.
+
+The conclusion holds and the reason is different, which matters because the reason is what a design
+can lean on. A defensible replacement: **you rate a recipe you chose to cook, for people who chose
+to eat it, at the moment the grid asks** — which is the moment of most goodwill in the whole cycle.
+Nobody opens a rating grid to record a dinner they hated; they stop planning it instead, and
+*not planning something leaves no row at all*.
+
+### What it means for the three features, two of which came out differently
+
+**1. `warningsFor` fires zero times — confirmed, and blocked at a gate that is not the scale.**
+
+Run against the real household, it produces **0 warnings**, and there are two independent reasons:
+
+- `ENOUGH_TO_SAY = 6` ratings within one dimension before a reading is a `pattern`. Across all five
+  raters there are **0 patterns and 32 readings, every one of them `too-few`**. 46 ratings spread
+  over 10 recipes × 3 telling dimensions × 5 members fragments into buckets of one and two.
+- `AVOIDS` is `mean <= 2.5`. With no rating below 3, the mean of any set is ≥ 3, so this is not
+  improbable — it is **arithmetically out of range**. The lowest mean anywhere is 3.00, from a
+  single rating.
+
+The **binding** gate today is the first one, which the hypothesis did not predict: even a 1 would
+produce no warning until six ratings of that cuisine, protein or dish form existed.
+
+**2. Kid-friendly — refuted, and the real state is a different problem.**
+
+It is *not* "satisfied by a scale nobody uses the bottom of". Its threshold is **4**, which sits
+*inside* the occupied range of 3–5 and discriminates perfectly well: the adjacent "whole family
+likes" filter, which is `every(score >= 4)`, excludes **5 of 10** rated recipes — a clean half.
+
+The real finding is unrelated to the scale. `keepKidFriendly` filters to `member.isChild` and
+returns `[]` when there are none, and **no member of this household has a `birth_year`**, so
+`childIds.length === 0`. The filter is offered on `/recipes` with the hint *"a child rated it 4 or 5,
+and none rated it lower"* and **returns an empty list every time**. Left alone per the brief, and
+flagged: this is a live chip that cannot match, which is the dead-`lunch`-chip shape (§78 category
+2) arriving through data rather than through schema.
+
+**3. §71's dislike/allergen split — supported, as evidence the call was right.**
+
+A learned dislike requires a `pattern`, and there are **zero patterns after eight weeks and
+forty-six ratings**. So stated dislikes are not merely the better mechanism; they are **the only
+dislikes this app has ever seen**. §71 chose the household-stated route because the inferred one
+held health-shaped data to compute an answer the stated one gives directly. This measurement adds
+that the inferred route would also have had nothing to say.
+
+### The rule worth keeping
+
+**A threshold is only meaningful inside the range the data actually occupies.** 4 does real work on
+a 3–5 distribution; 2.5 cannot be reached by any mean of it. And a count threshold is the same
+question asked about volume rather than value: 6-in-one-dimension is unreachable at this library's
+density regardless of what anybody scores.
+
+This is §82 from the other side. There, a **label** interpreted a value and was wrong because the
+value never occurs. Here, a **threshold** compares a value and is unreachable for the same reason.
+Both come from a specification written against what the column *permits* rather than what the rows
+*contain* — so the habit generalises: **count the values before you write a label about them or a
+threshold against them.** One query, and it answers both.
