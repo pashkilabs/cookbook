@@ -1172,7 +1172,18 @@ try {
     for (const [name, path, marker] of screens) {
       const page = await call("GET", path);
       const body = typeof page.body === "string" ? page.body : JSON.stringify(page.body);
-      record(`${name} renders`, alive(page), `HTTP ${page.status}`);
+      /*
+       * 200, not `alive()`. A **404 is not a rendered page**, and `alive` deliberately accepts
+       * anything under 500 because it is about "did a handler run" — so a missing route reported
+       * `ok … renders — HTTP 404` while every marker under it failed. The verdict contradicted
+       * its own children, which is the self-contradicting-detail problem one level up: the
+       * summary line said yes and the detail said 404.
+       *
+       * Found by deploying a new screen and running the suite before the deploy landed. A 3xx is
+       * not a rendered page either: this list is screens a signed-in person can reach, and a
+       * redirect means they were sent somewhere else.
+       */
+      record(`${name} renders`, page.status === 200, `HTTP ${page.status}`);
       record(
         `and ${name} has no server-side exception`,
         !/Application error|server-side exception|Functions cannot be passed|Digest:/i.test(body),

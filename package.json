@@ -16,7 +16,7 @@
     "smoke": "node scripts/smoke.mjs",
     "smoke:local": "node scripts/smoke.mjs http://127.0.0.1:3000 --local",
     "check:pushed": "node scripts/check-migrations-pushed.mjs",
-    "ship": "node scripts/check-migrations-pushed.mjs && git push"
+    "ship": "node scripts/check-migrations-pushed.mjs && pnpm --filter @pashki/web build && git push"
   },
   "devDependencies": {
     "turbo": "^2.3.3",

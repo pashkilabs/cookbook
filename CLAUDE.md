@@ -720,6 +720,24 @@ guessing.
   half deploys itself and the other is remembered, so the answer is one command that does both in
   order. The health check stays the backstop for a push that comes from somewhere else.
 
+  **And `pnpm ship` now runs `next build` before it pushes, because `pnpm check` structurally
+  cannot.** A page file exporting anything outside Next's own fields — `export { SLOTS }`, a
+  leftover re-export nothing imported — compiles, passes `tsc`, passes all 215 tests, and fails
+  only at `next build`: *"SLOTS is not a valid Page export field"*. `tsc` has no way to know Next's
+  page contract, so the gate that runs constantly is blind to a whole class of error that the gate
+  that runs on Vercel catches **after the push**.
+
+  The tell was `check-shipped` reporting `AHEAD OF DEPLOYED BY 1 COMMIT` five minutes after a push
+  that normally lands in sixty seconds — and before that, six smoke failures that were **the new
+  suite running against the old deployment**, which is this project's own
+  *name-the-host* lesson arriving as a false bug report rather than a false pass. Without that
+  guard the session would have ended on "shipped".
+
+  Smoke had a matching flaw, found the same way: its page check used `alive()`, which accepts
+  anything under 500 because it asks "did a handler run" — so a missing route printed
+  `ok /today renders — HTTP 404` while every marker beneath it failed. **A verdict that
+  contradicts its own children**, and the fix is that a screen check requires 200.
+
 - **Verifying that A works and that B works is not verifying that A hands off to B.** Asked
   whether future weeks could be planned, I checked two things: the planner navigates weeks
   (it does) and the shortlist is week-scoped (it is). Both true, and I reported the feature

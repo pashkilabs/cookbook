@@ -9,7 +9,7 @@ import { leaderboard, type Rating } from "@/lib/leaderboard";
 import { readAvoidedAllergens } from "@/lib/allergen-filter";
 import { servingsForScale } from "@/lib/planner";
 import { Eyebrow, TabBar } from "@/components/harvest";
-import { TodayPlan, SLOTS, type PlannedMeal, type Suggestion } from "./today-plan";
+import { TodayPlan, type PlannedMeal, type Suggestion } from "./today-plan";
 
 /**
  * Today — what is planned, then what the household actually likes.
@@ -213,5 +213,3 @@ function longDate(iso: string): string {
     timeZone: "UTC",
   });
 }
-
-export { SLOTS };
