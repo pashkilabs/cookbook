@@ -5307,3 +5307,102 @@ value never occurs. Here, a **threshold** compares a value and is unreachable fo
 Both come from a specification written against what the column *permits* rather than what the rows
 *contain* — so the habit generalises: **count the values before you write a label about them or a
 threshold against them.** One query, and it answers both.
+
+## §84 — Today v2: the dark chip collapse, slot tabs, and a third empty state
+
+### The collapse was a `tokens.ts` fault, and the third correction to that file
+
+`themes.dark` had `chipBg` **and** `plannedBg` both `palette.ashWood`, so "5 of 5 liked it" and
+"made 6×" shared a background in dark and differed only by text colour. Light has two visibly
+different fills — `sageTint` against `clayTint` — so **the chip system had two kinds in light and
+one in dark.** Same shape as `textBody` collapsing onto `linen`: the dark palette was minted with
+fewer tints than the light one, so roles doubled up, and each collapse is invisible until a screen
+puts the two roles side by side.
+
+| role | light | dark was | dark now | ratio |
+|---|---|---|---|---|
+| `chipBg` | `sageTint` | `ashWood` | `sageShade` `#36402A` | — |
+| `chipText` | `oliveDeep` 7.19 | `moss` 5.64 | `mossLight` `#CBD8B0` | **7.27** |
+| `plannedBg` | `clayTint` | `ashWood` | `clayShade` `#45301F` | — |
+| `plannedText` | `terracottaDeep` 5.37 | `ember` 4.54 | `emberLight` `#F0BF9E` | **7.46** |
+| `chipQuietBg` | `oatDeep` | *(none)* | `ashWood` | — |
+| `chipQuietText` | `loam` **4.65** | *(none)* | `oatmeal` | **5.57** |
+
+`plannedBg` in dark is **a change to a live token**, not an addition: it also paints the planner's
+today row, which becomes warm brown in dark — correct, since that row is clay in light, and the
+collapse is exactly why it had been indistinguishable from any other card.
+
+`chipQuietBg`/`chipQuietText` are new **roles with no new colours**. The third chip kind — a
+lukewarm score, an untried count, "nobody has rated it" — had been hard-coding `surface-sunken` and
+`text-muted` from a screen. Naming them is what lets `check-palette-roles` see a chip rather than a
+surface borrowed by a screen, and lets a future theme move the quiet chip without moving every
+sunken panel with it.
+
+**The instrument correction belongs with §79 and §80** and is recorded as a family in `CLAUDE.md`:
+WCAG contrast says the two new dark tints differ by **1.13:1**, which reads alarming and is the
+wrong axis. Contrast is luminance; "can somebody tell two fills apart" is perceptual. By CIE76 the
+new dark pair is **ΔE 16.6** against light's existing **ΔE 11** — the dark chips end up *more*
+separable than the light ones they were modelled on. A concern computed with the wrong instrument
+was one sentence from being reported as a defect.
+
+### Slot tabs, and a null course
+
+The tab scopes the planned meal, the leaderboard and what a `+` writes. v1's slot set **what got
+written and not what got shown**, so choosing breakfast offered dinners. The choosing-mode banner is
+gone: a control visible at all times beats a state you can scroll past, which is the same argument
+the planner's "tap to cook" cue made about a conditional destination.
+
+Tabs are **links**, so the choice survives a reload and the server picks the content — which is what
+keeps the time-of-day default from flipping after hydration. Before 09:00 Bkfst, 09–13 Lunch, 13+
+Dinner, and after 20:00 it **stays** on Dinner, because a screen called Today must not open on a
+meal that is not today's.
+
+Lunch and Dinner show the same recipes. There is no `lunch` course and a household eats mains at
+both; inventing a distinction the data cannot support is the dead `lunch` chip again. The reversal
+condition is `plan_entries` history — a recipe planned at lunch five times is this household's
+lunch — and all 40 live entries are dinners, so there is no signal yet.
+
+**`course` is nullable, and the spec's mapping listed only enum values.** Measured, that drops
+**24 of 66 recipes** out of every tab, including **5 of the 10 rated ones** — the Dinner leaderboard
+would have shown half of itself with nothing on screen saying so. Null is *unknown*, not *none*, so
+it joins the main-meal tabs where 31 of the 43 classified recipes already sit, and **`drink`**,
+which the spec's table omitted, joins Snack. A test asserts that no course the database permits
+falls through to no tab.
+
+---
+
+### The third empty state, which continues §82's pattern
+
+The spec named two empty states and they do read differently: *nothing planned for this slot* and
+*nothing rated in this course*. Pointing a tab at a course the library has **none of** produces
+neither — and the screen said *"nobody has rated a breakfast yet"* when the truth was that there
+are no breakfasts. Found by a smoke check that demanded a heading the data could not produce.
+
+    nothing planned   "No breakfast planned."            — about the plan
+    nothing rated     unranked rows, chipped             — about the ratings
+    nothing at all    "No breakfasts in your recipes."   — about the library
+
+**This is §82's pattern, not a new one.** There, a spec specified `<Name> said no` for a rating
+nobody in this household has ever given. Here, a spec enumerated the empty states it could imagine
+from a *description* of the feature — planned, rated — and missed the one that only appears when you
+look at the rows: `breakfast` has **1** recipe, `drink` has **1**, `snack` has **4**, and a course
+with **0** is one value away from all three. §83 is the same thing again about thresholds.
+
+So the family is now three faces of one gap, and they are worth naming together because each looked
+like a different kind of oversight:
+
+| | the spec got wrong | because a description cannot carry |
+|---|---|---|
+| §82 | a **label** interpreting a value | the *distribution* — no 1s or 2s exist |
+| §83 | a **threshold** comparing a value | the *range* — `mean <= 2.5` is out of reach of a 3–5 scale |
+| §84 | an **enumeration** of states | *which combinations occur* — a category with no members |
+
+Each was written against what the column **permits** rather than what the rows **contain**, and in
+each case one query would have settled it. The habit generalises past labels and thresholds:
+**before enumerating the states of a thing, count the rows in each state.** A state with zero rows
+today is a state somebody will reach, and the enumeration written from a feature description will
+not have it.
+
+Worth saying what was *not* wrong: every other claim in both handoffs' data tables was correct, and
+the specs were careful. A description of data is simply a different artifact from the data, and the
+three gaps above are what the difference looks like.

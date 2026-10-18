@@ -877,6 +877,28 @@ guessing.
   invisible while the layout viewport stays too wide — fixing the thing you can see and keeping the
   thing that breaks the bars.
 
+- **The instrument was wrong, not weak — three times now, and the next one will be a fourth
+  instrument rather than a repeat of any.** This is the family entry; the instances keep their
+  detail where they are.
+
+  | the check | was green and correct about | could not see |
+  |---|---|---|
+  | `check-contrast` (§79) | *can this be read* | **whether it is the palette.** Near-black behind white text scores ~13:1 — perfectly legible, and `tokens.ts` contains no black. Answered by `check-palette-roles`: a *role* question, not a contrast one. |
+  | `check-contrast` again (§84) | *can this be read* | **whether two fills are distinguishable.** Two dark chip tints differ by 1.13:1 and read alarming; luminance ratio is the wrong axis for "are these different". ΔE 16.6 by CIE76 — *more* separable than the light pair at 11. No new guard: the fix was to stop asking contrast a perceptual question. |
+  | `check-busy-guarded` (§80) | *is the pending flag cleared* | **whether anything was said.** One `fetch` rejection has two consequences and the guard was built for one, so 9 of 29 try-blocks passed a check written about the exact failure they exhibited. Answered by `check-offline-said`. |
+
+  **In all three the check was green and right.** Not stale (§54a — those keep answering a question
+  that has changed), not unused (`EXTRACTOR_VERSION` and friends — those were never turned), and not
+  adjacent-by-accident (the seven-item list below — those reported on a neighbour of their claim).
+  These three were **pointed at the wrong axis of the thing they were measuring**, and a correct
+  answer on the wrong axis is the hardest kind to doubt, because there is nothing wrong with it.
+
+  So the question to ask of a measurement is not *is this passing* or even *is this still measuring
+  what it measured* — it is **what axis is this instrument sensitive to, and is that the axis the
+  question is about?** Contrast is luminance. A guard is its assertion. Both are exactly as
+  described and neither is the question you brought. Expect the fourth to be a new instrument
+  answering correctly about something nobody asked.
+
 - **One failure, two consequences, and a guard built for one of them reads as coverage for both.**
   An offline `fetch` **rejects**, and that one fact kills the pending flag *and* leaves the screen
   silent. `check-busy-guarded` was built from a real incident for the first, is mutation-tested,
