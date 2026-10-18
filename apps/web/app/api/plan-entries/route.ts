@@ -51,6 +51,8 @@ export async function POST(request: Request) {
     scale?: unknown;
     /** "yes, two entries, I meant it" */
     force?: unknown;
+    /** breakfast / lunch / dinner / snack — see below for why it is optional */
+    slot?: unknown;
   };
   try {
     body = (await request.json()) as typeof body;
@@ -63,6 +65,31 @@ export async function POST(request: Request) {
   if (!isIsoDate(body.date)) {
     return Response.json({ error: "date must be a calendar date" }, { status: 400 });
   }
+
+  /*
+   * ---------------------------------------------------------------------------
+   * The slot, which has existed in the database since §slot and never been written
+   * ---------------------------------------------------------------------------
+   *
+   * `plan_entries.slot` is `not null default 'dinner'` with a CHECK of breakfast / lunch /
+   * dinner / snack, and **every one of the 40 live entries is 'dinner'** — because this route has
+   * never sent the column and the default has been doing all the work. A column nothing writes is
+   * the quiet half of §54's *a schema field is not a request*: it is not wrong, it is unexercised.
+   *
+   * Optional rather than required, because omitting it must keep meaning "dinner" — the planner,
+   * the recipe page's plan-it panel and `CookTonight` all post without one, and making it
+   * mandatory would break three working paths to serve one new screen.
+   *
+   * Validated against the list rather than passed through, so a bad value is a 400 here instead
+   * of a CHECK violation surfacing as a 500 somewhere downstream — and the list is spelled out
+   * rather than imported, because the database owns it and a second copy that drifts is worse
+   * than a literal that is obviously local.
+   */
+  const SLOTS = ["breakfast", "lunch", "dinner", "snack"] as const;
+  if (body.slot !== undefined && !SLOTS.includes(body.slot as (typeof SLOTS)[number])) {
+    return Response.json({ error: `slot must be one of ${SLOTS.join(", ")}` }, { status: 400 });
+  }
+  const slot = (body.slot as (typeof SLOTS)[number] | undefined) ?? "dinner";
   const owned = await supabase
     .from("recipes")
     .select("id, title, servings")
@@ -109,6 +136,13 @@ export async function POST(request: Request) {
     .eq("family_id", family.id)
     .eq("recipe_id", body.recipeId)
     .eq("date", body.date)
+    /*
+     * Per (date, slot), because `(date, slot) IS the meal` — the migration says so in a heading.
+     * Porridge at breakfast and a rice pudding at dinner on one Sunday are two meals that happen
+     * to share a recipe, and refusing the second as "already planned" would be treating a day as
+     * a meal. This check previously had no slot because nothing wrote one.
+     */
+    .eq("slot", slot)
     .is("deleted_at", null)
     .maybeSingle();
 
@@ -139,6 +173,7 @@ export async function POST(request: Request) {
       meal_plan_id: week.id,
       date: body.date,
       recipe_id: body.recipeId,
+      slot,
       scale,
       cooked_at: null,
     })

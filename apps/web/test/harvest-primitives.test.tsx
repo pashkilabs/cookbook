@@ -97,11 +97,18 @@ describe("the tab bar", () => {
     expect((out.match(/aria-current/g) ?? []).length).toBe(1);
   });
 
-  it("is a nav with a name, and points Today at /recipes", () => {
+  it("is a nav with a name, and gives Today and Recipes separate destinations", () => {
+    /*
+     * Today pointed at `/recipes` while there was nothing else to point at, and the comment here
+     * defended that as avoiding "a second door on one shelf". The shelf argument was right and
+     * the premise expired: §82 gave Today its own screen — what is planned, and what the
+     * household likes — so two tabs sharing one destination is now the oddity rather than the
+     * economy. Five tabs, five routes.
+     */
     const out = html(<TabBar current="today" />);
     expect(out).toContain('aria-label="Main"');
-    // Today and Recipes are the same screen — a sixth route would be a second door on one shelf
-    expect((out.match(/href="\/recipes"/g) ?? []).length).toBe(2);
+    expect((out.match(/href="\/today"/g) ?? []).length).toBe(1);
+    expect((out.match(/href="\/recipes"/g) ?? []).length).toBe(1);
   });
 
   it("offers all five tabs", () => {

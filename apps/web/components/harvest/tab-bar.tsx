@@ -19,7 +19,7 @@ export type TabKey = "today" | "week" | "recipes" | "shopping" | "household";
 
 const TABS: ReadonlyArray<{ key: TabKey; label: string; href: string }> = [
   // Today and Recipes are the same screen; the key differs so the caller can say which it is
-  { key: "today", label: "Today", href: "/recipes" },
+  { key: "today", label: "Today", href: "/today" },
   { key: "week", label: "Week", href: "/planner" },
   { key: "recipes", label: "Recipes", href: "/recipes" },
   { key: "shopping", label: "Shopping", href: "/shopping" },

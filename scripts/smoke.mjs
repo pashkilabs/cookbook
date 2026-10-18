@@ -376,7 +376,7 @@ try {
   }
 
   console.log("\npages render");
-  for (const path of ["/", "/sign-in", "/recipes", "/planner", "/shopping", "/recipes/import", "/household"]) {
+  for (const path of ["/", "/sign-in", "/today", "/recipes", "/planner", "/shopping", "/recipes/import", "/household"]) {
     const result = await call("GET", path, { auth: false });
     record(`GET ${path}`, alive(result), `HTTP ${result.status}`);
   }
@@ -609,6 +609,64 @@ try {
         weekText.includes('aria-expanded="false"'),
         foundDetail(weekText, 'aria-expanded="false"'),
       );
+    }
+
+    /*
+     * The slot, written for the first time.
+     *
+     * `plan_entries.slot` has existed since §slot with a CHECK of breakfast / lunch / dinner /
+     * snack, and **all 40 live entries were 'dinner'** because no route ever sent the column —
+     * the default did all the work. So this is the first exercise of it, and the first time the
+     * CHECK has had a chance to refuse anything.
+     *
+     * Three assertions, because the interesting one is the third: a recipe at breakfast AND at
+     * dinner on one day is two meals, not a duplicate — `(date, slot)` is the meal — and the
+     * already-planned guard had no slot in it until now.
+     */
+    /*
+     * A day of its own, not `midweek` — the plan-it walk above has a dinner sitting there, so a
+     * dinner written here would be refused as already-planned and the 409 would read as the slot
+     * guard being wrong. **A probe owns its fixture**: this one got that wrong on its first run
+     * and reported a correct refusal as a failure.
+     */
+    const otherDay = (() => {
+      const d = new Date(`${midweek}T12:00:00Z`);
+      d.setUTCDate(d.getUTCDate() + 1);
+      return d.toISOString().slice(0, 10);
+    })();
+    const breakfast = await call("POST", "/api/plan-entries", {
+      body: { recipeId, date: otherDay, slot: "breakfast" },
+    });
+    record(
+      "a meal can be planned at a slot other than dinner",
+      breakfast.status === 200,
+      `HTTP ${breakfast.status} ${JSON.stringify(breakfast.body ?? "").slice(0, 70)}`,
+    );
+    const badSlot = await call("POST", "/api/plan-entries", {
+      body: { recipeId, date: otherDay, slot: "elevenses" },
+    });
+    record(
+      "and a slot outside the four is refused with a message, not a 500",
+      badSlot.status === 400,
+      `HTTP ${badSlot.status} ${String(badSlot.body?.error ?? "").slice(0, 60)}`,
+    );
+    if (breakfast.body?.id) {
+      /*
+       * The same recipe at dinner on the same day: a second meal, so a 200. A 409 here would mean
+       * the guard is still treating a day as a meal.
+       */
+      const alsoDinner = await call("POST", "/api/plan-entries", {
+        body: { recipeId, date: otherDay, slot: "dinner" },
+      });
+      record(
+        "and the same recipe at two slots on one day is two meals, not a duplicate",
+        alsoDinner.status === 200,
+        `HTTP ${alsoDinner.status}`,
+      );
+      if (alsoDinner.body?.id) await call("DELETE", `/api/plan-entries/${alsoDinner.body.id}`);
+      await call("DELETE", `/api/plan-entries/${breakfast.body.id}`);
+    } else {
+      record("and the same recipe at two slots on one day is two meals, not a duplicate", null, "the breakfast write did not return an id");
     }
 
     /*
@@ -1037,7 +1095,26 @@ try {
        * household name, and the docked tab bar that replaced five header links. A restyle that
        * renders the old markup is a restyle that did not happen, and nothing else would notice.
        */
-      "/recipes": ["Tonight", "for dinner?", 'aria-label="Main"'],
+      /*
+       * "Tonight" was a marker here and has gone with the banner it asserted (§82) — the question
+       * it answered now has its own screen, and a marker for a removed block would have failed
+       * loudly, which is the right direction for a deletion.
+       */
+      "/recipes": ["for dinner?", 'aria-label="Main"'],
+      /*
+       * Today (§82). The leaderboard's own chips are NOT asserted: a household with no ratings
+       * has none, and that is a correct screen rather than a broken one — the same reasoning as
+       * the alongside footnote. What must always be there is the heading, the slot invitations
+       * and the honesty line that keeps the counts from reading as a score.
+       */
+      /*
+       * "Nothing is averaged" was a marker here and is **state-dependent**: it lives inside the
+       * leaderboard, and a household with no ratings renders the "nobody has rated anything yet"
+       * sentence instead. A fresh smoke household has none, so the check failed against a correct
+       * screen — the same mistake the alongside footnote's marker was written to avoid, repeated
+       * one screen later. The heading is in both states; the chips are in neither reliably.
+       */
+      "/today": ["Today", "+ Add breakfast", "+ Add dinner", "What everyone likes"],
       /*
        * The Harvest shopping list (§4.5). The segmented control and the aisle rows are asserted;
        * the consolidation chips are not, because a week with no overlapping ingredient has none

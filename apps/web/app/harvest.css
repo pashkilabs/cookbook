@@ -988,3 +988,143 @@
 /* two short labels today, and a longer pair tomorrow stacks instead of widening the page */
 .h-docked { flex-wrap: wrap; }
 .h-docked > * { min-width: 0; }
+
+/* --- screen 6: Today ------------------------------------------------------ */
+
+.h-today-head { padding: var(--space-xxl) var(--space-xl) 0; }
+.h-today-date { margin: 0; font-size: 14px; color: var(--text-muted); }
+
+.h-slot { padding: var(--space-lg) var(--space-xl) 0; }
+
+.h-meal-card {
+  margin-top: var(--space-sm);
+  padding: var(--space-lg);
+  border-radius: var(--radius-card-large);
+  background: var(--surface);
+}
+.h-meal-head { display: flex; gap: var(--space-lg); align-items: flex-start; }
+.h-meal-text { flex: 1; min-width: 0; }
+.h-meal-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-display-m-size);
+  font-weight: var(--type-display-m-weight);
+  line-height: var(--type-display-m-line);
+  color: var(--text);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.h-meal-meta { margin: 4px 0 0; font-size: var(--type-meta-size); color: var(--text-muted); }
+
+.h-meal-buy { margin: var(--space-md) 0 0; font-size: var(--type-meta-size); color: var(--text-muted); }
+.h-meal-buy strong { color: var(--planned-text); }
+.h-meal-buy a { color: var(--primary); }
+
+.h-meal-actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); margin-top: var(--space-lg); }
+.h-meal-actions > * { min-width: 0; }
+
+.h-slot-adds {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-lg) var(--space-xl) 0;
+}
+/* the chosen slot: solid, because the offer has been taken and is now a decision in progress */
+.h-add-dinner.is-choosing { border-style: solid; border-color: var(--primary); color: var(--planned-text); }
+
+.h-choosing {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  align-items: center;
+  justify-content: space-between;
+  margin: var(--space-lg) var(--space-xl) 0;
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-card);
+  background: var(--planned-bg);
+  color: var(--planned-text);
+  font-size: var(--type-meta-size);
+}
+.h-choosing strong { text-transform: capitalize; }
+
+.h-board { padding: var(--space-xxl) var(--space-xl) 0; }
+.h-board-head { display: flex; flex-wrap: wrap; gap: var(--space-md); align-items: baseline; justify-content: space-between; }
+.h-board-title {
+  margin: 0;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-display-s-size);
+  font-weight: var(--type-display-s-weight);
+  color: var(--text);
+}
+.h-board-note { margin: 4px 0 var(--space-md); font-size: var(--type-meta-size); line-height: var(--type-meta-line); color: var(--text-muted); }
+
+.h-board-row {
+  display: flex;
+  gap: var(--space-md);
+  align-items: center;
+  margin-bottom: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+.h-board-text { flex: 1; min-width: 0; }
+.h-board-name {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--text);
+  text-decoration: none;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.h-board-name:hover { text-decoration: underline; }
+.h-board-chips { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin-top: 4px; }
+
+/* the quiet states — untried, and a lukewarm score — on the sunken ground, as the reference has */
+.h-chip-quiet {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+  font-size: var(--type-chip-size);
+  font-weight: var(--type-chip-weight);
+}
+
+/* outlined olive: a secondary action, which is what adding something to a list is */
+.h-board-plan {
+  flex: none;
+  width: var(--size-touch-min);
+  height: var(--size-touch-min);
+  border: 1.5px solid var(--secondary);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--secondary);
+  font: inherit;
+  font-size: 20px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.h-board-plan:disabled { opacity: 0.5; cursor: default; }
+/*
+ * `--planned-text`, not `--primary`, and the reason is measured: terracotta as 14px text on the
+ * **app ground** is 4.24:1 against AA's 4.5. It clears on parchment (4.67) and fails on the
+ * ground and on both tints — the accent was specified as a fill with white on it, so every use
+ * of it as text is an extension of the token (§79). `--planned-text` is the palette's own
+ * "text on clay tint" value and reads at 6.21 light / 6.4 dark on the ground.
+ *
+ * I declared this pair as "large text" in `check-contrast` first, which made it pass at 3:1 — a
+ * 14px link is not large text, and that is the table-describing-a-pairing-the-CSS-is-not-using
+ * mistake in reverse. The check found it the moment the declaration was honest.
+ */
+.h-board-all { display: block; padding: var(--space-md) 0 0; font-size: 14px; color: var(--planned-text); }
+
+.h-today-quiet,
+.h-today-hidden { padding: var(--space-xxl) var(--space-xl) 0; font-size: var(--type-meta-size); color: var(--text-muted); }
+.h-today-quiet p { margin: var(--space-sm) 0 0; line-height: var(--type-meta-line); }
+/* on the app ground too — see `.h-board-all` for the measurement */
+.h-today-quiet a,
+.h-today-hidden a { color: var(--planned-text); }

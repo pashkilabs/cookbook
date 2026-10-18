@@ -81,7 +81,8 @@ describe("the shopping list read by meal instead of by aisle", () => {
     /*
      * Alphabetical within a day, not the order the lines were encountered.
      *
-     * There is no meal-slot column — no lunch and dinner — so nothing says which of two dinners
+     * `plan_entries.slot` exists but a shopping list consolidates across slots by design, so
+     * nothing here says which of two dinners
      * on one Tuesday comes first, and both orders are arbitrary. Encounter order is *aisle*
      * order, which is arbitrary with respect to meals and shuffles when a catalog aisle changes;
      * alphabetical is arbitrary and stable. This test first asserted encounter order, which was

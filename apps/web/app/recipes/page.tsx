@@ -7,7 +7,6 @@ import { keepWholeFamilyLikes, searchRecipes } from "@/lib/recipe-search";
 import { allergenSentence } from "@/lib/allergen-filter";
 import { andList } from "@/lib/energy";
 import { startOfWeek, addWeeks, todayIso } from "@/lib/week";
-import { Tonight, type TonightMeal } from "./tonight";
 import { ShortlistButton } from "./shortlist-button";
 import { Filters, FILTERS, type FilterKey } from "./filters";
 import { COURSES, PROTEINS } from "./drill-down";
@@ -98,34 +97,15 @@ export default async function RecipesPage({
    * queries are family-scoped explicitly: RLS decides what may leave the database, a screen
    * decides whose kitchen it shows.
    */
-  const [tonightRows, waitingRows] = await Promise.all([
-    supabase
-      .from("plan_entries")
-      .select("id, cooked_at, recipe_id, recipes!inner(id, title, time_minutes)")
-      .eq("family_id", family.id)
-      .eq("date", today)
-      .is("deleted_at", null),
-    supabase
-      .from("shortlist_entries")
-      .select("recipe_id, recipes!inner(id, title)")
-      .eq("family_id", family.id)
-      .eq("week_start", weekStart)
-      .is("deleted_at", null),
-  ]);
-  const tonight: TonightMeal[] = rows(tonightRows, "tonight").map((row) => {
-    const recipe = row.recipes as unknown as { id: string; title: string; time_minutes: number | null };
-    return {
-      entryId: row.id as string,
-      recipeId: recipe.id,
-      title: recipe.title,
-      timeMinutes: recipe.time_minutes,
-      cooked: row.cooked_at !== null,
-    };
-  });
-  const waitingTonight = rows(waitingRows, "waiting tonight").map((row) => {
-    const recipe = row.recipes as unknown as { id: string; title: string };
-    return { recipeId: recipe.id, title: recipe.title };
-  });
+  /*
+   * The Tonight banner lived here and has moved to `/today` (§82).
+   *
+   * It existed because "what are we eating tonight" had no home, and it answered the question in
+   * a strip above a library. Today answers it per slot, with the photograph, the still-to-buy
+   * count and the way into cooking — so leaving this in place would be a second screen answering
+   * one question, which is the shape §78 names and this project has paid for twice. Its two
+   * queries went with it rather than being left to feed nothing.
+   */
   // both weeks, because shortlisting only ever reached this one and the planner's waiting list
   // is week-scoped — so a recipe was stranded here while next week showed empty
   const nextWeekStart = addWeeks(weekStart, 1);
@@ -244,7 +224,6 @@ export default async function RecipesPage({
         </SecondaryLink>
       </div>
 
-      <Tonight today={today} meals={tonight} waiting={waitingTonight} />
 
             <Filters
         q={q}
