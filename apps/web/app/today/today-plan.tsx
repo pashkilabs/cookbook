@@ -58,6 +58,7 @@ export function TodayPlan({
   suggestions,
   memberCount,
   stillToBuy,
+  photoFor,
 }: {
   today: string;
   weekStart: string;
@@ -65,6 +66,8 @@ export function TodayPlan({
   suggestions: Suggestion[];
   memberCount: number;
   stillToBuy: number | null;
+  /** signed URLs by recipe id — plain data, for the reason `membersByRecipe` gives on the planner */
+  photoFor: Record<string, string>;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
@@ -157,6 +160,14 @@ export function TodayPlan({
                         .join(" · ")}
                     </p>
                   </div>
+                  {/* no text over it, ever (§5) — the photograph sits beside the name */}
+                  {photoFor[meal.recipeId] ? (
+                    <img className="h-meal-photo" src={photoFor[meal.recipeId]} alt="" />
+                  ) : (
+                    <span className="h-meal-photo is-empty" aria-hidden="true">
+                      {meal.title.trim().charAt(0).toUpperCase() || "?"}
+                    </span>
+                  )}
                 </div>
 
                 {/*
@@ -237,6 +248,17 @@ export function TodayPlan({
 
           {suggestions.map((row) => (
             <article className="h-board-row" key={row.id}>
+              {/*
+                * A leaderboard of text rows reads as a list; with photographs it reads as a
+                * shelf, which is what somebody scanning for dinner is actually doing (§56).
+                */}
+              {photoFor[row.id] ? (
+                <img className="h-board-photo" src={photoFor[row.id]} alt="" loading="lazy" />
+              ) : (
+                <span className="h-board-photo is-empty" aria-hidden="true">
+                  {row.title.trim().charAt(0).toUpperCase() || "?"}
+                </span>
+              )}
               <div className="h-board-text">
                 <Link className="h-board-name" href={`/recipes/${row.id}`}>
                   {row.title}

@@ -1016,6 +1016,29 @@
 }
 .h-meal-meta { margin: 4px 0 0; font-size: var(--type-meta-size); color: var(--text-muted); }
 
+/* 72px on a meal card, 52px on a leaderboard row — the reference's own sizes */
+.h-meal-photo,
+.h-board-photo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  border-radius: var(--radius-thumb);
+  object-fit: cover;
+  background: var(--surface-sunken);
+}
+.h-meal-photo { width: 72px; height: 72px; }
+.h-board-photo { width: 52px; height: 52px; }
+/*
+ * The initial, for a recipe with no photograph. A letter rather than an icon: it differs between
+ * rows, so a shelf of them still reads as distinct things rather than as a column of the same
+ * placeholder.
+ */
+.h-meal-photo.is-empty,
+.h-board-photo.is-empty { font-family: var(--font-display); color: var(--text-muted); }
+.h-meal-photo.is-empty { font-size: 26px; }
+.h-board-photo.is-empty { font-size: 20px; }
+
 .h-meal-buy { margin: var(--space-md) 0 0; font-size: var(--type-meta-size); color: var(--text-muted); }
 .h-meal-buy strong { color: var(--planned-text); }
 .h-meal-buy a { color: var(--primary); }

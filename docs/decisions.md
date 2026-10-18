@@ -5152,3 +5152,69 @@ that will not need rewriting.
 
 **Deleting it would throw away the part that worked because the part that could not work was
 removed.** `check-typechecked` and the vitest config both still cover it, so it cannot rot silently.
+
+## §82 — Today, and a spec written from a description of the data
+
+`/today` is the sixth Harvest screen: what is planned, by slot, then what the household actually
+likes. The root and the Today tab point at it; they had both pointed at `/recipes`, which made two
+tabs one destination. The **Tonight banner is removed** with its two queries — it existed because
+"what are we eating tonight" had no home, and a second screen answering one question is the shape
+§78 names.
+
+**`plan_entries.slot` had existed since §slot and never been written.** A CHECK of breakfast /
+lunch / dinner / snack, `default 'dinner'`, and **all 40 live entries were dinners** because no
+route ever sent the column. Not a missing feature and not a wrong one — *unexercised*, which is
+§54's *a schema field is not a request* seen from the write side. `POST /api/plan-entries` now
+takes an optional slot, and the already-planned guard compares `(date, slot)` because the
+migration's own heading says that pair **is** the meal: porridge at breakfast and rice pudding at
+dinner on one Sunday are two meals, and refusing the second was treating a day as a meal.
+
+Worth separating from the `lunch` finding in §78, because a careless reader could cite it to refuse
+a lunch slot: that was `recipes.course`, which has seven values and no `lunch`. `plan_entries.slot`
+has four and does. Different columns, different lists, different questions.
+
+---
+
+### The spec specified a chip for a rating nobody has ever given
+
+The handoff asked for `<Name> said no` on any rating below 4. The household's actual scores are
+**11 threes, 16 fours and 19 fives** — nobody has ever given a 1 or a 2, and the lowest opinion
+anyone has recorded is a 3. So the chip would have rendered "Hazel said no" over a lukewarm three,
+turning a mild rating into a refusal nobody made, on the screen whose entire discipline is that
+every figure is checkable.
+
+It ships as `Hazel rated it 3`, which is the line the planner's low-rating warnings already take —
+*"Ada has rated 8 fish dishes low"* rather than *"Ada does not like fish"* — because an observation
+a person can weigh beats a verdict they can only accept or ignore.
+
+**The transferable part is how the spec came to be wrong, and it is not carelessness.** Every other
+claim in that handoff's data table was correct, including one I expected to be wrong. The table was
+built from a *description* of the data — "ratings per member ✅" — and a description cannot carry a
+distribution. "Members rate recipes 1 to 5" is true, and the design that follows from it is right
+for a library containing 1s and 2s. This one does not contain any.
+
+So: **a spec written from a description of the data gets the shape right and the range wrong.**
+Schema tells you what is *permissible*; only the rows tell you what is *present*, and a label is a
+claim about what is present. The same gap in a different costume as *an empty table cannot fail a
+constraint* — there, a statement was untested because the rows were absent; here, a label was wrong
+because the rows were never looked at. Both are the difference between what the column allows and
+what the household has done.
+
+The cheap habit that would have caught it: **before writing a label that interprets a value, count
+the values.** One query, and it reads differently from the other direction too — a leaderboard with
+no 1s or 2s in it is a household that rates things it already likes, which is a fact about the
+feature rather than about the data.
+
+### What else the data decided
+
+- **Unrated recipes are absent, not ranked last.** 46 ratings across 10 recipes of 66, so ranking
+  silence would be wrong about 85% of the library and produce fifty-six rows reading "5 haven't
+  tried it".
+- **No average, no rank, no percentage** — asserted by a test that checks the output object has no
+  such key. §61 and §75 each measured, separately, that this app has no confidence signal, and an
+  average of 3.8 hides that Hazel will not eat it, which is the only thing that changes dinner.
+- **"+ Add breakfast" chooses on this screen** rather than linking to the library, because nothing
+  on `/recipes` carries a slot and a recipe chosen there would arrive as `dinner` under a button
+  saying breakfast — the app lying in the database, which outlasts the screen.
+- **Still-to-buy comes from `buildShoppingWeek`**, the function the shopping screen renders, so a
+  card saying "3 things" above a list showing five is not expressible.

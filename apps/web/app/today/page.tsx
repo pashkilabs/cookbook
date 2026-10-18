@@ -146,6 +146,47 @@ export default async function TodayPage() {
     }
   }
 
+  /*
+   * ---------------------------------------------------------------------------
+   * The photographs, in one signing call for the whole screen
+   * ---------------------------------------------------------------------------
+   *
+   * Both sets of ids go in together — the meals planned today and the leaderboard's rows — so
+   * this is **two round trips for the page rather than two per row**: one read for the photo rows,
+   * one `createSignedUrls` for every path at once. The recipe list established the shape and the
+   * reason is the same: a signed URL is a request, and fourteen of them one at a time is fourteen
+   * requests for one screen.
+   *
+   * Signed as the person viewing, so the storage policy authorises it rather than a service role
+   * — the same reasoning as reading the rows. And `source` photographs are excluded as they are
+   * everywhere else: a grid of index cards where dish photographs should be is useless to
+   * somebody deciding what to eat (§56).
+   */
+  const photoFor = new Map<string, string>();
+  const wanted = [...new Set([...meals.map((meal) => meal.recipeId), ...board.map((row) => row.id)])];
+  if (wanted.length > 0) {
+    const photos = rows(
+      await supabase
+        .from("photos")
+        .select("recipe_id, storage_path")
+        .eq("family_id", family.id)
+        .neq("source", "source")
+        .in("recipe_id", wanted)
+        .is("deleted_at", null),
+      "photos",
+    );
+    const paths = [...new Set((photos ?? []).map((row) => row.storage_path as string))];
+    if (paths.length > 0) {
+      const { data: signed } = await supabase.storage.from("recipe-photos").createSignedUrls(paths, 600);
+      const urlFor = new Map((signed ?? []).map((entry) => [entry.path, entry.signedUrl]));
+      for (const row of photos ?? []) {
+        const url = urlFor.get(row.storage_path as string);
+        // one photograph per row; a recipe with several shows whichever came back first
+        if (url && !photoFor.has(row.recipe_id as string)) photoFor.set(row.recipe_id as string, url);
+      }
+    }
+  }
+
   const suggestions: Suggestion[] = board.map((row) => ({
     id: row.id,
     title: row.title,
@@ -171,6 +212,7 @@ export default async function TodayPage() {
           suggestions={suggestions}
           memberCount={members.length}
           stillToBuy={stillToBuy}
+          photoFor={Object.fromEntries(photoFor)}
         />
 
         {/*

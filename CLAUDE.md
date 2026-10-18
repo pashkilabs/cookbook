@@ -720,23 +720,8 @@ guessing.
   half deploys itself and the other is remembered, so the answer is one command that does both in
   order. The health check stays the backstop for a push that comes from somewhere else.
 
-  **And `pnpm ship` now runs `next build` before it pushes, because `pnpm check` structurally
-  cannot.** A page file exporting anything outside Next's own fields — `export { SLOTS }`, a
-  leftover re-export nothing imported — compiles, passes `tsc`, passes all 215 tests, and fails
-  only at `next build`: *"SLOTS is not a valid Page export field"*. `tsc` has no way to know Next's
-  page contract, so the gate that runs constantly is blind to a whole class of error that the gate
-  that runs on Vercel catches **after the push**.
-
-  The tell was `check-shipped` reporting `AHEAD OF DEPLOYED BY 1 COMMIT` five minutes after a push
-  that normally lands in sixty seconds — and before that, six smoke failures that were **the new
-  suite running against the old deployment**, which is this project's own
-  *name-the-host* lesson arriving as a false bug report rather than a false pass. Without that
-  guard the session would have ended on "shipped".
-
-  Smoke had a matching flaw, found the same way: its page check used `alive()`, which accepts
-  anything under 500 because it asks "did a handler run" — so a missing route printed
-  `ok /today renders — HTTP 404` while every marker beneath it failed. **A verdict that
-  contradicts its own children**, and the fix is that a screen check requires 200.
+  **`pnpm ship` also runs `next build` before pushing** — see the `tsc` entry below for why
+  `pnpm check` cannot stand in for that.
 
 - **Verifying that A works and that B works is not verifying that A hands off to B.** Asked
   whether future weeks could be planned, I checked two things: the planner navigates weeks
@@ -768,6 +753,63 @@ guessing.
 
   Count the boundaries when adding a value, not when a bug is reported. Three is the trigger:
   `apps/web/test/section-round-trip.test.ts` is the template.
+
+- **`tsc` cannot know Next's page contract, so a green `pnpm check` is not evidence that it
+  builds.** `export { SLOTS }` from `app/today/page.tsx` — a leftover re-export nothing imported —
+  is **valid TypeScript**. It compiled, passed `tsc`, passed all 215 tests, passed every boundary
+  guard, and failed only at `next build`: *"SLOTS is not a valid Page export field"*. A page file
+  may export `default`, `metadata`, `generateMetadata`, `revalidate`, `dynamic` and a short list
+  of others, and that list lives in Next's build, not in the type system.
+
+  **Worth naming because the next person will reasonably assume a green check means it builds.**
+  It does not, and the gap is not a gap in thoroughness — `pnpm check` is boundaries, typecheck
+  and tests, and none of those three has any way to learn a framework's file conventions. The
+  whole class is invisible to it: a bad page export, a `"use client"` file exporting an async
+  server function, metadata of the wrong shape. The only gate that knows is the one that runs on
+  **Vercel, after the push**.
+
+  So `pnpm ship` runs `pnpm --filter @pashki/web build` before `git push`. Same placement and same
+  reasoning as `check-migrations-pushed`: a build on every mid-feature `check` is slow enough to
+  get skipped, and immediately before a push is the moment the answer matters. **A guard, not a
+  reminder**, in the one place that removes the decision.
+
+  How it surfaced is the part worth keeping. `check-shipped` printed `AHEAD OF DEPLOYED BY 1
+  COMMIT` five minutes after a push that normally lands in sixty seconds. Before that it looked
+  like **six smoke failures against production**, which were the new suite running against the
+  *old* deployment — this project's own *name-the-host* lesson arriving as a false bug **report**
+  rather than a false pass, and the more confusing direction of the two. Without that guard the
+  session would have ended on the word "shipped".
+
+- **A check can report on something adjacent to what it claims, and the claim is what gets
+  believed.** `alive()` in smoke accepts any status under 500, because it answers *did a handler
+  run* — and a screen check used it, so a route that did not exist printed
+  `ok /today renders — HTTP 404` with **every marker beneath it failing**. A screen check requires
+  200 now; a 3xx is not a rendered page either, since the list is screens a signed-in person can
+  reach.
+
+  This shape has now arrived enough times to be worth enumerating rather than counted by feel, so
+  the number is checkable the way a figure on screen has to be:
+
+  1. the mutation harness treating **zero matched tests** as a pass — it reported on the tests it
+     ran, and it ran none
+  2. **smoke calling routes** — it reported on the endpoint and was read as the page, which 500'd
+  3. the **eval's cascade** — it reported on a provider and was read as production's, which was
+     sending an Anthropic model id to Together
+  4. **`promptKey`** — it fingerprinted every input the recipe carries and was read as
+     fingerprinting the prompt, which it omitted
+  5. **`check-busy-guarded`** — it reported the pending flag and was read as covering the offline
+     rejection, whose other half left nine screens silent (§80)
+  6. **`check-contrast`'s pair table** — it reported a pairing and was read as reporting the rule,
+     while the CSS used a different token
+  7. **`alive()`** — it reported that a handler ran and was read as a page rendering
+
+  Seven by that list, where the brief for this one said six; the discrepancy is probably whether
+  §54a's rotted proxy counts, and the list is here so a reader can take their own view instead of
+  inheriting mine. **What is new in the seventh is that the contradiction was visible in the same
+  output** — `ok` on one line, four `FAIL`s directly beneath it, `HTTP 404` printed in its own
+  detail. Every earlier instance needed a second measurement to expose; this one needed somebody
+  to read two adjacent lines together, which is a weaker excuse and a better reason to fix the
+  helper rather than the habit.
 
 - **A long-press gesture competes with the platform's own long-press, and the page does not
   arbitrate.** Drag-a-meal-to-another-day was attempted and withdrawn (decisions §81) after failing

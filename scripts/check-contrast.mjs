@@ -200,6 +200,7 @@ const PAIRS = [
   ["today: liked chip", "chip-text", "chip-bg", "text"],
   ["today: made-N-times chip", "planned-text", "planned-bg", "text"],
   ["today: quiet chip (untried, lukewarm)", "text-muted", "surface-sunken", "text"],
+  ["today: photo placeholder initial", "text-muted", "surface-sunken", "text"],
   ["today: plan control label", "secondary", "surface", "text"],
   ["today: plan control outline", "secondary", "surface", "ui"],
   ["today: choosing banner", "planned-text", "planned-bg", "text"],
