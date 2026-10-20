@@ -106,6 +106,33 @@ if (!household.familyId) {
   process.exit(2);
 }
 
+/*
+ * An operator grant, the same one smoke issues.
+ *
+ * Without it a fresh account on **production** is unentitled, every `/api/recipes` write is
+ * refused by the meter, and the library is empty — which the recipe-count guard caught as
+ * could-not-measure rather than reporting ok on twelve pictures of nothing. Local is permissive
+ * enough not to need it, so this is the local-and-hosted-disagree shape arriving in a screenshot
+ * tool: the thing that worked on a laptop refused in production, and the guard said so.
+ */
+await fetch(`${SUPABASE}/rest/v1/entitlements?on_conflict=family_id,app_key`, {
+  method: "POST",
+  headers: {
+    apikey: SERVICE,
+    authorization: `Bearer ${SERVICE}`,
+    "Content-Type": "application/json",
+    Prefer: "resolution=merge-duplicates",
+  },
+  body: JSON.stringify({
+    family_id: household.familyId,
+    app_key: "recipes",
+    tier: "full",
+    quota_json: { imports: { limit: 50, used: 0, resetsAt: null, periodDays: 30 } },
+    valid_until: new Date(Date.now() + 86400000).toISOString(),
+    grace_until: new Date(Date.now() + 2 * 86400000).toISOString(),
+  }),
+});
+
 const made = [];
 for (const [title, course, minutes] of [
   ["Grilled chilli and lemon chicken", "main", "90"],
