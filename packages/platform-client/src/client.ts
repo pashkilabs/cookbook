@@ -276,6 +276,19 @@ function assertYear(year: number | null): number | null {
   }
 
   /**
+   * How this household decides what to cook. `null` dismisses the question without choosing.
+   *
+   * Scoped to `ownFamily()` like every other setting here, so a caller cannot address somebody
+   * else's household by id — the seam's whole job.
+   */
+  async function setRecipeLayout(layout: string | null): Promise<Family> {
+    const family = await ownFamily();
+    const updated = await store.setRecipeLayout({ familyId: family.id, layout });
+    if (!updated) throw new Error("no such household");
+    return updated;
+  }
+
+  /**
    * Remove a member.
    *
    * **You cannot remove yourself.** Leaving a household is a different action with different
@@ -360,6 +373,7 @@ function assertYear(year: number | null): number | null {
     setMeasurementSystem,
     setTimezone,
     setAvoidedAllergens,
+    setRecipeLayout,
     setKrogerLocation,
     inviteAdult,
     listInvitations,

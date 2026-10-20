@@ -36,4 +36,4 @@
  * asserts it against the directory instead. `pnpm check` fails if it is stale, which is what a
  * rule that has failed five times against people who know it actually needs.
  */
-export const REQUIRED_MIGRATION = "20261011090000_kroger_export";
+export const REQUIRED_MIGRATION = "20261019090000_recipe_layout";

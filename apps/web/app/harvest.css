@@ -1185,3 +1185,142 @@
 /* on the app ground too — see `.h-board-all` for the measurement */
 .h-today-quiet a,
 .h-today-hidden a { color: var(--planned-text); }
+
+/* --- §85: how you choose, and the layouts it sets ------------------------- */
+
+/*
+ * The question, asked on the recipes page itself. The left accent is the reference's and it is
+ * what makes this read as an offer rather than as an error — the same edge "No breakfast planned"
+ * uses on Today.
+ */
+.h-choosing-card {
+  margin: 0 var(--space-xl) var(--space-lg);
+  padding: var(--space-lg);
+  border-radius: var(--radius-card-large);
+  border-left: 3px solid var(--primary);
+  background: var(--surface);
+}
+.h-choosing-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-display-s-size);
+  font-weight: var(--type-display-s-weight);
+  line-height: var(--type-display-s-line);
+  color: var(--text);
+  min-width: 0;
+}
+.h-choosing-note { margin: var(--space-sm) 0 0; font-size: var(--type-meta-size); line-height: var(--type-meta-line); color: var(--text-body); }
+
+.h-choosing-options { display: flex; flex-direction: column; gap: var(--space-sm); margin-top: var(--space-md); }
+.h-choosing-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  min-height: var(--size-touch-min);
+  padding: 0 var(--space-lg);
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--type-body-size);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.h-choosing-option > span:first-child { min-width: 0; }
+.h-choosing-option:hover:not(:disabled) { border-color: var(--primary); }
+/*
+ * A deferred option is shown and disabled rather than hidden: a household choosing between two
+ * does not know what it is not being offered, and the "not yet" chip says why (§85).
+ */
+.h-choosing-option:disabled { opacity: 0.6; cursor: default; }
+
+.h-choosing-dismiss {
+  display: block;
+  width: 100%;
+  min-height: var(--size-touch-min);
+  margin-top: var(--space-md);
+  border: 0;
+  background: transparent;
+  color: var(--planned-text);
+  font: inherit;
+  font-size: var(--type-meta-size);
+  cursor: pointer;
+}
+
+.h-layout { padding: 0 var(--space-xl); }
+.h-layout-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md); margin-top: var(--space-sm); }
+.h-layout-count { margin: 3px 0 0; font-size: var(--type-meta-size); color: var(--text-muted); min-width: 0; }
+
+.h-chapter { margin-bottom: var(--space-xxl); }
+.h-chapter-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-md); }
+
+/*
+ * No turmeric edge. The palette specifies `highlight` as a **fill with dark text on it** —
+ * *"'New' badge only, always with dark text"* — and as a 3px line on parchment it measures
+ * **2.14:1**, which fails §1.4.11 and, more to the point, is nearly invisible. That is §79 again:
+ * a role used on a side of the declaration the table never covered.
+ *
+ * So the band is marked by a turmeric **badge**, which is what the token is for, and its edge uses
+ * the accent that reads as a line. The badge is also more visible than the line it replaces.
+ */
+.h-layout-band {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  min-height: var(--size-touch-min);
+  margin-top: var(--space-lg);
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-card);
+  border-left: 3px solid var(--primary);
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+}
+
+/* the badge turmeric is actually specified for: a fill, with dark text on it */
+.h-layout-new {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--highlight);
+  color: var(--on-highlight);
+  font-size: var(--type-chip-size);
+  font-weight: var(--type-chip-weight);
+}
+.h-layout-band strong { display: block; font-family: var(--font-display); font-size: 17px; font-weight: 600; }
+
+/* a count, never "show more": a number is checkable and "more" is not */
+.h-layout-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--size-touch-min);
+  margin-top: var(--space-md);
+  border: 1.5px solid var(--secondary);
+  border-radius: var(--radius-pill);
+  color: var(--secondary);
+  font-size: var(--type-label-size);
+  font-weight: var(--type-label-weight);
+  text-decoration: none;
+}
+
+.h-setting { padding: var(--space-lg) var(--space-xl) 0; }
+.h-setting-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-display-s-size);
+  font-weight: var(--type-display-s-weight);
+  line-height: var(--type-display-s-line);
+  color: var(--text);
+  min-width: 0;
+}
+.h-setting-note { margin: var(--space-sm) 0 0; font-size: var(--type-meta-size); line-height: var(--type-meta-line); color: var(--text-muted); }
+/* the chosen one, by fill — `aria-pressed` carries it for anybody not reading colour */
+.h-choosing-option.is-on { border-color: var(--primary); background: var(--planned-bg); color: var(--planned-text); }
+.h-choosing-option strong { display: block; font-weight: 700; }

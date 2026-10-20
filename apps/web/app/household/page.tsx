@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { UnitsSetting } from "./units";
 import { TimezoneSetting } from "./timezone";
 import { AllergenSetting } from "./allergens";
+import { ChoosingSetting } from "./choosing";
 import { StoreSetting } from "./store";
 import { SignOutButton } from "../recipes/sign-out";
 import { krogerConfig } from "@/lib/kroger";
@@ -92,6 +93,7 @@ export default async function HouseholdPage() {
           one dinner gets cooked.
         </p>
         <AllergenSetting current={family.avoidedAllergens} />
+        <ChoosingSetting current={family.recipeLayout} />
       </section>
 
       <section style={{ marginBottom: "2rem" }}>

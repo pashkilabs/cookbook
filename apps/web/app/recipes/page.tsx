@@ -17,7 +17,9 @@ import { keepKidFriendly } from "@/lib/tastes";
  * removing it from a screen somebody can be stranded on would be a different bug.
  */
 import { SignOutButton } from "./sign-out";
-import { Chip, SecondaryLink, TabBar } from "@/components/harvest";
+import { Chip, Eyebrow, SecondaryLink, TabBar } from "@/components/harvest";
+import { AT_A_TIME, chapters, isRecipeLayout, rotation, type Planned } from "@/lib/recipe-layout";
+import { Choosing } from "./choosing";
 
 /**
  * The household's recipes, with the prototype's three filters.
@@ -117,6 +119,21 @@ export default async function RecipesPage({
    * what orders the list; re-querying would throw that away to save a pass over at most a few
    * hundred rows.
    */
+  /*
+   * ---------------------------------------------------------------------------
+   * The layout, and the data each branch needs
+   * ---------------------------------------------------------------------------
+   *
+   * `family.recipeLayout` is NOT NULL with a default, so there is no fallback branch to forget.
+   * `isRecipeLayout` still guards it, because a value stored before a layout was removed from the
+   * code would otherwise reach a screen with no branch for it.
+   *
+   * `searching` suspends the layout: a query or a filter means somebody has stopped browsing and
+   * started looking, and chaptering a result set buries what they asked for.
+   */
+  const layout = isRecipeLayout(family.recipeLayout) ? family.recipeLayout : "rotation";
+  const searching = q.length > 0 || filter !== null || chosen !== null || protein !== null;
+
   const narrowed = hits.filter(({ recipe }) => {
     const row = recipe as unknown as Record<string, string | null>;
     if (chosen && row[chosen.field] !== chosen.key) return false;
@@ -151,6 +168,54 @@ export default async function RecipesPage({
   );
 
   /*
+   * ---------------------------------------------------------------------------
+   * The rotation's order, from `plan_entries`
+   * ---------------------------------------------------------------------------
+   *
+   * Planning frequency, not `times_made`. Measured: 36 plan-entry rows over 26 recipes, against a
+   * `times_made` that tops out at **2** — so one is a signal and the other is barely populated.
+   *
+   * The signal is also **flat**: the top eight are 3, 3, 2, 2, 2, 2, 2, 2. Six recipes tie at two,
+   * so the tie-break decides most of the order, and `rotation()` breaks it on most-recently-planned
+   * then title — both total orders, so the page cannot reorder itself between visits. An unstable
+   * rotation would destroy the spatial memory the layout exists for.
+   */
+  let regulars: Planned[] = [];
+  let untriedCount = 0;
+  if (layout === "rotation" && !searching) {
+    const entries = rows(
+      await supabase
+        .from("plan_entries")
+        .select("recipe_id, date")
+        .eq("family_id", family.id)
+        .is("deleted_at", null),
+      "plan entries for the rotation",
+    );
+    const counts = new Map<string, { planned: number; lastPlanned: string | null }>();
+    for (const entry of entries) {
+      const id = entry.recipe_id as string;
+      const seen = counts.get(id) ?? { planned: 0, lastPlanned: null };
+      const date = entry.date as string;
+      counts.set(id, {
+        planned: seen.planned + 1,
+        lastPlanned: seen.lastPlanned && seen.lastPlanned > date ? seen.lastPlanned : date,
+      });
+    }
+    regulars = rotation(
+      narrowed.map(({ recipe }) => ({
+        id: recipe.id,
+        title: recipe.title,
+        planned: counts.get(recipe.id)?.planned ?? 0,
+        lastPlanned: counts.get(recipe.id)?.lastPlanned ?? null,
+      })),
+    );
+    // a count, not "more": how many of this household's recipes have never been given a day
+    untriedCount = narrowed.filter(({ recipe }) => !counts.has(recipe.id)).length;
+  }
+
+  const chaptered = layout === "browse" && !searching ? chapters(narrowed.map((hit) => ({ ...hit, course: hit.recipe.course ?? null }))) : [];
+
+  /*
    * The photographs, so the list is something a person recognises rather than a wall of titles.
    *
    * Two round trips for the whole page, not two per card: one read for the rows, one
@@ -168,7 +233,17 @@ export default async function RecipesPage({
       // never a card: a grid of index cards where dish photographs should be reads as a filing
       // cabinet, and is useless to somebody scanning for what to eat (§56)
       .neq("source", "source")
-      .in("recipe_id", narrowed.map(({ recipe }) => recipe.id))
+      // every id any branch may render: the flat list, the rotation, and the chapters
+      .in(
+        "recipe_id",
+        [
+          ...new Set([
+            ...narrowed.map(({ recipe }) => recipe.id),
+            ...regulars.map((recipe) => recipe.id),
+            ...chaptered.flatMap((chapter) => chapter.items.map(({ recipe }) => recipe.id)),
+          ]),
+        ],
+      )
       .is("deleted_at", null),
     "photos",
   );
@@ -286,7 +361,110 @@ export default async function RecipesPage({
         </p>
       )}
 
-      {narrowed.map(({ recipe, matchedIngredient, allergenNotes }) => (
+      {/*
+        * The question, once, where the problem is visible — and only where it has never been put.
+        * `recipe_layout_asked_at` is null for a household that has not answered, and a dismissal
+        * stamps it, so "not now" is permanent and "never asked" is the only state that prompts.
+        */}
+      {family.recipeLayoutAskedAt === null && narrowed.length > AT_A_TIME && (
+        <Choosing total={narrowed.length} />
+      )}
+
+      {/*
+        * ---------------------------------------------------------------------------
+        * The layout, and the rule all of them obey
+        * ---------------------------------------------------------------------------
+        *
+        * 67 recipes in one scroll is roughly ten times the choice-overload threshold the research
+        * puts at five to seven. The constraint is **not** *group them* — "Mains 28" is still 28
+        * once tapped — it is never show more than about seven at once.
+        *
+        * Server-rendered branches rather than a client toggle, for the reason the Today screen's
+        * hour-of-day default is read on the server: a layout chosen after hydration flips under
+        * the reader.
+        *
+        * A search or a filter **suspends the layout**. Somebody who has typed a query has stopped
+        * browsing and started looking, and chaptering a result set would bury the thing they
+        * asked for — the Index idea was dropped as a *mode* for exactly this reason: knowing the
+        * name is a different job, and it is on every layout rather than being one.
+        */}
+      {layout === "rotation" && !searching && regulars.length > 0 && (
+        <section className="h-layout">
+          <Eyebrow>What you cook</Eyebrow>
+          <div className="h-layout-grid">
+            {regulars.map((recipe) => (
+              <Link className="card" key={recipe.id} href={`/recipes/${recipe.id}`}>
+                {photoFor.has(recipe.id) ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- signed URLs expire
+                  <img className="card-photo" src={photoFor.get(recipe.id)} alt="" loading="lazy" />
+                ) : (
+                  <span className="card-photo none" aria-hidden="true">
+                    {recipe.title.trim().charAt(0).toUpperCase() || "?"}
+                  </span>
+                )}
+                <div className="card-body">
+                  <h2>{recipe.title}</h2>
+                  {/* planned, not `times_made` — 36 real rows against a column that tops out at 2 */}
+                  <p className="h-layout-count">planned {recipe.planned}×</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+          {/*
+            * The band that stops a rotation calcifying into the only thing anybody sees. Named
+            * with a count rather than "more", because a number is checkable.
+            */}
+          <Link className="h-layout-band" href="/recipes?filter=untried">
+            <span>
+              <strong>Try something new</strong>
+              <span className="h-layout-count">{untriedCount} you have never planned</span>
+            </span>
+            <span className="h-layout-new">new</span>
+          </Link>
+        </section>
+      )}
+
+      {layout === "browse" && !searching && (
+        <section className="h-layout">
+          {chaptered.map((chapter) => (
+            <div className="h-chapter" key={chapter.key}>
+              <div className="h-chapter-head">
+                <Eyebrow>{chapter.label}</Eyebrow>
+                <span className="h-layout-count">{chapter.total}</span>
+              </div>
+              <div className="h-layout-grid">
+                {chapter.items.map(({ recipe }) => (
+                  <Link className="card" key={recipe.id} href={`/recipes/${recipe.id}`}>
+                    {photoFor.has(recipe.id) ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- signed URLs expire
+                      <img className="card-photo" src={photoFor.get(recipe.id)} alt="" loading="lazy" />
+                    ) : (
+                      <span className="card-photo none" aria-hidden="true">
+                        {recipe.title.trim().charAt(0).toUpperCase() || "?"}
+                      </span>
+                    )}
+                    <div className="card-body">
+                      <h2>{recipe.title}</h2>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+              {chapter.total > chapter.items.length && (
+                <Link className="h-layout-more" href={`/recipes?in=${chapter.key}`}>
+                  Show the other {chapter.total - chapter.items.length}
+                </Link>
+              )}
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/*
+        * The flat list: every recipe, which is what a search or a filter wants and what the
+        * deferred layouts fall back to. §77 — nothing live is dropped by a layout.
+        */}
+      {(searching || layout === "time" || layout === "protein" || layout === "decide") &&
+        narrowed.map(({ recipe, matchedIngredient, allergenNotes }) => (
         <Link className="card" key={recipe.id} href={`/recipes/${recipe.id}`}>
           {photoFor.has(recipe.id) ? (
             // eslint-disable-next-line @next/next/no-img-element -- signed URLs expire; the

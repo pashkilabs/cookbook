@@ -62,6 +62,17 @@ function toMember(row: {
 const INVITATION_COLUMNS =
   "id, family_id, email, expires_at, accepted_at, revoked_at, superseded_at, created_at";
 
+/**
+ * One select list, because there were **six identical copies** of it.
+ *
+ * Adding `recipe_layout` meant editing six strings, and a seventh call site that forgot one would
+ * return a `Family` with the field quietly absent. `INVITATION_COLUMNS` above is the convention
+ * this file already had; the family reads had drifted from it. Same lesson as the eval and the
+ * product building their cascades in two places — **remove the second site rather than watch it.**
+ */
+const FAMILY_COLUMNS =
+  "id, name, owner_account_id, measurement_system, timezone, avoided_allergens, kroger_location_id, recipe_layout, recipe_layout_asked_at";
+
 /** Never carries the token hash: it is not selected, so it cannot be leaked by a caller. */
 function toInvitation(row: {
   id: string;
@@ -108,7 +119,7 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
     async findFamilyForAccount(accountId: string): Promise<Family | null> {
       const owned = await supabase
         .from("families")
-        .select("id, name, owner_account_id, measurement_system, timezone, avoided_allergens, kroger_location_id")
+        .select(FAMILY_COLUMNS)
         .eq("owner_account_id", accountId)
         .is("deleted_at", null)
         .order("created_at", { ascending: true })
@@ -184,19 +195,11 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
         // standing between a mistyped id and another household's row
         .eq("id", input.familyId)
         .is("deleted_at", null)
-        .select("id, name, owner_account_id, measurement_system, timezone, avoided_allergens, kroger_location_id")
+        .select(FAMILY_COLUMNS)
         .maybeSingle();
       if (error) throw new Error(error.message);
       if (!data) return null;
-      return {
-        id: data.id,
-        name: data.name,
-        ownerAccountId: data.owner_account_id,
-        measurementSystem: (data.measurement_system === "metric" ? "metric" : "us"),
-        timezone: (data.timezone as string | null) || "UTC",
-        avoidedAllergens: Array.isArray(data.avoided_allergens) ? (data.avoided_allergens as string[]) : [],
-        krogerLocationId: (data.kroger_location_id as string | null) ?? null,
-      };
+      return toFamily(data);
     },
 
     async setKrogerLocation(input): Promise<Family | null> {
@@ -205,19 +208,43 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
         .update({ kroger_location_id: input.locationId })
         .eq("id", input.familyId)
         .is("deleted_at", null)
-        .select("id, name, owner_account_id, measurement_system, timezone, avoided_allergens, kroger_location_id")
+        .select(FAMILY_COLUMNS)
         .maybeSingle();
       if (error) throw new Error(error.message);
       if (!data) return null;
-      return {
-        id: data.id,
-        name: data.name,
-        ownerAccountId: data.owner_account_id,
-        measurementSystem: data.measurement_system === "metric" ? "metric" : "us",
-        timezone: (data.timezone as string | null) || "UTC",
-        avoidedAllergens: Array.isArray(data.avoided_allergens) ? (data.avoided_allergens as string[]) : [],
-        krogerLocationId: (data.kroger_location_id as string | null) ?? null,
-      };
+      return toFamily(data);
+    },
+
+    async setRecipeLayout(input): Promise<Family | null> {
+      /*
+       * The layout and the asked-at stamp in one UPDATE.
+       *
+       * Answering the question and recording that it was asked are the same event. Two writes
+       * would let the first succeed and the second fail, leaving a household that has chosen a
+       * layout and will be prompted again anyway — and a prompt that returns after an answer is
+       * worse than one that never appeared.
+       *
+       * `layout: null` is a **dismissal**: it stamps the question and leaves `recipe_layout` at
+       * whatever it was, which is the default for anybody who has never chosen. That is why the
+       * two columns exist: the layout says what to render, the stamp says whether to ask.
+       *
+       * No validation here. The CHECK on the column owns the list, and a second copy in this file
+       * would be a third site for the five values — the thing the select-list consolidation above
+       * was about.
+       */
+      const patch: Record<string, unknown> = { recipe_layout_asked_at: new Date().toISOString() };
+      if (input.layout !== null) patch.recipe_layout = input.layout;
+
+      const { data, error } = await supabase
+        .from("families")
+        .update(patch)
+        .eq("id", input.familyId)
+        .is("deleted_at", null)
+        .select(FAMILY_COLUMNS)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      if (!data) return null;
+      return toFamily(data);
     },
 
     async setAvoidedAllergens(input): Promise<Family | null> {
@@ -232,19 +259,11 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
         .update({ avoided_allergens: allergens })
         .eq("id", input.familyId)
         .is("deleted_at", null)
-        .select("id, name, owner_account_id, measurement_system, timezone, avoided_allergens, kroger_location_id")
+        .select(FAMILY_COLUMNS)
         .maybeSingle();
       if (error) throw new Error(error.message);
       if (!data) return null;
-      return {
-        id: data.id,
-        name: data.name,
-        ownerAccountId: data.owner_account_id,
-        measurementSystem: data.measurement_system === "metric" ? "metric" : "us",
-        timezone: (data.timezone as string | null) || "UTC",
-        avoidedAllergens: Array.isArray(data.avoided_allergens) ? (data.avoided_allergens as string[]) : [],
-        krogerLocationId: (data.kroger_location_id as string | null) ?? null,
-      };
+      return toFamily(data);
     },
 
     async setTimezone(input): Promise<Family | null> {
@@ -254,19 +273,11 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
         // scoped by household id, like setMeasurementSystem: the service role bypasses RLS
         .eq("id", input.familyId)
         .is("deleted_at", null)
-        .select("id, name, owner_account_id, measurement_system, timezone, avoided_allergens, kroger_location_id")
+        .select(FAMILY_COLUMNS)
         .maybeSingle();
       if (error) throw new Error(error.message);
       if (!data) return null;
-      return {
-        id: data.id,
-        name: data.name,
-        ownerAccountId: data.owner_account_id,
-        measurementSystem: (data.measurement_system === "metric" ? "metric" : "us"),
-        timezone: (data.timezone as string | null) || "UTC",
-        avoidedAllergens: Array.isArray(data.avoided_allergens) ? (data.avoided_allergens as string[]) : [],
-        krogerLocationId: (data.kroger_location_id as string | null) ?? null,
-      };
+      return toFamily(data);
     },
 
     async updateMember(input): Promise<FamilyMember | null> {
@@ -510,7 +521,7 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
           const created = await supabase
             .from("families")
             .insert({ name: input.householdName, owner_account_id: input.accountId })
-            .select("id, name, owner_account_id, measurement_system, timezone, avoided_allergens, kroger_location_id")
+            .select(FAMILY_COLUMNS)
             .single();
           if (created.error) throw created.error;
           return toFamily(created.data);
@@ -593,6 +604,8 @@ function toFamily(row: {
   timezone?: string | null;
   avoided_allergens?: string[] | null;
   kroger_location_id?: string | null;
+  recipe_layout?: string | null;
+  recipe_layout_asked_at?: string | null;
 }): Family {
   return {
     id: row.id,
@@ -609,6 +622,15 @@ function toFamily(row: {
     avoidedAllergens: Array.isArray(row.avoided_allergens) ? row.avoided_allergens : [],
     // a row from before the column is a household that has not picked a store, which is not wrong
     krogerLocationId: row.kroger_location_id ?? null,
+    /*
+     * `rotation` rather than a second default invented here: the column's own default is
+     * `rotation`, and two defaults that could disagree is how a value ends up depending on which
+     * path read it. A row from before the migration is a household that has not answered the
+     * question, which is exactly what the default means.
+     */
+    recipeLayout: row.recipe_layout ?? "rotation",
+    /** null means never asked, and only null prompts — see the migration */
+    recipeLayoutAskedAt: row.recipe_layout_asked_at ?? null,
   };
 }
 

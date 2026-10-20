@@ -27,6 +27,14 @@ export interface RecipeRow {
   times_made: number;
   make_again: boolean | null;
   visibility: string;
+  /*
+   * The classification columns. `COLUMNS` has selected all three for some time and this type
+   * declared none of them, so they arrived at every caller and were invisible to the compiler —
+   * the browse layout needs `course` and had to add it to the type rather than to the query.
+   */
+  course: string | null;
+  dish_form: string | null;
+  principal_protein: string | null;
 }
 
 export interface SearchHit {
@@ -46,7 +54,7 @@ export interface SearchHit {
 const COLUMNS =
   // one literal, not a concatenation: PostgREST infers the row type from the string and a `+`
   // collapses it to GenericStringError[]. The classification columns are here because the list
-  // drills down by course, dish form and protein now that browse is gone.
+  // drills down by course, dish form and protein — and §85's browse layout chapters by course.
   "id, title, source_name, servings, time_minutes, times_made, make_again, visibility, course, dish_form, principal_protein";
 
 export interface SearchOptions {

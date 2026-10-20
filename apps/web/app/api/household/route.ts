@@ -77,7 +77,9 @@ export async function PATCH(request: Request) {
   let body: {
     measurementSystem?: unknown; timezone?: unknown; avoidedAllergens?: unknown;
     krogerLocationId?: unknown;
-  };
+      /** a layout name, or null to dismiss the question without choosing */
+    recipeLayout?: unknown;
+};
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -124,6 +126,40 @@ export async function PATCH(request: Request) {
     } catch (thrown) {
       return Response.json(
         { error: thrown instanceof Error ? thrown.message : "those were refused" },
+        { status: 400 },
+      );
+    }
+  }
+
+  /*
+   * How this household decides what to cook (§85).
+   *
+   * `recipeLayout: null` is a **dismissal** — the question was put and declined, which stamps
+   * `recipe_layout_asked_at` and leaves the layout alone. That is why `null` is meaningful here
+   * rather than a missing field, and why `undefined` (the key absent) means "this PATCH is not
+   * about the layout" as every other branch in this route does.
+   *
+   * Validated for *type* here and for *value* by the CHECK on the column. A third copy of the
+   * five names in this route would be a third site to drift from, which is the reason the
+   * allergen branch above does the same.
+   */
+  if (body.recipeLayout !== undefined) {
+    const layout = body.recipeLayout;
+    if (layout !== null && typeof layout !== "string") {
+      return Response.json(
+        { error: "recipeLayout must be a layout name, or null to dismiss the question" },
+        { status: 400 },
+      );
+    }
+    try {
+      const family = await platformClient(auth.user.id).setRecipeLayout(layout);
+      return Response.json({
+        recipeLayout: family.recipeLayout,
+        recipeLayoutAskedAt: family.recipeLayoutAskedAt,
+      });
+    } catch (thrown) {
+      return Response.json(
+        { error: thrown instanceof Error ? thrown.message : "that layout was refused" },
         { status: 400 },
       );
     }

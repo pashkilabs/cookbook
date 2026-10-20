@@ -612,6 +612,47 @@ try {
     }
 
     /*
+     * §85: the layout setting, and the three states its two columns exist to tell apart.
+     *
+     * `recipe_layout` says what to render; `recipe_layout_asked_at` says whether to ask. A
+     * dismissal stamps the second and leaves the first, which is the only way "not now" can differ
+     * from "never asked" — and conflating them would re-prompt a household forever.
+     */
+    const settingPage = await call("GET", "/household");
+    const settingText = visible(typeof settingPage.body === "string" ? settingPage.body : "");
+    record(
+      "a new household starts on the default layout",
+      settingPage.status === 200 &&
+        /aria-pressed="true"[^>]*>\s*<span>\s*<strong>We cook the same things/.test(settingText),
+      settingPage.status === 200
+        ? foundDetail(settingText, "We cook the same things", "the setting did not render")
+        : `HTTP ${settingPage.status}`,
+    );
+
+    const chose = await call("PATCH", "/api/household", { body: { recipeLayout: "browse" } });
+    record(
+      "a household can say how it decides what to cook",
+      chose.status === 200 && chose.body?.recipeLayout === "browse" && Boolean(chose.body?.recipeLayoutAskedAt),
+      `HTTP ${chose.status} layout=${chose.body?.recipeLayout} asked=${Boolean(chose.body?.recipeLayoutAskedAt)}`,
+    );
+
+    const refused = await call("PATCH", "/api/household", { body: { recipeLayout: "shelves" } });
+    record(
+      "and a layout no screen renders is refused, not stored",
+      // 'shelves' was ideated and dropped; the CHECK is what refuses it, and a 500 here would
+      // mean the constraint surfaced as a crash instead of a message
+      refused.status >= 400 && refused.status < 500,
+      `HTTP ${refused.status} ${String(refused.body?.error ?? "").slice(0, 60)}`,
+    );
+
+    const dismissed = await call("PATCH", "/api/household", { body: { recipeLayout: null } });
+    record(
+      "and dismissing the question keeps the layout it already had",
+      dismissed.status === 200 && dismissed.body?.recipeLayout === "browse" && Boolean(dismissed.body?.recipeLayoutAskedAt),
+      `HTTP ${dismissed.status} layout=${dismissed.body?.recipeLayout}`,
+    );
+
+    /*
      * The slot, written for the first time.
      *
      * `plan_entries.slot` has existed since §slot with a CHECK of breakfast / lunch / dinner /
@@ -1129,7 +1170,14 @@ try {
        * it answered now has its own screen, and a marker for a removed block would have failed
        * loudly, which is the right direction for a deletion.
        */
+      /*
+       * §85. The question appears only for a household that has never answered AND has more than
+       * seven recipes, so neither is asserted here — a smoke household has three. What IS
+       * asserted is below, against a real layout write.
+       */
       "/recipes": ["for dinner?", 'aria-label="Main"'],
+      // the setting itself, which is on /household for every household
+      "/household": ["How do you usually decide what to cook?", "We cook the same things"],
       /*
        * Today (§82). The leaderboard's own chips are NOT asserted: a household with no ratings
        * has none, and that is a correct screen rather than a broken one — the same reasoning as
@@ -1152,7 +1200,16 @@ try {
        * tabs replaced — a marker for a removed control fails loudly, which is the right direction
        * for a deletion.
        */
-      "/today": ["Today", "Bkfst", "Lunch", "Snack", "h-segmented", "Household ·"],
+      /*
+       * "Household ·" was a marker here and is **time-of-day dependent**: it lives in the
+       * leaderboard, and the tab the hour opens may be a course this household owns none of — in
+       * which case the quiet branch renders instead and the marker is correctly absent. It passed
+       * for a day and failed when the clock moved, which is the third state-dependent marker in
+       * this file and the same mistake the alongside footnote's marker was written to avoid.
+       *
+       * The tabs are the stable thing: they render whatever the hour, whatever the data.
+       */
+      "/today": ["Today", "Bkfst", "Lunch", "Dinner", "Snack", "h-segmented"],
       /*
        * The Harvest shopping list (§4.5). The segmented control and the aisle rows are asserted;
        * the consolidation chips are not, because a week with no overlapping ingredient has none

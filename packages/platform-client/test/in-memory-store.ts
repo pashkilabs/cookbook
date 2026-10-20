@@ -129,6 +129,19 @@ export function createInMemoryStore(seed: Seed = {}, clock: Clock = () => new Da
       return { ...family };
     },
 
+    async setRecipeLayout(input) {
+      const family = families.find((candidate) => candidate.id === input.familyId);
+      if (!family) return null;
+      /*
+       * `null` is a dismissal: it stamps the question and leaves the layout alone. The real store
+       * does the same in one UPDATE, and this fake has to agree or a test passing here would say
+       * nothing about production.
+       */
+      if (input.layout !== null) family.recipeLayout = input.layout;
+      family.recipeLayoutAskedAt = new Date().toISOString();
+      return family;
+    },
+
     async setAvoidedAllergens(input) {
       const family = families.find((f) => f.id === input.familyId);
       if (!family) return null;
@@ -326,6 +339,8 @@ export function createInMemoryStore(seed: Seed = {}, clock: Clock = () => new Da
             timezone: "UTC",
             avoidedAllergens: [],
             krogerLocationId: null,
+            recipeLayout: "rotation",
+            recipeLayoutAskedAt: null,
           };
           families.push(created);
           return created;
@@ -376,7 +391,7 @@ export function standardSeed(
 ): Seed {
   return {
     accounts: [{ id: ACCOUNT_ID, email: "adult@example.test" }],
-    families: [{ id: FAMILY_ID, name: "Household", ownerAccountId: ACCOUNT_ID, measurementSystem: "us", timezone: "UTC", avoidedAllergens: [], krogerLocationId: null }],
+    families: [{ id: FAMILY_ID, name: "Household", ownerAccountId: ACCOUNT_ID, measurementSystem: "us", timezone: "UTC", avoidedAllergens: [], krogerLocationId: null, recipeLayout: "rotation", recipeLayoutAskedAt: null }],
     members: [
       {
         id: "mem-1",

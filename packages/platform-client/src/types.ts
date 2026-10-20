@@ -52,6 +52,17 @@ export interface Family {
    */
   avoidedAllergens: string[];
   /**
+   * How this household decides what to cook, which sets how `/recipes` is laid out.
+   *
+   * A declared fact rather than an inference (§71, §85) — and a `string` rather than a union here
+   * because the seam must not own the app's vocabulary: the five values live in
+   * `apps/web/lib/recipe-layout.ts` and in a CHECK, and a union in the platform package would make
+   * a third site for the same list.
+   */
+  recipeLayout: string;
+  /** when the in-context question was answered or dismissed; null means never asked */
+  recipeLayoutAskedAt: string | null;
+  /**
    * The Kroger store this household shops at, or null (§74).
    *
    * A household setting beside `timezone` and `measurementSystem`, and required before any product
@@ -348,6 +359,15 @@ export interface PlatformStore {
    * allergens are on.
    */
   setAvoidedAllergens(input: { familyId: string; allergens: readonly string[] }): Promise<Family | null>;
+  /**
+   * The layout, and the asked-at stamp, written together.
+   *
+   * One call rather than two, because answering the question and recording that it was asked are
+   * the same event — two calls would let one succeed and leave a household that has chosen a
+   * layout and will be asked again anyway. `layout: null` is a dismissal: it stamps the question
+   * as asked and leaves the layout alone.
+   */
+  setRecipeLayout(input: { familyId: string; layout: string | null }): Promise<Family | null>;
   /** the store, validated by a CHECK on the column rather than here */
   setKrogerLocation(input: { familyId: string; locationId: string | null }): Promise<Family | null>;
   setMeasurementSystem(input: {
@@ -549,6 +569,8 @@ export interface PlatformClient {
    * site to drift.
    */
   setAvoidedAllergens(allergens: readonly string[]): Promise<Family>;
+  /** `null` dismisses the question without choosing — see `PlatformStore.setRecipeLayout` */
+  setRecipeLayout(layout: string | null): Promise<Family>;
   setKrogerLocation(locationId: string | null): Promise<Family>;
   removeMember(memberId: string): Promise<void>;
 
