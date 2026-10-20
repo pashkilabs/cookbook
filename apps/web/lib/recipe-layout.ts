@@ -47,6 +47,14 @@ export const LAYOUT_CHOICES: ReadonlyArray<{
   description: string;
   /** false where the data cannot support it yet — the option is shown as not ready, not hidden */
   ready: boolean;
+  /**
+   * Why it is not ready, in the household's words — never "not yet".
+   *
+   * §71's pattern: say the thing rather than gesture at it. "Soon" and "this would hide 42 of
+   * your recipes" are different promises, and a household is entitled to know which it is being
+   * given. One is a schedule; the other is a **ceiling**, and a ceiling does not move by waiting.
+   */
+  notYet?: string;
 }> = [
   {
     value: "rotation",
@@ -64,19 +72,25 @@ export const LAYOUT_CHOICES: ReadonlyArray<{
     value: "time",
     label: "Depends how much time we've got",
     description: "Under 30 minutes, under an hour, or a weekend job.",
-    ready: false,
+    ready: true,
   },
   {
     value: "protein",
     label: "We start with what's in the fridge",
     description: "Chicken, pork, fish — pick the thing you already have.",
     ready: false,
+    /*
+     * A ceiling, stated. The classifier has run on 64 of 67 recipes and named a protein for 25,
+     * so this is not a backlog that fills in — and a household told "soon" about it would be told
+     * something untrue.
+     */
+    notYet: "Only 25 of your 67 recipes name a protein, so this would hide 42 of them.",
   },
   {
     value: "decide",
     label: "Just tell us what to cook",
     description: "One suggestion a night, with the reason. Yes, or ask again.",
-    ready: false,
+    ready: true,
   },
 ];
 

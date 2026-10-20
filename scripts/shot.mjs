@@ -1,0 +1,292 @@
+#!/usr/bin/env node
+/**
+ * Render a screen at phone width and **measure** it, because a stylesheet cannot show you this.
+ *
+ * The fault that bought this tool: the rotation's cards were the Harvest list card — a
+ * `96px 1fr` grid built for a 350px full-width row — dropped into a two-column grid. In a 169px
+ * column the title gets **17px**, so every recipe title rendered one character per line. Every
+ * guard passed: `check-harvest-classes`, `check-contrast`, `check-palette-roles`, 110 pairs,
+ * 248 tests, and smoke's markers were all present because the *text* was there. It is visible in
+ * one screenshot and invisible in a stylesheet, which is the whole gap this closes.
+ *
+ * So it does two things, and the second is the one that will catch the next instance:
+ *
+ *   1. writes a PNG per screen per theme, for a person to look at
+ *   2. asserts what only a layout engine knows — **no horizontal overflow**, and **no text box
+ *      narrower than it needs**, which is the signature of the fault above
+ *
+ * Usage: node scripts/shot.mjs <baseUrl> [outDir]
+ * Needs a signed-in session, so it provisions one the way smoke does.
+ */
+import { mkdirSync, writeFileSync } from "node:fs";
+import { chromium } from "playwright";
+
+const base = process.argv[2] ?? "http://127.0.0.1:3000";
+const outDir = process.argv[3] ?? ".shots";
+const SUPABASE = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!SUPABASE || !ANON || !SERVICE) {
+  console.error("COULD NOT MEASURE: NEXT_PUBLIC_SUPABASE_URL, _ANON_KEY and SUPABASE_SERVICE_ROLE_KEY must be set");
+  process.exit(2);
+}
+
+/** a phone, and the width every layout claim in this project is made about */
+const WIDTH = 390;
+const HEIGHT = 844;
+
+const admin = (method, path, body) =>
+  fetch(`${SUPABASE}/auth/v1/admin${path}`, {
+    method,
+    headers: { apikey: SERVICE, authorization: `Bearer ${SERVICE}`, "Content-Type": "application/json" },
+    body: body && JSON.stringify(body),
+  }).then((r) => r.json());
+
+async function session() {
+  const stamp = Date.now();
+  const email = `shot-${stamp}@example.com`;
+  const password = `Shot-${stamp}-Aa1!`;
+  await admin("POST", "/users", { email, password, email_confirm: true });
+  const token = await (
+    await fetch(`${SUPABASE}/auth/v1/token?grant_type=password`, {
+      method: "POST",
+      headers: { apikey: ANON, "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    })
+  ).json();
+  if (!token.access_token) throw new Error(`could not sign in: ${JSON.stringify(token).slice(0, 120)}`);
+  return token;
+}
+
+const token = await session();
+const ref = new URL(SUPABASE).host.split(".")[0];
+const cookie = {
+  name: `sb-${ref}-auth-token`,
+  value: `base64-${Buffer.from(JSON.stringify(token)).toString("base64")}`,
+  domain: new URL(base).hostname,
+  path: "/",
+};
+
+mkdirSync(outDir, { recursive: true });
+const browser = await chromium.launch();
+
+/*
+ * One household, with enough recipes to reach the layouts. Seven is the rule's own number, so a
+ * shot of fewer would not exercise the cap the layouts exist to apply.
+ */
+/*
+ * The cookie renders the page and the bearer token satisfies the routes — `lib/supabase-server.ts`
+ * builds its client from cookies, and the API routes additionally want an Authorization header,
+ * which is exactly the two-doors shape smoke documents. Sending one and not the other produced
+ * `401 a bearer token is required` from a context that was rendering pages perfectly well.
+ */
+const AUTH = { Authorization: `Bearer ${token.access_token}` };
+
+const page0 = await browser.newContext({ viewport: { width: WIDTH, height: HEIGHT }, extraHTTPHeaders: AUTH });
+await page0.addCookies([cookie]);
+const setup = await page0.newPage();
+await setup.goto(`${base}/api/health`);
+
+/*
+ * Provisioning first, and this is not a detail.
+ *
+ * The first run of this script skipped it, so every page rendered "This account has no household
+ * yet" — and all eight screens reported **ok**, because an empty page has no overflow and no
+ * squeezed boxes. *A probe that could not have succeeded has measured nothing*, and it said ok
+ * eight times. Only looking at the PNG found it, which is the argument for the PNG.
+ *
+ * So the household is created and then **asserted**, and a missing one is exit 2 rather than a
+ * clean run over nothing.
+ */
+const provisioned = await setup.request.post(`${base}/api/household`, { data: {} });
+const household = await provisioned.json().catch(() => ({}));
+if (!household.familyId) {
+  console.error(`COULD NOT MEASURE: no household was provisioned (HTTP ${provisioned.status()}) ${JSON.stringify(household).slice(0, 120)}`);
+  process.exit(2);
+}
+
+const made = [];
+for (const [title, course, minutes] of [
+  ["Grilled chilli and lemon chicken", "main", "90"],
+  ["Easy Fried Rice", "main", "30"],
+  ["Sausage and Rice Skillet", "main", "35"],
+  ["Loaded potato soup", "main", "45"],
+  ["Greek Salad", "side", "15"],
+  ["Coconut rice", "side", "25"],
+  ["Cinnamon Rolls", "breakfast", "180"],
+  ["Mango Salsa", "side", "20"],
+  ["A recipe with a deliberately very long title indeed", "main", ""],
+]) {
+  const response = await setup.request.post(`${base}/api/recipes`, {
+    data: {
+      title, servings: "4", timeMinutes: minutes, sourceName: "", sourceUrl: "",
+      ingredients: "2 cups flour\n1 pint double cream", steps: "Mix.\nBake.",
+    },
+  });
+  const body = await response.json().catch(() => ({}));
+  if (body.id) made.push({ id: body.id, course });
+}
+// courses, so the browse layout has chapters, and plan entries so the rotation has an order
+for (const [i, recipe] of made.entries()) {
+  await setup.request.patch(`${base}/api/recipes/${recipe.id}`, { data: { course: recipe.course } }).catch(() => {});
+  for (let n = 0; n < (i < 2 ? 3 : i < 5 ? 2 : 1); n += 1) {
+    const day = new Date(Date.UTC(2026, 9, 12 + ((i + n) % 7))).toISOString().slice(0, 10);
+    await setup.request.post(`${base}/api/plan-entries`, { data: { recipeId: recipe.id, date: day } }).catch(() => {});
+  }
+}
+if (made.length < 7) {
+  // seven is the rule's own number: fewer and the cap the layouts exist to apply is not exercised
+  console.error(`COULD NOT MEASURE: only ${made.length} recipes were created, so no layout reaches its cap`);
+  process.exit(2);
+}
+console.log(`  setup: household ${household.familyId.slice(0, 8)} with ${made.length} recipes`);
+
+await page0.close();
+
+const SCREENS = [
+  ["today", "/today"],
+  ["recipes-rotation", "/recipes"],
+  ["recipes-browse", "/recipes"],
+  ["recipes-time", "/recipes"],
+  ["recipes-decide", "/recipes"],
+  ["household", "/household"],
+];
+
+let problems = 0;
+let shots = 0;
+
+for (const theme of ["light", "dark"]) {
+  for (const [name, path] of SCREENS) {
+    const context = await browser.newContext({
+      viewport: { width: WIDTH, height: HEIGHT },
+      colorScheme: theme === "dark" ? "dark" : "light",
+      deviceScaleFactor: 2,
+      extraHTTPHeaders: AUTH,
+    });
+    await context.addCookies([cookie]);
+    const page = await context.newPage();
+    if (name.startsWith("recipes-")) {
+      await page.request.patch(`${base}/api/household`, {
+        data: { recipeLayout: name.replace("recipes-", "") },
+      });
+    }
+    await page.goto(`${base}${path}`, { waitUntil: "networkidle" });
+    // the fonts decide every width below, so a shot before they land measures the fallback
+    await page.evaluate(() => document.fonts.ready);
+
+    writeFileSync(`${outDir}/${name}-${theme}.png`, await page.screenshot({ fullPage: true }));
+    shots += 1;
+
+    /*
+     * The two things only a layout engine knows.
+     */
+    const found = await page.evaluate(() => {
+      const out = { wider: 0, squeezed: [] };
+      const doc = document.documentElement;
+      // a page wider than its own viewport: the §81 chain, which breaks the docked bars
+      out.wider = Math.max(0, doc.scrollWidth - doc.clientWidth);
+      /*
+       * Which element is doing it. "The page is 564px too wide" is a symptom and the next
+       * question is always *what*, so the tool answers it rather than leaving a hunt — the
+       * narrowest element whose own box extends past the viewport is the culprit, because an
+       * ancestor is only wide because a descendant made it so.
+       */
+      out.culprits = [];
+      if (out.wider > 0) {
+        for (const el of document.querySelectorAll("body *")) {
+          const box = el.getBoundingClientRect();
+          if (box.right <= doc.clientWidth + 1 || box.width === 0) continue;
+          // report the deepest ones: an ancestor inherits the overflow from its child
+          const deeper = [...el.children].some((kid) => kid.getBoundingClientRect().right > doc.clientWidth + 1);
+          if (deeper) { out.deeper = true; continue; }
+          out.culprits.push({
+            tag: el.tagName.toLowerCase(),
+            cls: (el.className || "").toString().slice(0, 44),
+            right: Math.round(box.right),
+            width: Math.round(box.width),
+          });
+        }
+      }
+      /*
+       * A text box narrower than one word needs. `scrollWidth > clientWidth` on an element whose
+       * own text is wrapping is the signature of the rotation fault: the box is 17px, the word
+       * wants 80, and nothing in a stylesheet says so.
+       */
+      for (const el of document.querySelectorAll("h1, h2, h3, p, a, span, strong")) {
+        const text = (el.textContent ?? "").trim();
+        if (text.length < 4 || el.children.length > 0) continue;
+        const box = el.getBoundingClientRect();
+        /*
+         * Only a zero *height* means not rendered. A first version skipped zero **width** too, as
+         * "not laid out" — and zero width is exactly what the fault looks like: the broken titles
+         * measured **0px wide and 329px tall**, the most broken box a text node can have, and the
+         * guard filtered them out as absent. It reported ok on the screen it was written for.
+         *
+         * That is §80 inside the tool built to catch what guards cannot see: an assertion that
+         * did not cover its own subject.
+         */
+        if (box.height === 0) continue;
+        // a box so narrow that a word cannot fit is a broken box, whatever the stylesheet says
+        if (box.width < 40 && text.length > 8) {
+          out.squeezed.push({ text: text.slice(0, 40), width: Math.round(box.width), height: Math.round(box.height) });
+        }
+        /*
+         * If every candidate was filtered as "has an overflowing child", nothing is reported and
+         * a real overflow prints with no culprit — which happened on /household and sent me to a
+         * separate probe. So the fallback reports the widest element regardless of depth.
+         */
+        if (out.culprits.length === 0) {
+          const all = [...document.querySelectorAll("body *")]
+            .map((el) => ({ el, box: el.getBoundingClientRect() }))
+            .filter(({ box }) => box.right > doc.clientWidth + 1)
+            .sort((a, b) => b.box.right - a.box.right)
+            .slice(0, 3);
+          out.culprits = all.map(({ el, box }) => ({
+            tag: el.tagName.toLowerCase(),
+            cls: (el.className || "").toString().slice(0, 44),
+            right: Math.round(box.right),
+            width: Math.round(box.width),
+          }));
+        }
+      }
+      return out;
+    });
+
+    /*
+     * Did this screen render *itself*? An error page, a redirect to sign-in, or a household that
+     * failed to provision all produce a page with no overflow and no squeezed text — which is to
+     * say, a clean pass. Each screen names something only it renders.
+     */
+    const marker = name.startsWith("recipes-") ? "Recipes" : name === "today" ? "Today" : "Household";
+    const body = await page.textContent("body");
+    if (!body?.includes(marker) || body.includes("no household yet")) {
+      console.error(`  COULD NOT MEASURE ${name} (${theme}): the page did not render its own content`);
+      problems += 1;
+      await context.close();
+      continue;
+    }
+
+    const label = `${name} (${theme})`;
+    if (found.wider > 0) {
+      console.error(`  FAIL ${label}: the page is ${found.wider}px wider than the viewport`);
+      for (const c of (found.culprits ?? []).slice(0, 3)) {
+        console.error(`         ${c.tag}.${c.cls} is ${c.width}px wide and ends at ${c.right}`);
+      }
+      problems += 1;
+    }
+    for (const box of found.squeezed.slice(0, 4)) {
+      console.error(`  FAIL ${label}: "${box.text}" is in a ${box.width}px box and ${box.height}px tall — it is wrapping per character`);
+      problems += 1;
+    }
+    if (found.wider === 0 && found.squeezed.length === 0) console.log(`  ok   ${label}`);
+    await context.close();
+  }
+}
+
+await browser.close();
+console.log(`\n${shots} screenshots in ${outDir}/ at ${WIDTH}px, against ${base}`);
+if (problems > 0) {
+  console.error(`${problems} layout problem(s) a stylesheet cannot show.`);
+  process.exit(1);
+}

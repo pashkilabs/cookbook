@@ -121,8 +121,32 @@ describe("the setting's values", () => {
     expect(LAYOUT_CHOICES.map((c) => c.value)).toEqual([...RECIPE_LAYOUTS]);
   });
 
-  it("marks exactly the two that are built as ready", () => {
-    expect(LAYOUT_CHOICES.filter((c) => c.ready).map((c) => c.value)).toEqual(["rotation", "browse"]);
+  it("marks the four that are built as ready, and only the fifth as not", () => {
+    expect(LAYOUT_CHOICES.filter((c) => c.ready).map((c) => c.value)).toEqual([
+      "rotation", "browse", "time", "decide",
+    ]);
+  });
+
+  it("gives the deferred one a reason rather than the word 'soon'", () => {
+    /*
+     * §71's pattern. "Soon" is a schedule and this is a ceiling: the classifier has run on 64 of
+     * 67 recipes and named a protein for 25, so waiting changes nothing. A household told "soon"
+     * about it would be told something untrue.
+     */
+    const deferred = LAYOUT_CHOICES.filter((c) => !c.ready);
+    expect(deferred.map((c) => c.value)).toEqual(["protein"]);
+    for (const choice of deferred) {
+      expect(choice.notYet, choice.value).toBeTruthy();
+      expect(choice.notYet!.toLowerCase(), choice.value).not.toBe("soon");
+      // a count a person can check, not an adjective
+      expect(choice.notYet, choice.value).toMatch(/\d/);
+    }
+  });
+
+  it("gives a ready layout no not-yet reason, so the two states cannot blur", () => {
+    for (const choice of LAYOUT_CHOICES.filter((c) => c.ready)) {
+      expect(choice.notYet, choice.value).toBeUndefined();
+    }
   });
 
   it("asks each option as a sentence about the household, never as a layout name", () => {

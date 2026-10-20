@@ -846,6 +846,34 @@ guessing.
   the one question the gesture had to settle before release. That is a design constraint on any
   platform, and the fix is a readout placed where the hand is not, naming the target in words.
 
+- **There is a renderer now: `pnpm shots`. Some faults are only visible in a picture.**
+  `scripts/shot.mjs` renders every screen at **390px** in both themes with Playwright, writes a PNG
+  each, and asserts the two things only a layout engine knows: **no horizontal overflow** (naming
+  the culprit element) and **no text box too narrow for a word**.
+
+  The fault that bought it: the rotation's tiles were the Harvest list card — `96px 1fr` built for
+  a 350px full-width row — dropped into a two-column grid. In a 169px column the title got 17px and
+  the browser gave it **0px wide by 329px tall**, one character per line, on every tile of two
+  layouts. **Every guard passed**: 121 contrast pairs, every class styled, every role right, 250
+  tests, and smoke's markers were all present *because the text was there*. For twenty turns the
+  honest line was "no pixels, that part is yours"; it should have been "install a browser".
+
+  Three lessons the tool itself taught, in order:
+
+  1. Its first run reported **ok on all eight screens** — of a page reading "this account has no
+     household yet", because it never provisioned one. *A probe that could not have succeeded.*
+     It now provisions, asserts the household and the recipe count, and each screen asserts it
+     rendered its own content; all three are exit 2.
+  2. Its heuristic then **skipped the exact fault** it was written for: `if (box.width === 0)
+     continue`, meant to ignore unrendered elements, filtered out the 0px-wide titles. Zero width
+     *is* the signature. §80 inside the tool built to catch what guards cannot see.
+  3. Asserting *proximity* failed against correct markup — `aria-checked="true"` within 400
+     characters of its label, when the preview diagram puts the real distance at **620**. Assert by
+     **order**, not by a window: a window is a guess about a spelling.
+
+  So: **render before claiming a layout works**, and when a screenshot and a stylesheet disagree,
+  the screenshot is the one that has looked.
+
 - **`flex: 1` does not mean a flex child can shrink: `min-width` defaults to `auto`, which floors
   it at min-content.** So a `flex: 1` cell holding one unbreakable ingredient name — or a button
   with `white-space: nowrap` — widens its row past the viewport, the *page* becomes wider than the
@@ -858,6 +886,13 @@ guessing.
   inside a day row on a 390px phone — the viewport less the week's 20px gutters, the row's 12px
   padding and the 44px date block with its gap — against **340px needed** for a 5rem name column
   plus five 44px buttons. 70px over, the last column cut off on every row.
+
+  **And a grid item has the same default.** §85 hit it again: `section.h-layout` is an item of a
+  `display: grid` parent, so its `min-width: auto` floored it at min-content — the shelf's nine
+  118px tiles stretched the item to 548px, the `overflow-x: auto` scroll container therefore
+  inherited 508px instead of 350px, **never became narrower than its content, and never scrolled**.
+  The page was 564px wide instead. The rule is every item of a grid or flex container that must not
+  grow, not only the ones holding words.
 
   **The ratio is the useful part.** Grepping for the naive cause — a non-wrapping `display: flex`
   — returned **38 rules and almost all were noise**, because a non-wrapping flex row only overflows

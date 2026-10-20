@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { LAYOUT_CHOICES, type RecipeLayout } from "@/lib/recipe-layout";
+import { LayoutPreview } from "./layout-preview";
 
 /**
  * How this household decides what to cook — the setting, beside units and timezone.
@@ -56,22 +57,34 @@ export function ChoosingSetting({ current }: { current: string }) {
         either way.
       </p>
 
-      <div className="h-choosing-options">
+      <div className="h-choosing-options" role="radiogroup" aria-label="How you decide what to cook">
         {LAYOUT_CHOICES.map((choice) => (
           <button
             key={choice.value}
             type="button"
-            className={chosen === choice.value ? "h-choosing-option is-on" : "h-choosing-option"}
-            // a radio group's semantics without a radio group's markup: one of a set, and which
-            aria-pressed={chosen === choice.value}
+            className={chosen === choice.value ? "h-option is-on" : "h-option"}
+            /*
+             * `aria-checked` with `role="radio"`, which is what this is: one of a set. A disabled
+             * option keeps its role so a screen reader counts five, the same reason it stays on
+             * screen at all — a reader who cannot see the greyed card would otherwise be offered
+             * four and never know a fifth existed.
+             */
+            role="radio"
+            aria-checked={chosen === choice.value}
             disabled={busy || !choice.ready}
             onClick={() => void choose(choice.value)}
           >
-            <span>
+            <span className={chosen === choice.value ? "h-radio is-on" : "h-radio"} aria-hidden="true" />
+            <LayoutPreview layout={choice.value} />
+            <span className="h-option-text">
               <strong>{choice.label}</strong>
-              <span className="h-layout-count">{choice.description}</span>
+              <span className="h-option-why">{choice.description}</span>
+              {/*
+                * The reason, not "not yet". §71's pattern: "soon" is a schedule and a ceiling is
+                * not, and a household is entitled to know which it is being given.
+                */}
+              {!choice.ready && choice.notYet && <span className="h-option-blocked">{choice.notYet}</span>}
             </span>
-            {!choice.ready && <span className="h-chip-quiet">not yet</span>}
           </button>
         ))}
       </div>

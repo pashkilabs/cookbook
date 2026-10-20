@@ -620,13 +620,25 @@ try {
      */
     const settingPage = await call("GET", "/household");
     const settingText = visible(typeof settingPage.body === "string" ? settingPage.body : "");
+    /*
+     * The **first** option in the radiogroup is the one that must be checked, and that is asserted
+     * by order rather than by proximity. A first version matched `aria-checked="true"` within 400
+     * characters of the label and failed against correct markup: the preview diagram sits between
+     * them and the real distance is about **620**. A window is a guess about a spelling, and this
+     * project has a rule about those.
+     */
+    const options = [...settingText.matchAll(/aria-checked="(true|false)"/g)].map((m) => m[1]);
+    const defaultChecked = options.length === 5 && options[0] === "true" && !options.slice(1).includes("true");
     record(
       "a new household starts on the default layout",
-      settingPage.status === 200 &&
-        /aria-pressed="true"[^>]*>\s*<span>\s*<strong>We cook the same things/.test(settingText),
-      settingPage.status === 200
-        ? foundDetail(settingText, "We cook the same things", "the setting did not render")
-        : `HTTP ${settingPage.status}`,
+      settingPage.status === 200 && defaultChecked,
+      settingPage.status !== 200
+        ? `HTTP ${settingPage.status}`
+        : defaultChecked
+          ? `5 options, the first checked: ${options.join(",")}`
+          : settingText.includes("We cook the same things")
+            ? `the setting rendered with ${options.length} option(s) checked as ${options.join(",") || "nothing"}`
+            : "the setting did not render at all",
     );
 
     const chose = await call("PATCH", "/api/household", { body: { recipeLayout: "browse" } });

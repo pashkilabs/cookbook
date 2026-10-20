@@ -20,6 +20,7 @@ import { SignOutButton } from "./sign-out";
 import { Chip, Eyebrow, SecondaryLink, TabBar } from "@/components/harvest";
 import { AT_A_TIME, chapters, isRecipeLayout, rotation, type Planned } from "@/lib/recipe-layout";
 import { Choosing } from "./choosing";
+import { Tile } from "./tile";
 
 /**
  * The household's recipes, with the prototype's three filters.
@@ -33,12 +34,22 @@ import { Choosing } from "./choosing";
  * The household id comes from the seam, because `family_members` is a platform table and
  * `check-platform-tables.mjs` fails the build on a direct read.
  */
+/** "Oct 12" — from the ISO parts, so the server's zone cannot shift the day */
+function readableDate(iso: string): string {
+  const [year, month, day] = iso.split("-").map(Number);
+  return new Date(Date.UTC(year!, (month ?? 1) - 1, day ?? 1, 12)).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+}
+
 export default async function RecipesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; filter?: string; in?: string; protein?: string }>;
+  searchParams: Promise<{ q?: string; filter?: string; in?: string; protein?: string; pick?: string }>;
 }) {
-  const { q: rawQuery, filter: rawFilter, in: rawCourse, protein: rawProtein } = await searchParams;
+  const { q: rawQuery, filter: rawFilter, in: rawCourse, protein: rawProtein, pick } = await searchParams;
   const chosen = COURSES.find((entry) => entry.key === rawCourse) ?? null;
   const protein = PROTEINS.includes(rawProtein as (typeof PROTEINS)[number]) ? rawProtein! : null;
   const q = (rawQuery ?? "").trim();
@@ -182,7 +193,9 @@ export default async function RecipesPage({
    */
   let regulars: Planned[] = [];
   let untriedCount = 0;
-  if (layout === "rotation" && !searching) {
+  /* read once: the rotation orders by it and `decide` picks by it */
+  const plannedCounts = new Map<string, { planned: number; lastPlanned: string | null }>();
+  if ((layout === "rotation" || layout === "decide") && !searching) {
     const entries = rows(
       await supabase
         .from("plan_entries")
@@ -191,7 +204,7 @@ export default async function RecipesPage({
         .is("deleted_at", null),
       "plan entries for the rotation",
     );
-    const counts = new Map<string, { planned: number; lastPlanned: string | null }>();
+    const counts = plannedCounts;
     for (const entry of entries) {
       const id = entry.recipe_id as string;
       const seen = counts.get(id) ?? { planned: 0, lastPlanned: null };
@@ -212,6 +225,53 @@ export default async function RecipesPage({
     // a count, not "more": how many of this household's recipes have never been given a day
     untriedCount = narrowed.filter(({ recipe }) => !counts.has(recipe.id)).length;
   }
+
+  /*
+   * Time (§85). The three bands the handoff names, plus one for the recipes with no time at all:
+   * `time_minutes` is set on **42 of 67**, so a quarter of the library would otherwise vanish
+   * from this layout — the same decision §84 reached about a null course, for the same reason.
+   */
+  const timeBands =
+    layout === "time" && !searching
+      ? [
+          { key: "30", label: "30 minutes or less", within: (m: number | null) => m !== null && m <= 30 },
+          { key: "60", label: "An hour or less", within: (m: number | null) => m !== null && m > 30 && m <= 60 },
+          { key: "long", label: "A weekend job", within: (m: number | null) => m !== null && m > 60 },
+          { key: "unknown", label: "No time recorded", within: (m: number | null) => m === null },
+        ]
+          .map((band) => {
+            const mine = narrowed.filter(({ recipe }) => band.within(recipe.time_minutes));
+            return { ...band, items: mine.slice(0, AT_A_TIME), total: mine.length };
+          })
+          .filter((band) => band.total > 0)
+      : [];
+
+  /*
+   * Just tell us what to cook (§85). One pick, and the **reason is the feature** — §67 settled
+   * that a suggestion states what it rests on or it is a verdict.
+   *
+   * Picked from what the household has planned least recently among things it has planned at all,
+   * which is a fact it can check rather than a score it cannot. `?pick=` rotates through the
+   * candidates so "something else" is a tap and not a reroll nobody can predict.
+   */
+  const suggestion = (() => {
+    if (layout !== "decide" || searching) return null;
+    const candidates = narrowed
+      .map(({ recipe }) => ({ recipe, planned: plannedCounts.get(recipe.id) }))
+      .filter((entry) => entry.planned)
+      .sort((a, b) => (a.planned!.lastPlanned ?? "").localeCompare(b.planned!.lastPlanned ?? ""));
+    if (candidates.length === 0) return null;
+    const at = Math.min(Math.max(0, Number(pick) || 0), candidates.length - 1);
+    const chosen = candidates[at]!;
+    const since = chosen.planned!.lastPlanned;
+    return {
+      recipe: chosen.recipe,
+      why: since
+        ? `You last planned it on ${readableDate(since)}, which is longer ago than anything else you cook.`
+        : "You have planned it before and not lately.",
+      next: (at + 1) % candidates.length,
+    };
+  })();
 
   const chaptered = layout === "browse" && !searching ? chapters(narrowed.map((hit) => ({ ...hit, course: hit.recipe.course ?? null }))) : [];
 
@@ -390,30 +450,32 @@ export default async function RecipesPage({
         */}
       {layout === "rotation" && !searching && regulars.length > 0 && (
         <section className="h-layout">
-          <Eyebrow>What you cook</Eyebrow>
-          <div className="h-layout-grid">
+          <div className="h-shelf-head">
+            <Eyebrow>What you cook · {regulars.length}</Eyebrow>
+            <Link href="/recipes?filter=make-again">See all</Link>
+          </div>
+          {/* a shelf, not a grid — see harvest.css for why the Shelves objection does not apply */}
+          <div className="h-shelf">
             {regulars.map((recipe) => (
-              <Link className="card" key={recipe.id} href={`/recipes/${recipe.id}`}>
-                {photoFor.has(recipe.id) ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- signed URLs expire
-                  <img className="card-photo" src={photoFor.get(recipe.id)} alt="" loading="lazy" />
-                ) : (
-                  <span className="card-photo none" aria-hidden="true">
-                    {recipe.title.trim().charAt(0).toUpperCase() || "?"}
-                  </span>
-                )}
-                <div className="card-body">
-                  <h2>{recipe.title}</h2>
-                  {/* planned, not `times_made` — 36 real rows against a column that tops out at 2 */}
-                  <p className="h-layout-count">planned {recipe.planned}×</p>
-                </div>
-              </Link>
+              <Tile
+                key={recipe.id}
+                id={recipe.id}
+                title={recipe.title}
+                photo={photoFor.get(recipe.id)}
+                meta={`planned ${recipe.planned}×`}
+              />
             ))}
           </div>
           {/*
             * The band that stops a rotation calcifying into the only thing anybody sees. Named
             * with a count rather than "more", because a number is checkable.
             */}
+          {/*
+            * Only when there is something to try. A band reading "0 you have never planned" is a
+            * control offering nothing — visible in the first screenshot of the fixed layout, and
+            * invisible in every guard, because zero is a perfectly good number.
+            */}
+          {untriedCount > 0 && (
           <Link className="h-layout-band" href="/recipes?filter=untried">
             <span>
               <strong>Try something new</strong>
@@ -421,6 +483,7 @@ export default async function RecipesPage({
             </span>
             <span className="h-layout-new">new</span>
           </Link>
+          )}
         </section>
       )}
 
@@ -434,19 +497,7 @@ export default async function RecipesPage({
               </div>
               <div className="h-layout-grid">
                 {chapter.items.map(({ recipe }) => (
-                  <Link className="card" key={recipe.id} href={`/recipes/${recipe.id}`}>
-                    {photoFor.has(recipe.id) ? (
-                      // eslint-disable-next-line @next/next/no-img-element -- signed URLs expire
-                      <img className="card-photo" src={photoFor.get(recipe.id)} alt="" loading="lazy" />
-                    ) : (
-                      <span className="card-photo none" aria-hidden="true">
-                        {recipe.title.trim().charAt(0).toUpperCase() || "?"}
-                      </span>
-                    )}
-                    <div className="card-body">
-                      <h2>{recipe.title}</h2>
-                    </div>
-                  </Link>
+                  <Tile key={recipe.id} id={recipe.id} title={recipe.title} photo={photoFor.get(recipe.id)} />
                 ))}
               </div>
               {chapter.total > chapter.items.length && (
@@ -460,10 +511,81 @@ export default async function RecipesPage({
       )}
 
       {/*
+        * Time (§85). Three bands, and a fourth for the 25 of 67 with no time recorded — named
+        * rather than hidden, because a quarter of the library cannot be silently absent and a
+        * band you can see is a band you can fix.
+        */}
+      {layout === "time" && !searching && (
+        <section className="h-layout">
+          {timeBands.map((band) => (
+            <div className="h-chapter" key={band.key}>
+              <div className="h-chapter-head">
+                <Eyebrow>{band.label}</Eyebrow>
+                <span className="h-layout-count">{band.total}</span>
+              </div>
+              <div className="h-layout-grid">
+                {band.items.map(({ recipe }) => (
+                  <Tile
+                    key={recipe.id}
+                    id={recipe.id}
+                    title={recipe.title}
+                    photo={photoFor.get(recipe.id)}
+                    meta={recipe.time_minutes ? `${recipe.time_minutes} min` : undefined}
+                  />
+                ))}
+              </div>
+              {band.total > band.items.length && (
+                <Link className="h-layout-more" href={`/recipes?time=${band.key}`}>
+                  Show the other {band.total - band.items.length}
+                </Link>
+              )}
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/*
+        * Just tell us what to cook (§85). One suggestion, and **the reason is the feature** —
+        * §67 settled that a suggestion states what it rests on or it is a verdict somebody can
+        * only accept or ignore. "Something else" is one tap, because a bad pick twice running is
+        * how this one dies.
+        */}
+      {layout === "decide" && !searching && suggestion && (
+        <section className="h-layout">
+          <article className="h-plate">
+            {photoFor.has(suggestion.recipe.id) ? (
+              // eslint-disable-next-line @next/next/no-img-element -- signed URLs expire
+              <img className="h-plate-photo" src={photoFor.get(suggestion.recipe.id)} alt="" />
+            ) : (
+              <span className="h-plate-photo" aria-hidden="true">
+                {suggestion.recipe.title.trim().charAt(0).toUpperCase() || "?"}
+              </span>
+            )}
+            <div className="h-plate-body">
+              <p className="h-layout-count">Tonight you could cook</p>
+              <h2 className="h-plate-title">{suggestion.recipe.title}</h2>
+              <p className="h-plate-why">{suggestion.why}</p>
+              <div className="h-meal-actions">
+                <Link className="h-primary" href={`/recipes/${suggestion.recipe.id}`}>
+                  Open it
+                </Link>
+                <Link className="h-secondary" href={`/recipes?pick=${suggestion.next}`}>
+                  Something else
+                </Link>
+              </div>
+            </div>
+          </article>
+          <Link className="h-layout-more" href="/recipes?filter=untried">
+            I&rsquo;ll choose myself
+          </Link>
+        </section>
+      )}
+
+      {/*
         * The flat list: every recipe, which is what a search or a filter wants and what the
         * deferred layouts fall back to. §77 — nothing live is dropped by a layout.
         */}
-      {(searching || layout === "time" || layout === "protein" || layout === "decide") &&
+      {(searching || layout === "protein" || (layout === "decide" && !suggestion)) &&
         narrowed.map(({ recipe, matchedIngredient, allergenNotes }) => (
         <Link className="card" key={recipe.id} href={`/recipes/${recipe.id}`}>
           {photoFor.has(recipe.id) ? (

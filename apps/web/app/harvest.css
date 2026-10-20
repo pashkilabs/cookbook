@@ -1250,8 +1250,106 @@
   cursor: pointer;
 }
 
-.h-layout { padding: 0 var(--space-xl); }
+/*
+ * `min-width: 0`, and it is §81's chain arriving in a **grid** item.
+ *
+ * `.recipes` is `display: grid` and this section is one of its items. A grid item's `min-width`
+ * defaults to `auto` exactly as a flex item's does, so it is floored at min-content — and the
+ * shelf's nine 118px tiles made that 548px. The scroll container then inherited 508px instead of
+ * 350px, never became narrower than its content, and **never scrolled**: the whole page was
+ * 564px wide instead.
+ *
+ * §81 recorded this for flex children holding text. Grid items have the same default and I did
+ * not carry it over, which is why the rule is written here as *every* item of a grid or flex
+ * container that must not grow, not only the ones holding words.
+ */
+.h-layout { padding: 0 var(--space-xl); min-width: 0; }
+
+/*
+ * ---------------------------------------------------------------------------
+ * A VERTICAL tile. The horizontal card cannot survive a narrow column.
+ * ---------------------------------------------------------------------------
+ *
+ * `.recipes .card` is `grid-template-columns: 96px 1fr` with 20px padding — built for a 350px
+ * full-width row. Dropped into a two-column grid it gets a 169px column, so after padding there
+ * are 129px, of which the photograph takes 96 and the gap 16: **17px for the title**, and in
+ * practice the browser gave it **0px and 329px tall**. Every character on its own line.
+ *
+ * `min-width: 0` cannot fix that — there is no width to give. The fix is the shape: the
+ * photograph goes across the full tile, the title below it, the count below that. Nothing
+ * competes for horizontal space because nothing is beside anything.
+ *
+ * Every guard passed while this was live: 110 contrast pairs, every class styled, every role
+ * right, 248 tests, smoke's markers present because the *text* was there. It took a screenshot.
+ */
+.h-tile {
+  display: block;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  overflow: hidden;
+  text-decoration: none;
+  color: var(--text);
+}
+.h-tile-photo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 92px;
+  object-fit: cover;
+  background: var(--surface-sunken);
+  font-family: var(--font-display);
+  font-size: 26px;
+  color: var(--text-muted);
+}
+.h-tile-body { padding: 9px 11px; }
+.h-tile-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--text);
+  /* two lines, then an ellipsis: a tile is a fixed shape and a long title must not stretch it */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .h-layout-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md); margin-top: var(--space-sm); }
+
+/*
+ * ---------------------------------------------------------------------------
+ * The rotation is a shelf, and the objection to Shelves was about a ratio
+ * ---------------------------------------------------------------------------
+ *
+ * Shelves was rejected as a browsing mode because a sideways row showed **3 of 28** mains, so 25
+ * needed a swipe nobody would make. The rotation is six to eight items, so a row showing three
+ * with three more behind a swipe hides almost nothing. Same direction, different ratio — and the
+ * ratio was the objection.
+ *
+ * 118px tiles with 12px gaps put three across a 390px screen and leave the fourth **visibly cut
+ * off at the edge**, which is the thing that tells a thumb there is more. A row that ends flush
+ * looks finished.
+ */
+.h-shelf {
+  display: flex;
+  gap: var(--space-md);
+  margin-top: var(--space-sm);
+  padding-bottom: var(--space-sm);
+  overflow-x: auto;
+  /* the gutter, so the first tile lines up with the heading and the last can scroll clear */
+  scroll-padding-left: var(--space-xl);
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+}
+.h-shelf > * { flex: 0 0 118px; scroll-snap-align: start; }
+/* the shelf is the one place a sideways scrollbar is the point rather than the §81 bug */
+.h-shelf::-webkit-scrollbar { height: 0; }
+
+.h-shelf-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-md); }
+.h-shelf-head a { color: var(--planned-text); font-size: var(--type-meta-size); font-weight: 600; flex: none; }
 .h-layout-count { margin: 3px 0 0; font-size: var(--type-meta-size); color: var(--text-muted); min-width: 0; }
 
 .h-chapter { margin-bottom: var(--space-xxl); }
@@ -1324,3 +1422,112 @@
 /* the chosen one, by fill — `aria-pressed` carries it for anybody not reading colour */
 .h-choosing-option.is-on { border-color: var(--primary); background: var(--planned-bg); color: var(--planned-text); }
 .h-choosing-option strong { display: block; font-weight: 700; }
+
+/* --- the setting, as the wireframe draws it ------------------------------ */
+
+/*
+ * A card, not a pill. It shipped as a 999px pill holding a label and a description, and a
+ * description does not fit a pill: the text ran past the right edge and the "not yet" badge
+ * landed on top of it. Three faults from one wrong shape — the wireframe's 18px card has room
+ * for a radio, a preview and two lines of text, which a pill never did.
+ */
+.h-option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  width: 100%;
+  padding: 13px 14px;
+  border: 1.5px solid transparent;
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  /*
+   * `white-space: normal`, because this is a `<button>` and globals.css sets
+   * `button, a.button { white-space: nowrap }` on the **element**. A button holding a one-word
+   * label should not wrap; a button holding a sentence must. The inherited rule made the
+   * description and the blocked-reason refuse to break — clientWidth 184 against scrollWidth 411
+   * — which pushed the whole page to 566px on a 390px screen.
+   *
+   * Second time that element selector has reached a new component: it also gave every button in
+   * the app a near-black fill (§85). Anything built as a `<button>` inherits its fill, its
+   * nowrap, and its padding, and a component that is a button for semantic reasons has to say so.
+   */
+  white-space: normal;
+}
+.h-option.is-on { border-color: var(--primary); }
+.h-option:disabled { opacity: 0.65; cursor: default; }
+.h-option-text { flex: 1; min-width: 0; }
+.h-option-text strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+/* `min-width: 0` on the column and wrapping here: the description is two lines, not a clipped one */
+.h-option-why { display: block; margin-top: 3px; font-size: 12.5px; line-height: 1.35; color: var(--text-body); }
+.h-option-blocked { display: block; margin-top: 6px; font-size: 12.5px; line-height: 1.35; color: var(--planned-text); }
+
+/* the radio the wireframe draws: a ring that fills, rather than a border that changes colour */
+.h-radio {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-top: 2px;
+  border: 1.5px solid var(--checkbox-edge);
+  border-radius: var(--radius-pill);
+  box-sizing: border-box;
+}
+.h-radio.is-on { border: 6.5px solid var(--primary); }
+
+/*
+ * The preview. Six blocks that say what shape a layout is — the part of the wireframe that
+ * matters most, because picking a layout blind asks somebody to predict their own behaviour.
+ */
+.h-preview {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  gap: 3px;
+  width: 58px;
+  height: 58px;
+  padding: 6px;
+  border-radius: 10px;
+  background: var(--bg);
+  box-sizing: border-box;
+}
+.h-preview-row { display: flex; flex: 1; gap: 3px; }
+.h-preview-block { flex: 1; border-radius: 2px; background: var(--border-strong); }
+.h-preview-block.is-on { background: var(--primary); }
+
+/* --- the one-plate layout ------------------------------------------------ */
+
+.h-plate { border-radius: var(--radius-card-large); background: var(--surface); overflow: hidden; }
+.h-plate-photo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+  background: var(--surface-sunken);
+  font-family: var(--font-display);
+  font-size: 40px;
+  color: var(--text-muted);
+}
+.h-plate-body { padding: 13px 15px; }
+.h-plate-title {
+  margin: 2px 0 0;
+  font-family: var(--font-display);
+  font-size: var(--type-display-m-size);
+  font-weight: var(--type-display-m-weight);
+  line-height: var(--type-display-m-line);
+  color: var(--text);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* the reason, which is the feature — §67: a suggestion states what it rests on or it is a verdict */
+.h-plate-why { margin: var(--space-sm) 0 var(--space-lg); font-size: var(--type-meta-size); line-height: var(--type-meta-line); color: var(--text-body); }
