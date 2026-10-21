@@ -257,6 +257,25 @@ const PAIRS = [
   ["checked fill vs card", "checked", "surface", "ui"],
   ["day circle, open outline", "border-strong", "surface", "ui"],
   ["input border", "border", "surface", "decorative"],
+  /*
+   * The recipe book's contents page and its chapter pages (§86).
+   *
+   * The chapter icon is the interesting one: it is a PNG **masked** with `var(--text)`, so what
+   * reaches the eye is a token and this table can gate it. As an `<img>` it would be the ink baked
+   * into the file, which no stylesheet check can see at all — that is `check-chapter-icons.mjs`.
+   * "ui" is the right threshold: §1.4.11 asks 3:1 of a graphic, and masked this clears it by four
+   * times over in both themes.
+   */
+  ["contents: book title 25px", "text", "bg", "large"],
+  ["contents: recipe count 11px", "text-muted", "bg", "text"],
+  ["contents: chapter icon, masked", "text", "surface", "ui"],
+  ["contents: chapter name 14.5px", "text", "surface", "text"],
+  ["contents: chapter count 11px", "text-muted", "surface", "text"],
+  ["contents: unsorted row name", "text", "surface", "large"],
+  ["contents: unsorted row edge", "border-strong", "surface", "ui"],
+  ["contents: unsorted row chevron", "text-muted", "surface", "text"],
+  ["chapter: hero title 26px", "text", "bg", "large"],
+  ["chapter: hero icon, masked", "text", "bg", "ui"],
 ];
 
 /*

@@ -78,10 +78,28 @@ for (const [, colour] of hand.matchAll(NAMED)) {
  * (`--space-*`, `--size-*`, `--radius-*`, `--type-*`) are theme-independent by design: a gram is a
  * gram in the dark.
  */
+/*
+ * A third category the prefix rule cannot express: a property the **caller** supplies per
+ * instance, which is not a token at all.
+ *
+ * `--chapter-icon` carries a `url()` for the masked chapter icons (§86) and `--chapter-icon-size`
+ * a pixel size; both are set inline by `ChapterIcon` on each element, so there is nothing for the
+ * token sheet to define in either theme. The icon's *colour* is themed, and it is themed the only
+ * way that matters: the mask paints with `var(--text)`, which this check does still require in
+ * all three dark sites.
+ *
+ * A named list rather than a pattern, deliberately. "Exclude anything the token sheet does not
+ * define" would read as the obvious rule and would gut the check — a misspelled `var(--txet)` is
+ * exactly a property the sheet does not define, and it would sail through. Spelled out, a typo
+ * still fails, and adding to this list is a decision somebody has to write down.
+ */
+const INSTANCE = new Set(["chapter-icon", "chapter-icon-size"]);
+
 const referenced = new Set(
   [...hand.matchAll(/var\(--([a-z0-9-]+)/g)]
     .map(([, name]) => name)
-    .filter((name) => !/^(colour|member|space|size|radius|type|font|shadow)-/.test(name)),
+    .filter((name) => !/^(colour|member|space|size|radius|type|font|shadow)-/.test(name))
+    .filter((name) => !INSTANCE.has(name)),
 );
 
 for (const token of [...referenced].sort()) {

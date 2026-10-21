@@ -6,3 +6,4 @@ export { DayCircle, type DayState } from "./day-circle";
 export { SectionHeader, Eyebrow } from "./section";
 export { DockedActionBar } from "./docked";
 export { TabBar, type TabKey } from "./tab-bar";
+export { ChapterIcon } from "./chapter-icon";

@@ -17,8 +17,9 @@ import { keepKidFriendly } from "@/lib/tastes";
  * removing it from a screen somebody can be stranded on would be a different bug.
  */
 import { SignOutButton } from "./sign-out";
-import { Chip, Eyebrow, SecondaryLink, TabBar } from "@/components/harvest";
-import { AT_A_TIME, chapters, isRecipeLayout, rotation, type Planned } from "@/lib/recipe-layout";
+import { ChapterIcon, Chip, Eyebrow, SecondaryLink, TabBar } from "@/components/harvest";
+import { AT_A_TIME, isRecipeLayout, rotation, type Planned } from "@/lib/recipe-layout";
+import { counted, chapterHref, type Classified } from "@/lib/chapters";
 import { Choosing } from "./choosing";
 import { Tile } from "./tile";
 
@@ -273,7 +274,18 @@ export default async function RecipesPage({
     };
   })();
 
-  const chaptered = layout === "browse" && !searching ? chapters(narrowed.map((hit) => ({ ...hit, course: hit.recipe.course ?? null }))) : [];
+  /*
+   * The contents page's chapters, counted over the household's whole library.
+   *
+   * `counted()` drops the empty ones, which is why this is eight tiles and not ten: Snacks holds
+   * nothing today. The counts deliberately do **not** sum to the library — Soups and Salads come
+   * from `dish_form` and everything else from `course`, so a soup that is also a main appears
+   * twice (§84: a soup is a soup *and* a main). Measured: the ten chapters sum to 73 over 67.
+   */
+  const contents =
+    layout === "browse" && !searching
+      ? counted(narrowed.map(({ recipe }) => recipe as unknown as Classified))
+      : [];
 
   /*
    * The photographs, so the list is something a person recognises rather than a wall of titles.
@@ -300,7 +312,7 @@ export default async function RecipesPage({
           ...new Set([
             ...narrowed.map(({ recipe }) => recipe.id),
             ...regulars.map((recipe) => recipe.id),
-            ...chaptered.flatMap((chapter) => chapter.items.map(({ recipe }) => recipe.id)),
+
           ]),
         ],
       )
@@ -366,6 +378,9 @@ export default async function RecipesPage({
         course={chosen?.key ?? null}
         protein={protein}
         proteinsAvailable={proteinsAvailable}
+        /* the contents page is the chapter list; course chips above it ask the same question
+           twice, and drawing them costs the "one screen, no scroll" the layout is for */
+        chips={!(layout === "browse" && !searching)}
       />
 
       {error && <p className="error">Could not read recipes: {error}</p>}
@@ -487,26 +502,68 @@ export default async function RecipesPage({
         </section>
       )}
 
+      {/*
+        * ---------------------------------------------------------------------------
+        * Browse is a CONTENTS PAGE now, not a flat list of capped chapters
+        * ---------------------------------------------------------------------------
+        *
+        * What this replaces: eight chapters each showing seven tiles with "show the other 21"
+        * underneath. That moved the overload one screen deeper rather than removing it — "Mains
+        * 32" is still 32 once you have tapped it, which is the objection the whole layout rests
+        * on, and the old shape answered it by scrolling instead of by dividing.
+        *
+        * Paige's rule: **a chapter that outgrows a screen divides into chapters.** So this is one
+        * screen of chapters with no scroll, and Mains — the only one with an axis and more than
+        * seven — becomes a screen of chapters itself at `/recipes/c/main`.
+        *
+        * Eight tiles, not the wireframe's nine: Snacks is 0 on this library and `counted()` drops
+        * it. Every figure in the drawing was illustrative (§4 of the brief) and three of them were
+        * wrong by more than rounding — Salads 6 is really 1, Appetisers 4 is really 1.
+        */}
       {layout === "browse" && !searching && (
-        <section className="h-layout">
-          {chaptered.map((chapter) => (
-            <div className="h-chapter" key={chapter.key}>
-              <div className="h-chapter-head">
-                <Eyebrow>{chapter.label}</Eyebrow>
-                <span className="h-layout-count">{chapter.total}</span>
-              </div>
-              <div className="h-layout-grid">
-                {chapter.items.map(({ recipe }) => (
-                  <Tile key={recipe.id} id={recipe.id} title={recipe.title} photo={photoFor.get(recipe.id)} />
-                ))}
-              </div>
-              {chapter.total > chapter.items.length && (
-                <Link className="h-layout-more" href={`/recipes?in=${chapter.key}`}>
-                  Show the other {chapter.total - chapter.items.length}
+        <section className="h-contents">
+          <div className="h-contents-head">
+            <Eyebrow>Let&rsquo;s get cooking</Eyebrow>
+            <h1 className="h-contents-title">The Lundall Recipe Book</h1>
+            <p className="h-chapter-tally">
+              {narrowed.length} {narrowed.length === 1 ? "recipe" : "recipes"}
+            </p>
+          </div>
+
+          <div className="h-contents-grid">
+            {contents
+              .filter(({ chapter }) => chapter.slug !== "unsorted")
+              .map(({ chapter, count }) => (
+                <Link className="h-chapter-tile" key={chapter.slug} href={chapterHref(chapter.slug)}>
+                  <ChapterIcon icon={chapter.icon} size={46} />
+                  <span className="h-chapter-name">{chapter.label}</span>
+                  <span className="h-chapter-tally">{count}</span>
                 </Link>
-              )}
-            </div>
-          ))}
+              ))}
+          </div>
+
+          {/*
+            * "Not sorted yet" is a row rather than a tile: 23 of 67 is a third of the library and
+            * it is a *job*, not a cuisine. A chapter somebody can open is a chapter they can fix,
+            * which is why §84's answer here differs from the Today screen's — a slot tab could not
+            * name the group and a chapter list can.
+            */}
+          {contents
+            .filter(({ chapter }) => chapter.slug === "unsorted")
+            .map(({ chapter, count }) => (
+              <Link className="h-chapter-row" key={chapter.slug} href={chapterHref(chapter.slug)}>
+                <ChapterIcon icon={chapter.icon} size={34} />
+                <span className="h-chapter-row-body">
+                  <span className="h-chapter-row-name">{chapter.label}</span>
+                  <span className="h-chapter-tally" style={{ display: "block" }}>
+                    {count} with no course recorded
+                  </span>
+                </span>
+                <span className="h-chapter-chevron" aria-hidden="true">
+                  &rsaquo;
+                </span>
+              </Link>
+            ))}
         </section>
       )}
 

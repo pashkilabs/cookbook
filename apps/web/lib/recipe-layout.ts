@@ -130,50 +130,14 @@ export function rotation(recipes: readonly Planned[], limit = AT_A_TIME): Planne
     .slice(0, limit);
 }
 
-/**
- * The chapters, and the one for recipes that have no course.
+/*
+ * The flat chapter list lived here and is now the tree in `chapters.ts` (§86).
  *
- * 23 of 67 recipes carry no course, which is a third of the library and cannot be hidden — the
- * Today screen already made this decision for slots (§84) and reached the same conclusion from the
- * same measurement. Here the honest answer is different, though: a chapter list can **name** the
- * group, where a slot tab could not. "Not sorted yet" is a chapter somebody can open and fix.
- */
-export const CHAPTERS: ReadonlyArray<{ key: string; label: string; courses: ReadonlyArray<string | null> }> = [
-  { key: "main", label: "Mains", courses: ["main"] },
-  { key: "starter", label: "Starters", courses: ["starter"] },
-  { key: "side", label: "Sides", courses: ["side"] },
-  { key: "dessert", label: "Desserts", courses: ["dessert"] },
-  { key: "breakfast", label: "Breakfast", courses: ["breakfast"] },
-  { key: "snack", label: "Snacks", courses: ["snack"] },
-  { key: "drink", label: "Drinks", courses: ["drink"] },
-  // named rather than hidden: a third of the library, and a chapter you can open is a chapter
-  // you can fix
-  { key: "unsorted", label: "Not sorted yet", courses: [null] },
-];
-
-export interface Chaptered<T> {
-  key: string;
-  label: string;
-  items: T[];
-  /** how many the chapter holds in total, which may exceed what is shown */
-  total: number;
-}
-
-/**
- * Group into chapters, each capped at `limit`, empty chapters omitted.
+ * It grouped by `course` alone, capped each chapter at seven and offered "show the other 21"
+ * underneath — which moved the overload one screen deeper instead of removing it. The tree
+ * divides instead, and it also reads `dish_form`, which the flat version could not: a soup is a
+ * soup *and* a main, so Soups and Salads are chapters the course column cannot produce.
  *
- * A chapter over the cap keeps its count so the control beneath it can say how many are behind it
- * — "show the other 21" rather than "show more", because a number is checkable and "more" is not.
+ * Removed rather than left beside it. Two implementations of "what chapter is this recipe in"
+ * is the duplicate shape §78 names, and the one nothing renders is the one that drifts.
  */
-export function chapters<T extends { course: string | null }>(
-  recipes: readonly T[],
-  limit = AT_A_TIME,
-): Array<Chaptered<T>> {
-  const out: Array<Chaptered<T>> = [];
-  for (const chapter of CHAPTERS) {
-    const mine = recipes.filter((recipe) => chapter.courses.includes(recipe.course));
-    if (mine.length === 0) continue;
-    out.push({ key: chapter.key, label: chapter.label, items: mine.slice(0, limit), total: mine.length });
-  }
-  return out;
-}

@@ -1001,3 +1001,50 @@ guessing.
   not what anybody reads while restyling a component. Hence the habit that actually works: **put
   the reason in the component**, and before adding anything the reference shows, search for the
   *question it answers* elsewhere in the app rather than for the control.
+
+- **A guard can be wrong by being too broad, and that failure points the other way.** Masking the
+  chapter icons needs `background-color: var(--text)` — the exact pattern `check-palette-roles`
+  forbids ("text: ink, never a background"), because under a mask that fill *is* the ink. Two
+  guards fired on correct code: that one, and `check-theme-complete` demanding dark definitions for
+  `--chapter-icon`, which holds a `url()`. Not a false ok — a **false alarm**, and the costly
+  response would have been a blanket allow. Both were narrowed instead: the fill is exempt only in
+  a rule that *itself declares a mask*, and the theme check takes a **named list of two** instance
+  properties rather than the obvious pattern — "exclude anything the token sheet does not define"
+  would have gutted it, since a misspelled `var(--txet)` is precisely such a property. Then
+  re-mutated, because an exemption nobody re-tested is an exemption nobody has measured. **Name the
+  narrowest condition that separates the legitimate case, never the category it belongs to.**
+
+- **A fixture that fails silently produces a screenshot of the wrong thing — and a screenshot is
+  the one artefact nobody re-reads.** `shot.mjs` classified its recipes with `PATCH { course }`
+  into an endpoint whose `prepareRecipe` requires a title. Every call returned 400 "a title is
+  required", `.catch(() => {})` swallowed it, and **no shot had ever had a course on any recipe**:
+  browse rendered one "Not sorted yet" chapter of nine and looked entirely plausible in both
+  themes, for as long as the tool has existed. *A probe that could not have succeeded has measured
+  nothing* usually leaves an empty result somebody notices; this left a beautiful picture. So a
+  fixture **checks the write it depends on and exits 2 when it does not stick** — the renderer now
+  refuses to shoot unless all of them classify. And the lesson is narrower than "check responses":
+  the screenshot tool was built to catch what guards cannot see, and it had a blind spot of exactly
+  the same kind inside it.
+
+- **`width` and `height` do nothing to a `<span>`, and a flex parent hides it.** The masked chapter
+  icon rendered correctly inside `.h-chapter-tile` — a flex container, which blockifies its children
+  — and **was simply absent** from the chapter page's hero, an ordinary centred block where the span
+  stayed inline and collapsed to zero. Every guard passed: the class is styled, the element is in
+  the DOM, the mask is right, the contrast pair is gated. `display: inline-block` is the fix, and
+  the habit is to set it on anything sized rather than rely on the one parent that was tested.
+
+- **A column's fill rate is a property of the subset, not of the table.** §85 refused the fridge
+  layout because `principal_protein` is named on **25 of 67** recipes, and that measurement was
+  correct. Inside Mains the same column is named on **22 of 32** — Mains is where the classifier
+  succeeds — so the protein axis that fails library-wide works as a subdivision. The refusal stands
+  and was never the whole story: **re-measure a rejected axis inside each candidate subset before
+  concluding it is dead**, because "37% of the library" and "69% of the chapter" are the same column
+  answering two different questions.
+
+- **An assertion that only holds for a fixture it does not create is measuring the fixture.** A
+  smoke check asserting "Mains divides into chapters" failed against entirely correct behaviour —
+  that household has two mains, and dividing two recipes would be the bug. Rewritten to assert the
+  *rule* in both directions (over seven divides, seven or fewer lists), it holds on any library.
+  The honest half: only one branch of it runs in smoke, so the comment says where the other is
+  covered (`pnpm shots`, nine mains, both themes). **Two probes, one rule, and neither pretending
+  to be both.**

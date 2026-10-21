@@ -1,16 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   AT_A_TIME,
-  CHAPTERS,
   LAYOUT_CHOICES,
   RECIPE_LAYOUTS,
-  chapters,
   isRecipeLayout,
   rotation,
 } from "../lib/recipe-layout";
-
-/** every value `recipes.course` permits, from the CHECK constraint, plus null */
-const COURSES = ["breakfast", "starter", "main", "side", "dessert", "drink", "snack", null];
 
 const planned = (title: string, count: number, last: string | null = null) => ({
   id: title,
@@ -25,18 +20,7 @@ describe("the seven-at-a-time rule, which all five layouts obey", () => {
     expect(rotation(many)).toHaveLength(AT_A_TIME);
   });
 
-  it("never shows more than seven in a chapter, however many it holds", () => {
-    const mains = Array.from({ length: 28 }, (_, i) => ({ course: "main", id: `m${i}` }));
-    const [chapter] = chapters(mains);
-    // the point of the rule: "Mains 28" is still 28 once you tap it, so the cap is here
-    expect(chapter!.items).toHaveLength(AT_A_TIME);
-    expect(chapter!.total).toBe(28);
-  });
 
-  it("keeps the real total so a control can name it rather than saying 'more'", () => {
-    const mains = Array.from({ length: 28 }, (_, i) => ({ course: "main", id: `m${i}` }));
-    expect(chapters(mains)[0]!.total - AT_A_TIME).toBe(21);
-  });
 });
 
 describe("the rotation's order", () => {
@@ -89,31 +73,6 @@ describe("the rotation's order", () => {
   });
 });
 
-describe("the chapters", () => {
-  it("gives every course the database permits a chapter, including null", () => {
-    // 23 of 67 recipes carry no course — a third of the library, which cannot be hidden
-    for (const course of COURSES) {
-      const found = CHAPTERS.filter((chapter) => chapter.courses.includes(course));
-      expect(found.length, `course ${String(course)} has no chapter`).toBe(1);
-    }
-  });
-
-  it("names the unsorted chapter rather than hiding it", () => {
-    const out = chapters([{ course: null }, { course: "main" }]);
-    expect(out.map((c) => c.label)).toEqual(["Mains", "Not sorted yet"]);
-  });
-
-  it("omits a chapter with nothing in it rather than rendering an empty heading", () => {
-    const out = chapters([{ course: "main" }]);
-    expect(out).toHaveLength(1);
-  });
-
-  it("keeps chapters in the declared order, not in the data's order", () => {
-    // spatial memory is the whole argument for chapters: Mains is always first
-    const out = chapters([{ course: "dessert" }, { course: "main" }, { course: "side" }]);
-    expect(out.map((c) => c.key)).toEqual(["main", "side", "dessert"]);
-  });
-});
 
 describe("the setting's values", () => {
   it("offers a choice for every layout the database permits, and no more", () => {

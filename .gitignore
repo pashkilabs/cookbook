@@ -13,3 +13,8 @@ coverage/
 # `supabase link` stores the linked project ref and credentials here
 supabase/.temp/
 .check-test.log
+
+# screenshots from `pnpm shots` — regenerated on demand, and a render is evidence for a
+# report rather than a thing the repo carries
+.shots/
+prod/

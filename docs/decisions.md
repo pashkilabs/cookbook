@@ -5406,3 +5406,102 @@ not have it.
 Worth saying what was *not* wrong: every other claim in both handoffs' data tables was correct, and
 the specs were careful. A description of data is simply a different artifact from the data, and the
 three gaps above are what the difference looks like.
+
+## §86 — The recipe book: a chapter tree, and artwork that had to be masked
+
+The flat `browse` layout from §85 is replaced by the nested chapter tree Paige designed, with the
+designer's 25 commissioned icons. Two findings are worth more than the feature.
+
+### An `<img>` would have shipped invisible, and no guard could have seen it
+
+The icons are 192×192 RGBA PNGs whose **alpha channel carries the ink**; the RGB underneath is
+bark. Measured on the files themselves — 11–16% of pixels opaque at `#27221C` — and then measured
+as a contrast pair:
+
+| | ratio |
+|---|---|
+| as `<img>`, baked ink on the dark surface | **1.01:1** |
+| as `<img>`, baked ink on the dark ground | 1.11:1 |
+| masked, `--text` on the light surface | 14.04:1 |
+| masked, `--text` on the dark surface | 12.56:1 |
+
+The brief predicted 1.04:1 and the real figure against the PNGs' own pixels is 1.01:1 — which is to
+say, nothing at all. Cook mode is always dark and `/household` has a dark theme, so an `<img>` puts
+an invisible glyph on half the app's surfaces.
+
+**And every existing guard would have passed.** `check-contrast` reads the stylesheet and a PNG's
+pixels are not in it. `check-harvest-classes` asks whether the class is styled, and it is. The
+element renders, the page is correct in light, the build is green. This is the shape where "the
+tests pass" and "a person cannot see it" are both true, so it needed a mechanism of its own:
+`check-chapter-icons.mjs`, which greps for an `<img>` reaching `public/chapters` and is
+mutation-tested in all three outcomes.
+
+It also asserts the **sibling** failure the brief did not name. One failure, two consequences
+(§80): "the icon does not show" happens either because it was drawn as an `<img>` in the dark, *or*
+because the file is not on disk at all — a mask onto a 404 paints nothing, in **both** themes, with
+no error anywhere. A guard covering only the first would read as coverage of the subject when it is
+coverage of one assertion.
+
+### Two guards were over-broad for a case that did not exist when they were written
+
+Masking means `background-color: var(--text)`, which is precisely the pattern `check-palette-roles`
+exists to forbid — "text: ink, never a background". Under a mask that fill **is** the ink: the box
+becomes the glyph. And `check-theme-complete` demanded dark definitions for `--chapter-icon` and
+`--chapter-icon-size`, which hold a `url()` and a length that a caller sets per element.
+
+Both were widened, and the shape of the widening is the point. `check-palette-roles` exempts a fill
+only in a rule that **itself declares a mask**, so a plain `background: var(--text)` anywhere else
+still fails. `check-theme-complete` takes a **named list** of two instance properties rather than a
+pattern, because the obvious pattern — "exclude anything the token sheet does not define" — would
+have gutted it: a misspelled `var(--txet)` is exactly a property the sheet does not define. Both
+exemptions were mutation-tested to confirm the teeth are still there.
+
+The general note: **a guard can be wrong by being too broad, and it fails in the opposite direction
+from the usual one** — not a false ok, a false alarm. The fix is never a blanket allow; it is to
+name the narrowest condition that distinguishes the legitimate case, and then to re-mutate.
+
+### The shot fixture had never set a course on anything
+
+`scripts/shot.mjs` classified its recipes with `PATCH { course }`. `prepareRecipe` requires a title,
+so every one of those calls returned 400 "a title is required", a `.catch(() => {})` swallowed it,
+and **no screenshot has ever had a course on any recipe**. Browse rendered a single "Not sorted yet"
+chapter of nine and looked perfectly plausible in both themes.
+
+This is the stale-fixture trap wearing its worst costume. A probe that could not have succeeded at
+least usually shows an empty result; this one produced a beautiful screenshot of the wrong library,
+and a screenshot is the one artefact nobody re-reads for correctness. The fixture now sends the
+whole recipe, **checks the response**, and exits 2 if fewer than all of them classify.
+
+### What the data said, against a wireframe whose figures were illustrative
+
+| chapter | wireframe | measured |
+|---|---|---|
+| Mains | 28 | **32** |
+| Soups | 8 | **5** |
+| Salads | 6 | **1** |
+| Sides | 5 | 5 |
+| Appetisers | 4 | **1** |
+| Snacks | 4 | **0 — does not appear** |
+| Desserts | 3 | 4 |
+| Breakfast / Drinks | 1 / 1 | 1 / 1 |
+| Not sorted yet | 23 | 23 |
+
+So the nine-tile grid **does not hold**: it is **eight tiles plus the unsorted row**. Inside Mains,
+three of the eight protein groups are empty — Lamb, Eggs and Meat-free — where the drawing showed
+one apiece; the brief predicted Eggs alone.
+
+The protein axis is the interesting one. §85 refused a library-wide fridge layout because
+`principal_protein` is named on **25 of 67**, and that refusal stands. But **inside Mains the same
+column is named on 22 of 32**, because Mains is where the classifier succeeds. A subdivision that
+covers 22 and names the remaining 10 "Everything else" is a different proposition from a layout that
+hides 42. *A column's fill rate is a property of the subset, not of the table* — the ceiling §85
+measured was real and was never the whole story.
+
+### The chips were the chapters
+
+With the drill-down chips drawn above the chapter grid the contents page needed about **1700px** at
+390px wide: the book title sat below the fold and two tiles rendered behind the docked tab bar. But
+the space was the second reason to remove them. Those chips are *Appetizers, Soup, Salad, Mains,
+Sides, Desserts, Drinks, Breakfast, Snacks* — **they are the chapters**, drawn twice on one screen
+by two controls that would drift. §78's duplicate, found by looking at a render rather than by
+reasoning about it. Search-only on this layout: 872px, everything above the fold.

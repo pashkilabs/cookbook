@@ -1531,3 +1531,151 @@
 }
 /* the reason, which is the feature — §67: a suggestion states what it rests on or it is a verdict */
 .h-plate-why { margin: var(--space-sm) 0 var(--space-lg); font-size: var(--type-meta-size); line-height: var(--type-meta-line); color: var(--text-body); }
+
+/*
+ * ---------------------------------------------------------------------------
+ * The chapter icons are MASKED, not drawn. An <img> ships invisible in dark.
+ * ---------------------------------------------------------------------------
+ *
+ * The 25 PNGs are a designer's commissioned artwork, 192x192 RGBA, and **the alpha channel
+ * carries the ink** — the RGB underneath is bark and is irrelevant once masked. Measured on the
+ * files themselves: 11-16% of pixels opaque, and those pixels are bark, near enough.
+ *
+ * Dropped in as `<img>` that baked-in ink cannot respond to a theme, and the numbers are not
+ * marginal — measured against the PNGs' own pixels rather than the palette they were drawn from:
+ *
+ *   as <img>   baked ink on --surface, dark    1.01:1   <- a glyph nobody can see
+ *   as <img>   baked ink on --bg, dark         1.11:1
+ *   masked     --text on --surface, light     14.04:1
+ *   masked     --text on --surface, dark      12.56:1
+ *
+ * Cook mode is always dark and the household screen has a dark theme, so an `<img>` here ships an
+ * icon that is invisible on half the surfaces in the app — and **no existing guard catches it**:
+ * `check-contrast` reads the stylesheet, and a PNG's pixels are not in it. That is why
+ * `check-chapter-icons.mjs` exists and why it greps for the `<img>` rather than for the colour.
+ *
+ * Both the prefixed and unprefixed `mask` are required; Safari still wants `-webkit-`. The icon
+ * is decorative — the chapter name is always beside it — so callers pass `aria-hidden` and no
+ * `alt`, and the accessible name comes from the link.
+ */
+.h-chapter-icon {
+  /*
+   * `inline-block`, and it is load-bearing rather than tidy. This is a `<span>`, so it is inline
+   * by default and **`width` and `height` do not apply to an inline box** — it collapses to
+   * nothing. Inside `.h-chapter-tile` that was invisible, because a flex container blockifies its
+   * children and the icon rendered fine; on the chapter page's hero, which is an ordinary centred
+   * block, the icon simply was not there. Every guard passed: the class is styled, the element is
+   * in the DOM, the mask is correct. A screenshot found it.
+   */
+  display: inline-block;
+  width: var(--chapter-icon-size, 46px);
+  height: var(--chapter-icon-size, 46px);
+  flex: none;
+  /*
+   * This is ink, not a ground: the mask turns the box into the glyph, so `background-color` here
+   * paints the drawing. `check-palette-roles` exempts a fill in a rule that also declares a mask
+   * for exactly this reason — see the note in that script.
+   */
+  background-color: var(--text);
+  -webkit-mask: var(--chapter-icon) center / contain no-repeat;
+          mask: var(--chapter-icon) center / contain no-repeat;
+}
+
+/*
+ * ---------------------------------------------------------------------------
+ * The contents page: one screen of chapters, no scroll
+ * ---------------------------------------------------------------------------
+ *
+ * Eight tiles on the real library, not the wireframe's nine — Snacks is 0 and an empty tile is a
+ * door onto nothing. Three columns, so eight fills two rows and starts a third; the grid says how
+ * many there are rather than the drawing forcing a shape.
+ */
+.h-contents { padding: 0 var(--space-lg); min-width: 0; }
+.h-contents-head { text-align: center; margin-bottom: var(--space-md); min-width: 0; }
+.h-contents-title {
+  margin: var(--space-xs) 0 0;
+  font-family: var(--font-display);
+  font-size: 25px;
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--text);
+  overflow-wrap: break-word;
+}
+.h-contents-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 9px;
+  min-width: 0;
+}
+/* two across for the Mains proteins, where the names are longer and the icon is 52px */
+.h-mains-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-sm); min-width: 0; }
+
+.h-chapter-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 110px;
+  padding: 11px 5px;
+  box-sizing: border-box;
+  border-radius: var(--radius-card-large);
+  background: var(--surface);
+  text-decoration: none;
+  color: var(--text);
+  min-width: 0;
+}
+.h-chapter-name {
+  margin: 2px 0 0;
+  font-family: var(--font-display);
+  font-size: 14.5px;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+  color: var(--text);
+  /* a chapter name is two words at most, and it wraps rather than widening the grid (§81) */
+  overflow-wrap: break-word;
+  min-width: 0;
+}
+.h-chapter-tally { font-size: 11px; color: var(--text-muted); min-width: 0; }
+
+/*
+ * "Not sorted yet" is a row, not a tile — it is the one chapter that is a job rather than a
+ * cuisine, and the shape says so before the words do.
+ */
+.h-chapter-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-top: 9px;
+  padding: 11px var(--space-lg);
+  border-radius: var(--radius-card);
+  border-left: 3px solid var(--border-strong);
+  background: var(--surface);
+  text-decoration: none;
+  color: var(--text);
+  min-width: 0;
+}
+.h-chapter-row-body { flex: 1; min-width: 0; }
+.h-chapter-row-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 16.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--text);
+  overflow-wrap: break-word;
+}
+.h-chapter-chevron { flex: none; font-size: 19px; font-weight: 700; color: var(--text-muted); }
+
+/* a chapter's own page: the icon at 52px over the name, and what put recipes in it */
+.h-chapter-hero { text-align: center; margin-bottom: var(--space-lg); min-width: 0; }
+.h-chapter-hero-title {
+  margin: 2px 0 0;
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--text);
+  overflow-wrap: break-word;
+}

@@ -46,6 +46,7 @@ export function Filters({
   course,
   protein,
   proteinsAvailable,
+  chips = true,
 }: {
   q: string;
   filter: FilterKey | null;
@@ -53,6 +54,23 @@ export function Filters({
   protein: string | null;
   /** only the proteins this household actually has, so no chip leads to an empty list */
   proteinsAvailable: readonly string[];
+  /**
+   * Whether to draw the chips at all. The recipe book's contents page passes `false`.
+   *
+   * Two reasons, and the first is §78's duplicate rather than a space saving. The course chips
+   * — Appetizers, Soup, Salad, Mains, Sides, Desserts, Drinks, Breakfast, Snacks — **are the
+   * chapters**. Drawn above the chapter grid they are the same question asked twice on one
+   * screen, by two controls that will drift, which is the exact shape that brief warns about.
+   *
+   * The second is measured: with every chip drawn the contents page needs about 1700px at 390px
+   * wide, so the title sat below the fold and two tiles rendered behind the docked tab bar. The
+   * brief's requirement is "one screen, no scroll", and it is not a decoration — a contents page
+   * you have to scroll is a list again.
+   *
+   * The filters themselves are not lost. They are on every other layout, they are one search away
+   * here, and each is still a URL anybody can hold on to.
+   */
+  chips?: boolean;
 }) {
   const link = (over: Record<string, string | null>) => {
     const next = new URLSearchParams();
@@ -79,6 +97,8 @@ export function Filters({
         <button type="submit">Search</button>
       </form>
 
+      {chips && (
+      <>
       {/*
         * The drill-down, in place.
         *
@@ -139,6 +159,8 @@ export function Filters({
           );
         })}
       </div>
+      </>
+      )}
     </div>
   );
 }

@@ -134,16 +134,37 @@ await fetch(`${SUPABASE}/rest/v1/entitlements?on_conflict=family_id,app_key`, {
 });
 
 const made = [];
-for (const [title, course, minutes] of [
-  ["Grilled chilli and lemon chicken", "main", "90"],
-  ["Easy Fried Rice", "main", "30"],
-  ["Sausage and Rice Skillet", "main", "35"],
-  ["Loaded potato soup", "main", "45"],
-  ["Greek Salad", "side", "15"],
-  ["Coconut rice", "side", "25"],
-  ["Cinnamon Rolls", "breakfast", "180"],
-  ["Mango Salsa", "side", "20"],
-  ["A recipe with a deliberately very long title indeed", "main", ""],
+/*
+ * A library shaped like the real one, because the tree's behaviour turns entirely on the data.
+ *
+ * Nine mains, so Mains is over the cap and **divides** — five mains would render the undivided
+ * shape and tell us nothing about the screen this release is for. Two soups, one of them also a
+ * main, so the deliberate `dish_form`/`course` overlap is on screen. No snacks at all, which is
+ * what the real library has, so the shot shows eight tiles and not nine. Three with no course, so
+ * the unsorted row has something behind it.
+ *
+ *   title, course, minutes, dish_form, principal_protein
+ */
+for (const [title, course, minutes, dishForm, protein] of [
+  ["Grilled chilli and lemon chicken", "main", "90", null, "chicken"],
+  ["Easy Fried Rice", "main", "30", null, null],
+  ["Sausage and Rice Skillet", "main", "35", null, "pork"],
+  ["Loaded potato soup", "main", "45", "soup", null],
+  ["Pork Chops with Apples", "main", "40", null, "pork"],
+  ["Weeknight Chicken Traybake", "main", "45", null, "chicken"],
+  ["Slow Beef Ragu", "main", "180", null, "beef"],
+  ["Pan-fried Salmon", "main", "20", null, "fish"],
+  ["A recipe with a deliberately very long title indeed", "main", "", null, null],
+  ["Tomato and basil soup", "starter", "30", "soup", null],
+  ["Greek Salad", "side", "15", "salad", null],
+  ["Coconut rice", "side", "25", null, null],
+  ["Mango Salsa", "side", "20", null, null],
+  ["Cinnamon Rolls", "breakfast", "180", null, null],
+  ["Chocolate Mousse", "dessert", "25", null, null],
+  ["Homemade Lemonade", "drink", "10", null, null],
+  ["Something from a card", "", "", null, null],
+  ["Another one nobody has sorted", "", "", null, null],
+  ["A third unsorted recipe", "", "", null, null],
 ]) {
   const response = await setup.request.post(`${base}/api/recipes`, {
     data: {
@@ -152,11 +173,38 @@ for (const [title, course, minutes] of [
     },
   });
   const body = await response.json().catch(() => ({}));
-  if (body.id) made.push({ id: body.id, course });
+  if (body.id) made.push({ id: body.id, title, minutes, course, dishForm, protein });
 }
-// courses, so the browse layout has chapters, and plan entries so the rotation has an order
+/*
+ * Classify them, so the chapter tree has chapters — and send the WHOLE recipe.
+ *
+ * This used to PATCH `{ course }` alone. `prepareRecipe` requires a title, so every one of those
+ * calls returned 400 "a title is required", the `.catch(() => {})` swallowed it, and **no shot
+ * has ever had a course on anything**: browse rendered one "Not sorted yet" chapter of nine and
+ * looked perfectly fine in both themes. A fixture that silently fails produces a screenshot of
+ * the wrong thing, and a screenshot is the one artefact nobody re-reads for correctness.
+ *
+ * So the response is checked now rather than discarded. A classification that does not stick is a
+ * could-not-measure below, not a pass over an unclassified library.
+ */
+let classified = 0;
 for (const [i, recipe] of made.entries()) {
-  await setup.request.patch(`${base}/api/recipes/${recipe.id}`, { data: { course: recipe.course } }).catch(() => {});
+  const patched = await setup.request
+    .patch(`${base}/api/recipes/${recipe.id}`, {
+      data: {
+        title: recipe.title,
+        servings: "4",
+        timeMinutes: recipe.minutes,
+        sourceName: "",
+        ingredients: "2 cups flour\n1 pint double cream",
+        steps: "Mix.\nBake.",
+        course: recipe.course,
+        dishForm: recipe.dishForm ?? "",
+        principalProtein: recipe.protein ?? "",
+      },
+    })
+    .catch(() => null);
+  if (patched?.ok()) classified += 1;
   for (let n = 0; n < (i < 2 ? 3 : i < 5 ? 2 : 1); n += 1) {
     const day = new Date(Date.UTC(2026, 9, 12 + ((i + n) % 7))).toISOString().slice(0, 10);
     await setup.request.post(`${base}/api/plan-entries`, { data: { recipeId: recipe.id, date: day } }).catch(() => {});
@@ -167,24 +215,42 @@ if (made.length < 7) {
   console.error(`COULD NOT MEASURE: only ${made.length} recipes were created, so no layout reaches its cap`);
   process.exit(2);
 }
-console.log(`  setup: household ${household.familyId.slice(0, 8)} with ${made.length} recipes`);
+if (classified < made.length) {
+  // the failure this check exists for: an unclassified library renders one chapter and looks fine
+  console.error(`COULD NOT MEASURE: only ${classified} of ${made.length} recipes took a course, so the chapter tree is not exercised`);
+  process.exit(2);
+}
+console.log(`  setup: household ${household.familyId.slice(0, 8)} with ${made.length} recipes, all ${classified} classified`);
 
 await page0.close();
 
+/*
+ * Each screen names its own layout and **its own marker**.
+ *
+ * The marker used to be "Recipes" for every `recipes-*` screen — which the tab bar renders on all
+ * of them, so it asserted that the tab bar was present and nothing whatever about the page above
+ * it. "Each screen names something only it renders" was the stated intent and this is the first
+ * version that does it: a chapter page has to say *its own chapter name* to count as rendered.
+ */
 const SCREENS = [
-  ["today", "/today"],
-  ["recipes-rotation", "/recipes"],
-  ["recipes-browse", "/recipes"],
-  ["recipes-time", "/recipes"],
-  ["recipes-decide", "/recipes"],
-  ["household", "/household"],
+  { name: "today", path: "/today", marker: "Today" },
+  { name: "recipes-rotation", path: "/recipes", layout: "rotation", marker: "What you cook" },
+  { name: "recipes-browse", path: "/recipes", layout: "browse", marker: "The Lundall Recipe Book" },
+  { name: "recipes-time", path: "/recipes", layout: "time", marker: "Recipes" },
+  { name: "recipes-decide", path: "/recipes", layout: "decide", marker: "Recipes" },
+  // the tree (§86): the divided chapter, a protein leaf, a small leaf, and the unsorted row
+  { name: "chapter-main", path: "/recipes/c/main", layout: "browse", marker: "Mains" },
+  { name: "chapter-pork", path: "/recipes/c/main/pork", layout: "browse", marker: "Pork" },
+  { name: "chapter-soup", path: "/recipes/c/soup", layout: "browse", marker: "Soups" },
+  { name: "chapter-unsorted", path: "/recipes/c/unsorted", layout: "browse", marker: "Not sorted yet" },
+  { name: "household", path: "/household", marker: "Household" },
 ];
 
 let problems = 0;
 let shots = 0;
 
 for (const theme of ["light", "dark"]) {
-  for (const [name, path] of SCREENS) {
+  for (const { name, path, layout, marker } of SCREENS) {
     const context = await browser.newContext({
       viewport: { width: WIDTH, height: HEIGHT },
       colorScheme: theme === "dark" ? "dark" : "light",
@@ -193,10 +259,8 @@ for (const theme of ["light", "dark"]) {
     });
     await context.addCookies([cookie]);
     const page = await context.newPage();
-    if (name.startsWith("recipes-")) {
-      await page.request.patch(`${base}/api/household`, {
-        data: { recipeLayout: name.replace("recipes-", "") },
-      });
+    if (layout) {
+      await page.request.patch(`${base}/api/household`, { data: { recipeLayout: layout } });
     }
     await page.goto(`${base}${path}`, { waitUntil: "networkidle" });
     // the fonts decide every width below, so a shot before they land measures the fallback
@@ -285,7 +349,6 @@ for (const theme of ["light", "dark"]) {
      * failed to provision all produce a page with no overflow and no squeezed text — which is to
      * say, a clean pass. Each screen names something only it renders.
      */
-    const marker = name.startsWith("recipes-") ? "Recipes" : name === "today" ? "Today" : "Household";
     const body = await page.textContent("body");
     if (!body?.includes(marker) || body.includes("no household yet")) {
       console.error(`  COULD NOT MEASURE ${name} (${theme}): the page did not render its own content`);

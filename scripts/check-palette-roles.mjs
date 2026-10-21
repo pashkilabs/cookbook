@@ -89,12 +89,28 @@ for (const path of SHEETS) {
     // the alias block itself declares `--ink: var(--text)`, which is a definition not a painting
     if (selector.startsWith(":root") || selector.startsWith("@")) continue;
 
+    /*
+     * A fill under a mask is ink, not a ground.
+     *
+     * The chapter icons (§86) are PNGs whose alpha carries the drawing: `.h-chapter-icon` sets
+     * `background-color: var(--text)` and masks it, so the box *becomes* the glyph and that fill
+     * is the ink colour. Read as a ground it is exactly the bug this check was built for; read as
+     * what it is, it is the only correct way to write it — an `<img>` would bake the ink in and
+     * ship at 1.01:1 on the dark surface.
+     *
+     * Narrow on purpose: only a rule that itself declares a `mask` is exempt, so a plain
+     * `background: var(--text)` anywhere else still fails. Widening a gate is how you find the
+     * cases it was never asked about; widening it further than the case warrants is how a guard
+     * stops meaning anything.
+     */
+    const masked = /(?:^|[\s;])(?:-webkit-)?mask\s*:/.test(rule[2]);
+
     for (const [, property, token] of rule[2].matchAll(
       /(?<![-a-z])(background(?:-color)?|color)\s*:\s*var\(--([a-z0-9-]+)\)/g,
     )) {
       const role = resolve(token);
       const spelled = role === token ? `--${token}` : `--${token} (which is --${role})`;
-      if (property.startsWith("background") && TEXT.has(role)) {
+      if (property.startsWith("background") && TEXT.has(role) && !masked) {
         problems.push(
           `${path}: \`${selector}\` fills with ${spelled}, a TEXT role.\n` +
             `      A primary action is terracotta (--primary), a secondary is outlined olive,\n` +

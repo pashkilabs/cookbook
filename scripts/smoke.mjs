@@ -648,6 +648,66 @@ try {
       `HTTP ${chose.status} layout=${chose.body?.recipeLayout} asked=${Boolean(chose.body?.recipeLayoutAskedAt)}`,
     );
 
+    /*
+     * ---------------------------------------------------------------------------
+     * The recipe book, now that this household is on `browse` (§86)
+     * ---------------------------------------------------------------------------
+     *
+     * The layout was just set above, so this is the one place in the suite where the contents
+     * page actually renders. Four things, and the third is the one no stylesheet check can reach.
+     */
+    const contents = visible(String((await call("GET", "/recipes")).body ?? ""));
+    record(
+      "browse renders the recipe book's contents page, not a flat list",
+      contents.includes("The Lundall Recipe Book") && contents.includes("h-contents-grid"),
+      foundDetail(contents, "The Lundall Recipe Book"),
+    );
+    /*
+     * Masked, not drawn. An `<img>` onto `public/chapters` bakes the ink in and renders at
+     * 1.01:1 on the dark surface — invisible in cook mode, with every build guard green.
+     * `check-chapter-icons.mjs` catches it in the source; this catches it **as served**, which
+     * is the half a laptop cannot vouch for.
+     */
+    const maskedIcon = /--chapter-icon:\s*url\(\/chapters\//.test(contents);
+    const drawnIcon = /<img[^>]*\/chapters\//.test(contents);
+    record(
+      "and its icons are masked from a token, never an <img> with the ink baked in",
+      maskedIcon && !drawnIcon,
+      drawnIcon ? "an <img> reaches /chapters — invisible in dark" : maskedIcon ? "masked" : "no chapter icon served at all",
+    );
+
+    /*
+     * The subdivision **rule**, not the outcome — because the outcome depends on the data.
+     *
+     * A first version asserted that Mains divides, and failed against entirely correct behaviour:
+     * this household has two mains, and dividing two recipes into protein groups would be the
+     * bug. An assertion that only holds for a fixture it does not create is a probe that measures
+     * the fixture. So read the count the page states and assert the implication in both
+     * directions — over seven divides, seven or fewer lists. That holds on any library.
+     *
+     * Only one branch of it runs here, though, and saying so is the point: this household has no
+     * mains, so the *divides* side is never exercised by smoke. `pnpm shots` builds a library with
+     * nine mains and renders the divided screen in both themes, which is where that half is
+     * covered. Two probes, one rule, and neither of them pretending to be both.
+     */
+    const mainsPage = visible(String((await call("GET", "/recipes/c/main")).body ?? ""));
+    const mainsCount = Number(/(\d+)\s+recipes?/.exec(mainsPage)?.[1] ?? NaN);
+    const divided = mainsPage.includes("h-mains-grid");
+    record(
+      "a chapter divides exactly when it has an axis and outgrows a screen",
+      Number.isFinite(mainsCount) && divided === mainsCount > 7,
+      !Number.isFinite(mainsCount)
+        ? "Mains did not render its own count"
+        : `${mainsCount} mains, ${divided ? "divided" : "listed"}`,
+    );
+
+    const unknown = await call("GET", "/recipes/c/nonsense");
+    record(
+      "and an unknown chapter is a 404 rather than a silent fall back to Mains",
+      unknown.status === 404,
+      `HTTP ${unknown.status}`,
+    );
+
     const refused = await call("PATCH", "/api/household", { body: { recipeLayout: "shelves" } });
     record(
       "and a layout no screen renders is refused, not stored",
