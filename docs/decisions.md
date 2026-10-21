@@ -5505,3 +5505,31 @@ the space was the second reason to remove them. Those chips are *Appetizers, Sou
 Sides, Desserts, Drinks, Breakfast, Snacks* — **they are the chapters**, drawn twice on one screen
 by two controls that would drift. §78's duplicate, found by looking at a render rather than by
 reasoning about it. Search-only on this layout: 872px, everything above the fold.
+
+### Appetisers borrows nothing: the platter is spare
+
+The chapter shipped with `meat-platter.png`, which was drawn for something else and was only ever
+standing in because the first sheet had nothing for a starter. Paige commissioned two loaded
+skewers to close the gap, so Appetisers names `skewers.png` and the platter joins the spares.
+
+**Measured before swapping, because "it will not read heavier than its neighbours" is a claim.**
+Ink coverage 18.6% against a set median of 17.4% (range 10.5–24.9%), and aspect 0.807 against
+poultry's 0.815 — so it needs no special size and no different treatment at either place it
+renders. Those figures **do not reproduce the brief's 21.4% / 20.4% / 12.1–28.8** under any of the
+three definitions of coverage tried (alpha>0, alpha>127, integrated alpha). The ordering and the
+conclusion are identical under all three, so the brief is right about the thing it was asserting
+and unaccounted-for about the arithmetic — which is the safe direction for a disagreement, and
+worth writing down rather than quietly adopting whichever number was to hand.
+
+**What would reverse it:** another drawing from Paige. What would *not* is a reader finding an
+unreferenced platter on disk and wiring it back up — a relocation leaves no trace where it moved
+from (§78), so the reason sits in `chapters.ts` beside the entry rather than only here.
+
+**The gap this leaves, stated rather than guarded.** `check-chapter-icons.mjs` asserts every icon
+the tree names exists, and nothing asserts it is the *right drawing* — a repoint to any real file
+passes every check in the repo. That is deliberate: a guard pinning the filename would fail on
+Paige's next drawing, which is the `check-migrations-pushed` argument (a check that fails on
+ordinary work gets switched off, and that is worse than no check). Identity is a picture question,
+so `pnpm shots` grew `chapter-starter` — the contents tile is 46px and the hero is 52px, a
+different element on a different surface, and that hero was invisible once already because an
+inline `<span>` takes no width.
