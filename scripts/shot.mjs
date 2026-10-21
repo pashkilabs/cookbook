@@ -243,6 +243,13 @@ const SCREENS = [
   { name: "chapter-pork", path: "/recipes/c/main/pork", layout: "browse", marker: "Pork" },
   { name: "chapter-soup", path: "/recipes/c/soup", layout: "browse", marker: "Soups" },
   { name: "chapter-unsorted", path: "/recipes/c/unsorted", layout: "browse", marker: "Not sorted yet" },
+  /*
+   * Appetisers earns a screen of its own because it is the one chapter whose artwork changed, and
+   * the contents tile is only 46px of it. The hero is 52px, which is a different element on a
+   * different surface — the hero was invisible once already (an inline <span> takes no width), and
+   * that was found by looking at a picture rather than by any guard.
+   */
+  { name: "chapter-starter", path: "/recipes/c/starter", layout: "browse", marker: "Appetisers" },
   { name: "household", path: "/household", marker: "Household" },
 ];
 

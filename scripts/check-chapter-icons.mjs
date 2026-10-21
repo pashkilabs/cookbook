@@ -6,7 +6,7 @@
  * Why an `<img>` is the one mistake that would ship invisibly
  * ---------------------------------------------------------------------------
  *
- * The 25 PNGs under `public/chapters/` are a designer's artwork whose **alpha channel carries the
+ * The PNGs under `public/chapters/` are a designer's artwork whose **alpha channel carries the
  * ink** — the RGB under it is bark, measured at #27221C. Rendered as `<img>` that colour is baked
  * in and cannot answer a theme:
  *

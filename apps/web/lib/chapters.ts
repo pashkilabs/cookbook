@@ -86,7 +86,12 @@ export const TOP_LEVEL: readonly Chapter[] = [
   { slug: "soup", label: "Soups", icon: "soup.png", source: "shaped like a soup", holds: (r) => r.dish_form === "soup" },
   { slug: "salad", label: "Salads", icon: "salad.png", source: "shaped like a salad", holds: (r) => r.dish_form === "salad" },
   { slug: "side", label: "Sides", icon: "sides.png", source: "course is side", holds: (r) => r.course === "side" },
-  { slug: "starter", label: "Appetisers", icon: "meat-platter.png", source: "course is starter", holds: (r) => r.course === "starter" },
+  /* skewers, not the meat platter: the platter was drawn for something else and only ever borrowed
+     because the first sheet had nothing for this chapter. Paige commissioned the skewers to close
+     that gap, so the platter is now spare and nothing should reference it — a reader who "restores"
+     it is undoing the fix, not finding one. Measured against the set before swapping: ink 18.6%
+     against a median of 17.4%, aspect 0.807 to poultry's 0.815, so it needs no special size. */
+  { slug: "starter", label: "Appetisers", icon: "skewers.png", source: "course is starter", holds: (r) => r.course === "starter" },
   { slug: "snack", label: "Snacks", icon: "snacks.png", source: "course is snack", holds: (r) => r.course === "snack" },
   { slug: "dessert", label: "Desserts", icon: "desserts.png", source: "course is dessert", holds: (r) => r.course === "dessert" },
   { slug: "breakfast", label: "Breakfast", icon: "breakfast.png", source: "course is breakfast", holds: (r) => r.course === "breakfast" },
