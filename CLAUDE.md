@@ -1048,3 +1048,25 @@ guessing.
   The honest half: only one branch of it runs in smoke, so the comment says where the other is
   covered (`pnpm shots`, nine mains, both themes). **Two probes, one rule, and neither pretending
   to be both.**
+
+- **An assertion that something is missing is worthless without evidence that something else is
+  present.** The chapter tree changed what `/recipes` renders on the `browse` layout — a contents
+  page lists *chapters*, so no recipe title appears — and `"a recipe naming an avoided allergen is
+  absent from the recipe list"` went on passing. It would have passed with the allergen filter
+  ripped out entirely: the title was absent because **every** title was. §54a's rotting proxy, but
+  caused by a screen changing beneath a probe rather than by a bug being fixed under it, and the
+  dangerous half is that nothing failed. The loud failure three lines later ("clearing it brings
+  the recipe back") is what sent me looking; had that assertion not existed the silent one would
+  still be green.
+
+  Two repairs, and the second generalises. Read the list through a **search**, which suspends the
+  layout on all five, so the response is a flat list whatever the household chose. And assert a
+  **control** present in the same response — if the control is gone too, report *NOT MEASURED*
+  rather than a pass. **Absence and emptiness are indistinguishable**, and every "is not there"
+  check in this repo is one screen change away from testing nothing.
+
+  The companion mistake, in the same probe, is one this file already warned about: the new check
+  read the raw body instead of `visible()`, so `{count} hidden:` — a static string beside an
+  interpolated one — arrived as `1<!-- --> hidden:` and the regex missed it. **The rule is not
+  "remember the comments", it is that human text goes through `visible()`, including in a check
+  written the same hour as the page.**

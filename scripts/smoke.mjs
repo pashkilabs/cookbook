@@ -1567,14 +1567,68 @@ try {
     const setPeanut = await call("PATCH", "/api/household", { body: { avoidedAllergens: ["peanut"] } });
     record("avoiding peanut saves", setPeanut.status === 200, `HTTP ${setPeanut.status}`);
 
-    const hiddenList = await call("GET", "/recipes");
+    /*
+     * ---------------------------------------------------------------------------
+     * An "absent" assertion needs a positive control in the same response
+     * ---------------------------------------------------------------------------
+     *
+     * This read `GET /recipes` and asserted the subject's title was not in the HTML. The chapter
+     * tree (§86) broke it **silently and in the dangerous direction**: this household is on
+     * `browse` by the time it runs, and a contents page lists *chapters*, so no recipe title is
+     * there at all. The check went on passing and would have passed with the allergen filter
+     * ripped out entirely — §54a's proxy that rots without failing, caused by a screen changing
+     * underneath it rather than by anything wrong with the filter.
+     *
+     * Two fixes, and the second is the general one. The list is read through a **search**, which
+     * suspends the layout on every one of the five, so the response is a flat list whatever the
+     * household has chosen. And a **control recipe** is asserted present in the same response: if
+     * "Smoke Test Pie" is not there either then the list is simply empty and "the subject is
+     * absent" has measured nothing.
+     *
+     * The rule worth keeping: **an assertion that something is missing is worthless without
+     * evidence that something else is present.** Absence and emptiness are indistinguishable.
+     */
+    const hiddenList = await call("GET", "/recipes?q=smoke");
     const hiddenHtml = typeof hiddenList.body === "string" ? hiddenList.body : JSON.stringify(hiddenList.body);
+    const controlPresent = hiddenHtml.includes("Smoke Test Pie");
     record(
       "a recipe naming an avoided allergen is absent from the recipe list",
-      hiddenList.status === 200 && !hiddenHtml.includes("Smoke Allergen Subject"),
-      hiddenList.status === 200
-        ? hiddenHtml.includes("Smoke Allergen Subject") ? "still listed — the filter is not wired" : "hidden"
-        : `HTTP ${hiddenList.status}`,
+      hiddenList.status === 200 && controlPresent && !hiddenHtml.includes("Smoke Allergen Subject"),
+      hiddenList.status !== 200
+        ? `HTTP ${hiddenList.status}`
+        : !controlPresent
+          ? "NOT MEASURED: the control recipe is absent too, so the list is empty"
+          : hiddenHtml.includes("Smoke Allergen Subject")
+            ? "still listed — the filter is not wired"
+            : "hidden, with the control still listed",
+    );
+
+    /*
+     * And absent from the **chapters**, which is a door the flat list never had.
+     *
+     * The brief requires exclusions to apply to every chapter with the hidden count stated. The
+     * tree reads through the same `searchRecipes` call, so this is checking the join rather than
+     * the matcher — and a join is where two pieces of correct work meet.
+     */
+    const chapterLeaf = await call("GET", "/recipes/c/unsorted");
+    /*
+     * `visible()`, and the first version of this check did not use it — which is the documented
+     * trap, committed again in the probe rather than in the page. `{count} hidden:` is a static
+     * string beside an interpolated one, so React's SSR separates them with an empty comment and
+     * the served HTML reads `1<!-- --> hidden:`. The regex found nothing, the screen was right,
+     * and the failure was indistinguishable from "the chapter does not say so".
+     */
+    const leafHtml = visible(typeof chapterLeaf.body === "string" ? chapterLeaf.body : JSON.stringify(chapterLeaf.body));
+    record(
+      "and absent from its chapter, with the hidden count stated rather than silent",
+      chapterLeaf.status === 200 && !leafHtml.includes("Smoke Allergen Subject") && /\d+ hidden:/.test(leafHtml),
+      chapterLeaf.status !== 200
+        ? `HTTP ${chapterLeaf.status}`
+        : leafHtml.includes("Smoke Allergen Subject")
+          ? "the chapter does not filter"
+          : /\d+ hidden:/.test(leafHtml)
+            ? "hidden, and the chapter says how many"
+            : "hidden, but the chapter does not say so",
     );
 
     const hiddenSearch = await call("GET", "/recipes?q=allergen");
@@ -1600,9 +1654,14 @@ try {
     );
 
     const clearPeanut = await call("PATCH", "/api/household", { body: { avoidedAllergens: [] } });
-    record("and clearing it brings the recipe back", clearPeanut.status === 200
-      && (await call("GET", "/recipes")).body?.includes?.("Smoke Allergen Subject") !== false,
-      `HTTP ${clearPeanut.status}`);
+    // searched, for the same reason as above: a contents page has no titles to find it in
+    const restored = await call("GET", "/recipes?q=allergen");
+    const restoredHtml = typeof restored.body === "string" ? restored.body : JSON.stringify(restored.body);
+    record(
+      "and clearing it brings the recipe back",
+      clearPeanut.status === 200 && restoredHtml.includes("Smoke Allergen Subject"),
+      clearPeanut.status !== 200 ? `HTTP ${clearPeanut.status}` : restoredHtml.includes("Smoke Allergen Subject") ? "back" : "still hidden",
+    );
 
     const backToUs = await call("PATCH", "/api/household", { body: { measurementSystem: "us" } });
     record("and can change back", backToUs.status === 200
