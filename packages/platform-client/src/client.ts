@@ -283,7 +283,13 @@ function assertYear(year: number | null): number | null {
    */
   async function changeAvoidedAllergen(allergen: string, action: "add" | "remove"): Promise<Family> {
     const family = await ownFamily();
-    const updated = await store.changeAvoidedAllergen({ familyId: family.id, allergen, action });
+    const updated = await store.changeAvoidedAllergen({
+      familyId: family.id,
+      allergen,
+      action,
+      // the account this client is scoped to — the one fact a trigger cannot work out for itself
+      actorAccountId: accountId,
+    });
     if (!updated) throw new Error("no such household");
     return updated;
   }

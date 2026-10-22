@@ -334,3 +334,59 @@ describe("a child's year of birth", () => {
     expect(child?.birthYear).toBe(2018);
   });
 });
+
+/**
+ * One allergen on or off, and who asked (§87, §88).
+ *
+ * The bug this replaces: the control held the list in `useState`, seeded from a read that had
+ * silently resolved to `[]` for every invited member, and PATCHed the whole array back. So a
+ * broken read became an authoritative write and could erase a real exclusion — which it did.
+ */
+describe("changing one allergen", () => {
+  const withList = (allergens: string[]): Seed => {
+    const seed = standardSeed();
+    return { ...seed, families: seed.families!.map((f) => ({ ...f, avoidedAllergens: allergens })) };
+  };
+
+  it("removes the one named and leaves the rest standing", async () => {
+    const { client } = setup(withList(["peanut", "wheat"]));
+    const family = await client.changeAvoidedAllergen("peanut", "remove");
+    expect(family.avoidedAllergens).toEqual(["wheat"]);
+  });
+
+  it("adds to what is stored rather than replacing it", async () => {
+    const { client } = setup(withList(["wheat"]));
+    const family = await client.changeAvoidedAllergen("sesame", "add");
+    expect(family.avoidedAllergens).toEqual(["sesame", "wheat"]);
+  });
+
+  /*
+   * The whole point of a delta. A caller that believed the list was empty — which is exactly what
+   * the broken read told every invited member — cannot express "the list is empty" at all.
+   */
+  // regression: a member's defaulted read was PATCHed back as the whole list and erased it
+  it("cannot empty a list it was wrong about, because it never sends a list", async () => {
+    const { client } = setup(withList(["peanut", "wheat"]));
+    const family = await client.changeAvoidedAllergen("sesame", "add");
+    expect(family.avoidedAllergens).toEqual(["peanut", "sesame", "wheat"]);
+  });
+
+  it("adding one that is already there changes nothing and does not duplicate it", async () => {
+    const { client } = setup(withList(["peanut"]));
+    const family = await client.changeAvoidedAllergen("peanut", "add");
+    expect(family.avoidedAllergens).toEqual(["peanut"]);
+  });
+
+  /*
+   * And the actor reaches the store. The type makes omitting it a compile error; this catches
+   * passing the **wrong** one — a family id where an account id belongs type-checks, and looks
+   * identical in an audit log until somebody needs to read it, which is the day it matters.
+   */
+  it("names the account that asked, so the log can answer who", async () => {
+    const { client, store } = setup(withList(["peanut"]));
+    await client.changeAvoidedAllergen("peanut", "remove");
+    expect(store.allergenChanges).toEqual([
+      { familyId: FAMILY_ID, allergen: "peanut", action: "remove", actorAccountId: ACCOUNT_ID },
+    ]);
+  });
+});

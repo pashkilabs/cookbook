@@ -54,6 +54,9 @@ export const APP_TABLES = [
   // what has been sent to a Kroger cart, because the cart itself cannot be read (§74)
   "cart_exports",
   "import_jobs",
+  // who changed what a household avoids (§88). Carries family_id and is NOT in
+  // HOUSEHOLD_TABLES: it has no policies at all, because no screen reads it
+  "allergen_changes",
   "import_cache",
 ] as const;
 
@@ -110,6 +113,12 @@ export type HouseholdTable = (typeof HOUSEHOLD_TABLES)[number];
  * The catalog is global reference data — cream comes in pints regardless of whose
  * kitchen it is. The cache is keyed by URL hash so a recipe doing the rounds is
  * fetched once for the entire user base.
+ *
+ * `allergen_changes` is in neither this list nor `HOUSEHOLD_TABLES`, and that is
+ * not an oversight: it carries `family_id`, so it is scoped, but it has **no
+ * policies at all** — RLS on, nothing granted to a client — because no screen
+ * reads it (§88). The household list promises four policies; promising them here
+ * would be promising a surface that must not exist yet.
  */
 export const UNSCOPED_TABLES = {
   ingredients: "catalog: global reference data, readable by any signed-in user",

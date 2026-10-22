@@ -31,6 +31,14 @@ export interface InMemoryStore extends PlatformStore {
   /** what the store holds now, for assertions the client interface does not expose */
   peekEntitlement(familyId: string, appKey: string): Entitlement | undefined;
   devices: Device[];
+  /**
+   * What the real store would have logged (§88), so a test can assert the **actor** reaches it.
+   *
+   * The type already makes omitting the actor a compile error; this catches passing the wrong
+   * one — a family id where an account id belongs looks identical to a type checker and identical
+   * in an audit log until somebody needs to read it.
+   */
+  allergenChanges: Array<{ familyId: string; allergen: string; action: string; actorAccountId: string | null }>;
 }
 
 /** `clock` lets a test drive the quota period rollover without waiting for one. */
@@ -38,6 +46,7 @@ export function createInMemoryStore(seed: Seed = {}, clock: Clock = () => new Da
   const accounts = [...(seed.accounts ?? [])];
   const families = [...(seed.families ?? [])];
   const members = [...(seed.members ?? [])];
+  const allergenChanges: InMemoryStore["allergenChanges"] = [];
   const invitations: Array<{
     id: string;
     familyId: string;
@@ -58,6 +67,8 @@ export function createInMemoryStore(seed: Seed = {}, clock: Clock = () => new Da
 
   return {
     devices,
+
+    allergenChanges,
 
     peekEntitlement(familyId, appKey) {
       return entitlements.find((e) => e.familyId === familyId && e.appKey === appKey);
@@ -145,6 +156,17 @@ export function createInMemoryStore(seed: Seed = {}, clock: Clock = () => new Da
       if (input.action === "add") held.add(input.allergen);
       else held.delete(input.allergen);
       family.avoidedAllergens = [...held].sort();
+      /*
+       * Logged here as the trigger logs it there. A fake that silently drops the actor would let
+       * a caller stop passing one and every test would still pass — which is the divergence
+       * between the measurement path and the shipping path, in a test double.
+       */
+      allergenChanges.push({
+        familyId: input.familyId,
+        allergen: input.allergen,
+        action: input.action,
+        actorAccountId: input.actorAccountId,
+      });
       return { ...family };
     },
 

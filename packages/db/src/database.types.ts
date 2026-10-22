@@ -33,6 +33,48 @@ export type Database = {
         }
         Relationships: []
       }
+      allergen_changes: {
+        Row: {
+          action: string
+          allergen: string
+          changed_at: string
+          changed_by: string | null
+          family_id: string
+          id: string
+        }
+        Insert: {
+          action: string
+          allergen: string
+          changed_at?: string
+          changed_by?: string | null
+          family_id: string
+          id?: string
+        }
+        Update: {
+          action?: string
+          allergen?: string
+          changed_at?: string
+          changed_by?: string | null
+          family_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "allergen_changes_changed_by_fkey"
+            columns: ["changed_by"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "allergen_changes_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cart_exports: {
         Row: {
           body_fingerprint: string
@@ -1336,6 +1378,15 @@ export type Database = {
         Returns: Json
       }
       applied_migration_versions: { Args: never; Returns: string[] }
+      change_avoided_allergen: {
+        Args: {
+          p_action: string
+          p_actor: string
+          p_allergen: string
+          p_family_id: string
+        }
+        Returns: string[]
+      }
       household_can_write_recipes: { Args: never; Returns: boolean }
       import_claim_next_job: {
         Args: { p_lease_seconds?: number; p_worker: string }

@@ -258,26 +258,47 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
      * last-write-wins on one allergen, not a wipe, and the audit rows make it visible.
      */
     async changeAvoidedAllergen(input): Promise<Family | null> {
-      const current = await supabase
-        .from("families")
-        .select(FAMILY_COLUMNS)
-        .eq("id", input.familyId)
-        .is("deleted_at", null)
-        .maybeSingle();
-      if (current.error) throw new Error(current.error.message);
-      if (!current.data) return null;
+      /*
+       * One statement, through `public.change_avoided_allergen`, rather than a SELECT and then an
+       * UPDATE. Two reasons and the audit is only the second of them.
+       *
+       * **The lost update.** Two people toggling at once each read the same list and the second
+       * write discarded the first's change. A function cannot do that: the read and the write are
+       * one statement in one transaction.
+       *
+       * **Attribution.** §87 ended on a question nobody could answer — who emptied this list —
+       * because `updated_at` had been overwritten and Postgres keeps no column history. The log
+       * is a trigger on the column, so no write path can skip it, and a trigger cannot know who
+       * is asking when the caller is the service role (`auth.uid()` is null there). So the actor
+       * is passed in and stamped transaction-locally for the trigger to read.
+       *
+       * The delta stays a delta all the way down: the full array now never crosses a boundary in
+       * either direction.
+       */
+      const changed = await supabase.rpc("change_avoided_allergen", {
+        p_family_id: input.familyId,
+        p_allergen: input.allergen,
+        p_action: input.action,
+        p_actor: input.actorAccountId,
+      });
+      if (changed.error) {
+        // "no such household" is the function's own refusal, and it is an absence rather than a
+        // failure — every other caller here reports that as null
+        if (changed.error.message.includes("no such household")) return null;
+        throw new Error(changed.error.message);
+      }
 
-      const held = new Set(toFamily(current.data).avoidedAllergens);
-      if (input.action === "add") held.add(input.allergen);
-      else held.delete(input.allergen);
-      const next = [...held].sort();
-
+      /*
+       * Read back through `FAMILY_COLUMNS`, because the function returns the list and this port
+       * returns a `Family`. One more round trip, and worth it rather than hand-assembling a
+       * `Family` from a list plus remembered fields — which would be the sixth select list this
+       * file exists to have ended.
+       */
       const { data, error } = await supabase
         .from("families")
-        .update({ avoided_allergens: next })
+        .select(FAMILY_COLUMNS)
         .eq("id", input.familyId)
         .is("deleted_at", null)
-        .select(FAMILY_COLUMNS)
         .maybeSingle();
       if (error) throw new Error(error.message);
       if (!data) return null;

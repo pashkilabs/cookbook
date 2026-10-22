@@ -367,6 +367,17 @@ export interface PlatformStore {
     familyId: string;
     allergen: string;
     action: "add" | "remove";
+    /**
+     * Who asked, recorded in `allergen_changes` (§88).
+     *
+     * **Required, and nullable** — the two are doing different work. Required so a new caller
+     * cannot quietly write an unattributed change to a safety setting: that is the same trick
+     * `FamilyRow` plays, where a short select is a compile error rather than a silent default.
+     * Nullable because a write genuinely can have no actor — a console, a migration — and "a
+     * change happened and nobody knows who" is precisely the fact that was missing, so it is
+     * worth a row rather than a refusal.
+     */
+    actorAccountId: string | null;
   }): Promise<Family | null>;
   /** the store, validated by a CHECK on the column rather than here */
   setKrogerLocation(input: { familyId: string; locationId: string | null }): Promise<Family | null>;

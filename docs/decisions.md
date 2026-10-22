@@ -5659,3 +5659,103 @@ them differently at all.
 `/recipes` renders `The Lundall Recipe Book` as a literal for **every** household. The smoke marker
 now leans on that string, which makes it a check that would need rewriting the day the title is
 made real. Out of this brief's scope and recorded here so it is not discovered twice.
+
+## §88 — Who changed what this household avoids, and a renderer photographing nothing
+
+Two unrelated things, both of which came out of §87's tail.
+
+### The audit table, because "attribution is not available" is a bad answer twice
+
+§87 ended on a question with no answer: the Lundalls' avoided-allergen list held
+`["peanut","wheat"]` on 17 October and was empty when anybody looked. The cause was found and
+fixed; the hand was not recoverable, because `updated_at` had been overwritten by a later
+unrelated write and Postgres keeps no history of a column. The report said so rather than naming a
+likely culprit, which was right — and the right response to having to say it is a table, not a
+better guess next time.
+
+`public.allergen_changes`: one row per allergen per change, `added` or `removed`, `changed_by`,
+`changed_at`.
+
+**Written by a trigger on the column, and that is the whole design.** The write that caused §87
+came from a path nobody was looking at — a route doing something else entirely. A log written by
+the route that is *meant* to change allergens would have recorded nothing on the day it mattered.
+Same reasoning as `propagate_soft_delete` living in a trigger rather than route code (§30): a
+thing that must not be skippable cannot live where a caller chooses whether to call it. The test
+for this is explicit — a bare `UPDATE families SET avoided_allergens = '{}'` must appear in the
+log, because that is the shape of the write that did the damage.
+
+**The actor, which a trigger cannot know.** `auth.uid()` is null under `service_role`, and the
+seam writes as the service role — that is the whole reason platform tables are reachable only
+through it. So the seam says who it is acting for, through `public.change_avoided_allergen`, which
+does the read-modify-write **and** stamps the actor transaction-locally for the trigger to read.
+Execute is revoked from every client role.
+
+Two things came free with that function and neither is the audit:
+
+- **The lost update went away.** `changeAvoidedAllergen` was a SELECT then an UPDATE as two
+  PostgREST calls, so two people toggling at once each read the same list and the second write
+  discarded the first's change. One statement cannot do that.
+- **The delta stays a delta all the way down.** §87 made the *control* send `{addAllergen}`; this
+  makes the *database* do the same, so the full array never crosses a boundary in either direction.
+
+**Two faults the first probe found, and both were about believing a plausible shape.**
+
+`set_config(..., true)` is transaction-local, which means it outlives the statement that set it.
+A bare `UPDATE` two statements later was logged as having been made by the actor of an earlier
+RPC — **a wrong name in an audit log, which is worse than no name, because no name is visibly
+unknown and a wrong one is not.** In production each PostgREST call is its own transaction so it
+would not have happened; "it would not have happened" is not a property of the function. It now
+clears the setting after its write.
+
+And `changed_at` defaulted to `now()`, which is **transaction** time: the probe returned four rows,
+four distinct events, one identical timestamp. A log whose rows cannot be ordered answers "what
+changed" and not "what happened when", which is half the question. `clock_timestamp()` now.
+
+**Not readable from the app, deliberately.** RLS on with no policies, and the grants revoked —
+Postgres checks table privileges before row-level security and the two are not the same thing.
+Granting `authenticated` a read would publish to every member a list of which member changed a
+safety setting and when: a feature nobody asked for and a surface nobody has designed. When a
+screen wants it, that is a decision with a design, and the grant arrives then.
+`assert_allergen_changes_are_logged_and_private` refuses the grant, a dropped trigger, and the
+column's disappearance; all three were mutation-tested, and the refusals were checked against a
+control read so that "permission denied" could not be a typo'd table name.
+
+`changed_by` is **required in the TypeScript type and nullable in the column**, which are doing
+different jobs. Required so a new caller cannot quietly write an unattributed change to a safety
+setting — the same trick `FamilyRow` plays, where a short select is a compile error rather than a
+silent default. Nullable because a write genuinely can have no actor, and "a change happened and
+nobody knows who" is precisely the fact that was missing, so it is worth a row rather than a
+refusal.
+
+`allergen_changes` is in `APP_TABLES` and in **neither** `HOUSEHOLD_TABLES` nor `UNSCOPED_TABLES`.
+It carries `family_id`, so it is scoped — but the household list promises four policies, and
+promising them here would be promising a surface that must not exist yet.
+
+### `pnpm shots` was photographing unstyled HTML, and the tell was in `ls -la`
+
+A dev server that had been up across many edits served
+`<link href="/_next/static/css/app/layout.css">` answering **404**. Every screen rendered as Times
+serif with native form controls, and the run reported **14 screens ok and 8 overflow problems** —
+the eight being artefacts of having no stylesheet at all. Playwright's `colorScheme` emulation was
+fine; `matchMedia('(prefers-color-scheme: dark)')` agreed. What never arrived was a palette.
+
+**Every light/dark pair was byte-identical** — eleven screenshots written twice, while the run
+printed "22 screenshots in both themes" — and nothing compared them, so the one fact that would
+have exposed it sat unread in the file sizes.
+
+This is the tool built *because* guards cannot see layout, failing in exactly the family it was
+built from. §86's fixture bug left a plausible picture of the wrong data; this left a picture of no
+design at all and still called it a pass. After restarting the server: **22 shots, zero layout
+problems** — including the `/household` change this run existed to check, in both themes.
+
+Two assertions now, both **exit 2** rather than FAIL, because a run against a broken server has
+measured nothing and must not read as a layout verdict:
+
+- a stylesheet must have reached the page — sheets, rules, and `--text` resolving;
+- the two themes must differ byte-for-byte. No screen here is colourless, so identical bytes
+  cannot be a legitimate outcome.
+
+The habit the second one leaves: when a visual tool passes, ask what it would look like if the
+thing under the picture were missing entirely — and `curl` the stylesheet the page links rather
+than trusting that a 200 on the page means a 200 on its assets. A long-lived dev server is a stale
+one.
