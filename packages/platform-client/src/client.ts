@@ -276,6 +276,19 @@ function assertYear(year: number | null): number | null {
   }
 
   /**
+   * One allergen on or off. What a person's toggle should call.
+   *
+   * Scoped to `ownFamily()` like every other setting, so a caller cannot address another
+   * household by id — and the list it edits is the stored one, not one a screen sent along.
+   */
+  async function changeAvoidedAllergen(allergen: string, action: "add" | "remove"): Promise<Family> {
+    const family = await ownFamily();
+    const updated = await store.changeAvoidedAllergen({ familyId: family.id, allergen, action });
+    if (!updated) throw new Error("no such household");
+    return updated;
+  }
+
+  /**
    * How this household decides what to cook. `null` dismisses the question without choosing.
    *
    * Scoped to `ownFamily()` like every other setting here, so a caller cannot address somebody
@@ -373,6 +386,7 @@ function assertYear(year: number | null): number | null {
     setMeasurementSystem,
     setTimezone,
     setAvoidedAllergens,
+    changeAvoidedAllergen,
     setRecipeLayout,
     setKrogerLocation,
     inviteAdult,

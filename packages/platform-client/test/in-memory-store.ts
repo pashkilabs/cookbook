@@ -150,6 +150,17 @@ export function createInMemoryStore(seed: Seed = {}, clock: Clock = () => new Da
       return { ...family };
     },
 
+    /* the delta, as literal as the adapter: applied to what is held, never to a sent-in set */
+    async changeAvoidedAllergen(input) {
+      const family = families.find((f) => f.id === input.familyId);
+      if (!family) return null;
+      const held = new Set(family.avoidedAllergens);
+      if (input.action === "add") held.add(input.allergen);
+      else held.delete(input.allergen);
+      family.avoidedAllergens = [...held].sort();
+      return { ...family };
+    },
+
     async removeMember(input) {
       const at = members.findIndex(
         (m) => m.id === input.memberId && m.familyId === input.familyId,

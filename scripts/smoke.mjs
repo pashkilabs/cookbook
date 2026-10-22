@@ -1083,6 +1083,151 @@ try {
   });
   record("a token works once and only once", reused?.status === "used", reused?.status ?? "no answer");
 
+  /*
+   * ---------------------------------------------------------------------------
+   * Can two members of one household hold different settings, and see their own?
+   * ---------------------------------------------------------------------------
+   *
+   * **Nothing tested this, which is why it reached a person.** Every household-setting check here
+   * ran as the owner, and the owner's read goes through a different branch of
+   * `findFamilyForAccount` than an invited member's. That second branch hand-wrote five of nine
+   * columns, so an invited member resolved `timezone`, `avoided_allergens`, `kroger_location_id`
+   * and `recipe_layout` as absent — and the defaults dressed the absences as choices.
+   *
+   * The shape of the check is the point: set as one member, read back as a *different* member of
+   * the same household, and assert the first member's value is unchanged. A single-member
+   * assertion cannot see a resolver that is wrong for everybody except whoever wrote it.
+   *
+   * Signed in as the invitee with the password minted above — the account is a real member of this
+   * household, so this is the product's own path and not an admin read.
+   */
+  if (invitedAccountId) {
+    const inviteeToken = await (await fetch(`${SUPABASE}/auth/v1/token?grant_type=password`, {
+      method: "POST",
+      headers: { apikey: ANON, "Content-Type": "application/json" },
+      body: JSON.stringify({ email: invitedAddress, password: invitedPassword }),
+    })).json();
+
+    if (!inviteeToken.access_token) {
+      skip(
+        "a second member of the household reads the household's settings, not a default",
+        `could not sign in as the invitee — ${String(inviteeToken.error_description ?? inviteeToken.msg ?? "").slice(0, 60)}`,
+      );
+    } else {
+      const asInvitee = async (method, path, body) => {
+        const response = await fetch(`${base}${path}`, {
+          method,
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${inviteeToken.access_token}`,
+            Cookie: sessionCookie(inviteeToken),
+          },
+          body: body === undefined ? undefined : JSON.stringify(body),
+          signal: AbortSignal.timeout(90_000),
+        });
+        const text = await response.text();
+        try {
+          return { status: response.status, body: JSON.parse(text) };
+        } catch {
+          return { status: response.status, body: text };
+        }
+      };
+
+      /*
+       * The member's settings are read from the **screen**, because there is no GET on
+       * /api/household and because the screen is the thing that was wrong. An endpoint answering
+       * is not a feature; here it is not even available, so asserting on one would have meant
+       * adding an endpoint in order to test a page. `visible()` strips React's SSR comments —
+       * a static string beside an interpolated one arrives as `1<!-- --> hidden:`.
+       */
+      const screenAsInvitee = async (path) => {
+        const response = await fetch(`${base}${path}`, {
+          headers: {
+            Authorization: `Bearer ${inviteeToken.access_token}`,
+            Cookie: sessionCookie(inviteeToken),
+          },
+          signal: AbortSignal.timeout(90_000),
+        });
+        return { status: response.status, text: visible(await response.text()) };
+      };
+
+      /*
+       * Set as the owner, read as the member. `browse` rather than the column default, so "the
+       * member sees browse" cannot pass by accident on an unread column — the bug being guarded
+       * against resolved to the default, which is what made it look like a choice.
+       */
+      const owners = await call("PATCH", "/api/household", { body: { recipeLayout: "browse" } });
+      record(
+        "the owner sets a household layout",
+        owners.status === 200 && owners.body?.recipeLayout === "browse",
+        `HTTP ${owners.status} — ${JSON.stringify(owners.body?.recipeLayout ?? null)}`,
+      );
+
+      const seen = await screenAsInvitee("/recipes");
+      const sawBrowse = seen.text.includes("The Lundall Recipe Book");
+      const sawRotation = seen.text.includes("What you cook");
+      record(
+        "a second member of the household reads the household's settings, not a default",
+        seen.status === 200 && sawBrowse && !sawRotation,
+        `HTTP ${seen.status} — member's /recipes rendered ${sawBrowse ? "browse" : sawRotation ? "rotation (the column default — the bug)" : "neither marker"}, stored browse`,
+      );
+
+      /*
+       * The allergen list is the expensive one and it is asserted separately, because an empty
+       * array is exactly what the broken read produced — and `[]` compares equal to a household
+       * that genuinely avoids nothing. Set two, so the assertion cannot pass on an absence.
+       */
+      await call("PATCH", "/api/household", { body: { avoidedAllergens: ["peanut", "wheat"] } });
+      const asMember = await screenAsInvitee("/household");
+      /*
+       * Read off /household, where the control renders what it believes is avoided — which is
+       * exactly the value it used to PATCH back. `aria-pressed="true"` marks a chosen allergen,
+       * and a control showing none while two are stored is the fault that erased a real list.
+       */
+      const pressed = (asMember.text.match(/aria-pressed="true"/g) ?? []).length;
+      record(
+        "and the member's own allergen control shows what is stored, not an empty set",
+        asMember.status === 200 && pressed >= 2,
+        `HTTP ${asMember.status} — ${pressed} allergen(s) shown as chosen on the member's screen, stored 2`,
+      );
+
+      /*
+       * The destructive half. A toggle sends the change, not the list, so a member whose screen
+       * resolved the list wrongly cannot write that over a real exclusion. Removing one leaves
+       * the other standing — under the old whole-array PATCH, a member seeding from an empty read
+       * would have left nothing.
+       */
+      const dropped = await asInvitee("PATCH", "/api/household", { removeAllergen: "peanut" });
+      record(
+        "a member removing one allergen removes one, not the list",
+        dropped.status === 200 && (dropped.body?.avoidedAllergens ?? []).join() === "wheat",
+        `HTTP ${dropped.status} — ${JSON.stringify(dropped.body?.avoidedAllergens ?? null)}, wanted ["wheat"]`,
+      );
+
+      const added = await asInvitee("PATCH", "/api/household", { addAllergen: "sesame" });
+      record(
+        "and adding one adds to what is stored rather than replacing it",
+        added.status === 200 && (added.body?.avoidedAllergens ?? []).join() === "sesame,wheat",
+        `HTTP ${added.status} — ${JSON.stringify(added.body?.avoidedAllergens ?? null)}, wanted ["sesame","wheat"]`,
+      );
+
+      /* and the owner's view agrees, because there is one stored list and both read it */
+      /*
+       * And the owner's value is unchanged by the member's read — the third assertion the brief
+       * asked for. One stored list, both members reading it, so "unchanged" here means the
+       * member's screen did not write anything just by being looked at.
+       */
+      const ownerAfter = await call("PATCH", "/api/household", { body: { addAllergen: "peanut" } });
+      record(
+        "the owner's list still holds what the member left, plus the owner's own change",
+        ownerAfter.status === 200 && (ownerAfter.body?.avoidedAllergens ?? []).join() === "peanut,sesame,wheat",
+        `HTTP ${ownerAfter.status} — ${JSON.stringify(ownerAfter.body?.avoidedAllergens ?? null)}, wanted ["peanut","sesame","wheat"]`,
+      );
+    }
+  } else {
+    skip("a second member of the household reads the household's settings, not a default", "no invited account");
+  }
+
   console.log("\nplanner, shopping, storage");
   if (recipeId) {
     const monday = new Date();

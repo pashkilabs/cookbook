@@ -76,6 +76,8 @@ export async function PATCH(request: Request) {
 
   let body: {
     measurementSystem?: unknown; timezone?: unknown; avoidedAllergens?: unknown;
+    /** one allergen on or off — what a person's toggle sends, see the branch below */
+    addAllergen?: unknown; removeAllergen?: unknown;
     krogerLocationId?: unknown;
       /** a layout name, or null to dismiss the question without choosing */
     recipeLayout?: unknown;
@@ -115,6 +117,39 @@ export async function PATCH(request: Request) {
    * the matching vocabulary and the constraint owns storage, so a third list in this route would
    * be a third site to drift (§71).
    */
+  /*
+   * One allergen on or off, which is what a toggle actually expresses.
+   *
+   * Checked **before** `avoidedAllergens` so the delta is the path a screen takes. The whole-array
+   * branch below still exists for a deliberate absolute set (a script, a test, an import), but a
+   * control must not use it: it would be sending a list derived from a value it cannot verify, and
+   * that is precisely how a member's empty view came to be written over a real exclusion. The
+   * server applies the change to what is stored, so a wrong seed renders wrongly and erases
+   * nothing.
+   */
+  if (body.addAllergen !== undefined || body.removeAllergen !== undefined) {
+    const adding = body.addAllergen !== undefined;
+    const allergen = adding ? body.addAllergen : body.removeAllergen;
+    if (body.addAllergen !== undefined && body.removeAllergen !== undefined) {
+      return Response.json({ error: "send addAllergen or removeAllergen, not both" }, { status: 400 });
+    }
+    if (typeof allergen !== "string" || !allergen) {
+      return Response.json({ error: "addAllergen/removeAllergen must be an allergen name" }, { status: 400 });
+    }
+    try {
+      const family = await platformClient(auth.user.id).changeAvoidedAllergen(
+        allergen,
+        adding ? "add" : "remove",
+      );
+      return Response.json({ avoidedAllergens: family.avoidedAllergens });
+    } catch (thrown) {
+      return Response.json(
+        { error: thrown instanceof Error ? thrown.message : "that allergen was refused" },
+        { status: 400 },
+      );
+    }
+  }
+
   if (body.avoidedAllergens !== undefined) {
     const list = body.avoidedAllergens;
     if (!Array.isArray(list) || list.some((value) => typeof value !== "string")) {

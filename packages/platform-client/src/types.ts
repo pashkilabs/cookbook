@@ -360,6 +360,17 @@ export interface PlatformStore {
    */
   setAvoidedAllergens(input: { familyId: string; allergens: readonly string[] }): Promise<Family | null>;
   /**
+   * One allergen on or off, applied to the stored list rather than to a replacement set.
+   *
+   * Preferred over `setAvoidedAllergens` for anything a person drives: a toggle expresses one
+   * change, so a screen with a stale or wrongly-resolved list renders wrongly but cannot erase.
+   */
+  changeAvoidedAllergen(input: {
+    familyId: string;
+    allergen: string;
+    action: "add" | "remove";
+  }): Promise<Family | null>;
+  /**
    * The layout, and the asked-at stamp, written together.
    *
    * One call rather than two, because answering the question and recording that it was asked are
@@ -569,6 +580,8 @@ export interface PlatformClient {
    * site to drift.
    */
   setAvoidedAllergens(allergens: readonly string[]): Promise<Family>;
+  /** One allergen on or off, applied to what is stored — see the store interface. */
+  changeAvoidedAllergen(allergen: string, action: "add" | "remove"): Promise<Family>;
   /** `null` dismisses the question without choosing — see `PlatformStore.setRecipeLayout` */
   setRecipeLayout(layout: string | null): Promise<Family>;
   setKrogerLocation(locationId: string | null): Promise<Family>;

@@ -130,7 +130,13 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
 
       const member = await supabase
         .from("family_members")
-        .select("family_id, families!inner(id, name, owner_account_id, measurement_system, deleted_at)")
+        /*
+         * `FAMILY_COLUMNS` interpolated rather than hand-written, which is the whole point of the
+         * constant and the one site that did not get it. It was left out because it reads as
+         * un-substitutable inside an embedded resource, and it is not: the filter is a string,
+         * spaces and all. Verified against PostgREST before this line was written.
+         */
+        .select(`family_id, families!inner(${FAMILY_COLUMNS}, deleted_at)`)
         .eq("account_id", accountId)
         .is("deleted_at", null)
         .order("created_at", { ascending: true })
@@ -138,15 +144,13 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
         .maybeSingle();
       if (member.error) throw member.error;
 
-      const family = member.data?.families as
-        | {
-            id: string;
-            name: string;
-            owner_account_id: string;
-            measurement_system: string | null;
-            deleted_at: string | null;
-          }
-        | undefined;
+      /*
+       * Typed as the full row plus `deleted_at`. The previous cast named five of nine columns and
+       * `toFamily` accepted it, because every settings field was optional there — so a member read
+       * returned a Family with four values quietly absent and the defaults below made them look
+       * chosen. The fields are required now, which makes that shape a compile error.
+       */
+      const family = member.data?.families as (FamilyRow & { deleted_at: string | null }) | undefined;
       if (!family || family.deleted_at !== null) return null;
       return toFamily(family);
     },
@@ -257,6 +261,49 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
       const { data, error } = await supabase
         .from("families")
         .update({ avoided_allergens: allergens })
+        .eq("id", input.familyId)
+        .is("deleted_at", null)
+        .select(FAMILY_COLUMNS)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      if (!data) return null;
+      return toFamily(data);
+    },
+
+    /**
+     * One allergen on or off, applied to what is **stored** rather than to what a screen believed.
+     *
+     * `setAvoidedAllergens` replaces the whole set, and its own comment gave the reason: "that is
+     * what the screen edits: a partial update invites two tabs disagreeing about which allergens
+     * are on." The delta is better on exactly that axis. Two tabs disagreeing is a display
+     * problem — both show something and one is stale. A whole-array write from a stale seed is a
+     * *data* problem, and it is the one that happened: a member's screen resolved the list as
+     * empty, and one tick would have written that emptiness over a real exclusion. Worse, the
+     * stale-tab case the comment worried about *resurrects* removed allergens under whole-array
+     * (tab A still holding wheat writes wheat back), where a delta changes exactly one thing.
+     *
+     * Read-modify-write here rather than in the client, because the read must be the authoritative
+     * one. The remaining window is two writers toggling within the same round trip; that is a
+     * last-write-wins on one allergen, not a wipe, and the audit rows make it visible.
+     */
+    async changeAvoidedAllergen(input): Promise<Family | null> {
+      const current = await supabase
+        .from("families")
+        .select(FAMILY_COLUMNS)
+        .eq("id", input.familyId)
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (current.error) throw new Error(current.error.message);
+      if (!current.data) return null;
+
+      const held = new Set(toFamily(current.data).avoidedAllergens);
+      if (input.action === "add") held.add(input.allergen);
+      else held.delete(input.allergen);
+      const next = [...held].sort();
+
+      const { data, error } = await supabase
+        .from("families")
+        .update({ avoided_allergens: next })
         .eq("id", input.familyId)
         .is("deleted_at", null)
         .select(FAMILY_COLUMNS)
@@ -596,41 +643,67 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
   };
 }
 
-function toFamily(row: {
+/**
+ * Exactly the columns `FAMILY_COLUMNS` selects, and **required**, which is what makes a short
+ * select fail to compile rather than fail quietly.
+ *
+ * They used to be optional, for a real reason: a row read before a column's migration would not
+ * carry it, and a household from before `avoided_allergens` existed avoids nothing rather than
+ * being wrong. That reason has expired — every one of those migrations is long applied, hosted
+ * included (`/api/health` reports `schema: ok` against the newest). What the optionality did
+ * instead was let a five-column object satisfy a nine-column contract, and the four missing
+ * values were then dressed as choices by the defaults below. A field made optional so an old row
+ * still parses is a field a new row may also omit silently.
+ *
+ * Nullability follows the DDL rather than taste: four columns are NOT NULL with defaults, two are
+ * genuinely nullable.
+ */
+interface FamilyRow {
   id: string;
   name: string;
   owner_account_id: string;
-  measurement_system?: string | null;
-  timezone?: string | null;
-  avoided_allergens?: string[] | null;
-  kroger_location_id?: string | null;
-  recipe_layout?: string | null;
-  recipe_layout_asked_at?: string | null;
-}): Family {
+  measurement_system: string;
+  timezone: string;
+  avoided_allergens: string[];
+  kroger_location_id: string | null;
+  recipe_layout: string;
+  recipe_layout_asked_at: string | null;
+}
+
+function assertAllergens(row: FamilyRow): string[] {
+  if (!Array.isArray(row.avoided_allergens)) {
+    throw new Error(
+      "families.avoided_allergens was not selected: this read would disable the allergen filter " +
+        "silently. Every select against families must use FAMILY_COLUMNS.",
+    );
+  }
+  return row.avoided_allergens;
+}
+
+function toFamily(row: FamilyRow): Family {
   return {
     id: row.id,
     name: row.name,
     ownerAccountId: row.owner_account_id,
-    // defaulted rather than asserted: the column defaults to 'us', and a row read before that
-    // migration is a household that has never expressed a preference
     measurementSystem: row.measurement_system === "metric" ? "metric" : "us",
-    // same reasoning: the column defaults to UTC, and UTC is exactly what a household read
-    // before the column existed, so a row from before it is not wrong — it is unchanged
-    timezone: row.timezone || "UTC",
-    // same reasoning again: a row from before the column is a household that avoids nothing,
-    // which is not wrong — it is unchanged
-    avoidedAllergens: Array.isArray(row.avoided_allergens) ? row.avoided_allergens : [],
-    // a row from before the column is a household that has not picked a store, which is not wrong
-    krogerLocationId: row.kroger_location_id ?? null,
+    timezone: row.timezone,
     /*
-     * `rotation` rather than a second default invented here: the column's own default is
-     * `rotation`, and two defaults that could disagree is how a value ends up depending on which
-     * path read it. A row from before the migration is a household that has not answered the
-     * question, which is exactly what the default means.
+     * Read, never defaulted — this is the one field where a fallback was actively harmful.
+     *
+     * `?? []` turned an absent read into "this household avoids nothing", which is a plausible
+     * answer and was the wrong one for every invited member. Worse, `AllergenSetting` seeded its
+     * editor from this value and PATCHed the whole array back, so a defaulted read became an
+     * authoritative write and could erase a real list. **Never default a value that a control
+     * will PATCH in full.**
+     *
+     * The column is NOT NULL, so an absence here is a wrong select rather than a data state, and
+     * it throws: a safety filter that silently switches itself off is worse than a loud page.
      */
-    recipeLayout: row.recipe_layout ?? "rotation",
+    avoidedAllergens: assertAllergens(row),
+    krogerLocationId: row.kroger_location_id,
+    recipeLayout: row.recipe_layout,
     /** null means never asked, and only null prompts — see the migration */
-    recipeLayoutAskedAt: row.recipe_layout_asked_at ?? null,
+    recipeLayoutAskedAt: row.recipe_layout_asked_at,
   };
 }
 

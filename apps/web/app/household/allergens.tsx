@@ -31,23 +31,35 @@ const ALLERGENS = [
 export function AllergenSetting({ current }: { current: string[] }) {
   const [chosen, setChosen] = useState<string[]>(current);
   const [error, setError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
 
-  async function toggle(allergen: string) {
+  /**
+   * Sends the **change**, never the resulting list.
+   *
+   * This control used to PATCH the whole array, seeded from `current`. That made the screen
+   * authoritative about a value it had no way to verify — and when a resolver bug handed an
+   * invited member an empty list, one tick here would have written that emptiness over a real
+   * exclusion, for the person with the allergy, silently. The seed is now display only: a wrong
+   * one renders wrongly and cannot erase, because the server applies one change to what it holds.
+   */
+  async function send(allergen: string, action: "add" | "remove") {
     if (pending) return;
     const previous = chosen;
-    const next = chosen.includes(allergen)
-      ? chosen.filter((value) => value !== allergen)
-      : [...chosen, allergen].sort();
+    const next =
+      action === "remove"
+        ? chosen.filter((value) => value !== allergen)
+        : [...chosen, allergen].sort();
     setChosen(next);
     setError(null);
+    setConfirming(null);
 
     try {
       const response = await fetch("/api/household", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ avoidedAllergens: next }),
+        body: JSON.stringify(action === "add" ? { addAllergen: allergen } : { removeAllergen: allergen }),
       });
       if (!response.ok) {
         // put it back rather than leaving the screen claiming something the database does not say
@@ -61,6 +73,20 @@ export function AllergenSetting({ current }: { current: string[] }) {
       setChosen(previous);
       setError("No signal — that was not saved.");
     }
+  }
+
+  /*
+   * Removing the last one is the destructive direction, so it asks.
+   *
+   * §71 made this list household-wide on purpose — you do not cook two dinners — and the other
+   * face of that is that one person clearing it clears it for the person with the allergy.
+   * Adding needs no ceremony; emptying does. Inline rather than `confirm()`, which is better on a
+   * phone and cannot be suppressed by an embedding context.
+   */
+  function toggle(allergen: string) {
+    if (!chosen.includes(allergen)) return void send(allergen, "add");
+    if (chosen.length === 1) return setConfirming(allergen);
+    return void send(allergen, "remove");
   }
 
   return (
@@ -79,6 +105,32 @@ export function AllergenSetting({ current }: { current: string[] }) {
           </button>
         ))}
       </div>
+
+      {confirming && (
+        /*
+         * `.confirm` is the pattern this page already uses for removing a member, reused rather
+         * than restyled — and it already carries `flex-wrap`, so the two buttons and the sentence
+         * drop to their own lines on a phone instead of widening the row (§81). `min-width: 0` on
+         * the sentence because it is the flex child holding text.
+         */
+        <span className="confirm" style={{ marginTop: "0.6rem" }}>
+          <span className="meta" style={{ minWidth: 0 }}>
+            That is the last one — nothing will be hidden for anybody here, including whoever needs
+            it avoided.
+          </span>
+          <button
+            type="button"
+            className="danger"
+            disabled={pending}
+            onClick={() => void send(confirming, "remove")}
+          >
+            Stop avoiding it
+          </button>
+          <button type="button" className="quiet" onClick={() => setConfirming(null)}>
+            Keep avoiding it
+          </button>
+        </span>
+      )}
 
       {/*
         * Two sentences, and neither is optional.
