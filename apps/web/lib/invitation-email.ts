@@ -48,14 +48,29 @@ export async function sendInvitationEmail(invitation: InvitationEmail): Promise<
       from: `Pashki <${from}>`,
       to: [invitation.to],
       subject: `${invitation.invitedBy} invited you to ${invitation.householdName}`,
+      /*
+       * The app's own address, named — because until now this email contained **no URL but the
+       * token**, and somebody duly added the invitation page to her home screen.
+       *
+       * Every launch then loaded a spent token, was correctly told the invitation had been used,
+       * and offered only "Sign in" — which reported as "signed out every time I close the app"
+       * and cost an afternoon ruling out cookies, clients and middleware. The page now sends a
+       * member onward instead of explaining, and this line is the half that stops the next person
+       * making the same reasonable mistake: if the only address you were ever sent is a one-shot
+       * link, that is the one you will save.
+       */
       text:
         `${invitation.invitedBy} has invited you to share the recipes in ${invitation.householdName}.\n\n` +
         `Accept: ${link}\n\n` +
         `The link works once and expires in seven days. If you weren't expecting this, ignore it — ` +
-        `nothing happens until you follow the link.`,
+        `nothing happens until you follow the link.\n\n` +
+        `Afterwards, Pashki lives at ${siteUrl()} — that is the address to save or add to your ` +
+        `home screen, not the link above.`,
       html:
         `<p>${who} has invited you to share the recipes in <strong>${household}</strong>.</p>` +
         `<p><a href="${link}">Accept the invitation</a></p>` +
+        `<p>Afterwards, Pashki lives at <a href="${siteUrl()}">${escapeHtml(siteUrl())}</a> — ` +
+        `that is the address to save or add to your home screen, not the link above.</p>` +
         /*
          * The token value, interpolated — not a hex literal and not an exemption.
          *

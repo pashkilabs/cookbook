@@ -28,6 +28,7 @@
  * Needs `apps/web/.env.local` (or the same variables in the environment) for the service role,
  * which is used only to create and destroy the fixtures a real user would create.
  */
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
 const PASSED = 0;
@@ -1273,6 +1274,74 @@ try {
         "and the owner's layout is untouched by what the member chose",
         ownerBack.status === 200 && ownerBack.body?.recipeLayout === "browse",
         `HTTP ${ownerBack.status} — the owner still reads ${JSON.stringify(ownerBack.body?.recipeLayout ?? null)}, wanted "browse"`,
+      );
+
+      /*
+       * ---------------------------------------------------------------------------
+       * A spent invitation is not a dead end for the person who spent it
+       * ---------------------------------------------------------------------------
+       *
+       * Reported as "signed out every time she closes the app", and it was not a session fault:
+       * her home-screen icon pointed at `/invite/[token]`. Every launch loaded a spent token, was
+       * correctly told the invitation had been used, and offered only "Sign in" — which she
+       * already was. Three correct eliminations (cookies, client, middleware) and the cause was a
+       * bookmark.
+       *
+       * The token is never returned by the API — there is a check above asserting exactly that —
+       * so this mints one: `token_hash` is sha256 of the token in hex, so setting the hash of a
+       * string we chose makes the already-accepted invitation reachable at a URL we know. That is
+       * a service-role write to a platform table, which is what this script already does for
+       * provisioning and acceptance.
+       *
+       * `fetch` follows the redirect, so the assertion is on **where she lands** rather than on a
+       * 3xx: the recipe screen's own content, and the spent-token sentence absent. A status code
+       * would not distinguish a redirect into the app from a redirect back to sign-in.
+       */
+      const mintedToken = `smoke-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const mintedHash = createHash("sha256").update(mintedToken, "utf8").digest("hex");
+      let reachable = true;
+      try {
+        await rest("PATCH", `/invitations?id=eq.${invited.body?.invitation?.id}`, {
+          token_hash: mintedHash,
+        });
+      } catch {
+        reachable = false;
+      }
+
+      if (!reachable) {
+        skip(
+          "a member who opens their own spent invitation is sent into the app",
+          "could not re-key the invitation, so the spent-token page was not reached",
+        );
+      } else {
+        const spent = await screenAsInvitee(`/invite/${mintedToken}`);
+        const landedInApp = spent.text.includes("What you cook") || spent.text.includes("The Lundall Recipe Book");
+        const toldItIsSpent = spent.text.includes("already been used");
+        record(
+          "a member who opens their own spent invitation is sent into the app",
+          spent.status === 200 && landedInApp && !toldItIsSpent,
+          `HTTP ${spent.status} — ${
+            toldItIsSpent
+              ? "still told the invitation is spent, which is the bookmark loop"
+              : landedInApp
+                ? "landed on the recipe screen"
+                : "landed somewhere that is neither the app nor the spent-token page"
+          }`,
+        );
+      }
+
+      /*
+       * And the other dead end: a token that was never real. A signed-in visitor there is offered
+       * "Sign in", an instruction to do what they have already done — the same fault one branch
+       * along, and the one a member of *another* household would hit.
+       */
+      const nonsense = await screenAsInvitee("/invite/not-a-real-token-at-all");
+      record(
+        "and an unrecognised invitation offers a signed-in visitor the app, not a sign-in",
+        nonsense.status === 200 && nonsense.text.includes("Open Pashki") && !nonsense.text.includes("Sign in"),
+        `HTTP ${nonsense.status} — offers ${
+          nonsense.text.includes("Open Pashki") ? '"Open Pashki"' : ""
+        }${nonsense.text.includes("Sign in") ? ' "Sign in" (wrong for a signed-in visitor)' : ""}`.trim(),
       );
 
       /*

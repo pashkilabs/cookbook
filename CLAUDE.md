@@ -432,6 +432,36 @@ models be good enough. Do not add a silent-save path.
   code, because Phase 3's sync writes `deleted_at` straight into Postgres from a device and never
   calls a route. Children take the parent's *exact* timestamp, which is what makes an undelete
   distinguishable from a child deleted on its own.
+- **Three correct eliminations, and the answer was outside the space being searched.** "Paige is
+  signed out every time she closes the app" was investigated as a session fault, because that is
+  what the words describe. Each check was sound and each result was right: there is **no magic
+  link** in the codebase at all (so no separate-storage-jar mechanism for sign-in), `browserClient`
+  is one cookie-based construction on every path with a **400-day** `maxAge`, and the middleware
+  refreshes correctly with `getUser()` on a matcher covering her routes. I also enumerated every
+  owner-versus-member branch and found exactly one — the seam read, already fixed — and reported
+  that the suspected second architectural split did not exist.
+
+  **All of it true, and none of it the cause.** Her home-screen icon pointed at `/invite/[token]`.
+  Every launch loaded a spent token, was correctly told the invitation had been used, and offered
+  only "Sign in" — which she already was. The loop was a **bookmark**.
+
+  The transferable part is not "check the bookmark". It is that **a symptom names a subsystem, and
+  the name is a hypothesis wearing the costume of an observation.** "Signed out" says *session*, so
+  the search ran inside the session and every honest answer it returned was a fact about a place
+  the bug was not. Nothing in a sound elimination tells you the space is wrong; a clean elimination
+  and a mislocated search produce identical output, which is why three of them in a row read as
+  progress.
+
+  So before eliminating inside a named subsystem, spend one question on the boundary: **what is
+  actually being opened, typed, tapped or pointed at?** Here it was one screenshot of a home
+  screen. Same family as *print the thing, then search what came back*, asked about the user's
+  journey instead of about a file — and the cheap observation came from Stephen, not from the
+  code, because the code could not see it.
+
+  It also was not purely her mistake, which is the half worth fixing: the invitation email
+  contained **no URL but the one-shot token**, never naming where the app lives. If the only
+  address somebody is ever sent expires on use, that is the one they will save.
+
 - **A test can encode the bug as the specification.** The 1c check asserted that a second member
   *reads the household's layout*. Against the broken resolver that was exactly right; about the
   product it was exactly wrong, because how somebody browses is personal (§87). It was **green
