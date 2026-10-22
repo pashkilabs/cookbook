@@ -257,6 +257,9 @@ let problems = 0;
 let shots = 0;
 /* name -> the light shot's bytes, so the dark pass can prove the theme actually changed something */
 const lightBytes = new Map();
+/* how much the selected-state check actually got to compare, summed over every screen and theme */
+let pressedCandidates = 0;
+let pressedComparable = 0;
 
 for (const theme of ["light", "dark"]) {
   for (const { name, path, layout, marker } of SCREENS) {
@@ -431,6 +434,121 @@ for (const theme of ["light", "dark"]) {
      * failed to provision all produce a page with no overflow and no squeezed text — which is to
      * say, a clean pass. Each screen names something only it renders.
      */
+    /*
+     * ---------------------------------------------------------------------------
+     * Does a selected segment look different from an unselected one?
+     * ---------------------------------------------------------------------------
+     *
+     * The units control on `/household` rendered **US and Metric both filled terracotta** in both
+     * themes, for as long as Harvest has existed. `units.tsx` wrote `.button.selected` while the
+     * redesign had named the rule `.h-segmented button.is-selected`, so the class was applied and
+     * styled by nothing — both segments fell through to the bare `button` element selector.
+     *
+     * **Every guard was green and none of them could have seen it.** `check-harvest-classes` asks
+     * which `h-` classes nothing styles, and `selected` is not an `h-` class; the primitives test
+     * tests the primitive, which was correct and simply unused. `aria-pressed` was right
+     * throughout, so smoke's marker checks passed too.
+     *
+     * Two static-analysis attempts at a complement guard both missed it — the state class lives
+     * inside a `${...}` interpolation, which both versions stripped. So this is a *rendering*
+     * question and it belongs here, the same conclusion the 0px-wide title reached: when a
+     * stylesheet and a screenshot disagree, the screenshot is the one that has looked.
+     *
+     * Could-not-measure, not FAIL, when a group has no unpressed sibling: a two-way control with
+     * both segments on, or a one-segment group, cannot answer the question.
+     */
+    const states = await page.evaluate(() => {
+      const groups = new Map();
+      for (const el of document.querySelectorAll("[aria-pressed], [aria-checked]")) {
+        const value = el.getAttribute("aria-pressed") ?? el.getAttribute("aria-checked");
+        if (value !== "true" && value !== "false") continue;
+        const parent = el.parentElement;
+        if (!parent) continue;
+        if (!groups.has(parent)) groups.set(parent, []);
+        groups.get(parent).push({ el, on: value === "true" });
+      }
+
+      /*
+       * Everything a control might legitimately distinguish itself by — and the list grew twice,
+       * both times because the first version false-alarmed on correct code.
+       *
+       * `borderColor` is here because `.h-option.is-on` sets **border-color alone**, and a first
+       * version comparing only background, weight, shadow and colour reported the layout
+       * radiogroup as identical when it is plainly not. The **descendants** are here for the same
+       * reason one step down: that control also fills a child ring (`.h-radio.is-on`), and a
+       * control whose only difference is in a child is still a distinguishable control.
+       *
+       * Widening a comparison weakens a check, so it is worth being explicit: every property added
+       * here is one more way for a control to count as different, and the narrowest condition that
+       * separates the legitimate case is the right one — never an exemption for the class that
+       * tripped it, which would have been a blanket allow over a real signal.
+       */
+      const signature = (el) => {
+        const own = getComputedStyle(el);
+        const parts = [own.backgroundColor, own.color, own.fontWeight, own.boxShadow, own.borderColor, own.outlineColor];
+        for (const child of el.querySelectorAll("*")) {
+          const style = getComputedStyle(child);
+          parts.push(style.backgroundColor, style.borderColor, style.color, style.fontWeight);
+        }
+        return parts.join("|");
+      };
+
+      const identical = [];
+      let candidates = 0;
+      let comparable = 0;
+      for (const [parent, members] of groups) {
+        /*
+         * A group of ONE is a standalone toggle, not a segmented control — the shortlist button on
+         * a recipe tile is `aria-pressed` on its own and has no sibling by design. A first version
+         * counted those as "could not compare" and reported three screens as unmeasurable, which
+         * is noise a guard gets switched off for (§85's ratio lesson). Two or more members with
+         * the attribute is what makes a group a candidate at all.
+         */
+        if (members.length < 2) continue;
+        candidates += 1;
+        const on = members.find((m) => m.on);
+        const off = members.find((m) => !m.on);
+        if (!on || !off) continue;
+        comparable += 1;
+        if (signature(on.el) === signature(off.el)) {
+          const style = getComputedStyle(on.el);
+          identical.push({
+            group: (parent.className || parent.tagName).toString().slice(0, 40),
+            labels: members.map((m) => (m.el.textContent || "").trim().slice(0, 14)).join(" / "),
+            background: style.backgroundColor,
+            weight: style.fontWeight,
+          });
+        }
+      }
+      return { candidates, comparable, identical };
+    });
+
+    for (const fault of states.identical) {
+      console.error(
+        `  FAIL ${name} (${theme}): selected and unselected render identically in .${fault.group}`,
+      );
+      console.error(
+        `         ${fault.labels} — same background ${fault.background}, weight ${fault.weight}, shadow, colour, border and children`,
+      );
+      problems += 1;
+    }
+    /*
+     * Coverage is accumulated and printed once, and a screen with nothing selected is **not** a
+     * problem.
+     *
+     * A first version reported could-not-measure per screen whenever no group had both a selected
+     * and an unselected member, and incremented `problems`. That fired on 6 of 22 shots — the
+     * `/recipes` layouts, where the shortlist buttons are simply all unpressed — so an entirely
+     * normal screen state failed the run. A check that fails routinely is one people learn to
+     * ignore, which is worse than no check (the `check-migrations-pushed` argument, in a renderer).
+     *
+     * But silence must not read as success either, so the run says how much it actually compared.
+     * "0 of N groups comparable" and "14 of N" are the difference between a check that ran and a
+     * check that was present, and only the printed number tells them apart.
+     */
+    pressedCandidates += states.candidates;
+    pressedComparable += states.comparable;
+
     const body = await page.textContent("body");
     if (!body?.includes(marker) || body.includes("no household yet")) {
       console.error(`  COULD NOT MEASURE ${name} (${theme}): the page did not render its own content`);
@@ -458,6 +576,12 @@ for (const theme of ["light", "dark"]) {
 
 await browser.close();
 console.log(`\n${shots} screenshots in ${outDir}/ at ${WIDTH}px, against ${base}`);
+console.log(
+  pressedCandidates === 0
+    ? "  selected-state: no multi-member pressed/checked group on any screen — nothing to compare."
+    : `  selected-state: ${pressedComparable} of ${pressedCandidates} group(s) had both a selected and an ` +
+      `unselected member and were compared; the rest had nothing selected.`,
+);
 if (problems > 0) {
   console.error(`${problems} layout problem(s) a stylesheet cannot show.`);
   process.exit(1);

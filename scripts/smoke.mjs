@@ -1175,6 +1175,13 @@ try {
        *
        * Three steps, which is what the brief asked for: set as one member, read as a second
        * member of the same household, and assert the first member's is unchanged.
+       *
+       * **This assertion's direction depends on a design decision, and it has already reversed
+       * once.** It is here because a test can encode the bug as the specification: the previous
+       * version asserted the member reads the *household's* layout, was green throughout, and
+       * would have defended the fault against the fix. If the layout ever becomes shared again,
+       * this block does not need a better instrument — it needs reversing, deliberately. Anyone
+       * who makes it fail should check which of the two they changed before assuming a break.
        */
       const owners = await call("PATCH", "/api/household", { body: { recipeLayout: "browse" } });
       record(
@@ -1280,12 +1287,66 @@ try {
        * exactly the value it used to PATCH back. `aria-pressed="true"` marks a chosen allergen,
        * and a control showing none while two are stored is the fault that erased a real list.
        */
-      const pressed = (asMember.text.match(/aria-pressed="true"/g) ?? []).length;
-      record(
-        "and the member's own allergen control shows what is stored, not an empty set",
-        asMember.status === 200 && pressed >= 2,
-        `HTTP ${asMember.status} — ${pressed} allergen(s) shown as chosen on the member's screen, stored 2`,
-      );
+      /*
+       * ---------------------------------------------------------------------------
+       * Stored against rendered, as sets — not a count, and not of the whole page
+       * ---------------------------------------------------------------------------
+       *
+       * This was `aria-pressed="true"` counted across the entire document and compared with
+       * `>= 2`, under a name that promised it "shows what is stored". Two faults, and the run's
+       * own output printed the evidence: **"3 allergen(s) shown as chosen, stored 2"**.
+       *
+       * The third was the **units control**, which carries `aria-pressed` too. So the count was
+       * over two unrelated controls, and `>=` meant the assertion would have passed with *no*
+       * allergen chosen at all as long as something else on the page was pressed. The check that
+       * stands for the §87 fix — a member's control showing an empty list it would then write
+       * back — could not have failed for the reason it exists.
+       *
+       * Scoping it is the fix rather than waiting for the count to settle: migrating units to
+       * `SegmentedControl` keeps its `aria-pressed`, so the pollution does not go away.
+       */
+      /*
+       * Matched by the **allergen vocabulary**, not by a container.
+       *
+       * A first version scoped with `class="allergens"[\s\S]*?</div>\s*</div>` — a guess about
+       * nesting depth and about whether React emits whitespace between the closing tags, which is
+       * the "a window is a guess about a spelling" mistake this project has paid for. The nine
+       * labels are a closed set, so matching them is order-independent, nesting-independent, and
+       * cannot pick up the units control, whose segments say "US" and "Metric".
+       */
+      const ALLERGEN_LABELS = [
+        "Peanuts", "Tree nuts", "Milk & dairy", "Eggs", "Fish",
+        "Shellfish", "Soy", "Wheat & gluten", "Sesame",
+      ];
+      const pressedState = (label) => {
+        const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        return asMember.text.match(new RegExp(`aria-pressed="(true|false)"[^>]*>\\s*${escaped}\\s*<`))?.[1] ?? null;
+      };
+      const states = new Map(ALLERGEN_LABELS.map((label) => [label, pressedState(label)]));
+      const renderedOn = new Set([...states].filter(([, on]) => on === "true").map(([label]) => label));
+      const storedLabels = new Set(["Peanuts", "Wheat & gluten"]);
+      const agree =
+        renderedOn.size === storedLabels.size && [...storedLabels].every((label) => renderedOn.has(label));
+
+      if ([...states.values()].every((state) => state === null)) {
+        /*
+         * The control did not render, so "nothing is pressed" says nothing about the read.
+         * Absence and emptiness are indistinguishable, and an empty set looked like a real answer
+         * once already — that is the whole of §87.
+         */
+        skip(
+          "the member's own allergen control shows exactly what is stored",
+          "no allergen button rendered on the member's /household, so what it shows was not measured",
+        );
+      } else {
+        record(
+          "the member's own allergen control shows exactly what is stored",
+          asMember.status === 200 && agree,
+          `HTTP ${asMember.status} — stored {${[...storedLabels].join(", ")}}, rendered {${
+            [...renderedOn].join(", ") || "nothing"
+          }}`,
+        );
+      }
 
       /*
        * The destructive half. A toggle sends the change, not the list, so a member whose screen

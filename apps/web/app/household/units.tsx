@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { SegmentedControl } from "@/components/harvest";
 
 /**
  * Which units the household reads.
@@ -54,22 +55,32 @@ export function UnitsSetting({ current }: { current: "us" | "metric" }) {
     }
   }
 
+  /*
+   * `SegmentedControl`, not a hand-rolled row of buttons.
+   *
+   * This was `className={`button${selected ? " selected" : ""}`}` inside `.tabs`, and **`.selected`
+   * is defined in no stylesheet** — the Harvest redesign named it `.h-segmented button.is-selected`
+   * and this control was never migrated. So the class was applied, nothing styled it, and both
+   * segments fell through to the bare `button` element selector, which fills with `--primary`:
+   * **US and Metric both rendered as filled terracotta, in both themes, on every screenshot.**
+   *
+   * The allergen chips below survived the same missing class by accident, because their
+   * *unselected* branch says `" quiet"` and `button.quiet` does exist. One missing class, a
+   * correct-looking control in one place and a broken one here — which is why nobody reported it
+   * and why the difference is worth stating rather than fixing quietly.
+   *
+   * `disabled` while pending is dropped rather than reimplemented: the primitive owns the
+   * control's markup, `choose` already returns early on `pending`, and a second disabled
+   * mechanism inside a shared primitive would be a second site for its behaviour.
+   */
   return (
     <div className="units">
-      <div className="tabs" style={{ margin: 0 }}>
-        {OPTIONS.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            className={`button${system === option.value ? " selected" : ""}`}
-            aria-pressed={system === option.value}
-            disabled={pending}
-            onClick={() => void choose(option.value)}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        segments={OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+        value={system}
+        onChange={(next) => void choose(next)}
+        label="Which units this household reads"
+      />
       <p className="meta" style={{ marginTop: "0.5rem" }}>
         {OPTIONS.find((option) => option.value === system)?.example}
       </p>

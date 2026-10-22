@@ -432,6 +432,47 @@ models be good enough. Do not add a silent-save path.
   code, because Phase 3's sync writes `deleted_at` straight into Postgres from a device and never
   calls a route. Children take the parent's *exact* timestamp, which is what makes an undelete
   distinguishable from a child deleted on its own.
+- **A test can encode the bug as the specification.** The 1c check asserted that a second member
+  *reads the household's layout*. Against the broken resolver that was exactly right; about the
+  product it was exactly wrong, because how somebody browses is personal (§87). It was **green
+  throughout**, and it would have defended the fault against the fix — the next person to make the
+  layout per-member would have seen a failing check and concluded they had broken something.
+
+  **Every other shape on the list is a check failing to see something. This one saw it and
+  approved.** Not stale (§54a keeps answering a question that changed), not unused
+  (`EXTRACTOR_VERSION` was never turned), not adjacent (the seven-item list reported on a
+  neighbour of its claim), not wrong-axis (§84/§79, correct answers to a different question). This
+  one was pointed at precisely the right thing and recorded the wrong behaviour as the standard.
+
+  The defence is different too, and it is not a better instrument. It is one question asked of the
+  assertion itself: **does this describe the product, or only the code?** A test written from
+  observed behaviour cannot tell those apart — it will reproduce whatever it found, which is the
+  whole value of a regression test and the whole danger of one written before the behaviour was
+  agreed. So a check near a design decision says which way it points and why, in a comment, and an
+  assertion whose direction would reverse if the decision reversed is labelled as such. `smoke.mjs`
+  now carries that note on the per-member block.
+
+- **`pnpm shots` has photographed a lie twice, and both times the tell was in its own output.**
+  First a fixture whose `PATCH { course }` returned 400 for every recipe, so browse rendered one
+  chapter of nine and looked entirely plausible (§86). Then a stylesheet that answered **404**, so
+  every screen rendered as unstyled Times serif and the run reported 14 screens `ok`.
+
+  **Identical light/dark bytes is impossible for a correct render**, and eleven pairs were
+  byte-identical while the summary said "22 screenshots in both themes". Nothing compared them. In
+  the first case nothing checked that the fixture's write stuck. Both facts were already in the
+  tool's own hands.
+
+  So: **the instrument built to catch what guards cannot see needs its own guards, and they are
+  assertions about the photograph rather than about the app.** Three now, all exit 2: the fixture's
+  writes must stick, a stylesheet must have reached the page, and the two themes must differ. The
+  general form — ask what the picture would look like if the thing under it were missing entirely,
+  and assert against *that*, not against the app being correct.
+
+  **And the mundane cause, worth knowing:** `pnpm ship` runs `next build`, which **overwrites
+  `.next` out from under a running dev server** — the server then serves HTML linking assets that
+  no longer exist. That is what produced the 404'd stylesheet, and later a `MODULE_NOT_FOUND` 500.
+  After any `pnpm ship`, a dev server wants restarting before `pnpm shots` is believed.
+
 - **The renderer photographed unstyled HTML and called it a pass, and the tell was in the file
   sizes.** A dev server that had been up across many edits served
   `<link href="/_next/static/css/app/layout.css">` answering **404**. Every screen rendered as
