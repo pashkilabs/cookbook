@@ -616,7 +616,11 @@ try {
      *
      * `recipe_layout` says what to render; `recipe_layout_asked_at` says whether to ask. A
      * dismissal stamps the second and leaves the first, which is the only way "not now" can differ
-     * from "never asked" — and conflating them would re-prompt a household forever.
+     * from "never asked" — and conflating them would re-prompt somebody forever.
+     *
+     * Per **person** since §87, which is why the per-member half is a separate block further down:
+     * these run as the owner, and a check that only ever runs as the owner is what let an invited
+     * member read five of nine columns for five months.
      */
     const settingPage = await call("GET", "/household");
     const settingText = visible(typeof settingPage.body === "string" ? settingPage.body : "");
@@ -630,7 +634,7 @@ try {
     const options = [...settingText.matchAll(/aria-checked="(true|false)"/g)].map((m) => m[1]);
     const defaultChecked = options.length === 5 && options[0] === "true" && !options.slice(1).includes("true");
     record(
-      "a new household starts on the default layout",
+      "somebody who has never been asked starts on the default layout",
       settingPage.status === 200 && defaultChecked,
       settingPage.status !== 200
         ? `HTTP ${settingPage.status}`
@@ -643,7 +647,7 @@ try {
 
     const chose = await call("PATCH", "/api/household", { body: { recipeLayout: "browse" } });
     record(
-      "a household can say how it decides what to cook",
+      "a person can say how they decide what to cook",
       chose.status === 200 && chose.body?.recipeLayout === "browse" && Boolean(chose.body?.recipeLayoutAskedAt),
       `HTTP ${chose.status} layout=${chose.body?.recipeLayout} asked=${Boolean(chose.body?.recipeLayoutAskedAt)}`,
     );
@@ -1098,6 +1102,12 @@ try {
    * the same household, and assert the first member's value is unchanged. A single-member
    * assertion cannot see a resolver that is wrong for everybody except whoever wrote it.
    *
+   * **Two kinds of setting, and the assertions point opposite ways.** The allergen list is
+   * household-wide — one kitchen, one dinner (§71) — so a second member must read what the first
+   * one stored. The layout is personal since §87, so a second member must read their *own*. The
+   * two halves below are not variations on one check; one of them asserts sharing and the other
+   * asserts isolation, and the resolver bug would have failed both.
+   *
    * Signed in as the invitee with the password minted above — the account is a real member of this
    * household, so this is the product's own path and not an admin read.
    */
@@ -1110,7 +1120,7 @@ try {
 
     if (!inviteeToken.access_token) {
       skip(
-        "a second member of the household reads the household's settings, not a default",
+        "two members of one household: shared settings shared, personal settings their own",
         `could not sign in as the invitee — ${String(inviteeToken.error_description ?? inviteeToken.msg ?? "").slice(0, 60)}`,
       );
     } else {
@@ -1152,24 +1162,110 @@ try {
       };
 
       /*
-       * Set as the owner, read as the member. `browse` rather than the column default, so "the
-       * member sees browse" cannot pass by accident on an unread column — the bug being guarded
-       * against resolved to the default, which is what made it look like a choice.
+       * ---------------------------------------------------------------------------
+       * The layout: two members of one household, two answers (§87, brief 1c)
+       * ---------------------------------------------------------------------------
+       *
+       * The assertion here **inverted** when the column moved, and that is worth saying plainly
+       * because the old one looked like a stronger check than it was. It asserted that a member
+       * reads *the household's* layout, which was the right assertion against the broken resolver
+       * and the wrong one about the product: Stephen choosing the recipe book changed what Paige
+       * saw, and Paige is the one who cooks from it. So the same two fetches now prove the
+       * opposite, and a single-member check could not have told the two apart.
+       *
+       * Three steps, which is what the brief asked for: set as one member, read as a second
+       * member of the same household, and assert the first member's is unchanged.
        */
       const owners = await call("PATCH", "/api/household", { body: { recipeLayout: "browse" } });
       record(
-        "the owner sets a household layout",
+        "the owner sets their own layout",
         owners.status === 200 && owners.body?.recipeLayout === "browse",
         `HTTP ${owners.status} — ${JSON.stringify(owners.body?.recipeLayout ?? null)}`,
       );
 
-      const seen = await screenAsInvitee("/recipes");
-      const sawBrowse = seen.text.includes("The Lundall Recipe Book");
-      const sawRotation = seen.text.includes("What you cook");
+      /*
+       * The claim is an **absence** — the member does not get the owner's layout — so it needs a
+       * control in the same breath, or it passes whenever the marker is missing for any reason at
+       * all (§86). The control is the owner's own screen, read here rather than relied on from the
+       * earlier block: same library, same moment, same marker.
+       *
+       * The marker is the contents page's title. A first version also required the member's screen
+       * to carry the rotation heading, and that failed against entirely correct behaviour — this
+       * household's library is small enough that rotation renders the empty-cookbook state instead
+       * of its heading. So the rotation marker is reported as evidence and never gated on: it is a
+       * property of the library, not of the setting.
+       */
+      const BROWSE = "The Lundall Recipe Book";
+      const ownerSees = visible(String((await call("GET", "/recipes")).body ?? ""));
+      const memberBefore = await screenAsInvitee("/recipes");
+      const memberOnBrowse = memberBefore.text.includes(BROWSE);
+
+      if (!ownerSees.includes(BROWSE)) {
+        skip(
+          "a second member is not moved onto the layout the owner chose",
+          `the owner's own /recipes does not carry "${BROWSE}" either, so the member's not carrying it proves nothing`,
+        );
+      } else {
+        record(
+          "a second member is not moved onto the layout the owner chose",
+          memberBefore.status === 200 && !memberOnBrowse,
+          `HTTP ${memberBefore.status} — the owner's /recipes carries the contents page and the member's ${
+            memberOnBrowse
+              ? "DOES TOO, having never chosen it — the bug"
+              : `does not${memberBefore.text.includes("What you cook") ? ", and carries the rotation heading instead" : ""}`
+          }`,
+        );
+      }
+
+      /*
+       * And the question is per person, which is the half `recipe_layout_asked_at` exists for.
+       *
+       * Measured rather than assumed: the card only appears above `AT_A_TIME` recipes, so a small
+       * library would fail this for a reason that has nothing to do with the claim. A library too
+       * small to prompt reports NOT MEASURED — absence and emptiness are indistinguishable, and
+       * this project has paid for reading one as the other.
+       */
+      const PROMPT = "How do you usually pick one?";
+      const askedBefore = memberBefore.text.includes(PROMPT);
+
+      /*
+       * The member answers, and both answers stand at once. This is the assertion the household
+       * column could not pass at all: one column cannot hold two values.
+       */
+      const memberChose = await asInvitee("PATCH", "/api/household", { recipeLayout: "browse" });
       record(
-        "a second member of the household reads the household's settings, not a default",
-        seen.status === 200 && sawBrowse && !sawRotation,
-        `HTTP ${seen.status} — member's /recipes rendered ${sawBrowse ? "browse" : sawRotation ? "rotation (the column default — the bug)" : "neither marker"}, stored browse`,
+        "the member can choose for themselves",
+        memberChose.status === 200 && memberChose.body?.recipeLayout === "browse",
+        `HTTP ${memberChose.status} — ${JSON.stringify(memberChose.body?.recipeLayout ?? null)}`,
+      );
+
+      /*
+       * One rule, asserted in both directions: the card appears for somebody who has not answered
+       * and is gone once they have. One direction alone would pass with the stamp ignored — a card
+       * that never appears satisfies "gone after", and a card that always appears satisfies
+       * "present before".
+       */
+      if (!askedBefore) {
+        skip(
+          "the member is asked even though the owner answered, and asked only once",
+          "this household's library is below the prompt threshold, so the card could not appear for anybody",
+        );
+      } else {
+        const memberAfter = await screenAsInvitee("/recipes");
+        record(
+          "the member is asked even though the owner answered, and asked only once",
+          memberAfter.status === 200 && !memberAfter.text.includes(PROMPT),
+          `HTTP ${memberAfter.status} — the card was offered before the member answered and is ${
+            memberAfter.text.includes(PROMPT) ? "STILL offered after" : "gone after"
+          }; the owner had already answered`,
+        );
+      }
+
+      const ownerBack = await call("PATCH", "/api/household", { body: { recipeLayout: null } });
+      record(
+        "and the owner's layout is untouched by what the member chose",
+        ownerBack.status === 200 && ownerBack.body?.recipeLayout === "browse",
+        `HTTP ${ownerBack.status} — the owner still reads ${JSON.stringify(ownerBack.body?.recipeLayout ?? null)}, wanted "browse"`,
       );
 
       /*
@@ -1225,7 +1321,7 @@ try {
       );
     }
   } else {
-    skip("a second member of the household reads the household's settings, not a default", "no invited account");
+    skip("two members of one household: shared settings shared, personal settings their own", "no invited account");
   }
 
   console.log("\nplanner, shopping, storage");

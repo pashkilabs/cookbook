@@ -52,16 +52,14 @@ export interface Family {
    */
   avoidedAllergens: string[];
   /**
-   * How this household decides what to cook, which sets how `/recipes` is laid out.
+  /*
+   * The recipe layout used to live here and is now `public.member_settings.recipe_layout`.
    *
-   * A declared fact rather than an inference (§71, §85) — and a `string` rather than a union here
-   * because the seam must not own the app's vocabulary: the five values live in
-   * `apps/web/lib/recipe-layout.ts` and in a CHECK, and a union in the platform package would make
-   * a third site for the same list.
+   * It is **not** a household fact: how somebody browses a recipe book is personal, the way a
+   * dislike is personal (§71 one table along). It is also an app concern rather than a platform
+   * one, so it does not belong on this type at all — the platform knows who people are, the
+   * recipe app knows how they like to read it.
    */
-  recipeLayout: string;
-  /** when the in-context question was answered or dismissed; null means never asked */
-  recipeLayoutAskedAt: string | null;
   /**
    * The Kroger store this household shops at, or null (§74).
    *
@@ -370,15 +368,6 @@ export interface PlatformStore {
     allergen: string;
     action: "add" | "remove";
   }): Promise<Family | null>;
-  /**
-   * The layout, and the asked-at stamp, written together.
-   *
-   * One call rather than two, because answering the question and recording that it was asked are
-   * the same event — two calls would let one succeed and leave a household that has chosen a
-   * layout and will be asked again anyway. `layout: null` is a dismissal: it stamps the question
-   * as asked and leaves the layout alone.
-   */
-  setRecipeLayout(input: { familyId: string; layout: string | null }): Promise<Family | null>;
   /** the store, validated by a CHECK on the column rather than here */
   setKrogerLocation(input: { familyId: string; locationId: string | null }): Promise<Family | null>;
   setMeasurementSystem(input: {
@@ -582,8 +571,6 @@ export interface PlatformClient {
   setAvoidedAllergens(allergens: readonly string[]): Promise<Family>;
   /** One allergen on or off, applied to what is stored — see the store interface. */
   changeAvoidedAllergen(allergen: string, action: "add" | "remove"): Promise<Family>;
-  /** `null` dismisses the question without choosing — see `PlatformStore.setRecipeLayout` */
-  setRecipeLayout(layout: string | null): Promise<Family>;
   setKrogerLocation(locationId: string | null): Promise<Family>;
   removeMember(memberId: string): Promise<void>;
 

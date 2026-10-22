@@ -18,7 +18,8 @@ import { keepKidFriendly } from "@/lib/tastes";
  */
 import { SignOutButton } from "./sign-out";
 import { ChapterIcon, Chip, Eyebrow, SecondaryLink, TabBar } from "@/components/harvest";
-import { AT_A_TIME, isRecipeLayout, rotation, type Planned } from "@/lib/recipe-layout";
+import { AT_A_TIME, rotation, type Planned } from "@/lib/recipe-layout";
+import { readMemberSettings } from "@/lib/member-settings";
 import { counted, chapterHref, type Classified } from "@/lib/chapters";
 import { Choosing } from "./choosing";
 import { Tile } from "./tile";
@@ -85,6 +86,12 @@ export default async function RecipesPage({
    * search go through (§71). The reported bug was that this setting saved and changed nothing:
    * the matcher was measured, the control rendered, and no call site joined them.
    */
+  /*
+   * How this reader reads — their layout and whether they have been asked (§87). Read beside the
+   * household rather than from it: the two questions have different answers per person.
+   */
+  const reader = await readMemberSettings(supabase, family.id, auth.user.id);
+
   const found = await searchRecipes({
     supabase,
     familyId: family.id,
@@ -136,14 +143,15 @@ export default async function RecipesPage({
    * The layout, and the data each branch needs
    * ---------------------------------------------------------------------------
    *
-   * `family.recipeLayout` is NOT NULL with a default, so there is no fallback branch to forget.
-   * `isRecipeLayout` still guards it, because a value stored before a layout was removed from the
-   * code would otherwise reach a screen with no branch for it.
+   * The layout is **this reader's**, not the household's (§87): how somebody browses is personal
+   * the way a dislike is personal, and the household column changed what every member saw. A
+   * member with no row reads the default and is asked — `readMemberSettings` never invents one,
+   * because a read that wrote a row to learn its default would be a write on a GET.
    *
    * `searching` suspends the layout: a query or a filter means somebody has stopped browsing and
    * started looking, and chaptering a result set buries what they asked for.
    */
-  const layout = isRecipeLayout(family.recipeLayout) ? family.recipeLayout : "rotation";
+  const layout = reader.layout;
   const searching = q.length > 0 || filter !== null || chosen !== null || protein !== null;
 
   const narrowed = hits.filter(({ recipe }) => {
@@ -437,11 +445,12 @@ export default async function RecipesPage({
       )}
 
       {/*
-        * The question, once, where the problem is visible — and only where it has never been put.
-        * `recipe_layout_asked_at` is null for a household that has not answered, and a dismissal
-        * stamps it, so "not now" is permanent and "never asked" is the only state that prompts.
+        * The question, once, where the problem is visible — and only where it has never been put
+        * **to this person**. `recipe_layout_asked_at` is null for somebody who has not answered,
+        * and a dismissal stamps it, so "not now" is permanent and "never asked" is the only state
+        * that prompts. Per member on purpose: Stephen having answered is not Paige being asked.
         */}
-      {family.recipeLayoutAskedAt === null && narrowed.length > AT_A_TIME && (
+      {reader.askedAt === null && narrowed.length > AT_A_TIME && (
         <Choosing total={narrowed.length} />
       )}
 

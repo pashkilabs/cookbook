@@ -5533,3 +5533,129 @@ ordinary work gets switched off, and that is worse than no check). Identity is a
 so `pnpm shots` grew `chapter-starter` — the contents tile is 46px and the hero is 52px, a
 different element on a different surface, and that hero was invisible once already because an
 inline `<span>` takes no width.
+
+## §87 — The recipe layout is personal, and the seam stopped owning it
+
+**The report.** Stephen set the recipe book on `/household`. Paige — an invited member of the
+same household, and the person who actually cooks from it — went on seeing the rotation. Two
+separate faults, and only the first was the one being looked for.
+
+### The read fault, which was not about the layout at all
+
+`findFamilyForAccount` has two branches: an owner's household, and a membership. The owner's
+branch selected `FAMILY_COLUMNS`; the membership branch hand-wrote **five of nine columns**,
+because it reads as un-substitutable inside `families!inner(...)`. It is not — the filter is a
+string, and `families!inner(${FAMILY_COLUMNS})` works.
+
+So for five months every **invited** member resolved a household with `timezone`,
+`avoided_allergens`, `kroger_location_id`, `recipe_layout` and `recipe_layout_asked_at` absent,
+and `toFamily`'s `?? []` and `?? "rotation"` dressed the absences as choices. The layout was the
+cheap half. The expensive half was `avoided_allergens`: the filter silently applied nothing, and
+`AllergenSetting` seeded its editor from the empty value and PATCHed the whole array back, so a
+member's broken *read* could become an authoritative *write* over a real exclusion. It did. The
+Lundalls' list held `["peanut","wheat"]` on 17 October and was empty by the time this was looked
+at; `updated_at` had been overwritten by a later write and Postgres keeps no history, so
+**attribution is not available** and no name is recorded here. The list was not restored from a
+screenshot either — writing a safety list back from a reading nobody verified is the same act as
+the bug, with better intentions. Stephen re-ticked it himself, which is the only confirmation of
+the fix that the fix cannot fake.
+
+Three shapes worth keeping:
+
+1. **A consolidation that covers six of seven sites reads as complete.** `FAMILY_COLUMNS` was
+   created to end exactly this bug and its own comment said so. The site it missed was excluded by
+   **syntax**, not by oversight, so nobody re-counted — and the constant's existence became the
+   evidence that the problem was solved. A count of sites fixed is not a count of sites covered,
+   and the site that resists the pattern is the one that needed it most.
+2. **A default is a claim.** `?? []` on an allergen list is not a safe fallback; it is the sentence
+   "this household avoids nothing", which is plausible, wrong, and indistinguishable from a real
+   answer. `toFamily` now takes a **required** `FamilyRow` so a short select fails to compile, and
+   `avoided_allergens` **throws** rather than defaulting — a safety filter that switches itself off
+   quietly is worse than a loud page. Never default a value a control will PATCH in full.
+3. **A control that seeds itself from a read it cannot verify should not send the whole value.**
+   `AllergenSetting` now PATCHes a **delta** — `{addAllergen}` or `{removeAllergen}` — which
+   removes the failure instead of detecting it. The store does the read-modify-write server-side
+   through `FAMILY_COLUMNS`. Compare-and-set was the alternative and is strictly more code for a
+   weaker guarantee. And emptying a non-empty list now asks first, inline.
+
+`scripts/check-family-columns.mjs` is the guard `FAMILY_COLUMNS` was supposed to be: it fails the
+build on any select that names family columns literally, is mutation-tested, and reports
+could-not-measure as exit 2 — which it correctly did on its first run, when it matched only string
+literals and the compliant form passes an identifier.
+
+### The write fault: it was the wrong table
+
+Fixing the read made Stephen's choice reach Paige, and that is **also wrong**. How somebody browses
+a recipe book is personal — §71 one table along. A dislike is personal; so is this. The household
+column meant one member's answer decided the layout for everybody, and the member who answered was
+not the member who cooks.
+
+`families.recipe_layout` and `families.recipe_layout_asked_at` are gone.
+`private.assert_recipe_layout_is_per_member()` refuses their return, in the invariant chain, the
+way `assert_blends_never_public` does.
+
+**Where it went, and why not the two obvious places.** The brief offered `member_preferences` or a
+column on `family_members`. It is neither:
+
+- `member_preferences` is a row per *statement about food*: `(member, subject_kind, subject)` with
+  a `stance` of like or dislike. A layout is not a stance about a subject. Putting it there needs a
+  `subject_kind` of `'layout'` with the value smuggled into `subject` and `stance` forced to a lie.
+  That is modelling by coincidence of shape.
+- A column on `family_members` fails the boundary: `family_members` is a **platform** table, so
+  every layout change would route through the seam's HTTP surface — the platform carrying a method
+  for a vocabulary it does not own.
+
+So `public.member_settings`: one row per member, settings as CHECKed columns on it, `family_id`
+like every app table, read and written through the signed-in person's own session. The seam lost
+`Family.recipeLayout`, `Family.recipeLayoutAskedAt` and `setRecipeLayout` entirely — the platform
+knows who people are, this app knows how they like to read it.
+
+`recipe_layout_asked_at` moved too, which is the half that is easy to drop: "not now" and "never
+asked" are answers *a person* gives, so Paige is asked once even though Stephen has already
+answered. The migration carries the existing value forward for **whoever set it** (the owner, where
+`recipe_layout_asked_at` was not null) and leaves everybody else unasked.
+
+### Two things the implementation taught
+
+**Column grants make an upsert impossible, and the error says "table".** `.upsert(...)` failed with
+*permission denied for table member_settings* while a plain insert and a plain update both worked.
+PostgREST renders a merge-duplicates upsert as `ON CONFLICT (…) DO UPDATE SET` **every column in
+the payload** — `family_id` and `family_member_id` included — and those two carry an INSERT grant
+and deliberately no UPDATE grant, because a client must not move somebody's setting into another
+household (§26). The grant matrix was right and the statement was wrong. `ON CONFLICT DO NOTHING`
+needs only INSERT, so the write is **ensure the row, then set the columns we may set**: two
+statements, no race, and a failure between them still leaves a coherent row.
+
+**The smoke assertion inverted, and the old one looked stronger than it was.** It asserted that a
+member reads *the household's* layout — the right assertion against the broken resolver and the
+wrong one about the product. The same two fetches now assert the opposite. Three things follow:
+
+- The block now holds **two kinds of setting pointing opposite ways**: allergens are shared, so a
+  second member must read what the first stored; the layout is personal, so a second member must
+  read their own. They are not variations on one check.
+- The absence needs a **control in the same breath** (§86). A first version also required the
+  member's screen to carry the rotation heading, and it failed against correct behaviour: the smoke
+  household's library is small enough that rotation renders the empty-cookbook state instead. The
+  control is the owner's own screen, read at the same moment, and without it the check reports NOT
+  MEASURED.
+- The one-question-per-person half reports **NOT CHECKED** in smoke for the same reason — the card
+  only appears above `AT_A_TIME` recipes. The storage half is covered in
+  `packages/db/test/member-settings.test.ts` ("gives a new member no row, so they have not been
+  asked"). Two probes, one rule, and neither pretending to be both.
+
+### Still open, deliberately not bundled
+
+`measurement_system` has the same smell and **does not have the same answer**, so it is its own
+decision rather than a second column in this migration. The split is the sharp part: **personal for
+display, household for the basket.** Someone who thinks in grams should read grams; the shopping
+list cannot be, because §28 forbids mixing two markets in one purchase — a pint is 473 ml and a
+metric carton is 500, and one trip buys one of them. So a per-member display unit is a real
+feature and a per-member *basket* unit is a bug. That is a two-column change with a rule about
+which one each screen reads, and it wants its own measurement of how many households would set
+them differently at all.
+
+### Also noted, not fixed
+
+`/recipes` renders `The Lundall Recipe Book` as a literal for **every** household. The smoke marker
+now leans on that string, which makes it a check that would need rewriting the day the title is
+made real. Out of this brief's scope and recorded here so it is not discovered twice.

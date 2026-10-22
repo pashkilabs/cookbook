@@ -19,7 +19,10 @@ import { LAYOUT_CHOICES, type RecipeLayout } from "@/lib/recipe-layout";
  * "Not now" and "never asked" are different states and only one re-prompts. Both are written the
  * same way — `recipe_layout_asked_at` is stamped either way — so a dismissal is a real answer
  * rather than a deferral. The layout column is left alone by a dismissal, which is why the two are
- * separate columns (see the migration).
+ * separate columns (see `member_settings`).
+ *
+ * Both states are **per person** since §87: one member answering does not spend another member's
+ * one question, so Paige is asked once even though Stephen has already chosen.
  *
  * The three deferred layouts are shown and **disabled with a reason**, not hidden. A household
  * choosing between two options does not know what it is not being offered, and "not built yet" is
@@ -66,7 +69,8 @@ export function Choosing({ total }: { total: number }) {
     <section className="h-choosing-card">
       <h2 className="h-choosing-title">You have {total} recipes. How do you usually pick one?</h2>
       <p className="h-choosing-note">
-        We&rsquo;ll lay this page out to match. Changeable any time in Household.
+        We&rsquo;ll lay this page out to match, for you — everybody here picks their own.
+        Changeable any time in Household.
       </p>
 
       <div className="h-choosing-options">

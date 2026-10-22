@@ -6,16 +6,17 @@
  * The failure this exists for
  * ---------------------------------------------------------------------------
  *
- * `FAMILY_COLUMNS` was created to end exactly one bug, and its own comment said so: *"Adding
- * `recipe_layout` meant editing six strings, and a seventh call site that forgot one would return
- * a `Family` with the field quietly absent."* It consolidated six literal lists — and the seventh
+ * `FAMILY_COLUMNS` was created to end exactly one bug, and its own comment said so: *"Adding a
+ * column meant editing six strings, and a seventh call site that forgot one would return a
+ * `Family` with the field quietly absent."* It consolidated six literal lists — and the seventh
  * site, the membership branch of `findFamilyForAccount`, kept its own hand-written list of five
  * columns, because it reads as un-substitutable inside `families!inner(...)`. It is not; the
  * filter is a string.
  *
  * So for five months every **invited** member resolved a household with `timezone`,
- * `avoided_allergens`, `kroger_location_id`, `recipe_layout` and `recipe_layout_asked_at` absent,
- * and `toFamily`'s defaults dressed the absences as choices. The allergen one was the expensive
+ * `avoided_allergens`, `kroger_location_id` and the two layout columns absent (those two have
+ * since moved to `member_settings`, §87), and `toFamily`'s defaults dressed the absences as
+ * choices. The allergen one was the expensive
  * half: the filter silently applied nothing, and the screen that edits the list seeded itself from
  * the empty value and would write it back.
  *
@@ -30,7 +31,7 @@
  *
  * `FamilyRow` is required now, so a short select fails to compile — that is the stronger half and
  * it is mutation-tested in the type checker. This catches the case types cannot: a literal list
- * that happens to name all nine columns today and silently stops matching when a tenth is added.
+ * that happens to name every column today and silently stops matching when the next one is added.
  * The type is about *this* read; the guard is about the next column.
  *
  * Three outcomes, distinct exit codes: a check that cannot run must not look like one that passed.
@@ -41,14 +42,20 @@ import { join } from "node:path";
 const ROOTS = ["packages/platform-client/src", "apps/web/app", "apps/web/lib"];
 const CONSTANT = "FAMILY_COLUMNS";
 
-/* the columns, so a literal list naming several of them is recognisable as one */
+/*
+ * The columns, so a literal list naming several of them is recognisable as one.
+ *
+ * `recipe_layout` and `recipe_layout_asked_at` were here and are **not** any more: §87 moved them
+ * to `public.member_settings`, and leaving them in this list would fail the build on
+ * `lib/member-settings.ts`, which legitimately names both of a *different* table's columns. A
+ * guard keyed on column names has to follow the column, or it starts refusing correct code —
+ * which is the direction that gets a guard switched off.
+ */
 const COLUMNS = [
   "owner_account_id",
   "measurement_system",
   "avoided_allergens",
   "kroger_location_id",
-  "recipe_layout",
-  "recipe_layout_asked_at",
   "timezone",
 ];
 

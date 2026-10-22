@@ -6,12 +6,16 @@ import { LAYOUT_CHOICES, type RecipeLayout } from "@/lib/recipe-layout";
 import { LayoutPreview } from "./layout-preview";
 
 /**
- * How this household decides what to cook — the setting, beside units and timezone.
+ * How **you** decide what to cook — a personal setting, below the household ones.
  *
- * Asked as a **question about the household**, never as a list of layouts. The answer is a
- * declared fact, which §71 established beats an inferred one: a household that says "it depends
- * how much time we've got" has told us something no amount of behaviour would establish, and told
- * us on purpose.
+ * Asked as a **question about the person**, never as a list of layouts. The answer is a declared
+ * fact, which §71 established beats an inferred one: somebody who says "it depends how much time
+ * I've got" has told us something no amount of behaviour would establish, and told us on purpose.
+ *
+ * Per person since §87. It was a household column, so Stephen answering changed what Paige saw —
+ * and Paige is the one who cooks from it. The copy says so, because a setting that silently
+ * stopped being shared is worse than one that never was: somebody would change it and wait for
+ * the rest of the house to notice.
  *
  * The three that are not built are shown and disabled with a reason rather than hidden, for the
  * same reason the in-context card does it: a household choosing between two options cannot see
@@ -53,8 +57,8 @@ export function ChoosingSetting({ current }: { current: string }) {
     <section className="h-setting">
       <h2 className="h-setting-title">How do you usually decide what to cook?</h2>
       <p className="h-setting-note">
-        This sets how your recipes are laid out. Change it whenever you like — nothing is lost
-        either way.
+        This sets how the recipe book is laid out for you. Change it whenever you like — nothing is
+        lost either way.
       </p>
 
       <div className="h-choosing-options" role="radiogroup" aria-label="How you decide what to cook">

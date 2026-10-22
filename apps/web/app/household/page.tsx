@@ -9,6 +9,7 @@ import { SignOutButton } from "../recipes/sign-out";
 import { krogerConfig } from "@/lib/kroger";
 import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
+import { readMemberSettings } from "@/lib/member-settings";
 import { MEMBER_COLOURS, invitationState } from "@pashki/platform-client";
 import { Roster } from "./roster";
 import { childTastes } from "@/lib/tastes";
@@ -57,6 +58,14 @@ export default async function HouseholdPage() {
    */
   const tastes = await childTastes(supabase, auth.user.id, family.id);
 
+  /*
+   * This person's own settings, which is why they are read separately from the household's.
+   *
+   * `family.recipeLayout` is gone: Stephen choosing the recipe book changed what Paige saw, and
+   * Paige is the one who cooks from it (§87).
+   */
+  const mine = await readMemberSettings(supabase, family.id, auth.user.id);
+
   // read here, not in the client component: `lib/kroger` holds a client secret and
   // `check-server-only` would refuse it in a "use client" file
   const krogerEnvironment = krogerConfig()?.environment ?? null;
@@ -93,7 +102,22 @@ export default async function HouseholdPage() {
           one dinner gets cooked.
         </p>
         <AllergenSetting current={family.avoidedAllergens} />
-        <ChoosingSetting current={family.recipeLayout} />
+      </section>
+
+      {/*
+        * Its own section, below the household ones, because it is the only setting on this screen
+        * that is **not** shared — and a personal setting sitting inside "What you avoid" read as
+        * one more thing that applies to everybody. Which settings change what the whole household
+        * gets, and which change only your own view, is the distinction this screen has to make
+        * visible rather than leave to be discovered.
+        */}
+      <section style={{ marginBottom: "2rem" }}>
+        <h2>How you read the recipe book</h2>
+        <p className="subtitle">
+          Yours alone — everybody here picks their own, and changing this changes nothing for
+          anyone else.
+        </p>
+        <ChoosingSetting current={mine.layout} />
       </section>
 
       <section style={{ marginBottom: "2rem" }}>

@@ -65,13 +65,16 @@ const INVITATION_COLUMNS =
 /**
  * One select list, because there were **six identical copies** of it.
  *
- * Adding `recipe_layout` meant editing six strings, and a seventh call site that forgot one would
- * return a `Family` with the field quietly absent. `INVITATION_COLUMNS` above is the convention
+ * Adding a column meant editing six strings, and a seventh call site that forgot one would
+ * return a `Family` with the field quietly absent — which is what the membership branch did for
+ * five months, reading five of the then nine columns. `INVITATION_COLUMNS` above is the convention
  * this file already had; the family reads had drifted from it. Same lesson as the eval and the
- * product building their cascades in two places — **remove the second site rather than watch it.**
+ * product building their cascades in two places — **remove the second site rather than watch
+ * it** — and `scripts/check-family-columns.mjs` now refuses a select that names a column
+ * literally, because a convention only holds while somebody remembers it.
  */
 const FAMILY_COLUMNS =
-  "id, name, owner_account_id, measurement_system, timezone, avoided_allergens, kroger_location_id, recipe_layout, recipe_layout_asked_at";
+  "id, name, owner_account_id, measurement_system, timezone, avoided_allergens, kroger_location_id";
 
 /** Never carries the token hash: it is not selected, so it cannot be leaked by a caller. */
 function toInvitation(row: {
@@ -210,38 +213,6 @@ export function createSupabasePlatformStore(supabase: SupabaseClient): PlatformS
       const { data, error } = await supabase
         .from("families")
         .update({ kroger_location_id: input.locationId })
-        .eq("id", input.familyId)
-        .is("deleted_at", null)
-        .select(FAMILY_COLUMNS)
-        .maybeSingle();
-      if (error) throw new Error(error.message);
-      if (!data) return null;
-      return toFamily(data);
-    },
-
-    async setRecipeLayout(input): Promise<Family | null> {
-      /*
-       * The layout and the asked-at stamp in one UPDATE.
-       *
-       * Answering the question and recording that it was asked are the same event. Two writes
-       * would let the first succeed and the second fail, leaving a household that has chosen a
-       * layout and will be prompted again anyway — and a prompt that returns after an answer is
-       * worse than one that never appeared.
-       *
-       * `layout: null` is a **dismissal**: it stamps the question and leaves `recipe_layout` at
-       * whatever it was, which is the default for anybody who has never chosen. That is why the
-       * two columns exist: the layout says what to render, the stamp says whether to ask.
-       *
-       * No validation here. The CHECK on the column owns the list, and a second copy in this file
-       * would be a third site for the five values — the thing the select-list consolidation above
-       * was about.
-       */
-      const patch: Record<string, unknown> = { recipe_layout_asked_at: new Date().toISOString() };
-      if (input.layout !== null) patch.recipe_layout = input.layout;
-
-      const { data, error } = await supabase
-        .from("families")
-        .update(patch)
         .eq("id", input.familyId)
         .is("deleted_at", null)
         .select(FAMILY_COLUMNS)
@@ -666,8 +637,6 @@ interface FamilyRow {
   timezone: string;
   avoided_allergens: string[];
   kroger_location_id: string | null;
-  recipe_layout: string;
-  recipe_layout_asked_at: string | null;
 }
 
 function assertAllergens(row: FamilyRow): string[] {
@@ -701,9 +670,6 @@ function toFamily(row: FamilyRow): Family {
      */
     avoidedAllergens: assertAllergens(row),
     krogerLocationId: row.kroger_location_id,
-    recipeLayout: row.recipe_layout,
-    /** null means never asked, and only null prompts — see the migration */
-    recipeLayoutAskedAt: row.recipe_layout_asked_at,
   };
 }
 

@@ -255,6 +255,8 @@ const SCREENS = [
 
 let problems = 0;
 let shots = 0;
+/* name -> the light shot's bytes, so the dark pass can prove the theme actually changed something */
+const lightBytes = new Map();
 
 for (const theme of ["light", "dark"]) {
   for (const { name, path, layout, marker } of SCREENS) {
@@ -273,8 +275,81 @@ for (const theme of ["light", "dark"]) {
     // the fonts decide every width below, so a shot before they land measures the fallback
     await page.evaluate(() => document.fonts.ready);
 
-    writeFileSync(`${outDir}/${name}-${theme}.png`, await page.screenshot({ fullPage: true }));
+    /*
+     * ---------------------------------------------------------------------------
+     * Did any CSS arrive at all?
+     * ---------------------------------------------------------------------------
+     *
+     * This tool exists because some faults are only visible in a picture, and it spent a whole
+     * run photographing **unstyled HTML**: a stale dev server served
+     * `<link href="/_next/static/css/app/layout.css">` that answered **404**, so every screen
+     * rendered as Times serif with native form controls — and the run reported 14 screens `ok`
+     * and 8 overflow problems that were artefacts of having no stylesheet.
+     *
+     * The tell was there and unread: **every light/dark pair was byte-identical**, because
+     * there was no palette to vary. A theme emulation that reaches the page (`matchMedia`
+     * agreed) and a palette that reaches the page are different facts.
+     *
+     * Same family as the fixture that silently failed above, and worse in one way — that one
+     * left a plausible picture of the wrong data, this one left a picture of no design at all
+     * and still called it a pass. So: the page must have a stylesheet with rules in it, and a
+     * palette token must resolve. Exit 2, could-not-measure, never a FAIL — a run against a
+     * broken server has measured nothing and must not read as a layout verdict.
+     */
+    const styling = await page.evaluate(() => {
+      let rules = 0;
+      let blocked = 0;
+      for (const sheet of document.styleSheets) {
+        try {
+          rules += sheet.cssRules.length;
+        } catch {
+          blocked += 1;
+        }
+      }
+      return {
+        sheets: document.styleSheets.length,
+        rules,
+        blocked,
+        /* a token from the generated palette: present in light and dark, so its absence is the stylesheet's */
+        text: getComputedStyle(document.documentElement).getPropertyValue("--text").trim(),
+      };
+    });
+    if (styling.sheets === 0 || (styling.rules === 0 && styling.blocked === 0) || !styling.text) {
+      console.error(
+        `  COULD NOT MEASURE ${name} (${theme}): no stylesheet reached the page — ` +
+          `${styling.sheets} sheet(s), ${styling.rules} rule(s), --text=${styling.text || "(unset)"}. ` +
+          `A shot of unstyled HTML is not a layout measurement. Restart the dev server and re-run.`,
+      );
+      await context.close();
+      process.exit(2);
+    }
+
+    const png = await page.screenshot({ fullPage: true });
+    writeFileSync(`${outDir}/${name}-${theme}.png`, png);
     shots += 1;
+
+    /*
+     * The two themes must differ, and this is the assertion the unstyled run should have failed.
+     *
+     * Every pair came back **byte-identical** — 11 screenshots written twice — and the run said
+     * "22 screenshots in both themes". Nothing compared them, so the one fact that would have
+     * exposed it sat in the file sizes. Playwright's `colorScheme` did reach the page
+     * (`matchMedia` agreed); what did not reach it was a palette.
+     *
+     * No screen here is colourless, so identical bytes cannot be a legitimate outcome: it means
+     * the dark palette did not apply. Could-not-measure rather than a FAIL, for the same reason
+     * as the stylesheet check — this says the measurement did not happen, not that the layout is
+     * wrong.
+     */
+    if (theme === "light") {
+      lightBytes.set(name, png);
+    } else if (lightBytes.get(name)?.equals(png)) {
+      console.error(
+        `  COULD NOT MEASURE ${name} (dark): byte-identical to the light shot, so the dark ` +
+          `palette never applied — these are one screenshot written twice, not two themes.`,
+      );
+      problems += 1;
+    }
 
     /*
      * The two things only a layout engine knows.

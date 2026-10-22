@@ -41,6 +41,9 @@ export const APP_TABLES = [
   "ratings",
   // what a person has SAID they like and dislike, which outranks what ratings imply (§71)
   "member_preferences",
+  // per-person app settings — how somebody reads the recipe book, which is not the household's
+  // business any more than a dislike is (§87)
+  "member_settings",
   "meal_plans",
   "plan_entries",
   "shortlist_entries",
@@ -88,6 +91,7 @@ export const HOUSEHOLD_TABLES = [
   "recipe_steps",
   "ratings",
   "member_preferences",
+  "member_settings",
   "meal_plans",
   "plan_entries",
   "shortlist_entries",

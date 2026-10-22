@@ -1,6 +1,8 @@
 import { provisionForConfirmedAccount } from "@/lib/provisioning";
-import { platformClient } from "@/lib/platform";
+import { platformClient, platformStore } from "@/lib/platform";
 import { userClient } from "@/lib/supabase-server";
+import { memberIdFor, writeRecipeLayout } from "@/lib/member-settings";
+import { isRecipeLayout } from "@/lib/recipe-layout";
 
 /**
  * Provision the household for whoever holds this bearer token.
@@ -167,31 +169,55 @@ export async function PATCH(request: Request) {
   }
 
   /*
-   * How this household decides what to cook (§85).
+   * How **this person** reads the recipe book (§85, moved per-member in §87).
+   *
+   * Not a household setting and not a platform one, so this branch writes `member_settings`
+   * through the signed-in person's own session rather than through the seam — see
+   * `lib/member-settings.ts` for why it is a third table and not a column on `family_members`.
    *
    * `recipeLayout: null` is a **dismissal** — the question was put and declined, which stamps
    * `recipe_layout_asked_at` and leaves the layout alone. That is why `null` is meaningful here
    * rather than a missing field, and why `undefined` (the key absent) means "this PATCH is not
    * about the layout" as every other branch in this route does.
-   *
-   * Validated for *type* here and for *value* by the CHECK on the column. A third copy of the
-   * five names in this route would be a third site to drift from, which is the reason the
-   * allergen branch above does the same.
    */
   if (body.recipeLayout !== undefined) {
     const layout = body.recipeLayout;
-    if (layout !== null && typeof layout !== "string") {
+    /*
+     * Validated against the vocabulary here, unlike the allergen branch, because this write does
+     * not go through the seam: the CHECK is still the authority, and `isRecipeLayout` is the
+     * module that owns the list rather than a copy of it. A bad value would otherwise come back
+     * as a constraint violation in a 400 nobody can read.
+     */
+    if (layout !== null && !isRecipeLayout(layout)) {
       return Response.json(
         { error: "recipeLayout must be a layout name, or null to dismiss the question" },
         { status: 400 },
       );
     }
     try {
-      const family = await platformClient(auth.user.id).setRecipeLayout(layout);
-      return Response.json({
-        recipeLayout: family.recipeLayout,
-        recipeLayoutAskedAt: family.recipeLayoutAskedAt,
-      });
+      const family = await platformStore().findFamilyForAccount(auth.user.id);
+      if (!family) return Response.json({ error: "this account has no household" }, { status: 404 });
+
+      /*
+       * No member row means no row to attach a setting to — the foreign key says so. It refuses
+       * loudly rather than answering 200 to a write that stored nothing: a silently dropped
+       * write looks like it worked, which is the worse half of §80.
+       */
+      const memberId = await memberIdFor(family.id, auth.user.id);
+      if (!memberId) {
+        return Response.json(
+          { error: "this account is not a member of its household, so it has nowhere to save this" },
+          { status: 409 },
+        );
+      }
+
+      /*
+       * Echo what was **stored**, not what was sent: a dismissal carries `null` and leaves the
+       * layout alone, so a route repeating its own input would report a dismissal as having set
+       * the layout to nothing.
+       */
+      const saved = await writeRecipeLayout(supabase, family.id, memberId, layout);
+      return Response.json({ recipeLayout: saved.layout, recipeLayoutAskedAt: saved.askedAt });
     } catch (thrown) {
       return Response.json(
         { error: thrown instanceof Error ? thrown.message : "that layout was refused" },

@@ -432,6 +432,54 @@ models be good enough. Do not add a silent-save path.
   code, because Phase 3's sync writes `deleted_at` straight into Postgres from a device and never
   calls a route. Children take the parent's *exact* timestamp, which is what makes an undelete
   distinguishable from a child deleted on its own.
+- **The renderer photographed unstyled HTML and called it a pass, and the tell was in the file
+  sizes.** A dev server that had been up across many edits served
+  `<link href="/_next/static/css/app/layout.css">` answering **404**. Every screen rendered as
+  Times serif with native form controls, and `pnpm shots` reported *14 screens ok, 8 overflow
+  problems* — the eight being artefacts of having no stylesheet at all. Playwright's `colorScheme`
+  emulation was fine (`matchMedia` agreed); what never arrived was a palette.
+
+  **Every light/dark pair was byte-identical** — 11 screenshots written twice while the run said
+  "22 screenshots in both themes" — and nothing compared them, so the one fact that would have
+  exposed it sat unread in `ls -la`. This is the tool built *because* guards cannot see layout,
+  failing in exactly the family it was built from: a probe that could not have succeeded, leaving
+  a confident artefact nobody re-reads. The fixture-classification bug (§86) left a plausible
+  picture of the wrong data; this left a picture of no design and still passed.
+
+  Two assertions now, both exit 2 rather than FAIL, because a run against a broken server has
+  measured nothing and must not read as a layout verdict: **a stylesheet must have reached the
+  page** (sheets, rules, and `--text` resolving), and **the two themes must differ byte-for-byte**.
+  No screen here is colourless, so identical bytes cannot be a legitimate outcome.
+
+  The habit: when a visual tool passes, ask what it would look like if the thing under the
+  picture were missing entirely — and `curl` the stylesheet the page links, rather than trusting
+  that a 200 on the page means a 200 on its assets. A long-lived dev server is a stale one.
+
+- **Column grants make an upsert impossible, and the error blames the table.** `.upsert()` on
+  `member_settings` failed with *permission denied for table member_settings* while a plain insert
+  and a plain update both worked. PostgREST renders a merge-duplicates upsert as
+  `ON CONFLICT (…) DO UPDATE SET` **every column in the payload** — the key columns included — and
+  `family_id`/`family_member_id` carry an INSERT grant and deliberately no UPDATE grant, because a
+  client must not move a row into another household (§26). So the grant matrix was right and the
+  statement was wrong, and the message named the table rather than the column that refused.
+  `ON CONFLICT DO NOTHING` needs only INSERT, so the shape is **ensure the row, then set the
+  columns you may set** — two statements, no race, and a failure between them leaves a coherent
+  row. Any table following the grant-columns rule cannot be upserted; reach for this pattern
+  first rather than after the 400.
+
+- **An assertion can *invert* when a design changes, and the old one reads as the stronger of the
+  two.** A smoke check asserted that a second member reads *the household's* layout. Against the
+  broken resolver that was exactly right; about the product it was exactly wrong, because the
+  layout is personal (§87) — so the same two fetches now assert the opposite. This is §54a's
+  rotting proxy with the sign flipped: a stale proxy keeps answering a question that stopped
+  being the question, and this one kept **asserting the behaviour that became the bug**. It was
+  green throughout, and it would have defended the fault against the fix.
+
+  The tell is available before the change: ask of every check near a design decision **which way
+  does this point, and would it still point that way if the decision reversed?** A check whose
+  direction depends on a design choice gets a comment saying so, because nothing else will
+  distinguish it from a check about a rule.
+
 - **Row-level security says nothing about columns.** A policy decides which *rows* a
   caller may write; a table-wide `INSERT`/`UPDATE` grant then lets it write every
   column of those rows. Correct policies therefore coexisted with a client able to set
