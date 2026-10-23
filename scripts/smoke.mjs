@@ -665,6 +665,151 @@ try {
     );
 
     /*
+     * A typed item in a week with **nothing planned**, which is where it used to disappear.
+     *
+     * regression: `buildShoppingWeek` consolidated the item into `lines` — its own comment says
+     * this case must work — and `/shopping` gated the whole list behind `plannedCount > 0`, so the
+     * screen said "No list yet", rendered no aisle, and showed the item only inside the add box.
+     * Each half correct, the join broken, and no component test can see a join.
+     *
+     * A far week rather than this one, because the fixture above plans meals into the current week
+     * and an empty week has to be genuinely empty to measure anything.
+     */
+    const emptyWeek = "2027-03-01";
+    const loneItem = await call("POST", "/api/shopping-extras", {
+      body: { text: "4 kumquat kazoos", weekStart: emptyWeek },
+    });
+    const loneWeek = await call("GET", `/shopping?week=${emptyWeek}`);
+    const loneText = visible(typeof loneWeek.body === "string" ? loneWeek.body : "");
+    record(
+      "a typed item is a shopping list even with nothing planned",
+      loneItem.status === 200 && loneWeek.status === 200
+        && loneText.includes("kumquat kazoos") && !loneText.includes("No list yet"),
+      loneItem.status !== 200
+        ? `POST ${loneItem.status} ${JSON.stringify(loneItem.body?.error ?? null)}`
+        : loneWeek.status !== 200
+          ? `HTTP ${loneWeek.status} — the screen did not render`
+          : loneText.includes("No list yet")
+            ? "the screen says No list yet while holding a typed item"
+            : foundDetail(loneText, "kumquat kazoos", "the typed item is not on the list"),
+    );
+    if (typeof loneItem.body?.id === "string") {
+      await call("DELETE", `/api/shopping-extras?id=${loneItem.body.id}`);
+    }
+
+    /*
+     * ---------------------------------------------------------------------------
+     * The groups a household makes — Costco, HEB, Trader Joes, Boo Basket (§91)
+     * ---------------------------------------------------------------------------
+     *
+     * **One walk, in order, rather than a check per part.** The value crosses four boundaries —
+     * created on `/household`, attached to an item on `/shopping`, renamed back on `/household`,
+     * read on `/shopping` — and four of this project's bugs have lived in a join with every hop
+     * correct and nothing on the screen. A component test cannot see a handoff by construction.
+     *
+     * The rename is the assertion that matters, because it is the only thing a table buys over
+     * free text: the item must follow the row, not a copy of the string.
+     */
+    const groupName = `Kumquat Depot ${Date.now().toString(36).slice(-5)}`;
+    const madeGroup = await call("POST", "/api/shopping-groups", { body: { name: groupName } });
+    record(
+      "a group the household makes is accepted",
+      madeGroup.status === 200 && typeof madeGroup.body?.id === "string" && madeGroup.body?.created === true,
+      `HTTP ${madeGroup.status} ${JSON.stringify(madeGroup.body?.name ?? madeGroup.body?.error ?? null)}`,
+    );
+
+    const householdScreen = await call("GET", "/household");
+    const householdText = visible(typeof householdScreen.body === "string" ? householdScreen.body : "");
+    record(
+      "and the screen that manages groups is reachable, not just the route behind it",
+      householdScreen.status === 200 && householdText.includes("How you group the list"),
+      householdScreen.status !== 200
+        ? `HTTP ${householdScreen.status} — the household screen did not render, so what it offers was not measured`
+        : foundDetail(householdText, "How you group the list", "the route exists and there is no way in from the product"),
+    );
+
+    if (typeof madeGroup.body?.id !== "string") {
+      skip("a typed item lands in its group", "no group was made, so attaching to one proves nothing");
+      skip("and renaming the group renames it on the list without losing the item", "no group was made");
+      skip("and removing the group keeps the thing to buy", "no group was made");
+    } else {
+      const groupId = madeGroup.body.id;
+
+      /*
+       * Typing the **same name again** must return the same group rather than refusing or
+       * doubling: somebody typing "costco" on Friday when "Costco" exists means Costco. Asserted
+       * on the id, because a matching name proves nothing about which row answered.
+       */
+      const again = await call("POST", "/api/shopping-groups", { body: { name: groupName.toUpperCase() } });
+      record(
+        "and typing the same name differently finds that group instead of making a second",
+        again.status === 200 && again.body?.id === groupId && again.body?.created === false,
+        `HTTP ${again.status} — ${again.body?.id === groupId ? "same group" : `a different id, created=${again.body?.created}`}`,
+      );
+
+      const inGroup = await call("POST", "/api/shopping-extras", {
+        body: { text: "6 kumquat candles", weekStart: monday, groupId },
+      });
+      const grouped = await call("GET", `/shopping?week=${monday}`);
+      const groupedText = visible(typeof grouped.body === "string" ? grouped.body : "");
+      record(
+        "a typed item lands in its group",
+        inGroup.status === 200 && grouped.status === 200
+          && groupedText.includes(groupName) && groupedText.includes("kumquat candles"),
+        inGroup.status !== 200
+          ? `POST ${inGroup.status} ${JSON.stringify(inGroup.body?.error ?? null)}`
+          : grouped.status !== 200
+            ? `HTTP ${grouped.status} — the list did not render`
+            : `${groupedText.includes(groupName) ? "group shown" : "GROUP MISSING"}, ${groupedText.includes("kumquat candles") ? "item shown" : "ITEM MISSING"}`,
+      );
+
+      const renamed = `${groupName} Annexe`;
+      const renameSaid = await call("PATCH", "/api/shopping-groups", { body: { id: groupId, name: renamed } });
+      const afterRename = await call("GET", `/shopping?week=${monday}`);
+      const renamedText = visible(typeof afterRename.body === "string" ? afterRename.body : "");
+      /*
+       * Both directions, because "the new name is there" would pass with the item orphaned and
+       * "the item is there" would pass with the rename lost. The old name must be **gone** — a
+       * string copied rather than referenced would leave it behind.
+       */
+      record(
+        "and renaming the group renames it on the list without losing the item",
+        renameSaid.status === 200 && afterRename.status === 200
+          && renamedText.includes(renamed) && renamedText.includes("kumquat candles"),
+        renameSaid.status !== 200
+          ? `PATCH ${renameSaid.status} ${JSON.stringify(renameSaid.body?.error ?? null)}`
+          : afterRename.status !== 200
+            ? `HTTP ${afterRename.status} — the list did not render`
+            : `${renamedText.includes(renamed) ? "renamed on the list" : "THE NEW NAME IS NOT ON THE LIST"}, ${renamedText.includes("kumquat candles") ? "item kept" : "THE ITEM WAS ORPHANED"}`,
+      );
+
+      const goneGroup = await call("DELETE", `/api/shopping-groups?id=${encodeURIComponent(groupId)}`);
+      const afterDelete = await call("GET", `/shopping?week=${monday}`);
+      const deletedText = visible(typeof afterDelete.body === "string" ? afterDelete.body : "");
+      /*
+       * **Deleting a label must never delete a thing to buy.** The control is the item itself:
+       * if the whole list failed to render, the group's absence proves nothing (§86), so the
+       * item's presence is both the assertion and the evidence that the screen was measured.
+       */
+      if (afterDelete.status !== 200) {
+        skip(
+          "and removing the group keeps the thing to buy",
+          `the shopping screen did not render (HTTP ${afterDelete.status}), so the absence proves nothing`,
+        );
+      } else {
+        record(
+          "and removing the group keeps the thing to buy",
+          goneGroup.status === 200 && deletedText.includes("kumquat candles") && !deletedText.includes(renamed),
+          `DELETE ${goneGroup.status} — ${deletedText.includes("kumquat candles") ? "the item is still on the list" : "THE ITEM WENT WITH THE LABEL"}, ${deletedText.includes(renamed) ? "and the group is still shown" : "and the group is gone"}`,
+        );
+      }
+
+      if (typeof inGroup.body?.id === "string") {
+        await call("DELETE", `/api/shopping-extras?id=${inGroup.body.id}`);
+      }
+    }
+
+    /*
      * Item 3: what the day row holds AT REST, asserted by absence.
      *
      * The fix is not "the panel exists" — it is that four controls are *not* in the row until

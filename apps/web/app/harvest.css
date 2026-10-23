@@ -851,6 +851,15 @@
 
 .h-check-pantry { padding-top: var(--space-md); border-top: 1px solid var(--border); }
 
+/*
+ * A section for one of the household's own groups — Costco, Boo Basket — rather than an aisle.
+ *
+ * Marked by a rule above it rather than by colour, because the distinction is "this is a different
+ * trip", not "this is more or less important", and `check-palette-roles` is right that a surface
+ * tint would be saying something about status. Same reason `.h-check-pantry` uses one.
+ */
+.h-shop-group { padding-top: var(--space-md); border-top: 1px solid var(--border); }
+
 .h-meal { padding: 0 var(--space-xl); margin-bottom: var(--space-xl); }
 .h-meal-items { margin: var(--space-sm) 0 0; padding: 0; list-style: none; }
 .h-meal-items li {
@@ -1795,6 +1804,26 @@
 }
 .h-extras-who { color: var(--text-muted); font-size: 13px; }
 
+/*
+ * A block of things that belong to one group, with its name over them.
+ *
+ * The heading is the group — Costco, Trader Joes, Boo Basket — and it reads as a heading rather
+ * than a label because a group is a separate trip, which is a different thing from a note on a
+ * row. `min-width: 0` on the block: it is a child of a flex column holding words.
+ */
+.h-extras-block { min-width: 0; }
+.h-extras-block + .h-extras-block { margin-top: var(--space-md); }
+.h-extras-block .h-extras-list { margin-top: var(--space-xs); }
+.h-extras-heading {
+  margin: var(--space-md) 0 0;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  overflow-wrap: break-word;
+}
+
 /* a reviewed line from a photographed list — the checkbox, the editable text, the notes */
 .h-photo-row {
   display: flex;
@@ -1818,3 +1847,21 @@
   outline-offset: 2px;
 }
 .h-file label { cursor: pointer; }
+
+/*
+ * The group control beside the typed item. `min-width: 0` and a flex-basis that can shrink,
+ * because a non-shrinking control in a flex row is what put a page 176px past the viewport (§81).
+ */
+.h-extras-group {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 11rem;
+  height: var(--size-touch-min);
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-input);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+}

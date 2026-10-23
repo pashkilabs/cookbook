@@ -1132,6 +1132,7 @@ export type Database = {
       recipes: {
         Row: {
           classified_at: string | null
+          classified_with: string | null
           components: Json | null
           components_agreed_on_count: number | null
           components_agreement: number | null
@@ -1162,6 +1163,7 @@ export type Database = {
         }
         Insert: {
           classified_at?: string | null
+          classified_with?: string | null
           components?: Json | null
           components_agreed_on_count?: number | null
           components_agreement?: number | null
@@ -1192,6 +1194,7 @@ export type Database = {
         }
         Update: {
           classified_at?: string | null
+          classified_with?: string | null
           components?: Json | null
           components_agreed_on_count?: number | null
           components_agreement?: number | null
@@ -1243,6 +1246,7 @@ export type Database = {
           created_at: string
           deleted_at: string | null
           family_id: string
+          group_id: string | null
           id: string
           raw_text: string
           updated_at: string
@@ -1253,6 +1257,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           family_id: string
+          group_id?: string | null
           id?: string
           raw_text: string
           updated_at?: string
@@ -1263,6 +1268,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           family_id?: string
+          group_id?: string | null
           id?: string
           raw_text?: string
           updated_at?: string
@@ -1277,8 +1283,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "shopping_extras_group"
+            columns: ["group_id", "family_id"]
+            isOneToOne: false
+            referencedRelation: "shopping_groups"
+            referencedColumns: ["id", "family_id"]
+          },
+          {
             foreignKeyName: "shopping_extras_member"
             columns: ["added_by", "family_id"]
+            isOneToOne: false
+            referencedRelation: "family_members"
+            referencedColumns: ["id", "family_id"]
+          },
+        ]
+      }
+      shopping_groups: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          family_id: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          family_id: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          family_id?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shopping_groups_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shopping_groups_member"
+            columns: ["created_by", "family_id"]
             isOneToOne: false
             referencedRelation: "family_members"
             referencedColumns: ["id", "family_id"]

@@ -20,12 +20,29 @@ import { useRouter } from "next/navigation";
 export function AddExtra({
   weekStart,
   extras,
+  groups,
 }: {
   weekStart: string;
-  extras: Array<{ id: string; text: string; addedBy: string }>;
+  extras: Array<{ id: string; text: string; addedBy: string; group: string | null; groupId: string | null }>;
+  groups: Array<{ id: string; name: string }>;
 }) {
   const router = useRouter();
   const [text, setText] = useState("");
+  /*
+   * The group lives beside the item, not on another screen.
+   *
+   * Somebody adding "2 lemons" is already thinking about where they are buying them; sending them
+   * to Household to make a group first means nobody makes one. `""` is no group, which is what most
+   * items have and always will — a recipe-derived item has no opinion about where to buy it.
+   *
+   * `__new` opens an inline field rather than navigating. The create path normalises exactly as the
+   * match path does, so "costco" typed here when "Costco" exists resolves to Costco and says so
+   * rather than making a near twin (§91).
+   */
+  const [group, setGroup] = useState("");
+
+  const [newGroup, setNewGroup] = useState("");
+  const [said, setSaid] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -41,14 +58,38 @@ export function AddExtra({
       const response = await fetch("/api/shopping-extras", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ text: typed, weekStart }),
+        body: JSON.stringify({
+          text: typed,
+          weekStart,
+          ...(group === "__new"
+            ? newGroup.trim()
+              ? { groupName: newGroup.trim() }
+              : {}
+            : group
+              ? { groupId: group }
+              : {}),
+        }),
       });
       if (!response.ok) {
         const failed = (await response.json().catch(() => ({}))) as { error?: string };
         setError(failed.error ?? `that did not work (${response.status})`);
         return;
       }
+      const body = (await response.json().catch(() => ({}))) as {
+        group?: string;
+        groupCreated?: boolean;
+      };
       setText("");
+      setNewGroup("");
+      /*
+       * "Added to Costco" rather than an error, when a typed group already existed. The person
+       * asked for that group and there is now one — saying which it went to is the whole feedback
+       * they need, and saying "created" when it was not would be a small lie about their list.
+       */
+      if (body.group) {
+        setSaid(body.groupCreated ? `Added to a new group, ${body.group}` : `Added to ${body.group}`);
+        window.setTimeout(() => setSaid(null), 2500);
+      }
       router.refresh();
     } catch {
       setError("No signal — that was not added. Try it again in a moment.");
@@ -94,12 +135,57 @@ export function AddExtra({
             maxLength={200}
             disabled={busy}
           />
+          {/*
+            * The group control, beside the item. `h-extras-group` rather than a bare select so it
+            * can shrink: a non-shrinking control in a flex row is what put the page 176px past the
+            * viewport once already (§81).
+            */}
+          <select
+            className="h-extras-group"
+            value={group}
+            aria-label="Which group this is for"
+            disabled={busy}
+            onChange={(event) => setGroup(event.target.value)}
+          >
+            <option value="">No group</option>
+            {groups.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.name}
+              </option>
+            ))}
+            <option value="__new">New group…</option>
+          </select>
           <button type="submit" className="h-secondary" disabled={busy || text.trim().length === 0}>
             Add
           </button>
         </div>
       </form>
 
+      {group === "__new" && (
+        <div className="h-extras-row">
+          <input
+            className="h-extras-input"
+            value={newGroup}
+            aria-label="Name the new group"
+            placeholder="Costco, Trader Joes, Boo Basket…"
+            maxLength={60}
+            disabled={busy}
+            onChange={(event) => setNewGroup(event.target.value)}
+          />
+        </div>
+      )}
+
+      {said && <p className="meta">{said}</p>}
+
+      {/*
+        * A flat log of what was typed, with the group named beside it — **not** grouped.
+        *
+        * The grouping moved to the shopping list proper, where it belongs: a group is where
+        * something is bought, so it needs tick boxes and package advice, and a person standing in
+        * Costco wants the list rather than the record of requests. This panel answers a different
+        * question — what have we typed, and how do I take one back off — so the group is a note on
+        * the row. §78's third case: the same question answered deliberately elsewhere.
+        */}
       {extras.length > 0 && (
         <ul className="h-extras-list">
           {extras.map((extra) => (
@@ -111,7 +197,9 @@ export function AddExtra({
                 */}
               <span className="h-extras-text" style={{ minWidth: 0 }}>
                 {extra.text}
-                <span className="h-extras-who"> — {extra.addedBy}</span>
+                <span className="h-extras-who">
+                  {extra.group ? ` — ${extra.group}, ${extra.addedBy}` : ` — ${extra.addedBy}`}
+                </span>
               </span>
               <button
                 type="button"

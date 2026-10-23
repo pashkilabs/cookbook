@@ -1,6 +1,7 @@
 import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
 import { memberIdFor } from "@/lib/member-settings";
+import { findOrCreateGroup, listGroups } from "@/lib/shopping-groups";
 import { isIsoDate, startOfWeek } from "@/lib/week";
 
 /**
@@ -19,7 +20,7 @@ export async function POST(request: Request) {
   if ("response" in scope) return scope.response;
   const { supabase, familyId, memberId } = scope;
 
-  let body: { text?: unknown; weekStart?: unknown };
+  let body: { text?: unknown; weekStart?: unknown; groupId?: unknown; groupName?: unknown };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -41,14 +42,51 @@ export async function POST(request: Request) {
     : null;
   if (!weekStart) return Response.json({ error: "weekStart must be a date" }, { status: 400 });
 
+  /*
+   * The group, by id or by name — and a name that already exists **is** that group.
+   *
+   * Somebody typing "costco" on Friday when "Costco" exists means Costco, so the collision is not
+   * an error: `findOrCreateGroup` returns the existing row and says it did not create one, and the
+   * screen says "Added to Costco". The create path is a duplicate source exactly as the typed-match
+   * path is, so it goes through the same normalisation and the same unique index.
+   */
+  let groupId: string | null = typeof body.groupId === "string" ? body.groupId : null;
+  let groupName: string | null = null;
+  let groupCreated = false;
+  if (!groupId && typeof body.groupName === "string" && body.groupName.trim()) {
+    const outcome = await findOrCreateGroup(supabase, familyId, memberId, body.groupName);
+    if ("error" in outcome) return Response.json({ error: outcome.error }, { status: 400 });
+    groupId = outcome.group.id;
+    groupName = outcome.group.name;
+    groupCreated = outcome.created;
+  } else if (groupId) {
+    /*
+     * An id from the client is still checked against this household's groups. RLS would refuse
+     * another household's row, but a 403 from a foreign key reads as a bug rather than an answer.
+     */
+    const known = (await listGroups(supabase, familyId)).find((g) => g.id === groupId);
+    if (!known) return Response.json({ error: "no such group" }, { status: 400 });
+    groupName = known.name;
+  }
+
   const { data, error } = await supabase
     .from("shopping_extras")
-    .insert({ family_id: familyId, week_start: weekStart, raw_text: text, added_by: memberId })
+    .insert({
+      family_id: familyId,
+      week_start: weekStart,
+      raw_text: text,
+      added_by: memberId,
+      ...(groupId ? { group_id: groupId } : {}),
+    })
     .select("id, raw_text")
     .single();
   if (error) return Response.json({ error: error.message }, { status: 400 });
 
-  return Response.json({ id: data.id, text: data.raw_text });
+  return Response.json({
+    id: data.id,
+    text: data.raw_text,
+    ...(groupName ? { group: groupName, groupId, groupCreated } : {}),
+  });
 }
 
 export async function DELETE(request: Request) {

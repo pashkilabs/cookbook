@@ -274,7 +274,48 @@ if (classified < made.length) {
   console.error(`COULD NOT MEASURE: only ${classified} of ${made.length} recipes took a course, so the chapter tree is not exercised`);
   process.exit(2);
 }
-console.log(`  setup: household ${household.familyId.slice(0, 8)} with ${made.length} recipes, all ${classified} classified`);
+/*
+ * A group with things in it, because the screens that render groups render nothing without one.
+ *
+ * `/household` grows a "How you group the list" section and `/shopping` groups the typed items
+ * under headings — and both look entirely plausible when the household has made no group, which is
+ * the state every shot would otherwise be in. **This tool has already photographed that exact lie
+ * twice** (a library with no course, a stylesheet that 404'd), so the writes are checked and a
+ * failure is a could-not-measure rather than a beautiful picture of an unexercised feature.
+ *
+ * Two groups, because one heading does not exercise the gap between blocks, and an ungrouped item
+ * as well, since that block has no heading and is the common case.
+ */
+const groupsMade = [];
+for (const name of ["Costco", "Boo Basket"]) {
+  const response = await setup.request.post(`${base}/api/shopping-groups`, { data: { name } })
+    .catch(() => null);
+  const body = await response?.json().catch(() => null);
+  if (body?.id) groupsMade.push({ id: body.id, name });
+}
+let groupedItems = 0;
+for (const [text, group] of [
+  ["rotisserie chicken", 0],
+  ["paper towels, the big pack", 0],
+  ["fun size chocolate", 1],
+  ["bread", null],
+]) {
+  const groupId = group === null ? undefined : groupsMade[group]?.id;
+  if (group !== null && !groupId) continue;
+  const response = await setup.request.post(`${base}/api/shopping-extras`, {
+    data: { text, weekStart: MONDAY.toISOString().slice(0, 10), ...(groupId ? { groupId } : {}) },
+  }).catch(() => null);
+  if (response?.ok()) groupedItems += 1;
+}
+if (groupsMade.length < 2 || groupedItems < 4) {
+  console.error(
+    `COULD NOT MEASURE: ${groupsMade.length} of 2 groups and ${groupedItems} of 4 typed items stuck, `
+    + "so the grouped shopping list and the household's group section are not exercised",
+  );
+  process.exit(2);
+}
+
+console.log(`  setup: household ${household.familyId.slice(0, 8)} with ${made.length} recipes, all ${classified} classified, ${groupsMade.length} shopping groups and ${groupedItems} typed items`);
 
 await page0.close();
 

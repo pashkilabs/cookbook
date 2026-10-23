@@ -298,7 +298,7 @@ export async function classifyIfUnclassified(
   recipeId: string,
 ): Promise<void> {
   const { cascadeFromEnv } = await import("@pashki/import");
-  const { classifyRecipe } = await import("@pashki/import");
+  const { classifyRecipe, classificationProvenance } = await import("@pashki/import");
   const cascade = cascadeFromEnv();
   if (!cascade) return;
 
@@ -343,6 +343,12 @@ export async function classifyIfUnclassified(
         dish_form: cls.dishForm,
         principal_protein: cls.principalProtein,
         classified_at: new Date().toISOString(),
+        /*
+         * What produced this answer, so a changed prompt or model makes the row eligible again
+         * while a correct null stays settled (§90). `classified_at` says only that something
+         * happened, which is why 49 rows carried a wrong null that nothing would ever retry.
+         */
+        classified_with: classificationProvenance(cascade.models[0]!.model),
       })
       .eq("id", recipeId);
   } catch (thrown) {

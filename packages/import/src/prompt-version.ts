@@ -41,6 +41,7 @@ import { fingerprint } from "@pashki/core";
 import { COMPONENTS_INSTRUCTIONS, COMPONENTS_JSON_SCHEMA } from "./components.js";
 import { PALATE_INSTRUCTIONS, PALATE_JSON_SCHEMA } from "./palate.js";
 import { SHOPPING_PHOTO_INSTRUCTIONS, SHOPPING_PHOTO_JSON_SCHEMA } from "./shopping-photo.js";
+import { CLASSIFY_INSTRUCTIONS, CLASSIFY_JSON_SCHEMA } from "./classify.js";
 
 /*
  * The schema travels with the instructions because it is half the prompt.
@@ -72,3 +73,29 @@ export const SHOPPING_PHOTO_PROMPT_FINGERPRINT = digest(
   SHOPPING_PHOTO_INSTRUCTIONS,
   SHOPPING_PHOTO_JSON_SCHEMA,
 );
+
+/**
+ * The classifier's inputs, **including the model** — which is the part the two above miss.
+ *
+ * `COMPONENTS_PROMPT_FINGERPRINT` and `PALATE_PROMPT_FINGERPRINT` hash instructions and schema,
+ * because for those the prompt was the thing that changed. Classification failed the other way:
+ * `classify.ts` has a single commit and has never been edited, every principal protein in the real
+ * library was recorded in August, and not one across thirty classifications since. The prompt was
+ * constant and the answer changed, so a prompt-only digest would have been one more stamp nobody
+ * turned.
+ *
+ * `PASHKI_LLM_MODEL` is deployment configuration and cannot be hashed at build time, so it is not
+ * part of this constant — it is appended per row by `classificationProvenance`, and the two
+ * together are what a row records.
+ */
+export const CLASSIFY_PROMPT_FINGERPRINT = digest(CLASSIFY_INSTRUCTIONS, CLASSIFY_JSON_SCHEMA);
+
+/**
+ * What a row stores to say what produced its classification.
+ *
+ * A row whose value equals the current one is settled — a dessert with no principal protein stays
+ * answered, which is the thing a plain "retry every null" would get wrong. A row whose value
+ * differs, or is absent, is eligible to be asked again.
+ */
+export const classificationProvenance = (model: string): string =>
+  `${CLASSIFY_PROMPT_FINGERPRINT}:${model}`;

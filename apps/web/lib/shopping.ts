@@ -1,5 +1,6 @@
 import { maybeRow, rows } from "./rows";
 import { platformStore } from "./platform";
+import { listGroups } from "./shopping-groups";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   consolidate,
@@ -39,7 +40,24 @@ export interface ShoppingWeek {
    * recipes asked for, and an extra is a *request somebody made*. Two people asking for milk is
    * two requests and one carton, and only the first of those is editable.
    */
-  extras: Array<{ id: string; text: string; addedBy: string }>;
+  /*
+   * `groupId` as well as the name, because the screen groups by it. Matching rows to blocks on a
+   * display string is the free-text failure the table was built to remove — two names cannot
+   * collide today, and a screen that joins on one would quietly start splitting a group the first
+   * time one could.
+   */
+  extras: Array<{ id: string; text: string; addedBy: string; group: string | null; groupId: string | null }>;
+  /** the groups this household has made, for the add box's dropdown */
+  groups: Array<{ id: string; name: string }>;
+  /**
+   * One section per group that has something in it this week — Costco, Boo Basket.
+   *
+   * Separate from `byAisle` rather than an aisle among them, because an aisle is a position in one
+   * shop and a group is a different shop or a different basket. The handwritten lists this came
+   * from write them as columns with headers for exactly that reason: a thing in a group appears
+   * **once**, under its header, and not also in the middle of the main trip.
+   */
+  groupedLines: Array<{ id: string; name: string; lines: ShoppingLine[] }>;
   byAisle: Array<{ aisle: string; lines: ShoppingLine[] }>;
   leftovers: ShoppingLine[];
   suggestions: Array<{ id: string; title: string; uses: string[] }>;
@@ -90,7 +108,7 @@ export async function buildShoppingWeek(
      */
     supabase
       .from("shopping_extras")
-      .select("id, raw_text, added_by")
+      .select("id, raw_text, added_by, group_id")
       .eq("family_id", familyId)
       .eq("week_start", weekStart)
       .is("deleted_at", null)
@@ -141,7 +159,14 @@ export async function buildShoppingWeek(
     id: row.id as string,
     text: row.raw_text as string,
     addedById: row.added_by as string,
+    groupId: (row.group_id as string | null) ?? null,
   }));
+  /*
+   * The household's groups, read whether or not anything is grouped — the add box needs the list to
+   * offer a dropdown, and a household with groups and no grouped items this week is ordinary.
+   */
+  const groups = await listGroups(supabase, familyId);
+  const groupNames = new Map(groups.map((group) => [group.id, group.name]));
   const memberNames = new Map<string, string>(
     extras.length === 0
       ? []
@@ -157,9 +182,9 @@ export async function buildShoppingWeek(
    *
    * Grouped by person so the `uses` row says who asked.
    */
-  const extraEntries = (): ConsolidationEntry[] => {
+  const extraEntries = (only: (typeof extras)[number][] = extras): ConsolidationEntry[] => {
     const byPerson = new Map<string, string[]>();
-    for (const extra of extras) {
+    for (const extra of only) {
       const texts = byPerson.get(extra.addedById) ?? [];
       texts.push(extra.text);
       byPerson.set(extra.addedById, texts);
@@ -184,11 +209,42 @@ export async function buildShoppingWeek(
     }));
   };
 
+  /**
+   * A section of the list per group, consolidated **within** the group and nowhere else.
+   *
+   * Why its own consolidation rather than one bucket with the rest: a group is a different trip or
+   * a different destination, so merging "flour" for Costco with Tuesday's flour would buy one bag
+   * in the wrong place. Inside a group it still merges — two people asking for paper towels at
+   * Costco is one purchase.
+   *
+   * **The tick key is namespaced by the group id**, which is what stops a tick leaking between
+   * sections: paper towels at Costco and paper towels at the main store are two things to pick up,
+   * and one tick for both would cross them off together. The id rather than the name, so renaming
+   * Costco does not lose a week's ticks.
+   */
+  const groupedSections = (catalogue: ReturnType<typeof createCatalog>) =>
+    groups
+      .map((group) => {
+        const mine = extras.filter((extra) => extra.groupId === group.id);
+        if (mine.length === 0) return null;
+        const lines = consolidate(extraEntries(mine), catalogue, { system }).map((line) => ({
+          ...line,
+          key: `g:${group.id}:${line.key}`,
+        }));
+        return { id: group.id, name: group.name, lines };
+      })
+      .filter((section): section is { id: string; name: string; lines: ShoppingLine[] } => section !== null);
+
+  // what the aisles are built from: everything **not** in a group, which has its own section
+  const ungrouped = () => extras.filter((extra) => !extra.groupId);
+
   const asExtras = () =>
     extras.map((extra) => ({
       id: extra.id,
       text: extra.text,
       addedBy: memberNames.get(extra.addedById) ?? "someone",
+      group: extra.groupId ? (groupNames.get(extra.groupId) ?? null) : null,
+      groupId: extra.groupId,
     }));
 
   const planned = (plan.data ?? []).map((entry) => ({
@@ -206,11 +262,13 @@ export async function buildShoppingWeek(
 
   if (planned.length === 0) {
     // typed items still have to appear — see `extraEntries`
-    const only = consolidate(extraEntries(), catalog, { system });
+    const only = consolidate(extraEntries(ungrouped()), catalog, { system });
     return {
       week: {
         lines: only,
         extras: asExtras(),
+        groups,
+        groupedLines: groupedSections(catalog),
         byAisle: groupByAisle(only),
         leftovers: [], suggestions: [], plannedCount: 0,
         pantry: (pantryRows.data ?? []).map((row) => ({ id: row.id, name: row.name })),
@@ -330,7 +388,7 @@ export async function buildShoppingWeek(
    * "salt" has run out of salt — the default drops it, silently, which is the fault the design
    * pass found by running this rather than reading it.
    */
-  entries.push(...extraEntries());
+  entries.push(...extraEntries(ungrouped()));
 
   const lines = consolidate(entries, catalog, { pantry, deductPantry: true, system });
   const leftovers = significantLeftovers(lines);
@@ -362,6 +420,8 @@ export async function buildShoppingWeek(
     week: {
       lines,
       extras: asExtras(),
+      groups,
+      groupedLines: groupedSections(catalog),
       byAisle: groupByAisle(lines),
       leftovers,
       suggestions: suggested.slice(0, 6).map((recipe) => ({

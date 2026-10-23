@@ -24,6 +24,14 @@ export function ShoppingList(props: {
   weekStart: string;
   plannedCount: number;
   byAisle: Array<{ aisle: string; lines: ShoppingLine[] }>;
+  /**
+   * A section per group with something in it — Costco, Boo Basket.
+   *
+   * Rendered after the aisles rather than among them: an aisle is a position inside one shop, and
+   * a group is a different shop or a different basket. The tick keys are already namespaced by
+   * group id upstream, so ticking Costco's paper towels does not tick the main trip's.
+   */
+  groupedLines: Array<{ id: string; name: string; lines: ShoppingLine[] }>;
   leftovers: ShoppingLine[];
   suggestions: Array<{ id: string; title: string; uses: string[] }>;
   pantry: Array<{ id: string; name: string }>;
@@ -105,7 +113,13 @@ export function ShoppingList(props: {
     if (ok) router.refresh();
   }
 
-  const total = props.byAisle.reduce((sum, group) => sum + group.lines.length, 0);
+  /*
+   * Everything there is to buy, grouped sections included — the figure says "7 items" and a
+   * person can count the rows. A total that silently excluded a section would be a number nobody
+   * can check against the screen under it.
+   */
+  const groupedTotal = props.groupedLines.reduce((sum, group) => sum + group.lines.length, 0);
+  const total = props.byAisle.reduce((sum, group) => sum + group.lines.length, 0) + groupedTotal;
 
   /*
    * ---------------------------------------------------------------------------
@@ -286,8 +300,16 @@ export function ShoppingList(props: {
         <div>
           <Eyebrow>Shopping</Eyebrow>
           <p className="h-shop-count">
-            {total} {total === 1 ? "item" : "items"} from {props.plannedCount}{" "}
-            {props.plannedCount === 1 ? "meal" : "meals"} · {ticked.size} in the trolley
+            {/*
+              * "from 0 meals" is not a sentence anybody writes. The list renders with nothing
+              * planned now — a typed item is enough — so the clause that counts meals only
+              * appears when there are some.
+              */}
+            {total} {total === 1 ? "item" : "items"}
+            {props.plannedCount > 0
+              ? ` from ${props.plannedCount} ${props.plannedCount === 1 ? "meal" : "meals"}`
+              : ""}{" "}
+            · {ticked.size} in the trolley
           </p>
         </div>
         <ShareList text={shareText} />
@@ -342,6 +364,26 @@ export function ShoppingList(props: {
           {group.lines.map((line) => lineRow(line))}
         </section>
       )))}
+
+      {/*
+        * The household's own groups, as sections of the list rather than a box at the bottom.
+        *
+        * **A group is where something is bought, so it has to be shoppable** — tick boxes, package
+        * advice, the same row as everything else. The first version of this put the grouping in the
+        * "Anything else you need" panel, which lists what was *typed*; a person standing in Costco
+        * needs the list, not the log of requests. And a thing in a group is deliberately not also
+        * in an aisle above, which is how the handwritten lists do it: one line, under its header.
+        *
+        * Shown in both views. "By meal" answers "what is this for", and the honest answer for one
+        * of these is "nothing, somebody asked for it" — leaving them out of that view would make
+        * them vanish on a tab change, which is the silent-drop shape (§80).
+        */}
+      {props.groupedLines.map((group) => (
+        <section key={group.id} className="h-aisle h-shop-group">
+          <Eyebrow>{group.name}</Eyebrow>
+          {group.lines.map((line) => lineRow(line))}
+        </section>
+      ))}
 
 
       {/*

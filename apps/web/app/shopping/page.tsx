@@ -81,7 +81,16 @@ export default async function ShoppingPage({
 
       {error && <p className="error">Could not build the list: {error}</p>}
 
-      {week && week.plannedCount === 0 && (
+      {/*
+        * Empty when there is **nothing to buy**, not when nothing is planned.
+        *
+        * Measured, not reasoned: a household with no plan that typed "4 kumquat kazoos" got "No
+        * list yet", no aisle headings, and the item visible only inside the add box — while
+        * `buildShoppingWeek` had consolidated it into `lines` all along. `extraEntries`'s own
+        * comment says this case must work and it does, one layer down; the screen gated it away.
+        * Each half correct, the join broken (§85).
+        */}
+      {week && week.plannedCount === 0 && week.lines.length === 0 && week.groupedLines.length === 0 && (
         <div className="empty">
           <h2>No list yet</h2>
           <p>
@@ -96,11 +105,12 @@ export default async function ShoppingPage({
         </div>
       )}
 
-      {week && week.plannedCount > 0 && (
+      {week && (week.lines.length > 0 || week.groupedLines.length > 0) && (
         <ShoppingList
           weekStart={weekStart}
           plannedCount={week.plannedCount}
           byAisle={week.byAisle}
+          groupedLines={week.groupedLines}
           leftovers={week.leftovers}
           suggestions={week.suggestions}
           pantry={week.pantry}
@@ -115,7 +125,7 @@ export default async function ShoppingPage({
         * unreachable on exactly the week somebody most wants to type a list by hand. The read path
         * agrees: `buildShoppingWeek` consolidates extras even when the plan is empty.
         */}
-      {week && <AddExtra weekStart={weekStart} extras={week.extras} />}
+      {week && <AddExtra weekStart={weekStart} extras={week.extras} groups={week.groups} />}
       {/*
         * The photograph path's own way in, deliberately distinct from the share control beside it
         * and deliberately labelled — the share button was read as an upload precisely because it

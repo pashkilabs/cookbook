@@ -5,11 +5,13 @@ import { TimezoneSetting } from "./timezone";
 import { AllergenSetting } from "./allergens";
 import { ChoosingSetting } from "./choosing";
 import { StoreSetting } from "./store";
+import { GroupSetting } from "./groups";
 import { SignOutButton } from "../recipes/sign-out";
 import { krogerConfig } from "@/lib/kroger";
 import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
 import { readMemberSettings } from "@/lib/member-settings";
+import { listGroupsWithCounts } from "@/lib/shopping-groups";
 import { MEMBER_COLOURS, invitationState } from "@pashki/platform-client";
 import { Roster } from "./roster";
 import { childTastes } from "@/lib/tastes";
@@ -65,6 +67,13 @@ export default async function HouseholdPage() {
    * Paige is the one who cooks from it (§87).
    */
   const mine = await readMemberSettings(supabase, family.id, auth.user.id);
+
+  /*
+   * The groups, with their counts, read here rather than in the client component — a screen that
+   * fetches its own list renders empty first and then fills, and "nothing in it yet" is a sentence
+   * this one says on purpose.
+   */
+  const groups = await listGroupsWithCounts(supabase, family.id);
 
   // read here, not in the client component: `lib/kroger` holds a client secret and
   // `check-server-only` would refuse it in a "use client" file
@@ -127,6 +136,25 @@ export default async function HouseholdPage() {
           shelf prices, and the aisle each thing is in at <em>that</em> store.
         </p>
         <StoreSetting current={family.krogerLocationId} environment={krogerEnvironment} />
+      </section>
+
+      {/*
+        * Beside where you shop, because it is the same question asked by the household rather than
+        * by Kroger: Costco, HEB, Trader Joes, Boo Basket. A *group*, not a store — "Boo Basket" is
+        * a Halloween gift basket, and a `store` field would either drop that group or lie about it.
+        *
+        * Groups are also made from the shopping list's add box, which is where somebody actually
+        * is when they discover they want one. This screen exists for the two things that box
+        * cannot do: rename without splitting the group, and remove the label without losing the
+        * shopping.
+        */}
+      <section style={{ marginBottom: "2rem" }}>
+        <h2>How you group the list</h2>
+        <p className="subtitle">
+          Somewhere to put the things that are not from a recipe — a shop you make a separate trip
+          to, or a basket you are filling. Anything you add to the week&rsquo;s list can go in one.
+        </p>
+        <GroupSetting groups={groups} />
       </section>
 
       {/*

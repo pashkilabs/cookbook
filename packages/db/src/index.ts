@@ -51,6 +51,8 @@ export const APP_TABLES = [
   "shopping_ticks",
   // things somebody typed onto a week's list that no recipe asked for (§89)
   "shopping_extras",
+  // groups a household makes for its shopping — a shop, or a gift basket (§91)
+  "shopping_groups",
   "cart_exports",
   "photos",
   // what has been sent to a Kroger cart, because the cart itself cannot be read (§74)
@@ -103,6 +105,7 @@ export const HOUSEHOLD_TABLES = [
   "pantry_items",
   "shopping_ticks",
   "shopping_extras",
+  "shopping_groups",
   "photos",
   "import_jobs",
   "recipe_derivations",
