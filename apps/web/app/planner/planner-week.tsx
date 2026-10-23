@@ -159,7 +159,7 @@ export function PlannerWeek(props: {
           </p>
           <div className="tabs" style={{ marginTop: "0.75rem", marginBottom: 0 }}>
             {duplicate.recipeServings && duplicate.servings ? (
-              <button
+              <button className="button"
                 type="button"
                 disabled={busy !== null}
                 onClick={async () => {

@@ -154,6 +154,51 @@ export function ShoppingList(props: {
   const day = (date: unknown) =>
     typeof date === "string" && isIsoDate(date) ? weekdayName(date).slice(0, 3) : null;
 
+  /*
+   * ---------------------------------------------------------------------------
+   * What a line with nothing to buy says, and the two zeros that are not the same
+   * ---------------------------------------------------------------------------
+   *
+   * It said **"0 spinach"**. Measured rather than assumed: `formatCountable(0, "spinach")` is
+   * `"0 spinach"` and `formatMeasure(0, "volume", "us")` is `"0 tsp"`, and **118 of 1407 live
+   * ingredient lines carry no amount** — `pineapple slices`, `cooked rice`, `shredded lettuce` —
+   * so any week planning one of those rendered a zero above the item.
+   *
+   * `formatCountable` already returns the bare noun for `null`, so the formatter was never the
+   * problem: `needed` is a number and arrives as `0`, which is a different fact from absent.
+   *
+   * **And zero does legitimately mean zero, which is why this is not one branch.** `consolidate`
+   * computes `needed = max(0, needed - onHand)` when the pantry carries an amount (§73), so a
+   * line can reach zero *because the household already has enough* — and rendering the bare name
+   * there would read as "buy spinach" when the answer is "do not". The data tells them apart:
+   * `pantryDeducted` is true only when an amount was actually subtracted.
+   *
+   *   needed > 0                        the quantity, as before
+   *   needed === 0 && pantryDeducted    you have enough — say so, do not print a zero
+   *   needed === 0 && !pantryDeducted   the paper never said how much; the bare name
+   *
+   * The third is the common case and will be most of a photographed list.
+   */
+  const buyAmount = (line: ShoppingLine, { packages = true } = {}) => {
+    if (packages && line.packagesDisplay) return line.packagesDisplay;
+    if (line.needed > 0) {
+      return line.dimension === "count"
+        ? formatCountable(line.needed, line.label)
+        : line.neededDisplay || "";
+    }
+    if (line.pantryDeducted) return "Enough already";
+    /*
+     * Nothing was ever stated, so the amount slot is **empty** — not the name again.
+     *
+     * `formatCountable(null, label)` returns the bare noun, which was the first fix and looked
+     * right in the diff: the row then rendered "spinach   spinach", the name in its own column and
+     * the name again where the quantity goes. Only the screenshot showed it. The name already has
+     * a column; what this slot has to say is "no number was given", and the day chips beneath
+     * already say "Mon · some".
+     */
+    return "";
+  };
+
   const lineRow = (line: ShoppingLine) => {
     const isTicked = ticked.has(line.key);
     const inPantry = line.inPantry;
@@ -184,13 +229,7 @@ export function ShoppingList(props: {
               * different forms rather than sharing a string — "a bag of potatoes" is plural
               * whatever the count, while a bare quantity agrees with its number.
               */}
-            <strong className="h-buy-amount">
-              {line.packagesDisplay
-                ? line.packagesDisplay
-                : line.dimension === "count"
-                  ? formatCountable(line.needed, line.label)
-                  : line.neededDisplay || ""}
-            </strong>
+            <strong className="h-buy-amount">{buyAmount(line)}</strong>
           </div>
 
           {line.packagesDisplay && (
@@ -335,11 +374,13 @@ export function ShoppingList(props: {
                 <div className="h-buy-what">
                   <div className="h-buy-top">
                     <span className="h-buy-name">{line.label}</span>
-                    <strong className="h-buy-amount">
-                      {line.dimension === "count"
-                        ? formatCountable(line.needed, line.label)
-                        : line.neededDisplay || ""}
-                    </strong>
+                    {/*
+                      * The pantry block, which shows no package on purpose — the question here is
+                      * "do you still have it", not "what size to buy". The zero handling is shared
+                      * rather than copied: a pantry line reaching zero is exactly the case where
+                      * "Enough already" is the true answer rather than a bare name.
+                      */}
+                    <strong className="h-buy-amount">{buyAmount(line, { packages: false })}</strong>
                   </div>
                 </div>
               </Checkbox>

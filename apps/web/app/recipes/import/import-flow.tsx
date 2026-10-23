@@ -124,7 +124,7 @@ export function ImportFlow() {
           />
         </div>
         <div className="tabs">
-          <button type="submit" disabled={busy}>
+          <button className="button" type="submit" disabled={busy}>
             {busy ? "Reading the page…" : "Read the recipe"}
           </button>
         </div>

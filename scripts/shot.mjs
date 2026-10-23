@@ -178,7 +178,12 @@ for (const [title, course, minutes, dishForm, protein] of [
   const response = await setup.request.post(`${base}/api/recipes`, {
     data: {
       title, servings: "4", timeMinutes: minutes, sourceName: "", sourceUrl: "",
-      ingredients: "2 cups flour\n1 pint double cream", steps: "Mix.\nBake.",
+      /*
+       * `spinach` carries **no amount**, deliberately. 118 of 1407 live ingredient lines are like
+       * that, and the screen rendered them as "0 spinach" — so without one here the fix for that
+       * is in the code and in no picture. A fixture that cannot produce the case cannot show it.
+       */
+      ingredients: "2 cups flour\n1 pint double cream\nspinach", steps: "Mix.\nBake.",
     },
   });
   const body = await response.json().catch(() => ({}));
@@ -205,7 +210,7 @@ for (const [i, recipe] of made.entries()) {
         servings: "4",
         timeMinutes: recipe.minutes,
         sourceName: "",
-        ingredients: "2 cups flour\n1 pint double cream",
+        ingredients: "2 cups flour\n1 pint double cream\nspinach",
         steps: "Mix.\nBake.",
         course: recipe.course,
         dishForm: recipe.dishForm ?? "",
@@ -300,6 +305,18 @@ const SCREENS = [
   { name: "planner", path: "/planner", marker: "Week plan" },
   { name: "shopping", path: "/shopping", marker: "Anything else you need" },
   { name: "household", path: "/household", marker: "Household" },
+  { name: "recipe-new", path: "/recipes/new", marker: "Add a recipe" },
+  { name: "import", path: "/recipes/import", marker: "One link" },
+  /*
+   * `/sign-in` carries no session, because the page **redirects a signed-in visitor to
+   * /recipes** — so the harness could never have rendered it with the cookie attached, and
+   * listing it as an unrendered static route implied an oversight rather than a reason.
+   *
+   * It holds one of the ten buttons that relied on the bare `button` element selector, which is
+   * why it is here now: a scoping change cannot be checked by looking at screens that do not
+   * show the thing being scoped.
+   */
+  { name: "sign-in", path: "/sign-in", marker: "Sign in", signedOut: true },
 ];
 
 let problems = 0;
@@ -311,14 +328,14 @@ let pressedCandidates = 0;
 let pressedComparable = 0;
 
 for (const theme of ["light", "dark"]) {
-  for (const { name, path, layout, marker } of SCREENS) {
+  for (const { name, path, layout, marker, signedOut } of SCREENS) {
     const context = await browser.newContext({
       viewport: { width: WIDTH, height: HEIGHT },
       colorScheme: theme === "dark" ? "dark" : "light",
       deviceScaleFactor: 2,
-      extraHTTPHeaders: AUTH,
+      ...(signedOut ? {} : { extraHTTPHeaders: AUTH }),
     });
-    await context.addCookies([cookie]);
+    if (!signedOut) await context.addCookies([cookie]);
     const page = await context.newPage();
     if (layout) {
       await page.request.patch(`${base}/api/household`, { data: { recipeLayout: layout } });

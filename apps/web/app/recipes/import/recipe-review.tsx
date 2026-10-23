@@ -217,7 +217,7 @@ export function RecipeReview({
       </div>
 
       <div className="tabs">
-        <button type="submit" disabled={busy}>
+        <button className="button" type="submit" disabled={busy}>
           {busy ? "Saving…" : saveLabel}
         </button>
         <button type="button" className="quiet" disabled={busy} onClick={onDiscard}>

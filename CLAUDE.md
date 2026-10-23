@@ -462,6 +462,45 @@ models be good enough. Do not add a silent-save path.
   contained **no URL but the one-shot token**, never naming where the app lives. If the only
   address somebody is ever sent expires on use, that is the one they will save.
 
+- **`button` in `globals.css` is a rule for components that did not exist when it was written —
+  four bugs, four accidents, not one found by a guard.** An element selector in a bridge stylesheet
+  silently governs **everything written after it**, and the Harvest sheet was explicitly a
+  migration, so every component added since has been inheriting a rule it never asked for:
+
+  1. every plain button and `.button` link rendered **near-black**, because the fill was `--ink`;
+  2. `/household` was **176px wider than the phone**, from this rule's horizontal padding;
+  3. the units control showed **both segments filled terracotta** — `.selected` styled nothing, so
+     both fell through to here;
+  4. the share glyph rendered **7px wide** in a correct 44px circle — `.h-icon` set width and
+     height and never reset this rule's padding.
+
+  **Scoping it to `.button` is a real refactor and the first attempt was wrong about its size.**
+  It looks like ten sites: the `<button>` tags with no `className` at all. It is not.
+  `pnpm shots` caught it on the first screen that could show it — `/sign-in`'s mode tabs rendered
+  as **native grey browser buttons**, because the selected one is
+  `className={mode === "in" ? "" : "quiet"}`, an **empty class** leaning entirely on the element
+  rule. Counted properly: about **24 buttons carry `"quiet"`** and nothing else, 3 carry
+  `"danger"`, and 5 use `""` for their selected state — all taking base paint from the element
+  rule and colour from a modifier that only overrides. And `quiet`/`danger` sit on **13
+  non-button elements**, so they cannot simply become self-contained button rules.
+
+  Reverted rather than half-shipped: unstyling two dozen controls across six screens is worse than
+  the rule being removed. The ten class-less buttons now carry `className="button"` explicitly,
+  which is a no-op today and a step toward it, and the inventory lives in `globals.css` where the
+  next person will meet it. **An element selector's blast radius is every component that will ever
+  exist, and it is measured by what fails to render, not by grepping for what lacks a class.**
+
+- **A spec in prose and nowhere in code is not a spec.** `tab-bar.tsx` said *"Five line icons at
+  24px"* while every icon in the app — the tab bar's own included — ships at **18px**. Nothing
+  enforced 24, nothing used it, and reading that comment while diagnosing the crushed share glyph
+  sent me looking for a deviation from a standard that does not exist.
+
+  The comment now says 18, because that is what ships; making 24 real would be a visual change to
+  every screen and nobody has asked for one. The rule is the general one: **a number in a comment
+  that disagrees with the whole codebase will be "fixed" by the next reader in whichever direction
+  they trust more** — either write the number that ships, or ship the number that is written, but
+  do not leave the two arguing.
+
 - **A fourth bug from the bare `button` selector, and no instrument could see it.** The share
   control on `/shopping` rendered its glyph **7px wide against a declared 18** — `.h-icon` sets
   `width` and `height` and never reset the `padding: 0.6rem 1.1rem` that the bare `button` element

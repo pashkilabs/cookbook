@@ -206,7 +206,7 @@ export function Roster({
               onChange={(event) => setYear(event.target.value.replace(/\D/g, "").slice(0, 4))}
               style={{ flex: "0 0 9rem" }}
             />
-            <button type="submit" disabled={busy || !name.trim()} style={{ flex: "0 0 auto" }}>
+            <button className="button" type="submit" disabled={busy || !name.trim()} style={{ flex: "0 0 auto" }}>
               {busy ? "Adding…" : "Add"}
             </button>
           </div>
@@ -264,7 +264,7 @@ export function Roster({
                 value={invitee}
                 onChange={(event) => setInvitee(event.target.value)}
               />
-              <button type="submit" disabled={busy || !invitee.trim()} style={{ flex: "0 0 auto" }}>
+              <button className="button" type="submit" disabled={busy || !invitee.trim()} style={{ flex: "0 0 auto" }}>
                 {busy ? "Sending…" : "Send invitation"}
               </button>
             </div>
@@ -306,7 +306,7 @@ function RenameButton({
         onChange={(event) => setValue(event.target.value)}
         style={{ width: "9rem" }}
       />
-      <button
+      <button className="button"
         type="button"
         disabled={busy || !value.trim()}
         onClick={async () => {

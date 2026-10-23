@@ -35,7 +35,7 @@ export function AcceptInvitation({
       )}
 
       <div className="tabs">
-        <button
+        <button className="button"
           type="button"
           disabled={busy || mismatched}
           onClick={async () => {

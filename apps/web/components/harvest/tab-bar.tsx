@@ -11,7 +11,7 @@ import Link from "next/link";
  * the rest are loam at 1.8, and a difference that is only colour and line weight is not a
  * difference to anybody who cannot see it.
  *
- * Icons are inline rather than a sprite or a library. Five line icons at 24px is less markup than
+ * Icons are inline rather than a sprite or a library. Five line icons at 18px is less markup than
  * the loader for them, and the CDN allow-list this project runs under would refuse an icon package
  * anyway.
  */

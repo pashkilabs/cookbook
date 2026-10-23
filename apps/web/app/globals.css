@@ -294,6 +294,49 @@ button:focus-visible, a:focus-visible {
   outline-offset: 2px;
 }
 
+/*
+ * ---------------------------------------------------------------------------
+ * `.button`, not `button` — four bugs came out of that one character
+ * ---------------------------------------------------------------------------
+ *
+ * An element selector in this file silently governs **every component written after it**, and the
+ * Harvest sheet was explicitly a migration — so `button` was a rule for components that did not
+ * exist when it was written. Four faults, four accidents, not one of them found by a guard:
+ *
+ *   1. every plain button and `.button` link rendered near-black, because the fill was `--ink`;
+ *   2. `/household` was 176px wider than the phone, from this rule's horizontal padding;
+ *   3. the units control showed **both** segments filled terracotta, because `.selected` styled
+ *      nothing and both fell through to here;
+ *   4. the share glyph rendered **7px wide** inside a correct 44px circle, because `.h-icon` set
+ *      width and height and never reset this rule's padding.
+ *
+ * ---------------------------------------------------------------------------
+ * It is NOT scoped yet, and the attempt is why
+ * ---------------------------------------------------------------------------
+ *
+ * Scoping it to `.button` looked like a ten-site change: the ten `<button>` tags carrying no
+ * `className` at all. Those now carry `className="button"`, which is a no-op today and a step
+ * toward the eventual change.
+ *
+ * The real dependency is **far wider**, and `pnpm shots` found it on the first screen it could
+ * see — `/sign-in`'s two mode tabs rendered as native grey browser buttons, because the selected
+ * one is `className={mode === "in" ? "" : "quiet"}`: an **empty class**, leaning entirely on this
+ * rule. Counting properly: about **24 buttons carry `className="quiet"`** and nothing else, 3
+ * carry `"danger"`, and 5 use an empty string for their selected state. All of them take their
+ * base paint from here and their colours from a modifier that only overrides.
+ *
+ * And `quiet` and `danger` sit on **13 non-button elements** too, so they cannot simply become
+ * self-contained button rules without wrongly styling links and spans.
+ *
+ * So it is a real refactor — roughly 30 call sites plus two rewritten rules — and four of the
+ * screens that would need checking (`/recipes/blend`, `/cook/[id]`, `/recipes/[id]`, the invite
+ * page) are not rendered by the harness. Shipping it half-done would unstyle two dozen controls
+ * across six screens, which is worse than the rule it is trying to remove.
+ *
+ * `button[disabled]` stays an element selector whenever this is done. It paints nothing and
+ * fights no primitive — `.h-primary:disabled` outranks it on specificity — and a sensible default
+ * for every disabled control is what an element selector is actually for.
+ */
 button, a.button {
   display: inline-flex;
   align-items: center;

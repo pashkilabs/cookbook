@@ -194,7 +194,7 @@ export function RecipeForm(
       </div>
 
       <div className="tabs">
-        <button type="submit" disabled={busy}>
+        <button className="button" type="submit" disabled={busy}>
           {busy ? "Saving…" : props.mode === "edit" ? "Save changes" : "Save recipe"}
         </button>
       </div>

@@ -94,7 +94,7 @@ export function Filters({
           placeholder="Search titles and ingredients…"
           aria-label="Search recipes by title or ingredient"
         />
-        <button type="submit">Search</button>
+        <button className="button" type="submit">Search</button>
       </form>
 
       {chips && (

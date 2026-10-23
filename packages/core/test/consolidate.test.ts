@@ -271,3 +271,40 @@ describe("something somebody typed onto the list", () => {
     expect(cream?.needed).toBeCloseTo(473.176, 1);
   });
 });
+
+describe("a line with nothing to buy", () => {
+  /*
+   * The two zeros the shopping screen has to tell apart. `consolidate` produces both and they mean
+   * opposite things, so the data has to carry the difference — the screen cannot guess it.
+   */
+  it("reaches zero with no amount ever stated, and says nothing was stated", () => {
+    const catalog = createCatalog([]);
+    const lines = consolidate(
+      [{ label: "Soup", ingredients: parseIngredientList(["spinach"]) }],
+      catalog,
+    );
+    const spinach = lines.find((line) => line.label === "spinach");
+    expect(spinach?.needed).toBe(0);
+    // nothing was subtracted, because nothing was known — which is what the screen renders as a
+    // bare name rather than "0 spinach"
+    expect(spinach?.pantryDeducted).toBe(false);
+  });
+
+  // regression: "0 spinach" rendered because needed === 0 was read as a quantity rather than as
+  // "no quantity was ever stated". 118 of 1407 live ingredient lines carry no amount.
+  it("reaches zero because the pantry covered it, and says so", () => {
+    const catalog = createCatalog([]);
+    const lines = consolidate(
+      [{ label: "Soup", ingredients: parseIngredientList(["2 cups rice"]) }],
+      catalog,
+      { pantry: [{ name: "rice", amount: 4, unit: "cup" }], deductPantry: true },
+    );
+    const rice = lines.find((line) => line.label === "rice");
+    expect(rice?.needed).toBe(0);
+    /*
+     * Deducted, which is the whole distinction: this household has enough, and rendering the bare
+     * name here would read as "buy rice" when the answer is "do not".
+     */
+    expect(rice?.pantryDeducted).toBe(true);
+  });
+});

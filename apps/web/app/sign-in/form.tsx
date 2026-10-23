@@ -201,7 +201,7 @@ export function SignInForm() {
           </>
         )}
 
-        <button type="submit" disabled={busy}>
+        <button className="button" type="submit" disabled={busy}>
           {busy ? "Working…" : mode === "in" ? "Sign in" : "Send confirmation email"}
         </button>
         {notice && <p className="subtitle">{notice}</p>}
