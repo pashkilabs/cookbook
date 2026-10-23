@@ -18,7 +18,8 @@
  * Usage: node scripts/shot.mjs <baseUrl> [outDir]
  * Needs a signed-in session, so it provisions one the way smoke does.
  */
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { chromium } from "playwright";
 
 const base = process.argv[2] ?? "http://127.0.0.1:3000";
@@ -263,6 +264,12 @@ const SCREENS = [
    * there whether or not anything is planned, and its absence means the screen did not render
    * what it should rather than that a layout is wrong.
    */
+  /*
+   * `/planner` — the fourth screen this tool has reported clean without opening. Its `<h1>` is the
+   * week label, which changes with the date, so the marker is the empty slot's own words: this
+   * household plans nothing, so every day offers one.
+   */
+  { name: "planner", path: "/planner", marker: "Add dinner" },
   { name: "shopping", path: "/shopping", marker: "Anything else you need" },
   { name: "household", path: "/household", marker: "Household" },
 ];
@@ -417,6 +424,19 @@ for (const theme of ["light", "dark"]) {
          * did not cover its own subject.
          */
         if (box.height === 0) continue;
+        /*
+         * Text that is **meant** to be invisible is not squeezed text.
+         *
+         * `.h-sr-only` is a 1px box with `clip-path: inset(50%)` — the standard visually-hidden
+         * pattern, deliberately left in the accessibility tree rather than `display: none`. The
+         * planner gives every day one as its heading, so the first run of that screen reported
+         * four FAILs per theme against markup that is exactly right.
+         *
+         * Matched on the **computed style** rather than the class name: an element clipped away
+         * says nothing about readability whatever it is called, and keying on `h-sr-only` would be
+         * a guess about a spelling that the next sr-only implementation would defeat.
+         */
+        if (getComputedStyle(el).clipPath !== "none") continue;
         // a box so narrow that a word cannot fit is a broken box, whatever the stylesheet says
         if (box.width < 40 && text.length > 8) {
           out.squeezed.push({ text: text.slice(0, 40), width: Math.round(box.width), height: Math.round(box.height) });
@@ -589,7 +609,93 @@ for (const theme of ["light", "dark"]) {
 }
 
 await browser.close();
+/*
+ * ---------------------------------------------------------------------------
+ * Which screens did this run NOT look at?
+ * ---------------------------------------------------------------------------
+ *
+ * The inverse question, the one `check-tests-run` and `check-typechecked` ask, asked about
+ * screenshots — and it is overdue. **Three times this tool has reported on something it was not
+ * looking at**: a fixture that set no course (§86), a stylesheet that answered 404, and
+ * `/shopping`, which was simply not on the list while a change to it was being verified against a
+ * clean run over ten other screens. `/planner` is the fourth and was absent the whole time.
+ *
+ * "Clean" meant "clean for the screens I happened to open", and nothing asked which those were.
+ * So the run now prints its own coverage against the routes that exist.
+ *
+ * **Printed, never failed.** A dynamic route needs a fixture id this harness does not have, so a
+ * check that refused an uncovered route would fail on `/cook/[id]` and `/invite/[token]` on every
+ * run — and a check that fails routinely is one people learn to ignore, which is worse than no
+ * check. Dynamic routes are listed separately for that reason: they are a judgement about
+ * fixtures, not an oversight.
+ */
+function pageRoutes(dir, prefix = "") {
+  const found = [];
+  for (const entry of readdirSync(dir)) {
+    if (entry === "node_modules" || entry === ".next") continue;
+    const path = join(dir, entry);
+    if (statSync(path).isDirectory()) {
+      /* a route group — `(marketing)` — adds no segment to the URL */
+      const segment = /^\(.*\)$/.test(entry) ? prefix : `${prefix}/${entry}`;
+      found.push(...pageRoutes(path, segment));
+    } else if (entry === "page.tsx") {
+      found.push(prefix === "" ? "/" : prefix);
+    }
+  }
+  return found;
+}
+
+const appDir = "apps/web/app";
+let coverage = null;
+if (existsSync(appDir)) {
+  const routes = pageRoutes(appDir).sort();
+  const shot = SCREENS.map((screen) => screen.path.split("?")[0]);
+
+  /*
+   * A concrete path covers the dynamic route it matches: `/recipes/c/main` is a shot of
+   * `/recipes/c/[chapter]`. A first version compared strings, so it listed six dynamic routes as
+   * needing a fixture while five of them were being rendered — an **overstated** gap, which is
+   * the false-alarm shape that gets a check switched off within a day.
+   */
+  const covers = (route, path) => {
+    const pattern = new RegExp(
+      `^${route.replace(/[.*+?^${}()|\\]/g, "\\$&").replace(/\[[^\]]+\]/g, "[^/]+")}$`,
+    );
+    return pattern.test(path);
+  };
+  /*
+   * A path that IS a static route cannot stand in for a dynamic one. Next prefers the static
+   * match, so a shot of `/recipes/blend` renders that page and not `/recipes/[id]` — crediting it
+   * would **understate** the gap, which is the direction that hides a problem rather than
+   * inventing one.
+   */
+  const staticRoutes = new Set(routes.filter((route) => !route.includes("[")));
+  const rendered = routes.filter((route) =>
+    shot.some((path) =>
+      route.includes("[") ? !staticRoutes.has(path) && covers(route, path) : route === path,
+    ),
+  );
+  const uncovered = routes.filter((route) => !rendered.includes(route));
+  coverage = {
+    total: routes.length,
+    rendered: rendered.length,
+    missing: uncovered.filter((route) => !route.includes("[")),
+    dynamic: uncovered.filter((route) => route.includes("[")),
+  };
+}
+
 console.log(`\n${shots} screenshots in ${outDir}/ at ${WIDTH}px, against ${base}`);
+if (coverage) {
+  console.log(`  screens: ${coverage.rendered} of ${coverage.total} route(s) rendered.`);
+  if (coverage.missing.length > 0) {
+    console.log(`  NOT RENDERED — a clean run says nothing about these: ${coverage.missing.join(", ")}`);
+  }
+  if (coverage.dynamic.length > 0) {
+    console.log(`  needs a fixture id, so not rendered: ${coverage.dynamic.join(", ")}`);
+  }
+} else {
+  console.log(`  screens: COULD NOT MEASURE — ${appDir} is not there, so coverage is unknown.`);
+}
 console.log(
   pressedCandidates === 0
     ? "  selected-state: no multi-member pressed/checked group on any screen — nothing to compare."

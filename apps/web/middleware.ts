@@ -1,4 +1,4 @@
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { DEFAULT_COOKIE_OPTIONS, createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
@@ -34,6 +34,8 @@ export const runtime = "nodejs";
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
+  /* whether the client wrote cookies itself, i.e. whether a real refresh happened */
+  let refreshed = false;
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -42,6 +44,7 @@ export async function middleware(request: NextRequest) {
       cookies: {
         getAll: () => request.cookies.getAll(),
         setAll: (written: Array<{ name: string; value: string; options: CookieOptions }>) => {
+          refreshed = true;
           for (const { name, value } of written) request.cookies.set(name, value);
           // rebuilt from the mutated request so the Server Components downstream read the
           // refreshed cookie, then re-applied to the response for the browser
@@ -53,6 +56,43 @@ export async function middleware(request: NextRequest) {
   );
 
   await supabase.auth.getUser();
+
+  /*
+   * ---------------------------------------------------------------------------
+   * Re-set the session cookie even when nothing was refreshed (§89)
+   * ---------------------------------------------------------------------------
+   *
+   * Measured, not inferred from the package's defaults: signing in produces **zero** `Set-Cookie`
+   * for the auth token. `createBrowserClient` writes it through `document.cookie`, and only a
+   * genuine refresh — an access token at or past its hour — makes this middleware write one.
+   *
+   * Safari's ITP caps a **script-written** cookie at seven days whatever `maxAge` claims, so
+   * between the client write and the next server write the stored 400 days is not true on iOS.
+   * Re-emitting it here closes that window on the **first navigation after sign-in**, seconds
+   * later, because a cookie delivered by `Set-Cookie` is not subject to the script cap.
+   *
+   * **The residual, stated rather than waved at:** a tab left open across an expiry that then
+   * never navigates again for seven days. The client refreshes such a tab itself, through
+   * `document.cookie`, and nothing here runs to convert it — iOS makes that shape close to
+   * impossible, and it is the one case this does not cover.
+   *
+   * **And the assumption to re-examine first:** the seven-day cap is Safari's *documented policy*,
+   * not something measured here. What was measured is which path writes, on Chromium. If somebody
+   * is still signed out roughly weekly after this, doubt the cap before doubting the plumbing.
+   *
+   * Skipped when `refreshed` is true: the client has already written fresher values onto the
+   * response, and re-setting from the request would put the stale ones back.
+   */
+  if (!refreshed) {
+    for (const cookie of request.cookies.getAll()) {
+      /*
+       * The auth cookie, and its chunks — a session over ~3KB is split into `…auth-token.0`,
+       * `.1` and so on, so this matches the prefix rather than the exact name.
+       */
+      if (!/^sb-.*-auth-token(\.\d+)?$/.test(cookie.name)) continue;
+      response.cookies.set(cookie.name, cookie.value, DEFAULT_COOKIE_OPTIONS);
+    }
+  }
 
   return response;
 }
