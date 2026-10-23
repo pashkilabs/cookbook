@@ -462,6 +462,55 @@ models be good enough. Do not add a silent-save path.
   contained **no URL but the one-shot token**, never naming where the app lives. If the only
   address somebody is ever sent expires on use, that is the one they will save.
 
+- **A fourth bug from the bare `button` selector, and no instrument could see it.** The share
+  control on `/shopping` rendered its glyph **7px wide against a declared 18** — `.h-icon` sets
+  `width` and `height` and never reset the `padding: 0.6rem 1.1rem` that the bare `button` element
+  selector imposes, so a 44px circle had a content box of `44 − 2 (border) − 35.2 = 6.8px`. The
+  week arrows beside it were untouched because `IconLink` renders an `<a>`, which that selector
+  never reaches. Measured side by side on one screen:
+
+  | element | circle | glyph | padding |
+  |---|---|---|---|
+  | `<a>` week before | 44x44 | **18x18** | 0px/0px |
+  | `<a>` week after | 44x44 | **18x18** | 0px/0px |
+  | `<button>` copy this list | 44x44 | **7x18** | 17.6px/17.6px |
+
+  **Every check was green and none of them was pointed at this.** `check-contrast` reads colour
+  and the glyph was correctly coloured; the selected-state check compares pressed against
+  unpressed and this is neither; the overflow check measures against the viewport and a crushed
+  glyph overflows nothing. A mark that is the wrong size, correctly coloured, inside a correct
+  container, is invisible to all three. It was found by somebody **looking at the screen** — the
+  third fault that week found that way and none of them by a check.
+
+  So the measurement became one: `pnpm shots` now fails any `svg[width][height]` rendering below
+  80% of what it declares, whatever the cause, because that is a fact a layout engine knows and a
+  stylesheet cannot tell you. **And it is mutation-tested in both directions, which mattered
+  here**: with the fix in place it reported clean, and the first mutation *also* reported clean —
+  because the rebuilt control had moved off `.h-icon` and `IconButton` has **zero adopters**, so
+  the check had no subject at all. Only recreating the original markup proved it fires. A clean
+  run from a guard with nothing to watch is the oldest shape in this file.
+
+  My diagnosis from source-reading was wrong twice over and the picture settled both: the glyph is
+  the standard iOS share mark and was never wrong, and the path spans *more* of its viewBox than
+  the chevron does. It looked tiny because it was being squeezed, which no amount of reading the
+  path tells you. **Print the rendered box, not the source dimensions.**
+
+- **A fixture's hard-coded week rots, and the screens it feeds go quietly empty.** `shot.mjs`
+  planned meals into `Date.UTC(2026, 9, 12 + …)` — the current week on the day it was written and
+  eleven days stale by the time anybody looked. `/shopping` and `/planner` both render by the week
+  being viewed, so both rendered their **empty states** — "No list yet", "0 of 7 dinners — waiting
+  for a day" — and the run reported both **ok**. The share control lives inside `plannedCount > 0`
+  and had therefore never been in a screenshot at all.
+
+  *Route coverage is not state coverage.* The coverage line can say `/shopping` was rendered and be
+  true about the route and false about half the screen. Compute dates in a fixture; a literal is an
+  expiry date nobody set a reminder for.
+
+  **And a marker tied to one state expires with the fixture.** `/planner`'s marker was "Add
+  dinner", chosen while nothing was planned — the moment the fixture planned something it vanished
+  and the screen reported COULD NOT MEASURE. The marker is now the eyebrow, which is there in
+  every state.
+
 - **Running the tool is not covering your change: `pnpm shots` had no `/shopping` screen.** The
   standing rule is *render anything that changes a layout*, and the run printed **"24 screenshots,
   zero layout problems"** for a change to a screen its `SCREENS` list does not contain. Ten other

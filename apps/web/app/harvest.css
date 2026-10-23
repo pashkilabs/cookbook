@@ -53,6 +53,23 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /*
+   * `padding: 0`, and it is the whole bug rather than a tidy-up.
+   *
+   * The bare `button` element selector in `globals.css` sets `padding: 0.6rem 1.1rem`, and this
+   * rule set width and height without ever resetting it. So a `.h-icon` that is a `<button>` has
+   * 17.6px of padding each side inside a 44px circle — a content box of
+   * `44 − 2 (border) − 35.2 = 6.8px` — and its glyph is crushed to **7px wide**. Measured on
+   * /shopping: both week arrows render `18x18` with `padding 0px/0px` because `IconLink` is an
+   * `<a>`, and the share button renders `7x18` with `padding 17.6px/17.6px` because it is a
+   * `<button>`. Same class, same circle, same SVG size, opposite outcomes.
+   *
+   * That is the fourth bug traced to that one element selector. No instrument could see it:
+   * contrast reads colour, the selected-state check compares pressed against unpressed, the
+   * overflow check reads width against the viewport, and a crushed glyph is correctly coloured,
+   * correctly contained and inside its own box.
+   */
+  padding: 0;
   width: var(--size-touch-min);
   height: var(--size-touch-min);
   border-radius: var(--radius-pill);

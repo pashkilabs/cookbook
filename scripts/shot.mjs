@@ -100,6 +100,14 @@ await setup.goto(`${base}/api/health`);
  * So the household is created and then **asserted**, and a missing one is exit 2 rather than a
  * clean run over nothing.
  */
+/* the Monday of the current week, so the planner and the shopping list are never shot empty */
+const MONDAY = (() => {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  d.setUTCHours(0, 0, 0, 0);
+  return d;
+})();
+
 const provisioned = await setup.request.post(`${base}/api/household`, { data: {} });
 const household = await provisioned.json().catch(() => ({}));
 if (!household.familyId) {
@@ -207,8 +215,24 @@ for (const [i, recipe] of made.entries()) {
     .catch(() => null);
   if (patched?.ok()) classified += 1;
   for (let n = 0; n < (i < 2 ? 3 : i < 5 ? 2 : 1); n += 1) {
-    const day = new Date(Date.UTC(2026, 9, 12 + ((i + n) % 7))).toISOString().slice(0, 10);
-    await setup.request.post(`${base}/api/plan-entries`, { data: { recipeId: recipe.id, date: day } }).catch(() => {});
+    /*
+     * **This week**, computed — it was `Date.UTC(2026, 9, 12 + …)`, a literal that was the current
+     * week on the day it was written and had rotted eleven days later.
+     *
+     * The consequence was not a failed shot. `/shopping` and `/planner` both render by the week
+     * being viewed, so with the plan in a past week they rendered "No list yet" and "0 of 7
+     * dinners — waiting for a day", and the run reported both **ok**. A screen photographed in its
+     * empty state is a screen whose populated state nothing has looked at, and the share control
+     * lives inside `plannedCount > 0`, so it had never appeared in a screenshot at all.
+     *
+     * *Route coverage is not state coverage*, and a hard-coded date is a fixture with an expiry
+     * nobody set a reminder for.
+     */
+    const day = new Date(MONDAY);
+    day.setUTCDate(day.getUTCDate() + ((i + n) % 7));
+    await setup.request.post(`${base}/api/plan-entries`, {
+      data: { recipeId: recipe.id, date: day.toISOString().slice(0, 10) },
+    }).catch(() => {});
   }
 }
 if (made.length < 7) {
@@ -265,11 +289,15 @@ const SCREENS = [
    * what it should rather than that a layout is wrong.
    */
   /*
-   * `/planner` — the fourth screen this tool has reported clean without opening. Its `<h1>` is the
-   * week label, which changes with the date, so the marker is the empty slot's own words: this
-   * household plans nothing, so every day offers one.
+   * `/planner` — the fourth screen this tool reported clean without opening.
+   *
+   * The marker is the eyebrow, which is on the screen in every state. It was "Add dinner", the
+   * empty slot's own words, chosen while the fixture planned nothing — and the moment the fixture
+   * planned something that marker vanished and the screen reported COULD NOT MEASURE. A marker
+   * tied to one state is a marker that expires when the fixture changes, which is the same rot as
+   * the hard-coded week it was chosen against.
    */
-  { name: "planner", path: "/planner", marker: "Add dinner" },
+  { name: "planner", path: "/planner", marker: "Week plan" },
   { name: "shopping", path: "/shopping", marker: "Anything else you need" },
   { name: "household", path: "/household", marker: "Household" },
 ];
@@ -582,6 +610,54 @@ for (const theme of ["light", "dark"]) {
      */
     pressedCandidates += states.candidates;
     pressedComparable += states.comparable;
+
+    /*
+     * ---------------------------------------------------------------------------
+     * Is a glyph rendering at the size it declares?
+     * ---------------------------------------------------------------------------
+     *
+     * The share control on /shopping rendered its SVG **7px wide against a declared 18** —
+     * `.h-icon` set width and height and never reset the padding the bare `button` element
+     * selector imposes, so a 44px circle had a 6.8px content box. The week arrows beside it were
+     * fine because `IconLink` is an `<a>` and escapes that selector entirely: same class, same
+     * circle, same declared size, opposite outcomes.
+     *
+     * **No instrument could see it.** `check-contrast` reads colour and the glyph was correctly
+     * coloured; the selected-state check compares pressed against unpressed and this is neither;
+     * the overflow check measures width against the viewport and a crushed glyph overflows
+     * nothing. It was found by somebody looking at the screen — the third such fault this week.
+     *
+     * So the measurement becomes the check. An SVG that declares a size and renders smaller is
+     * being squeezed by something, whatever the cause, and that is a fact a layout engine knows
+     * and a stylesheet cannot tell you. Asserted at **80%** rather than exactly, because
+     * fractional layout and transforms move a box by a pixel without anything being wrong.
+     */
+    const glyphs = await page.evaluate(() => {
+      const crushed = [];
+      for (const svg of document.querySelectorAll("svg[width][height]")) {
+        const declared = { w: Number(svg.getAttribute("width")), h: Number(svg.getAttribute("height")) };
+        if (!declared.w || !declared.h) continue;
+        const box = svg.getBoundingClientRect();
+        /* not rendered at all is a different question, and the marker check below owns it */
+        if (box.width === 0 && box.height === 0) continue;
+        if (box.width >= declared.w * 0.8 && box.height >= declared.h * 0.8) continue;
+        const owner = svg.closest("button, a") ?? svg.parentElement;
+        crushed.push({
+          where: (owner?.getAttribute("aria-label") || owner?.className || owner?.tagName || "?")
+            .toString()
+            .slice(0, 36),
+          declared: `${declared.w}x${declared.h}`,
+          rendered: `${Math.round(box.width)}x${Math.round(box.height)}`,
+        });
+      }
+      return crushed;
+    });
+    for (const g of glyphs) {
+      console.error(
+        `  FAIL ${name} (${theme}): a glyph declares ${g.declared} and renders ${g.rendered} — ${g.where}`,
+      );
+      problems += 1;
+    }
 
     const body = await page.textContent("body");
     if (!body?.includes(marker) || body.includes("no household yet")) {
