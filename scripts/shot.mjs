@@ -33,9 +33,33 @@ if (!SUPABASE || !ANON || !SERVICE) {
   process.exit(2);
 }
 
-/** a phone, and the width every layout claim in this project is made about */
-const WIDTH = 390;
-const HEIGHT = 844;
+/*
+ * Two viewports, because "clean" meant "clean at one width" and nothing asked which.
+ *
+ * 390px is the phone every layout claim in this project has been made about — §81's overflow
+ * work, the 0px-wide titles, the score grid, all of it. **Nothing above phone width had ever been
+ * rendered**, and both people using this app have an iPad on the kitchen counter. The recipe
+ * book's chapter tiles sit in a narrow left column there with most of the screen empty, which is
+ * the symptom; the cause is that no picture was ever taken.
+ *
+ * 1024x768 is the honest second one: an iPad in landscape, which is how a tablet sits on a
+ * counter. Not a desktop monitor — nobody has reported one, and a width nobody uses would add
+ * findings nobody needs.
+ */
+const VIEWPORTS = [
+  { name: "phone", width: 390, height: 844 },
+  { name: "tablet", width: 1024, height: 768 },
+  /*
+   * A desktop browser, because the report that made this necessary came from one and 1024px would
+   * not have shown it: `main` caps at `60rem` and centres, so every width past 960px only widens
+   * the empty margins. The question a wide screen asks is not "does anything overflow" but "does
+   * the capped column still make sense" — and that needs looking at, not asserting.
+   */
+  { name: "desktop", width: 1440, height: 900 },
+];
+/** the phone stays the default for the setup context and for anything measured once */
+const WIDTH = VIEWPORTS[0].width;
+const HEIGHT = VIEWPORTS[0].height;
 
 const admin = (method, path, body) =>
   fetch(`${SUPABASE}/auth/v1/admin${path}`, {
@@ -327,10 +351,11 @@ const lightBytes = new Map();
 let pressedCandidates = 0;
 let pressedComparable = 0;
 
-for (const theme of ["light", "dark"]) {
+for (const viewport of VIEWPORTS) {
+ for (const theme of ["light", "dark"]) {
   for (const { name, path, layout, marker, signedOut } of SCREENS) {
     const context = await browser.newContext({
-      viewport: { width: WIDTH, height: HEIGHT },
+      viewport: { width: viewport.width, height: viewport.height },
       colorScheme: theme === "dark" ? "dark" : "light",
       deviceScaleFactor: 2,
       ...(signedOut ? {} : { extraHTTPHeaders: AUTH }),
@@ -385,7 +410,7 @@ for (const theme of ["light", "dark"]) {
     });
     if (styling.sheets === 0 || (styling.rules === 0 && styling.blocked === 0) || !styling.text) {
       console.error(
-        `  COULD NOT MEASURE ${name} (${theme}): no stylesheet reached the page — ` +
+        `  COULD NOT MEASURE ${name} (${viewport.name} ${theme}): no stylesheet reached the page — ` +
           `${styling.sheets} sheet(s), ${styling.rules} rule(s), --text=${styling.text || "(unset)"}. ` +
           `A shot of unstyled HTML is not a layout measurement. Restart the dev server and re-run.`,
       );
@@ -394,7 +419,9 @@ for (const theme of ["light", "dark"]) {
     }
 
     const png = await page.screenshot({ fullPage: true });
-    writeFileSync(`${outDir}/${name}-${theme}.png`, png);
+    /* the viewport is in the filename, or the second pass silently overwrites the first */
+    const shotName = viewport.name === "phone" ? `${name}-${theme}` : `${name}-${viewport.name}-${theme}`;
+    writeFileSync(`${outDir}/${shotName}.png`, png);
     shots += 1;
 
     /*
@@ -411,10 +438,10 @@ for (const theme of ["light", "dark"]) {
      * wrong.
      */
     if (theme === "light") {
-      lightBytes.set(name, png);
-    } else if (lightBytes.get(name)?.equals(png)) {
+      lightBytes.set(`${viewport.name}:${name}`, png);
+    } else if (lightBytes.get(`${viewport.name}:${name}`)?.equals(png)) {
       console.error(
-        `  COULD NOT MEASURE ${name} (dark): byte-identical to the light shot, so the dark ` +
+        `  COULD NOT MEASURE ${name} (${viewport.name} dark): byte-identical to the light shot, so the dark ` +
           `palette never applied — these are one screenshot written twice, not two themes.`,
       );
       problems += 1;
@@ -671,20 +698,94 @@ for (const theme of ["light", "dark"]) {
     });
     for (const g of glyphs) {
       console.error(
-        `  FAIL ${name} (${theme}): a glyph declares ${g.declared} and renders ${g.rendered} — ${g.where}`,
+        `  FAIL ${name} (${viewport.name} ${theme}): a glyph declares ${g.declared} and renders ${g.rendered} — ${g.where}`,
       );
       problems += 1;
     }
 
+    /*
+     * ---------------------------------------------------------------------------
+     * Do the top-level sections of a screen agree on a container width?
+     * ---------------------------------------------------------------------------
+     *
+     * The one positive assertion among a dozen boundary checks. Overflow asks whether something
+     * left its container, squeezed text whether a box fell below a word, contrast whether two
+     * values are too close, crushed glyph whether a box fell below its own declaration — every one
+     * detects a value leaving a permitted range, and **emptiness is inside every range there is**.
+     * A layout can be maximally wrong in that direction with every instrument green, because there
+     * is nothing to violate. That is how a three-column card grid squeezing whole sections into
+     * 296px slots survived every check at every width.
+     *
+     * This asserts something instead: the direct children of `main` share a width. Objective, no
+     * magic number, and no argument with a capped reading column — a cap applied consistently
+     * passes, which is why there is deliberately **no "wasted space" percentage** here. A check
+     * that argues with a legitimate design choice every run is a check that gets switched off.
+     *
+     * Printed rather than failed, for now: three screens disagree today (`today` and `planner` by
+     * a deliberate-looking 40px inset, `import` by a `stack` at 416px inside 920px) and a check
+     * that fails on first introduction gets silenced rather than read.
+     */
+    if (theme === "light") {
+      const blocks = await page.evaluate(() => {
+        const main = document.querySelector("main");
+        if (!main) return [];
+        /* every direct child of main, which is what "one container width" is a claim about */
+        return [...main.children]
+          .map((el) => {
+            const b = el.getBoundingClientRect();
+            return {
+              cls: (el.className || el.tagName).toString().slice(0, 30),
+              width: Math.round(b.width),
+            };
+          })
+          .filter((b) => b.width > 0);
+      });
+      const widths = [...new Set(blocks.map((b) => b.width))];
+      if (widths.length > 1) {
+        console.error(
+          `    sections disagree on width: ${blocks.map((b) => `${b.cls}=${b.width}`).join(", ")}`,
+        );
+      }
+      /*
+       * Scroll to the bottom and ask whether the last content element clears the bar.
+       *
+       * Measured this way because guessing which element carries the reservation got it wrong
+       * twice: `main`'s own `padding-bottom` is 48px, which looks 36px short of an 84px bar — and
+       * the reservation is actually on `.h-docked-page` at `84 + safe-area + 24`. The question a
+       * person has is not "which element has the padding" but "can I read the last line", so that
+       * is what this asks.
+       */
+      const reach = await page.evaluate(async () => {
+        const bar = document.querySelector(".h-tabbar");
+        const main = document.querySelector("main");
+        if (!bar || !main) return null;
+        window.scrollTo(0, document.documentElement.scrollHeight);
+        await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+        const barTop = bar.getBoundingClientRect().top;
+        const hidden = [...main.querySelectorAll("*")]
+          .map((el) => ({ el, b: el.getBoundingClientRect() }))
+          .filter(({ b }) => b.height > 0 && b.width > 0 && b.top < barTop && b.bottom > barTop);
+        window.scrollTo(0, 0);
+        return hidden.length === 0
+          ? null
+          : { count: hidden.length, first: (hidden[0].el.textContent || "").trim().slice(0, 30) };
+      });
+      if (reach) {
+        console.error(
+          `    ${reach.count} element(s) still under the bar at full scroll — e.g. "${reach.first}"`,
+        );
+      }
+    }
+
     const body = await page.textContent("body");
     if (!body?.includes(marker) || body.includes("no household yet")) {
-      console.error(`  COULD NOT MEASURE ${name} (${theme}): the page did not render its own content`);
+      console.error(`  COULD NOT MEASURE ${name} (${viewport.name} ${theme}): the page did not render its own content`);
       problems += 1;
       await context.close();
       continue;
     }
 
-    const label = `${name} (${theme})`;
+    const label = `${name} (${viewport.name} ${theme})`;
     if (found.wider > 0) {
       console.error(`  FAIL ${label}: the page is ${found.wider}px wider than the viewport`);
       for (const c of (found.culprits ?? []).slice(0, 3)) {
@@ -699,6 +800,7 @@ for (const theme of ["light", "dark"]) {
     if (found.wider === 0 && found.squeezed.length === 0) console.log(`  ok   ${label}`);
     await context.close();
   }
+ }
 }
 
 await browser.close();
@@ -777,7 +879,9 @@ if (existsSync(appDir)) {
   };
 }
 
-console.log(`\n${shots} screenshots in ${outDir}/ at ${WIDTH}px, against ${base}`);
+console.log(
+  `\n${shots} screenshots in ${outDir}/ at ${VIEWPORTS.map((v) => `${v.width}px`).join(" and ")}, against ${base}`,
+);
 if (coverage) {
   console.log(`  screens: ${coverage.rendered} of ${coverage.total} route(s) rendered.`);
   if (coverage.missing.length > 0) {

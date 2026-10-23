@@ -219,6 +219,30 @@ a.card h2 { color: var(--ink); }
   .recipes { grid-template-columns: repeat(3, 1fr); }
 }
 
+/*
+ * ---------------------------------------------------------------------------
+ * The layout sections are not cards, and must not be laid out as cards
+ * ---------------------------------------------------------------------------
+ *
+ * `.recipes` is genuinely the card grid — the flat list renders `<Link className="card">` as its
+ * direct children and they should tile. But five `<section>` blocks are direct children of the
+ * same element: the rotation, the recipe book's contents page, time, decide, and the choosing
+ * card. At 56rem each of them became **one third of a column**, so the contents page measured
+ * 296px inside a 920px grid and the chapter tiles rendered at about 87px.
+ *
+ * Reported as "crammed like a mobile device on desktop", and that is exactly what it was: a
+ * three-column card grid squeezing whole sections into card-sized slots.
+ *
+ * **Invisible on a phone by construction.** At 390px `.recipes` is one column, so a section
+ * filling its only column looks correct — the cause is width-independent and the symptom is not,
+ * which is why every layout claim this project has made at 390px stayed true while this was wrong.
+ */
+.recipes > section,
+.recipes > p,
+.recipes > .h-choosing-card {
+  grid-column: 1 / -1;
+}
+
 /* the card becomes a frame around a photograph, so padding moves inside */
 .recipes .card { padding: 0; margin: 0; display: flex; flex-direction: column; }
 .recipes .card-body { padding: var(--s3) var(--s4) var(--s4); flex: 1; }

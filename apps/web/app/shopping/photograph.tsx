@@ -137,56 +137,7 @@ export function PhotographList({ weekStart }: { weekStart: string }) {
     return (
       <section className="h-extras">
         <p className="h-extras-label">Check what the photograph said</p>
-        <ul className="h-extras-list">
-          {rows.map((row, at) => (
-            <li key={at} className="h-photo-row">
-              {/*
-                * A plain checkbox wearing Harvest's styling, **not** the `Checkbox` primitive.
-                *
-                * Its states are `need | have | check-pantry` — a shopping-list vocabulary about
-                * what is still to buy. "Is this line going on the list" is a different question,
-                * and bending `have` to mean "include" is modelling by coincidence of shape, the
-                * same thing refused for `member_preferences` holding a layout. The class gives the
-                * look; the semantics stay honest.
-                */}
-              <label className="h-check">
-                <input
-                  type="checkbox"
-                  checked={row.add}
-                  aria-label={`Add ${row.text}`}
-                  onChange={() => setRows(rows.map((r, i) => (i === at ? { ...r, add: !r.add } : r)))}
-                />
-                <span className="h-check-box" aria-hidden="true">
-                  {row.add && (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M5 12l5 5 9-10" />
-                    </svg>
-                  )}
-                </span>
-                <span className="h-check-body h-extras-text" style={{ minWidth: 0 }}>
-                  <input
-                    className="h-extras-input"
-                    value={row.text}
-                    aria-label={`Line ${at + 1}`}
-                    onChange={(event) =>
-                      setRows(rows.map((r, i) => (i === at ? { ...r, text: event.target.value } : r)))
-                    }
-                  />
-                  {row.struck && (
-                    <span className="h-extras-who">
-                      {row.strikeConfidence === "unsure"
-                        ? " — looks crossed out, but the mark is unclear"
-                        : " — crossed out, so not added"}
-                    </span>
-                  )}
-                  {!row.legible && (
-                    <span className="h-extras-who"> — hard to read, check the wording</span>
-                  )}
-                </span>
-              </label>
-            </li>
-          ))}
-        </ul>
+        <ReviewRows rows={rows} onChange={setRows} />
         <div className="h-extras-row">
           <PrimaryButton disabled={busy} onClick={() => void save()}>
             {busy ? "Adding…" : "Add the ticked ones"}
@@ -241,5 +192,81 @@ export function PhotographList({ weekStart }: { weekStart: string }) {
       </div>
       {error && <p className="error">{error}</p>}
     </section>
+  );
+}
+
+/**
+ * The rows under review, exported so a test can assert the **words** rather than the row count.
+ *
+ * Its own component because that is what made the bug assertable: nine rows rendered with tick
+ * boxes and no item text, and a count of rows passes with every row empty. Separating it is not a
+ * test hook — the reviewing state is a distinct thing from the capture control, and the page
+ * composes them.
+ */
+export function ReviewRows({
+  rows,
+  onChange,
+}: {
+  rows: Row[];
+  onChange: (next: Row[]) => void;
+}) {
+  const setRows = onChange;
+  return (
+        <ul className="h-extras-list">
+          {rows.map((row, at) => (
+            <li key={at} className="h-photo-row">
+              {/*
+                * The tick and the text are **siblings**, not nested.
+                *
+                * The text input was inside the `<label>`, which is wrong twice over: a click
+                * inside a label activates its control, so **typing in the field toggled the
+                * tick** — and `.h-check input` (a descendant selector meaning "the checkbox")
+                * clipped the text field to 1px, so nine rows rendered with boxes and no text at
+                * all. The rule is scoped now; this structure is the other half.
+                *
+                * A plain checkbox wearing Harvest's styling rather than the `Checkbox` primitive:
+                * its states are `need | have | check-pantry`, a vocabulary about what is left to
+                * buy, and bending `have` to mean "include this line" is modelling by coincidence
+                * of shape — the thing refused for `member_preferences` holding a layout.
+                */}
+              <label className="h-check h-photo-tick">
+                <input
+                  type="checkbox"
+                  checked={row.add}
+                  aria-label={`Add ${row.text}`}
+                  onChange={() => setRows(rows.map((r, i) => (i === at ? { ...r, add: !r.add } : r)))}
+                />
+                <span className="h-check-box" aria-hidden="true">
+                  {row.add && (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M5 12l5 5 9-10" />
+                    </svg>
+                  )}
+                </span>
+              </label>
+              {/* `min-width: 0`, because this is the flex child holding words (§81) */}
+              <span className="h-extras-text" style={{ minWidth: 0 }}>
+                <input
+                  className="h-extras-input"
+                  value={row.text}
+                  aria-label={`Line ${at + 1}`}
+                  onChange={(event) =>
+                    setRows(rows.map((r, i) => (i === at ? { ...r, text: event.target.value } : r)))
+                  }
+                />
+                {row.struck && (
+                  <span className="h-extras-who">
+                    {row.strikeConfidence === "unsure"
+                      ? " — looks crossed out, but the mark is unclear"
+                      : " — crossed out, so not added"}
+                  </span>
+                )}
+                {!row.legible && (
+                  <span className="h-extras-who"> — hard to read, check the wording</span>
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
   );
 }
