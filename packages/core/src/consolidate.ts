@@ -37,7 +37,8 @@ export function consolidate(
     const scale = entry.scale ?? 1;
     for (const ingredient of entry.ingredients) {
       if (!ingredient.item) continue;
-      if (excludeStaples && isStaple(ingredient.item)) continue;
+      // `keepStaples` is for an entry somebody typed: they asked for salt because they ran out
+      if (excludeStaples && !entry.keepStaples && isStaple(ingredient.item)) continue;
 
       const item = catalog.find(ingredient.item);
       const key = item ? item.key : normaliseName(ingredient.item) || ingredient.item;

@@ -7,6 +7,7 @@ import { krogerConfig } from "@/lib/kroger";
 import { buildShoppingWeek } from "@/lib/shopping";
 import { addWeeks, isIsoDate, startOfWeek, todayIso, weekDays, weekLabel } from "@/lib/week";
 import { ShoppingList } from "./shopping-list";
+import { AddExtra } from "./add-extra";
 import { IconLink, TabBar } from "@/components/harvest";
 
 /**
@@ -105,6 +106,15 @@ export default async function ShoppingPage({
           ticked={[...week.ticked]}
         />
       )}
+
+      {/*
+        * Outside the `plannedCount > 0` branch above, deliberately.
+        *
+        * A household that has planned nothing can still need milk, and the whole feature would be
+        * unreachable on exactly the week somebody most wants to type a list by hand. The read path
+        * agrees: `buildShoppingWeek` consolidates extras even when the plan is empty.
+        */}
+      {week && <AddExtra weekStart={weekStart} extras={week.extras} />}
       {/*
         * The way in. Nine capabilities have shipped here with no path through them, and the
         * display of a thing is not the control for it (§69, §73).

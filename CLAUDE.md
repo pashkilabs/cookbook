@@ -462,6 +462,41 @@ models be good enough. Do not add a silent-save path.
   contained **no URL but the one-shot token**, never naming where the app lives. If the only
   address somebody is ever sent expires on use, that is the one they will save.
 
+- **Running the tool is not covering your change: `pnpm shots` had no `/shopping` screen.** The
+  standing rule is *render anything that changes a layout*, and the run printed **"24 screenshots,
+  zero layout problems"** for a change to a screen its `SCREENS` list does not contain. Ten other
+  screens were clean and that was about to be quoted as evidence. `/planner` is still absent too.
+
+  So the adjacent-claim fault has a second form: not a check written to report on a neighbour of
+  its claim, but a **correct check used as though its scope were the thing you changed**. The
+  question to ask of any green tool is not "did it pass" but **"does its subject include what I
+  touched?"** — for the renderer that means reading `SCREENS` before believing the summary, and
+  adding the screen is part of the change rather than a follow-up.
+
+- **`private.propagate_soft_delete` cannot be attached to `public.families`, and three tables had
+  it.** It reads `new.family_id` — which exists on `family_members` and not on `families` — so
+  every one of those triggers raised `record "new" has no field "family_id"` on **any** household
+  soft-delete, with no child rows involved. `cart_exports` had the shape first, `member_settings`
+  copied it, and `shopping_extras` nearly made three.
+
+  They were never required: `assert_soft_delete_propagation` excludes `families` and `accounts` by
+  name and says why — *"deleting one is teardown, not editing. A household going away is a device
+  wipe (§20) and a hard delete that cascades, not a million tombstones."* The FK carries
+  `ON DELETE CASCADE` for exactly that. So the triggers did not merely do nothing, they turned an
+  unsupported operation into an **erroring** one, and the error named a field rather than the
+  mistake.
+
+  Nothing caught it because the invariant asks which references *lack* a trigger and never asks
+  whether a trigger it finds can run — a guard's existence read as coverage of its subject, again.
+  `assert_no_family_propagation_triggers` now refuses it by name, and the narrowest condition is
+  the point: that one function on that one table, not "no triggers on families".
+
+  **And the restore half is a different function.** `private.restore_soft_delete(child, column)`
+  takes two arguments and no mode; passing `'restore'` as a third argument to
+  `propagate_soft_delete` is accepted and does nothing, because its UPDATE carries
+  `where deleted_at is null` and a tombstoned child never matches. The tombstone half worked, so
+  the pair looked symmetric and was not. Audited across the schema: nothing else does it.
+
 - **A test can encode the bug as the specification.** The 1c check asserted that a second member
   *reads the household's layout*. Against the broken resolver that was exactly right; about the
   product it was exactly wrong, because how somebody browses is personal (§87). It was **green

@@ -1237,6 +1237,54 @@ export type Database = {
           },
         ]
       }
+      shopping_extras: {
+        Row: {
+          added_by: string
+          created_at: string
+          deleted_at: string | null
+          family_id: string
+          id: string
+          raw_text: string
+          updated_at: string
+          week_start: string
+        }
+        Insert: {
+          added_by: string
+          created_at?: string
+          deleted_at?: string | null
+          family_id: string
+          id?: string
+          raw_text: string
+          updated_at?: string
+          week_start: string
+        }
+        Update: {
+          added_by?: string
+          created_at?: string
+          deleted_at?: string | null
+          family_id?: string
+          id?: string
+          raw_text?: string
+          updated_at?: string
+          week_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shopping_extras_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shopping_extras_member"
+            columns: ["added_by", "family_id"]
+            isOneToOne: false
+            referencedRelation: "family_members"
+            referencedColumns: ["id", "family_id"]
+          },
+        ]
+      }
       shopping_ticks: {
         Row: {
           created_at: string

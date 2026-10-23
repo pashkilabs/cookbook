@@ -547,6 +547,82 @@ try {
     );
 
     /*
+     * ---------------------------------------------------------------------------
+     * Things typed onto the list, which no recipe asked for (§89)
+     * ---------------------------------------------------------------------------
+     *
+     * Four assertions because the endpoint is the least of them. **A smoke check that calls an
+     * endpoint proves the endpoint and nothing else** — caption paste and screenshot upload both
+     * shipped green with no way in from the product. So: the route answers, the control is
+     * *reachable from the screen*, the typed item reaches the list, and removing it takes it off.
+     *
+     * **"3 kumquats", and the marker matters more than it looks.** The first version used
+     * "2 lemons" — reasoning carefully that a quantity makes it a count line and that lemons are
+     * not a staple, and never checking that the fixture recipe above is
+     * `"2 cups flour\n1 pint double cream\n3 lemons"`. So "what was typed reaches the list"
+     * passed because the *recipe* asks for lemons, and "removing it takes it off" failed because
+     * they are still there and always will be. **A stale-fixture probe looks like evidence**: one
+     * check read as a pass and the other as the exact failure being hunted. `kumquat` appears
+     * nowhere else in this script, the seed catalog or the fixtures.
+     *
+     * Every assertion also checks the **status**, which the first version did not — so a 500
+     * rendered as "the shopping screen offers no way to add anything", which is a claim about the
+     * product made from a crash. That is the adjacent-claim fault this project has a list of, and
+     * it did in fact happen here: `groupKey: "added"` reached `weekdayName(...).slice(0, 3)`.
+     */
+    const added = await call("POST", "/api/shopping-extras", {
+      body: { text: "3 kumquats", weekStart: monday },
+    });
+    record(
+      "something typed onto the week's list is accepted",
+      added.status === 200 && typeof added.body?.id === "string",
+      `HTTP ${added.status} ${JSON.stringify(added.body?.text ?? added.body?.error ?? null)}`,
+    );
+
+    const withExtra = await call("GET", `/shopping?week=${monday}`);
+    const extraText = visible(typeof withExtra.body === "string" ? withExtra.body : "");
+    record(
+      "and the box to type it in is on the screen, not just the route behind it",
+      withExtra.status === 200 && extraText.includes("Anything else you need"),
+      withExtra.status !== 200
+        ? `HTTP ${withExtra.status} — the screen did not render, so what it offers was not measured`
+        : foundDetail(extraText, "Anything else you need", "the shopping screen offers no way to add anything"),
+    );
+    record(
+      "and what was typed reaches the list",
+      withExtra.status === 200 && extraText.includes("kumquats"),
+      withExtra.status !== 200
+        ? `HTTP ${withExtra.status}`
+        : foundDetail(extraText, "kumquats", "the typed item did not reach the list it was added to"),
+    );
+
+    if (typeof added.body?.id !== "string") {
+      skip("and removing it takes it off the list", "nothing was added, so removing it proves nothing");
+    } else {
+      const removed = await call("DELETE", `/api/shopping-extras?id=${added.body.id}`);
+      const after = await call("GET", `/shopping?week=${monday}`);
+      const afterText = visible(typeof after.body === "string" ? after.body : "");
+      /*
+       * The control matters: "lemons" being absent proves nothing if the whole list failed to
+       * render. §86 — an assertion that something is missing is worthless without evidence that
+       * something else is present.
+       */
+      const listStillThere = after.status === 200 && afterText.includes("Anything else you need");
+      if (!listStillThere) {
+        skip(
+          "and removing it takes it off the list",
+          `the shopping screen did not render (HTTP ${after.status}), so the absence proves nothing`,
+        );
+      } else {
+        record(
+          "and removing it takes it off the list",
+          removed.status === 200 && !afterText.includes("kumquats"),
+          `DELETE ${removed.status} — ${afterText.includes("kumquats") ? "still listed" : "gone, and the list still rendered"}`,
+        );
+      }
+    }
+
+    /*
      * Item 3: what the day row holds AT REST, asserted by absence.
      *
      * The fix is not "the panel exists" — it is that four controls are *not* in the row until

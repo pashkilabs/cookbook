@@ -250,6 +250,20 @@ const SCREENS = [
    * that was found by looking at a picture rather than by any guard.
    */
   { name: "chapter-starter", path: "/recipes/c/starter", layout: "browse", marker: "Appetisers" },
+  /*
+   * `/shopping`, which was **not on this list** until the week's typed extras landed on it.
+   *
+   * Worth saying plainly: `pnpm shots` reported "22 screenshots, zero layout problems" for a
+   * change to a screen it never opened, and that was about to be quoted as evidence. The same
+   * adjacent-claim fault the helper list below collects, arriving through how the tool was *used*
+   * rather than how it is written — the brief says render anything that changes a layout, and a
+   * clean run over ten other screens is not that.
+   *
+   * The marker is the add control's own label: it is content only this screen renders, it is
+   * there whether or not anything is planned, and its absence means the screen did not render
+   * what it should rather than that a layout is wrong.
+   */
+  { name: "shopping", path: "/shopping", marker: "Anything else you need" },
   { name: "household", path: "/household", marker: "Household" },
 ];
 

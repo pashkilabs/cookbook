@@ -237,3 +237,37 @@ describe("end to end, a real week", () => {
     expect(parmesan.packages).not.toBeNull();
   });
 });
+
+describe("something somebody typed onto the list", () => {
+  /*
+   * The fault this exists for: `excludeStaples` is right for "1 tsp salt" on a recipe and
+   * silently wrong for a person who typed "salt" because they ran out. Measured before it was
+   * fixed — "salt" was absent from the output entirely, not shown as zero.
+   */
+  // regression: a typed staple was dropped by excludeStaples and appeared nowhere
+  it("keeps salt when somebody asked for salt, and drops it when a recipe did", () => {
+    const catalog = createCatalog([]);
+    const typed = parseIngredientList(["salt"]);
+
+    const fromARecipe = consolidate([{ label: "Soup", ingredients: typed }], catalog);
+    expect(fromARecipe.map((line) => line.label)).not.toContain("salt");
+
+    const askedFor = consolidate([{ label: "Paige", ingredients: typed, keepStaples: true }], catalog);
+    expect(askedFor.map((line) => line.label)).toContain("salt");
+  });
+
+  it("merges what somebody typed with what the recipes already need", () => {
+    const catalog = createCatalog([]);
+    const lines = consolidate(
+      [
+        { label: "Carbonara", ingredients: parseIngredientList(["1 cup double cream"]) },
+        { label: "Paige", ingredients: parseIngredientList(["1 cup double cream"]), keepStaples: true },
+      ],
+      catalog,
+    );
+    const cream = lines.find((line) => line.label === "double cream");
+    // one line, both askers named on it — not two lines, and not one that forgot the second
+    expect(cream?.uses.map((use) => use.label)).toEqual(["Carbonara", "Paige"]);
+    expect(cream?.needed).toBeCloseTo(473.176, 1);
+  });
+});

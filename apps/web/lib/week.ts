@@ -105,7 +105,20 @@ const MONTH_NAMES = [
 ];
 
 export function weekdayName(date: IsoDate): string {
-  return WEEKDAY_NAMES[new Date(toUtc(date)).getUTCDay()]!;
+  /*
+   * The `!` here was a lie that `noUncheckedIndexedAccess` would otherwise have caught.
+   *
+   * An unparseable date gives `NaN` from `getUTCDay()`, `WEEKDAY_NAMES[NaN]` is `undefined`, and
+   * the assertion typed that `undefined` as a `string` — so a caller doing
+   * `weekdayName(x).slice(0, 3)` threw at runtime with the type checker satisfied. It took the
+   * shopping screen down when a `groupKey` that was not a date reached it.
+   *
+   * Throwing names the input instead. The callers that could pass a non-date now guard with
+   * `isIsoDate` first, so this is unreachable from them — and reachable, loudly, from the next one.
+   */
+  const name = WEEKDAY_NAMES[new Date(toUtc(date)).getUTCDay()];
+  if (!name) throw new Error(`weekdayName: ${JSON.stringify(date)} is not a date`);
+  return name;
 }
 
 /** "12 August", for a day heading. Formatted here rather than by a locale, for the same reason. */

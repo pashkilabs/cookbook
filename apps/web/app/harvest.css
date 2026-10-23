@@ -1679,3 +1679,66 @@
   color: var(--text);
   overflow-wrap: break-word;
 }
+
+/* --- anything else you need, typed onto the week's list (§89) -------------- */
+
+.h-extras {
+  margin: var(--space-xl) 0 0;
+  padding: var(--space-lg);
+  border-radius: var(--radius-card);
+  background: var(--surface-sunken);
+}
+.h-extras-label {
+  display: block;
+  margin-bottom: var(--space-sm);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+/*
+ * `flex-wrap`, because a strip holding a text field and a button is exactly the shape §81
+ * measured: at 390px the input's intrinsic width plus a 44px control overflows, the page becomes
+ * wider than the screen, and every `position: fixed` bar sizes to a width that is not the screen.
+ * The input carries `min-width: 0` for the same reason — `flex: 1` does not mean a child can
+ * shrink.
+ */
+.h-extras-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: center;
+}
+.h-extras-input {
+  flex: 1 1 60%;
+  min-width: 0;
+  height: var(--size-touch-min);
+  padding: 0 var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-input);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 15px;
+}
+.h-extras-input::placeholder { color: var(--text-muted); }
+
+.h-extras-list {
+  margin: var(--space-md) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.h-extras-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) 0;
+}
+.h-extras-text {
+  flex: 1;
+  font-family: var(--font-body);
+  font-size: 15px;
+  color: var(--text);
+  overflow-wrap: break-word;
+}
+.h-extras-who { color: var(--text-muted); font-size: 13px; }

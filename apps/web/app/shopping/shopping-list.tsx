@@ -6,7 +6,7 @@ import { useState } from "react";
 import { formatCountable, pluralise, type ShoppingLine } from "@pashki/core";
 import { Checkbox, Chip, Eyebrow, SectionHeader, SegmentedControl } from "@/components/harvest";
 import { byMeal } from "@/lib/by-meal";
-import { weekdayName } from "@/lib/week";
+import { isIsoDate, weekdayName } from "@/lib/week";
 import { ShareList } from "./share";
 
 /**
@@ -145,7 +145,14 @@ export function ShoppingList(props: {
     ]),
   ].join("\n");
 
-  const day = (date: string | null) => (date ? weekdayName(date).slice(0, 3) : null);
+  /*
+   * `isIsoDate`, not `Boolean(date)`. A `groupKey` is typed `string | number` and only a planned
+   * meal's is a date — an entry somebody typed carries none, and one carrying any other string
+   * used to reach `weekdayName`, which answered `undefined` and took the screen down with
+   * `.slice` of nothing. Guarding the *type* was the mistake; this guards the shape.
+   */
+  const day = (date: unknown) =>
+    typeof date === "string" && isIsoDate(date) ? weekdayName(date).slice(0, 3) : null;
 
   const lineRow = (line: ShoppingLine) => {
     const isTicked = ticked.has(line.key);
@@ -203,7 +210,7 @@ export function ShoppingList(props: {
                  */
                 <span key={index} title={`${use.label} takes ${use.display || "some"}`}>
                   <Chip tone="clay">
-                    {day(typeof use.groupKey === "string" ? use.groupKey : null) ?? use.label}
+                    {day(use.groupKey) ?? use.label}
                     {" · "}
                     {use.display || "some"}
                   </Chip>

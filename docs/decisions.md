@@ -5759,3 +5759,41 @@ The habit the second one leaves: when a visual tool passes, ask what it would lo
 thing under the picture were missing entirely — and `curl` the stylesheet the page links rather
 than trusting that a 200 on the page means a 200 on its assets. A long-lived dev server is a stale
 one.
+
+## §89 — Who writes the session cookie, measured
+
+Asked because ITP caps script-written cookies at seven days regardless of `maxAge`, and
+`@supabase/ssr` sets `httpOnly: false`. Printed rather than reasoned from the package's defaults,
+which is the shape this thread had already cost two sessions to.
+
+**Signing in, fresh token:** **zero** `Set-Cookie` for the auth token — during sign-in and during
+the navigation after it. The cookie is script-readable from `document.cookie` and stored as
+`httpOnly=false`, `sameSite=Lax`, expiring in **400.0 days**.
+
+**The same cookie with its access token aged sixty seconds past expiry, then one navigation:**
+middleware **did** emit `Set-Cookie` on `/household`, and the access token **rotated** — a real
+refresh. The replacement again claims 400 days.
+
+So the answer is **both paths, in an order**: the initial write is `document.cookie` and nothing
+server-side writes it; refreshes are server-written by middleware. Access tokens last an hour
+(3596s observed), so any visit more than an hour after the last one converts the cookie back to
+server-written.
+
+**What that means.** The 400 days is a lie on iOS from each client-side write until the next
+server-side one. The browser client has `autoRefreshToken` on, so an open tab refreshes
+client-side and re-caps. The effective ceiling is roughly **seven days from the most recent client
+write** — a household opening the app weekly keeps its session; one that skips a fortnight does
+not. This was never the reported bug (that was a bookmark, §88-adjacent); it predicts weekly-ish
+sign-outs for everybody, not every launch for one person.
+
+**Where the evidence stops.** Which path writes is our code and browser-independent, measured on
+Chromium. The seven-day cap is Safari's documented policy, **not measured here** — a time-based
+eviction cannot be demonstrated by a short test. The write path is a fact; the cap is a citation,
+and the distinction is the whole reason this entry exists.
+
+**Not fixed, because the options trade against each other and it is not a bug today.**
+`httpOnly: true` is unavailable — the browser client must read the cookie to hydrate. Either force
+middleware to re-set the cookie on every navigation so the last write is usually server-side
+(cheap, does nothing for a long-open tab), additionally disable client-side `autoRefreshToken` and
+let middleware own refreshes (complete, breaks a tab left open across an expiry), or accept a
+weekly re-sign-in on iOS and say so in the product.

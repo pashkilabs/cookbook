@@ -1,4 +1,5 @@
 import { maybeRow, rows } from "./rows";
+import { platformStore } from "./platform";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   consolidate,
@@ -31,6 +32,14 @@ import type { IsoDate } from "./week";
  */
 export interface ShoppingWeek {
   lines: ShoppingLine[];
+  /**
+   * What somebody typed onto this week's list, for the control that lists and removes them.
+   *
+   * Separate from `lines` on purpose: a line is a *thing to buy*, already merged with whatever the
+   * recipes asked for, and an extra is a *request somebody made*. Two people asking for milk is
+   * two requests and one carton, and only the first of those is editable.
+   */
+  extras: Array<{ id: string; text: string; addedBy: string }>;
   byAisle: Array<{ aisle: string; lines: ShoppingLine[] }>;
   leftovers: ShoppingLine[];
   suggestions: Array<{ id: string; title: string; uses: string[] }>;
@@ -51,7 +60,7 @@ export async function buildShoppingWeek(
    */
   system: MeasurementSystem = "us",
 ): Promise<{ week: ShoppingWeek | null; error: string | null }> {
-  const [plan, ingredientRows, packageRows, pantryRows, tickRows] = await Promise.all([
+  const [plan, ingredientRows, packageRows, pantryRows, tickRows, extraRows] = await Promise.all([
     supabase
       .from("plan_entries")
       .select("id, date, scale, recipes!inner(id, title)")
@@ -74,6 +83,18 @@ export async function buildShoppingWeek(
       .eq("family_id", familyId)
       .eq("week_start", weekStart)
       .is("deleted_at", null),
+    /*
+     * Week-scoped, like the ticks beside it — that is what makes nothing have to clear them.
+     * `family_members` is a platform table, so the name comes through the seam below rather than
+     * from an embedded resource here; `check-platform-tables.mjs` fails the build on a join.
+     */
+    supabase
+      .from("shopping_extras")
+      .select("id, raw_text, added_by")
+      .eq("family_id", familyId)
+      .eq("week_start", weekStart)
+      .is("deleted_at", null)
+      .order("created_at"),
   ]);
 
   /*
@@ -89,13 +110,86 @@ export async function buildShoppingWeek(
    * The plan itself is different: with no planned recipes there is nothing to show, so that
    * failure is still fatal and still reported.
    */
-  const fatal = plan.error ?? pantryRows.error ?? tickRows.error;
+  /*
+   * A failed extras read is **fatal**, unlike the catalog.
+   *
+   * A list missing package advice is still the right ingredients; a list silently missing the
+   * thing somebody typed an hour ago is a list that lies, and they will not buy it. Absence and
+   * never-added are indistinguishable on a shopping screen.
+   */
+  const fatal = plan.error ?? pantryRows.error ?? tickRows.error ?? extraRows.error;
   if (fatal) return { week: null, error: fatal.message };
 
   const catalogFailure = ingredientRows.error ?? packageRows.error;
   if (catalogFailure) {
     console.error(`[pashki] shopping list built without the catalog: ${catalogFailure.message}`);
   }
+
+  /*
+   * Who asked, by name, through the seam — `family_members` is a platform table.
+   *
+   * The name becomes the entry's `label`, which lands in `ShoppingLine.uses`: the field the screen
+   * already uses to say which meals want an ingredient. So a merged line reads "Cream — Tuesday's
+   * carbonara, Friday's tart, Paige" with no new UI at all.
+   *
+   * No export sends `uses` — `instacart.ts` sends `display_text: line.label` and nothing else —
+   * so a household name does not leave on a cart. Recorded rather than assumed, and if an export
+   * ever carries `uses` it would then be sending both recipe titles and household names to a
+   * third party, which is a decision to take deliberately.
+   */
+  const extras = (extraRows.data ?? []).map((row) => ({
+    id: row.id as string,
+    text: row.raw_text as string,
+    addedById: row.added_by as string,
+  }));
+  const memberNames = new Map<string, string>(
+    extras.length === 0
+      ? []
+      : (await platformStore().listMembers(familyId)).map((member) => [member.id, member.displayName]),
+  );
+
+  /*
+   * One definition, two call sites — the empty-plan branch below needs these too.
+   *
+   * A household that has planned nothing and typed "milk" must still see milk: the first version
+   * returned early on an empty plan and the typed item vanished, which is the silent-drop shape
+   * (§80) arriving through a branch written before the feature existed.
+   *
+   * Grouped by person so the `uses` row says who asked.
+   */
+  const extraEntries = (): ConsolidationEntry[] => {
+    const byPerson = new Map<string, string[]>();
+    for (const extra of extras) {
+      const texts = byPerson.get(extra.addedById) ?? [];
+      texts.push(extra.text);
+      byPerson.set(extra.addedById, texts);
+    }
+    /*
+     * **No `groupKey`.** An extra is not on a day, and the first version set it to the string
+     * `"added"` — which 500'd the whole screen, because `ShoppingList` renders every `groupKey`
+     * through `weekdayName(...).slice(0, 3)` and had never met one that was not a date.
+     *
+     * Each half was right: the entry is well formed, `consolidate` buckets it correctly, the row
+     * renders. The **handoff** was broken, which is the join a component test cannot see — and
+     * this value crosses three boundaries (route → table → consolidate → screen), which is this
+     * project's own trigger for one test that walks the whole path.
+     *
+     * With it absent the chip falls back to `use.label`, which is the person's name: "Paige · 2".
+     * That is the right thing to show for something nobody put on a day.
+     */
+    return [...byPerson].map(([memberId, texts]) => ({
+      label: memberNames.get(memberId) ?? "Added by hand",
+      ingredients: parseIngredientList(texts),
+      keepStaples: true,
+    }));
+  };
+
+  const asExtras = () =>
+    extras.map((extra) => ({
+      id: extra.id,
+      text: extra.text,
+      addedBy: memberNames.get(extra.addedById) ?? "someone",
+    }));
 
   const planned = (plan.data ?? []).map((entry) => ({
     id: entry.id as string,
@@ -111,9 +205,14 @@ export async function buildShoppingWeek(
   );
 
   if (planned.length === 0) {
+    // typed items still have to appear — see `extraEntries`
+    const only = consolidate(extraEntries(), catalog, { system });
     return {
       week: {
-        lines: [], byAisle: [], leftovers: [], suggestions: [], plannedCount: 0,
+        lines: only,
+        extras: asExtras(),
+        byAisle: groupByAisle(only),
+        leftovers: [], suggestions: [], plannedCount: 0,
         pantry: (pantryRows.data ?? []).map((row) => ({ id: row.id, name: row.name })),
         ticked: new Set((tickRows.data ?? []).map((row) => row.item_key)),
       },
@@ -218,6 +317,21 @@ export async function buildShoppingWeek(
   // the same preference decides both halves: which sizes are on the shelf, and how the amounts
   // are written. Passing it to one and not the other is what produced "2.5 kg bag" above
   // "3 lb spare" (decisions §28).
+  /*
+   * Typed extras, one entry per person, appended to the planned meals.
+   *
+   * **One `consolidate` call, not two.** Everything the feature needs falls out of that: an extra
+   * naming a catalog item shares the recipes' bucket, so "1 pint cream" typed on Monday buys one
+   * carton across Tuesday and Friday rather than a second; an extra naming nothing recognisable
+   * falls through to its own line with no package advice, in the words that were typed; and the
+   * tick key is the consolidated key either way, so ticking the cream ticks all of it.
+   *
+   * Grouped by person so the `uses` row says who, and `keepStaples` because somebody who typed
+   * "salt" has run out of salt — the default drops it, silently, which is the fault the design
+   * pass found by running this rather than reading it.
+   */
+  entries.push(...extraEntries());
+
   const lines = consolidate(entries, catalog, { pantry, deductPantry: true, system });
   const leftovers = significantLeftovers(lines);
 
@@ -247,6 +361,7 @@ export async function buildShoppingWeek(
   return {
     week: {
       lines,
+      extras: asExtras(),
       byAisle: groupByAisle(lines),
       leftovers,
       suggestions: suggested.slice(0, 6).map((recipe) => ({

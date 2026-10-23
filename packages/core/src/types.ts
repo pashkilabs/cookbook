@@ -110,6 +110,19 @@ export interface ConsolidationEntry {
   ingredients: ParsedIngredient[];
   /** batch multiplier, e.g. 1.5 to cook half again as much */
   scale?: number;
+  /**
+   * Keep staples that `excludeStaples` would drop — for an entry somebody **typed**.
+   *
+   * "1 tsp salt" has no business on a shopping list, which is why staples are excluded by
+   * default. But somebody who types "salt" into the list has typed it *because they have run out
+   * of salt*, and dropping it is silent: the item appears nowhere, and a write that looks like it
+   * worked and stored nothing is the worse half of §80.
+   *
+   * Per entry rather than per call, so the recipes and the extras can disagree inside one
+   * `consolidate()`. Two calls would be two consolidation sites, which is the problem this
+   * codebase keeps paying for.
+   */
+  keepStaples?: boolean;
 }
 
 export interface IngredientUse {
