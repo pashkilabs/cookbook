@@ -132,3 +132,8 @@ export type { PalateNote } from "./palate.js";
 
 export { inferComponents, componentsPrompt, coversExactly, COMPONENTS_JSON_SCHEMA, COMPONENTS_INSTRUCTIONS } from "./components.js";
 export type { RecipeComponent } from "./components.js";
+export {
+  SHOPPING_PHOTO_INSTRUCTIONS,
+  SHOPPING_PHOTO_JSON_SCHEMA,
+  type PhotographedLine,
+} from "./shopping-photo.js";

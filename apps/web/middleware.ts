@@ -90,7 +90,26 @@ export async function middleware(request: NextRequest) {
        * `.1` and so on, so this matches the prefix rather than the exact name.
        */
       if (!/^sb-.*-auth-token(\.\d+)?$/.test(cookie.name)) continue;
-      response.cookies.set(cookie.name, cookie.value, DEFAULT_COOKIE_OPTIONS);
+      /*
+       * `Secure` on HTTPS, which the cookie did not carry before.
+       *
+       * Printed from production rather than assumed: the attributes were
+       * `Path=/; Expires=…; Max-Age=34560000; SameSite=lax` — no `Secure`, because
+       * `DEFAULT_COOKIE_OPTIONS` does not set it and `document.cookie` never did either. Without
+       * it a session cookie is sent over plaintext `http://` to this host, and the redirect to
+       * HTTPS happens *after* the cookie has left.
+       *
+       * Conditional on the request's own scheme: setting it unconditionally would make the
+       * browser discard the cookie over `http://127.0.0.1:3000` and break local development
+       * entirely — the kind of change that works in production and stops anybody working.
+       *
+       * `httpOnly` stays false and is not an oversight: `createBrowserClient` reads this cookie
+       * from script to hydrate the session, so hiding it would break the client (§89).
+       */
+      response.cookies.set(cookie.name, cookie.value, {
+        ...DEFAULT_COOKIE_OPTIONS,
+        secure: request.nextUrl.protocol === "https:",
+      });
     }
   }
 

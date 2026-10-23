@@ -40,6 +40,7 @@
 import { fingerprint } from "@pashki/core";
 import { COMPONENTS_INSTRUCTIONS, COMPONENTS_JSON_SCHEMA } from "./components.js";
 import { PALATE_INSTRUCTIONS, PALATE_JSON_SCHEMA } from "./palate.js";
+import { SHOPPING_PHOTO_INSTRUCTIONS, SHOPPING_PHOTO_JSON_SCHEMA } from "./shopping-photo.js";
 
 /*
  * The schema travels with the instructions because it is half the prompt.
@@ -58,3 +59,16 @@ export const COMPONENTS_PROMPT_FINGERPRINT = digest(
 );
 
 export const PALATE_PROMPT_FINGERPRINT = digest(PALATE_INSTRUCTIONS, PALATE_JSON_SCHEMA);
+
+/*
+ * Fingerprinted from the day it exists, rather than after the first stale answer.
+ *
+ * Nothing caches a photographed list yet — a photograph is read once, reviewed, and saved as
+ * rows. But a reading is exactly the kind of thing somebody caches later to avoid paying twice
+ * for the same image, and the two caches that bit this project were both added without one.
+ * Deriving it now costs a line and means the question is already answered.
+ */
+export const SHOPPING_PHOTO_PROMPT_FINGERPRINT = digest(
+  SHOPPING_PHOTO_INSTRUCTIONS,
+  SHOPPING_PHOTO_JSON_SCHEMA,
+);
