@@ -135,5 +135,6 @@ export type { RecipeComponent } from "./components.js";
 export {
   SHOPPING_PHOTO_INSTRUCTIONS,
   SHOPPING_PHOTO_JSON_SCHEMA,
+  readShoppingList,
   type PhotographedLine,
 } from "./shopping-photo.js";

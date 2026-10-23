@@ -1759,3 +1759,25 @@
   overflow-wrap: break-word;
 }
 .h-extras-who { color: var(--text-muted); font-size: 13px; }
+
+/* a reviewed line from a photographed list — the checkbox, the editable text, the notes */
+.h-photo-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-xs) 0;
+}
+.h-photo-row .h-check { width: 100%; align-items: flex-start; }
+
+/*
+ * A file input wearing a button. The input itself is `.h-sr-only` so it keeps focus and the
+ * accessibility tree; the label is what anybody sees, and this draws the focus ring the hidden
+ * input cannot show for itself — the same reason `.h-check input:focus-visible + .h-check-box`
+ * exists.
+ */
+.h-file { position: relative; }
+.h-file input:focus-visible + label {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.h-file label { cursor: pointer; }

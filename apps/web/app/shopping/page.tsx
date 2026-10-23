@@ -8,6 +8,7 @@ import { buildShoppingWeek } from "@/lib/shopping";
 import { addWeeks, isIsoDate, startOfWeek, todayIso, weekDays, weekLabel } from "@/lib/week";
 import { ShoppingList } from "./shopping-list";
 import { AddExtra } from "./add-extra";
+import { PhotographList } from "./photograph";
 import { IconLink, TabBar } from "@/components/harvest";
 
 /**
@@ -115,6 +116,12 @@ export default async function ShoppingPage({
         * agrees: `buildShoppingWeek` consolidates extras even when the plan is empty.
         */}
       {week && <AddExtra weekStart={weekStart} extras={week.extras} />}
+      {/*
+        * The photograph path's own way in, deliberately distinct from the share control beside it
+        * and deliberately labelled — the share button was read as an upload precisely because it
+        * was a bare glyph, and this is the one that actually uploads.
+        */}
+      {week && <PhotographList weekStart={weekStart} />}
       {/*
         * The way in. Nine capabilities have shipped here with no path through them, and the
         * display of a thing is not the control for it (§69, §73).

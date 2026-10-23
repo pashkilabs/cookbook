@@ -1,6 +1,12 @@
 import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
-import { attemptImport, attemptPasteImport, detectImageOrientation, spendImportQuota } from "@/lib/import";
+import {
+  attemptImport,
+  attemptPasteImport,
+  detectImageOrientation,
+  readShoppingListPhotos,
+  spendImportQuota,
+} from "@/lib/import";
 import { draftFrom } from "@/lib/draft";
 
 /**
@@ -82,6 +88,44 @@ export async function POST(request: Request) {
         status: "unreadable" as const,
       }));
       return Response.json({ orientation }, { headers: { "cache-control": "no-store" } });
+    }
+
+    /*
+     * Reading a shopping list, as a mode on this route rather than a route of its own — the same
+     * reasoning as the orientation probe above, and it shares this route's size ceiling and form
+     * parsing rather than copying them.
+     *
+     * **Spends no quota**, for the reason the probe does not: a household's allowance is for
+     * recipes, and this reads a list the household wrote itself.
+     *
+     * It returns the reading and saves nothing. The review screen is what turns lines into rows,
+     * through `/api/shopping-extras` — because **every import passes a review screen before
+     * saving** and a handwritten list is the input that needs one most: a misread strike-through
+     * silently removes an item, and the review is where that becomes visible and reversible.
+     */
+    if (String(form.get("mode") ?? "") === "shopping-list") {
+      const sheets = form.getAll("images").filter((part): part is File => part instanceof File);
+      if (sheets.length === 0 || sheets.length > MAX_IMAGES) {
+        return Response.json(
+          { error: `photograph the list in 1 to ${MAX_IMAGES} images` },
+          { status: 400 },
+        );
+      }
+      const read = await readShoppingListPhotos(
+        await Promise.all(
+          sheets.map(async (part) => ({ bytes: new Uint8Array(await part.arrayBuffer()) })),
+        ),
+      );
+      if (!read.ok) {
+        /*
+         * The three reasons stay distinct all the way out. "Nothing is configured" and "no model
+         * could read it" are different news — one is a switched-off feature and the other is a
+         * photograph worth retaking — and collapsing them is what made a sideways card report as
+         * upright (§75).
+         */
+        return Response.json({ error: read.detail, reason: read.reason }, { status: 422 });
+      }
+      return Response.json({ lines: read.lines }, { headers: { "cache-control": "no-store" } });
     }
 
     const parts = form.getAll("images").filter((part): part is File => part instanceof File);

@@ -623,6 +623,48 @@ try {
     }
 
     /*
+     * The photograph path's way in, and its refusal — not its reading.
+     *
+     * **Deliberately not a real extraction.** Reading a photograph costs an inference call and
+     * depends on a model seeing a synthetic image, and what it would tell us is whether one model
+     * read one fake list once. The accuracy question belongs to an eval against real handwritten
+     * lists, which is the corpus this path is waiting on; asserting it here would be a number that
+     * looks like a measurement and is not.
+     *
+     * What smoke can settle is the pair it always can: the control is **reachable from a screen**
+     * — caption paste and screenshot upload both shipped green with no way in — and the route
+     * **refuses an empty request** rather than answering 200 to nothing.
+     */
+    record(
+      "the shopping screen offers a way to photograph a written list",
+      extraText.includes("Or photograph a written list"),
+      foundDetail(
+        extraText,
+        "Or photograph a written list",
+        "the route exists and there is no way in from the product",
+      ),
+    );
+
+    /*
+     * A real multipart request, because the mode only exists inside that branch — `call` sends
+     * JSON and would fall through to a different refusal, which would pass while testing nothing.
+     */
+    const emptyForm = new FormData();
+    emptyForm.set("mode", "shopping-list");
+    const noImages = await fetch(`${base}/api/import`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${session.access_token}`, Cookie: sessionCookie(session) },
+      body: emptyForm,
+      signal: AbortSignal.timeout(90_000),
+    });
+    const noImagesSaid = await noImages.text();
+    record(
+      "and reading a list with no photograph is refused, not answered",
+      noImages.status >= 400 && noImages.status < 500,
+      `HTTP ${noImages.status} ${noImagesSaid.slice(0, 70)}`,
+    );
+
+    /*
      * Item 3: what the day row holds AT REST, asserted by absence.
      *
      * The fix is not "the panel exists" — it is that four controls are *not* in the row until

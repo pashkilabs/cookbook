@@ -115,3 +115,98 @@ export interface PhotographedLine {
   strikeConfidence: "certain" | "unsure";
   legible: boolean;
 }
+
+/**
+ * Read a shopping list off one or more photographs.
+ *
+ * Modelled on `extractFromImages` and deliberately not folded into it: that one returns an
+ * `ExtractedRecipe` and validates against recipe shape — a title, a method, ingredient headings.
+ * Sharing the function would mean a flag threaded through every branch of it, and the §54 risk
+ * here is precisely that recipe-shaped expectations leak into a list that has none.
+ *
+ * **No quota is spent.** A probe asking which way up the paper is does not bill a household (§75),
+ * and nor does reading the paper it has already photographed — the household's allowance is for
+ * recipes. If that ever changes it is a product decision, not a detail of this function.
+ */
+export async function readShoppingList(input: {
+  images: readonly { bytes: Uint8Array; mediaType: "image/jpeg" | "image/png" }[];
+  cascade: {
+    visionProvider?: { extract: (args: unknown) => Promise<{ json: unknown; usage?: unknown }> };
+    provider?: { extract: (args: unknown) => Promise<{ json: unknown; usage?: unknown }> };
+    visionModels?: readonly { model: string }[];
+  };
+}): Promise<
+  | { ok: true; lines: PhotographedLine[]; model: string }
+  | { ok: false; reason: "no-images" | "not-configured" | "unreadable"; detail: string }
+> {
+  if (input.images.length === 0) return { ok: false, reason: "no-images", detail: "nothing to read" };
+
+  const models = input.cascade.visionModels ?? [];
+  const provider = input.cascade.visionProvider ?? input.cascade.provider;
+  /*
+   * A missing vision model is a **refusal**, never a fall back to a text model that cannot see.
+   * `extractFromImages` makes the same call for the same reason, and it is the difference between
+   * "we could not read it" and "we read it and it was blank" — which a review screen renders
+   * identically unless the distinction survives this far (§80).
+   */
+  if (!provider || models.length === 0) {
+    return { ok: false, reason: "not-configured", detail: "no vision model is configured" };
+  }
+
+  for (const model of models) {
+    let response;
+    try {
+      response = await provider.extract({
+        model,
+        responseSchema: SHOPPING_PHOTO_JSON_SCHEMA,
+        instructions: SHOPPING_PHOTO_INSTRUCTIONS,
+        /* the paper carries the list; nothing about the household reaches this call */
+        content: "",
+        images: input.images,
+      });
+    } catch {
+      continue;
+    }
+
+    const lines = validateLines(response.json);
+    if (lines) return { ok: true, lines, model: model.model };
+  }
+
+  return { ok: false, reason: "unreadable", detail: "no model returned a readable list" };
+}
+
+/**
+ * Validate every field the schema declares, because an unvalidated field is an unasked one.
+ *
+ * §54's other half: *score every field you ask for*. A reading that returned `text` and silently
+ * dropped `struck` would be the least visible failure this path has — a crossed-out item arriving
+ * as an ordinary one looks exactly like a correct read, and the person finds out in the shop. So a
+ * line missing any field is **rejected**, which sends the cascade to the next model rather than
+ * letting a half-read list reach a review screen looking complete.
+ *
+ * An empty `lines` array is a valid answer: a photograph of something that is not a list.
+ */
+function validateLines(json: unknown): PhotographedLine[] | null {
+  if (!json || typeof json !== "object") return null;
+  const raw = (json as { lines?: unknown }).lines;
+  if (!Array.isArray(raw)) return null;
+
+  const lines: PhotographedLine[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") return null;
+    const line = entry as Record<string, unknown>;
+    const text = typeof line.text === "string" ? line.text.trim() : null;
+    /* a blank line is not a reading; dropping it silently is how a list loses an item */
+    if (!text) return null;
+    if (typeof line.struck !== "boolean") return null;
+    if (line.strikeConfidence !== "certain" && line.strikeConfidence !== "unsure") return null;
+    if (typeof line.legible !== "boolean") return null;
+    lines.push({
+      text,
+      struck: line.struck,
+      strikeConfidence: line.strikeConfidence,
+      legible: line.legible,
+    });
+  }
+  return lines;
+}

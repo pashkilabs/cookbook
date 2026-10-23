@@ -13,6 +13,8 @@ import {
   createPassthroughImagePreparer,
   detectOrientation,
   type OrientationReading,
+  readShoppingList,
+  type PhotographedLine,
 } from "@pashki/import";
 import { createSupabaseImportCache } from "@pashki/import/supabase";
 import { storeImportedPhoto } from "@pashki/import/photo-storage";
@@ -86,6 +88,7 @@ export interface ImportAttemptResult {
  * has one site now.
  */
 export { cascadeFromEnv };
+export type { PhotographedLine } from "@pashki/import";
 
 export async function attemptImport(url: string, familyId: string): Promise<ImportAttemptResult> {
   const admin = serviceRole();
@@ -194,6 +197,30 @@ export async function detectImageOrientation(
     rotations: rotations.map((r) => ({ bytes: r.bytes, mediaType: "image/jpeg" as const })),
   });
   return reading ? { status: "established", ...reading } : { status: "unreadable" };
+}
+
+/**
+ * Read a shopping list off photographs — the handwritten-scrap path, not a recipe card.
+ *
+ * Its own reader for the reason it has its own prompt: `attemptPasteImport` validates against
+ * recipe shape, and a list has no title, no method and usually no quantities (§54). Sharing it
+ * would thread a flag through every branch of a function whose whole job is finding recipe parts.
+ *
+ * **Spends no quota**, like the orientation probe beside it: a household's allowance is for
+ * recipes, and this reads a shopping list it already wrote.
+ */
+export async function readShoppingListPhotos(
+  images: readonly { bytes: Uint8Array }[],
+): Promise<
+  | { ok: true; lines: PhotographedLine[]; model: string }
+  | { ok: false; reason: "no-images" | "not-configured" | "unreadable"; detail: string }
+> {
+  const llm = cascadeFromEnv();
+  if (!llm) return { ok: false, reason: "not-configured", detail: "no inference is configured" };
+  return readShoppingList({
+    images: images.map((image) => ({ bytes: image.bytes, mediaType: "image/jpeg" as const })),
+    cascade: llm as never,
+  });
 }
 
 export async function attemptPasteImport(
