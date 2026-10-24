@@ -5976,3 +5976,99 @@ Beef's cow it reads as a placeholder, which is the honest cost of adding a value
 artwork. And duck earning its chapter by a recipe existing. The enum itself would widen again the
 first time the library acquires something it cannot name: the measurement that justified turkey is
 a count of the library, and that count changes.
+
+## §94 — Dairy named in the prompt: 6 errors to 2, and what a control run cost the experiment
+
+§93 ended with the wording as the next change and a named target: three of the four recipes naming
+butter or peanut butter were wrong and all three were `pork`, against a prompt whose only concrete
+mapping was "sausage, bacon and ham are pork" and which named no dairy at all.
+
+### The target, measured before the change rather than after
+
+| | names dairy | no dairy |
+|---|---|---|
+| right | 38 | 32 |
+| wrong | **6** | **0** |
+
+Every error named dairy; no dairy-free recipe was wrong. The n=4 butter lead was the weaker form of
+this — 6/6 against 0/32 is the same association with a denominator. The same query sized the risk:
+**29** correct rows name both dairy and a real protein, and those are the rows a "dairy is not a
+protein" sentence could talk out of a right answer.
+
+### The sentence
+
+> Dairy is never the principal protein: butter, cream, cheese and yoghurt do not answer this
+> question, and nor does peanut butter, in any quantity. Where dairy sits beside a meat or a fish,
+> the answer is that meat or fish; where dairy is the richest thing in the dish, there is none.
+
+Two things it deliberately does not say. **No dish examples** — naming a macaroni cheese, a pesto
+and a peanut butter cookie would name three of the six errors, so the re-score would measure
+whether the model can repeat the examples rather than whether it has the rule (§54a: an example is
+a silent default). **No protein in the positive half** — "a creamy chicken dish is still chicken"
+would reinforce `chicken`, which is what every non-butter false positive already defaulted to.
+
+### The result, three runs each
+
+| | errors | named | declined | library |
+|---|---|---|---|---|
+| control | 5–7 (mean 6.0) | 52/58 = 90% | 18/23 = 78% | 70/76 = 92% |
+| treatment | **1–3 (mean 2.0)** | 53/55 = 96% | 21/23 = 91% | **74/76 = 97%** |
+
+No overlap — the treatment's worst run beats the control's best. Recipes that disagree with
+themselves across runs: **8 of 76 → 3**. None of the 29 at-risk rows regressed. Across 228
+readings every label is 100% precise except `vegetarian`.
+
+Fixed and stable at 3/3: Annie's Shells, both Fresh Basil Pestos, Linguine with Shrimp, Garlic
+Butter Shrimp.
+
+### What the control cost the experiment, which is the lesson
+
+Three runs of the **unchanged** prompt produced identical headline figures and a different six
+recipes. That disqualified two of the three pre-registered predictions before the change: Garlic
+Butter Shrimp reached `seafood` and PB S'mores reached `null` unprompted. **A prediction about one
+row is only a test when that row is stable under the unchanged system.** Writing the prediction
+first was necessary and not sufficient; which rows *can* carry evidence is also a pre-registration,
+and one control run is what tells you.
+
+The instability count turned out to be the better instrument, and it was found by asking what the
+measure could see before changing anything (§84). At n=76 the error count has a ±1 floor; the
+recipes that cannot hold one answer were almost exactly the dairy and no-protein ones, so if the
+diagnosis — the model had no rule and was guessing differently each time — was right, *that* number
+had to move. It did, 8 to 3.
+
+### The error relocated rather than resolving, and the cause is in the prompt
+
+`vegetarian` had **never been used** in any control sample. After the change: 4 uses, 0 right, both
+peanut-butter recipes. The cause is a contradiction the sentence walked into — eight lines below it
+the prompt has always said *"answer vegetarian or vegan only when beans, lentils, tofu or another
+plant protein is what the dish is built on"*, and peanut butter is a plant protein. The model was
+told two incompatible things and resolved them in a direction nobody chose.
+
+Left for a separate change, because two edits and the next re-score cannot say which worked — which
+is the same constraint that made this one a single axis.
+
+### One row the backfill makes worse, stated plainly
+
+`PEANUT CHILLI NOODLES` stored a correct `null` and comes back `vegetarian` in 2 of 3 runs. It was
+already a coin-flip: the control gave `vegan` in 2 of 3. So this is not a regression caused by the
+change so much as a wrong answer with a new label, and it is the row the next change is aimed at.
+
+Its adjudication is also the one that can be argued with — `vegan`/`vegetarian` is a defensible
+reading of the instructions as written. It stands anyway. Re-judging a row after seeing the model's
+answer is how a held-out set stops being held out.
+
+### What would reverse this
+
+A measurement showing the dairy sentence suppressing a legitimate dairy-built answer. Nothing in
+the enum is dairy, so there is no such answer today; a `paneer` or a `halloumi` value would create
+one, and this sentence would need the exception written at the same time.
+
+### The duck half of §93, re-measured
+
+Across four control samples `duck` was used **twice, both wrong** (`Easy Homemade Pizza Dough`,
+`Cultured Butter`) and never once right, because the library contains no duck. Turkey, added on
+evidence, is 4 for 4. The treatment stopped using `duck` entirely. Not an argument for removing it —
+two uses on unstable rows is inside the noise, and §93's reversal condition (a duck recipe arriving)
+is unchanged — but the honest version of "added on the failure mode" is that **an enum value with no
+instances is a guess the model can now make**, and that cost was not in the reasoning when it was
+added.

@@ -329,6 +329,45 @@ models be good enough. Do not add a silent-save path.
   *a proxy can rot without failing* — but earlier: this proxy was never measuring the thing, not
   even once.
 
+- **A control run of the *unchanged* prompt disqualified two of my three pre-registered
+  predictions, before the change landed.** Stephen's brief asked for a prediction written first —
+  *"a re-score after a prompt change measures whether you fixed the thing you named or something
+  else moved"* — which was right and turned out to be necessary rather than sufficient.
+
+  Three runs of the identical prompt scored **6, 7 and 5** errors of 76 with **every headline
+  figure identical** (52/58 named, 18/23 declined, 70/76 overall) and **a different six recipes
+  each time**. Two of the three recipes the prediction named reached their predicted answer on
+  their own: `Garlic Butter Shrimp` → `seafood`, `PB S'mores` → `null`. So neither could carry
+  evidence either way, however the treatment came back.
+
+  **A prediction about one row is only a test when that row is stable under the unchanged
+  system.** The aggregate was stable to the recipe while the labels under it were not, which is the
+  worst shape for a single comparison — the number that looks most trustworthy is the one that
+  moved least. So pre-register *which rows can carry evidence*, not only what you expect them to
+  do, and the way to find out is one control run.
+
+  And my confidence ordering was **inverted**. The one clean primary test *failed* — `Peanut butter
+  balls` was `pork` in all four control samples and came back `vegetarian`, a different wrong
+  answer — while both secondaries I rated lower landed 3 of 3, including the pesto I called
+  unlikely. The change was real (errors 5–7 → 1–3, no overlap, instability 8 of 76 → 3, none of the
+  29 at-risk rows regressed); my per-row reasoning about *why* was not.
+
+- **A prohibition added without reading what the rest of the prompt permits moves an error instead
+  of removing it.** The dairy sentence says peanut butter is not a principal protein. Eight lines
+  later the prompt has always said *"answer vegetarian or vegan only when beans, lentils, tofu or
+  **another plant protein** is what the dish is built on"* — and peanut butter is a plant protein.
+  Two incompatible instructions, and the model resolved them by reaching for a label it had **never
+  used once**: `vegetarian` went from 0 uses across four control samples to **4 uses, 0 right**, all
+  on the two peanut-butter recipes. Every other label is 100% precise across 228 readings.
+
+  The error did not survive the change; it **relocated**, and into a shape that reads as more
+  defensible than the one it replaced, which is what makes it easy to accept. Same family as *an
+  example in a schema description is a silent default* — both are the prompt saying something its
+  author did not read it as saying — but the mechanism is new: not an omission, a **contradiction**,
+  resolved by the model in a direction nobody chose. So before adding a rule, grep the prompt for
+  what it already permits about the same noun, and expect a conflict to surface as a *new* wrong
+  answer rather than as the old one persisting.
+
 - **Temperature 0 is not determinism on a reasoning model, and most of this repo assumed it was.**
   `openai/gpt-oss-120b` at `temperature: 0` returned `[null, chicken, null]` and
   `[pork, seafood, seafood]` for the same recipe and the same prompt. The sampler is fixed; a
