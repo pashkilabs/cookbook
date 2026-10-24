@@ -1375,6 +1375,13 @@ guessing.
   concluding it is dead**, because "37% of the library" and "69% of the chapter" are the same column
   answering two different questions.
 
+  **Both figures are now out of date, which is the other half of the lesson.** After the enum, the
+  vote and the dairy sentence (§93, §94) the column is named on **53 of 57 mains = 93%**, and every
+  protein chapter the tree offers has at least one recipe. A fill rate is not a fact about a column,
+  it is a fact about a classifier on a date — so it expires, and an axis refused on one measurement
+  deserves re-measuring after anything that touches the thing filling it. The refusal was right
+  when it was made and would be wrong if repeated today.
+
 - **An assertion that only holds for a fixture it does not create is measuring the fixture.** A
   smoke check asserting "Mains divides into chapters" failed against entirely correct behaviour —
   that household has two mains, and dividing two recipes would be the bug. Rewritten to assert the
