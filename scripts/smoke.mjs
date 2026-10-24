@@ -455,6 +455,18 @@ try {
       timeMinutes: "30",
       sourceName: "",
       sourceUrl: "",
+      /*
+       * `course` is set here, and it was not before.
+       *
+       * The save path classifies a recipe whose four fields are all empty — a feature that had
+       * been dead for two months and now runs — so leaving this blank hands a model the decision
+       * about what this household owns. Flour, cream and lemons with "Mix. Bake." is a dessert by
+       * any reading, which moved it off the dinner tab and onto snack, and the dinner-tab check
+       * failed against entirely correct behaviour. **A probe owns its fixture**: smoke's own data
+       * must not depend on a model's opinion, and naming the course also means no inference call
+       * is made for this recipe at all.
+       */
+      course: "main",
       ingredients: "2 cups flour\n1 pint double cream\n3 lemons",
       steps: "Mix.\nBake.",
     },
@@ -2702,6 +2714,50 @@ try {
         );
       }
     }
+  }
+
+  /*
+   * ---------------------------------------------------------------------------
+   * Classification on save — a feature that was unreachable and that nothing checked
+   * ---------------------------------------------------------------------------
+   *
+   * Two faults made it dead: it gated on `classified_at`, which every insert stamps, and its write
+   * named columns `authenticated` holds no UPDATE grant on, so PostgREST refused the statement and
+   * the discarded result hid the refusal. Both are fixed, and **nothing would have noticed either
+   * of them** — the recipe saves cleanly whether or not a classification follows.
+   *
+   * So the assertion is about the row and not about the endpoint: a recipe saved with every
+   * classification field empty must come back carrying a provenance stamp and three readings. The
+   * readings count is what separates "a model answered" from "the write was permitted" — a refused
+   * UPDATE leaves both columns null while the POST still returns 200.
+   *
+   * This recipe is created last on purpose: a model decides its course, and every check above that
+   * depends on what this household owns is written against a fixture that names its own.
+   */
+  const unclassified = await call("POST", "/api/recipes", {
+    body: {
+      title: "Weeknight Chicken Traybake",
+      servings: "4", timeMinutes: "45", sourceName: "", sourceUrl: "",
+      ingredients: "4 chicken thighs\n2 lemons\n1 tbsp olive oil",
+      steps: "Roast at 200C for 40 minutes.",
+    },
+  });
+  const unclassifiedId = unclassified.body?.id ?? null;
+  if (unclassifiedId) madeRecipes.push(unclassifiedId);
+  if (!unclassifiedId) {
+    record("a recipe saved with no course is classified on save", false, `HTTP ${unclassified.status}`);
+  } else {
+    const stored = await rest(
+      "GET",
+      `/recipes?id=eq.${unclassifiedId}&select=course,principal_protein,classified_with,classified_readings`,
+    );
+    const row = stored?.[0] ?? {};
+    record(
+      "a recipe saved with no course is classified on save, and the write is permitted",
+      Boolean(row.classified_with) && row.classified_readings === 3,
+      `stamp ${row.classified_with ? "present" : "ABSENT"}, ${row.classified_readings} readings, ` +
+        `course=${row.course}, protein=${row.principal_protein}`,
+    );
   }
 
   const path = `${familyId}/smoke-${stamp}.jpg`;
