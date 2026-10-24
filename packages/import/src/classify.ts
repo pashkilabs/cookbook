@@ -65,7 +65,10 @@ export const CLASSIFY_INSTRUCTIONS = [
   "Say the dish's form only if it is plainly one of the listed shapes — a soup is a soup even",
   "when it is the main course. Most dishes are none of them; answer null rather than reaching.",
   "Say the principal protein the dish is built around: the one a person would name if asked what",
-  "they were eating. Sausage, bacon and ham are pork. Answer vegetarian or vegan only when beans,",
+  "they were eating. Sausage, bacon and ham are pork. Dairy is never the principal protein:",
+  "butter, cream, cheese and yoghurt do not answer this question, and nor does peanut butter, in",
+  "any quantity. Where dairy sits beside a meat or a fish, the answer is that meat or fish; where",
+  "dairy is the richest thing in the dish, there is none. Answer vegetarian or vegan only when beans,",
   "lentils, tofu or another plant protein is what the dish is built on. A dessert, a bread or a",
   "salad of vegetables has none — answer null. Absence of meat is not vegetarian.",
 ].join(" ");
@@ -107,6 +110,33 @@ export function classificationPrompt(recipe: {
     ...recipe.steps,
   ].join("\n");
 }
+
+/**
+ * The ingredient lines as the model sees them — one builder, because there are three callers.
+ *
+ * The backfill, the save path and the measurement harness each wrote this expression out. A
+ * harness that formats its input differently from production is the divergence that let the eval
+ * read a card perfectly while the app sent an Anthropic model id to Together — and this project
+ * has already paid for this exact shape once, when a consolidation harness fed `item_text` alone
+ * where production feeds amount, unit and item, so every reading was `need 0 g` and three
+ * questions got the same confident wrong answer.
+ *
+ * The amount and unit are not optional decoration. "2 tbsp butter" and "1 lb butter" are
+ * different dishes, and the second is the one a model should refuse to call a protein.
+ */
+export const classificationLines = (
+  rows: readonly {
+    amount?: number | string | null;
+    unit?: string | null;
+    item_text?: string | null;
+    note?: string | null;
+  }[],
+): string[] =>
+  rows.map((row) =>
+    [row.amount ?? "", row.unit ?? "", row.item_text ?? "", row.note ? `, ${row.note}` : ""]
+      .join(" ")
+      .trim(),
+  );
 
 /**
  * The fields a classification carries, in the order a reader meets them.

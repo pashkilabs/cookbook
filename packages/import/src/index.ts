@@ -119,7 +119,7 @@ export {
   textWiringFault,
 } from "./openai-compatible.js";
 export { acceptsTemperature, anthropicModelMismatch } from "./anthropic.js";
-export { classifyRecipe, classificationPrompt, CLASSIFICATION_COLUMNS, CLASSIFY_JSON_SCHEMA, CLASSIFY_INSTRUCTIONS } from "./classify.js";
+export { classifyRecipe, classificationPrompt, classificationLines, CLASSIFICATION_COLUMNS, CLASSIFY_JSON_SCHEMA, CLASSIFY_INSTRUCTIONS } from "./classify.js";
 export type { RecipeClassification } from "./classify.js";
 export { detectOrientation, ORIENTATIONS, ORIENTATION_INSTRUCTIONS, ORIENTATION_JSON_SCHEMA } from "./orientation.js";
 export type { Orientation, OrientationReading } from "./orientation.js";

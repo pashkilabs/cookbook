@@ -324,7 +324,7 @@ export async function classifyIfUnclassified(
   recipeId: string,
 ): Promise<void> {
   const { cascadeFromEnv } = await import("@pashki/import");
-  const { classifyRecipe, classificationProvenance } = await import("@pashki/import");
+  const { classifyRecipe, classificationLines, classificationProvenance } = await import("@pashki/import");
   const cascade = cascadeFromEnv();
   if (!cascade) return;
 
@@ -354,10 +354,9 @@ export async function classifyIfUnclassified(
       model: cascade.models[0]!,
       recipe: {
         title: recipe.title as string,
-        ingredients: (ings.data ?? []).map((row) =>
-          [row.amount ?? "", row.unit ?? "", row.item_text, row.note ? `, ${row.note}` : ""]
-            .join(" ")
-            .trim()),
+        // one builder shared with the backfill and the measurement harness: three sites
+        // formatting the model's input by hand is three chances to format it differently
+        ingredients: classificationLines(ings.data ?? []),
         steps: (steps.data ?? []).map((row) => row.text as string),
       },
     });

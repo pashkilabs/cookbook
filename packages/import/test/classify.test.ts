@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CLASSIFICATION_COLUMNS,
   CLASSIFY_JSON_SCHEMA,
+  classificationLines,
   classificationPrompt,
   classifyRecipe,
 } from "../src/classify.js";
@@ -142,5 +143,60 @@ describe("classifying a recipe that is already saved", () => {
   it("returns null when every reading answers nothing, so the recipe is left alone", async () => {
     const { provider } = answering(null);
     expect(await classifyRecipe({ provider, model: MODEL, recipe: RECIPE })).toBeNull();
+  });
+});
+
+describe("the ingredient lines the model is shown", () => {
+  /*
+   * There are three callers — the backfill, the save path and the measurement harness — and each
+   * one wrote this expression out by hand before it was shared. The quantity is the part a
+   * careless rewrite drops, and dropping it is not cosmetic: a harness fed `item_text` alone
+   * where production feeds amount and unit read every line as `need 0 g` and answered three
+   * consolidation questions confidently and wrongly.
+   */
+  it("keeps the quantity, because a pound of butter and a spoonful are different dishes", () => {
+    expect(classificationLines([
+      { amount: 1, unit: "lb", item_text: "butter" },
+      { amount: 2, unit: "tbsp", item_text: "butter" },
+    ])).toEqual(["1 lb butter", "2 tbsp butter"]);
+  });
+
+  it("writes a line for an ingredient with no amount and no unit", () => {
+    expect(classificationLines([{ item_text: "black pepper" }])).toEqual(["black pepper"]);
+    expect(classificationLines([{ amount: null, unit: null, item_text: "salt" }])).toEqual(["salt"]);
+  });
+
+  it("carries the note, which is where a form of an ingredient is often written", () => {
+    expect(classificationLines([
+      { amount: 200, unit: "g", item_text: "pecorino", note: "finely grated" },
+    ])).toEqual(["200 g pecorino , finely grated"]);
+  });
+
+  it("drops an empty note rather than leaving a trailing comma", () => {
+    expect(classificationLines([{ amount: 3, unit: null, item_text: "eggs", note: "" }])).toEqual(["3  eggs"]);
+  });
+
+  /*
+   * The double space in "3  eggs" is pinned deliberately, and it is not a typo.
+   *
+   * An ingredient with no unit joins an empty string between amount and item, and `.trim()` only
+   * takes the ends — so this is the exact text every stored classification in the library was
+   * produced from. Tidying it would be a change to what the model reads.
+   *
+   * And that change would be **invisible to the provenance stamp**, which is the part worth
+   * knowing. `classificationProvenance` hashes the instructions, the schema and the model; the
+   * builder that assembles the content is an input to the prompt that it does not cover. So
+   * normalising this whitespace would alter every answer while every row kept a stamp saying it
+   * was current, and nothing would re-ask — the same shape as `promptKey` fingerprinting every
+   * input the recipe carries except the prompt. Pinned here so a tidy-up has to delete a test
+   * with this comment in it rather than drift silently.
+   */
+  it("pins the exact text, because the provenance stamp does not cover this builder", () => {
+    expect(classificationLines([
+      { amount: 1, unit: "lb", item_text: "butter" },
+      { amount: null, unit: null, item_text: "black pepper" },
+      { amount: 2, unit: null, item_text: "eggs" },
+      { amount: 200, unit: "g", item_text: "pecorino", note: "grated" },
+    ])).toEqual(["1 lb butter", "black pepper", "2  eggs", "200 g pecorino , grated"]);
   });
 });

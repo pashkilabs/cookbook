@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { cascadeFromEnv } from "../src/openai-compatible.js";
-import { classifyRecipe, CLASSIFICATION_COLUMNS } from "../src/classify.js";
+import { classifyRecipe, classificationLines, CLASSIFICATION_COLUMNS } from "../src/classify.js";
 import { classificationProvenance } from "../src/prompt-version.js";
 
 const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
@@ -91,8 +91,7 @@ for (const family of familyIds.map((id) => ({ id, name: id.slice(0, 8) }))) {
         // regression: this selected raw_text, which does not exist — PostgREST errored, `?? []`
         // swallowed it, and every recipe was classified from its title and steps with no
         // ingredients at all. A chicken traybake showing no protein was never a model failure.
-        ingredients: (ings.data ?? []).map((i: any) =>
-          [i.amount ?? "", i.unit ?? "", i.item_text, i.note ? `, ${i.note}` : ""].join(" ").trim()),
+        ingredients: classificationLines(ings.data ?? []),
         steps: (steps.data ?? []).map((s: any) => s.text),
       },
     });
