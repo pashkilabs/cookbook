@@ -1,4 +1,4 @@
-import { parseIngredientList } from "@pashki/core";
+import { isPrincipalProtein, parseIngredientList } from "@pashki/core";
 
 /**
  * What a person typed, turned into rows.
@@ -54,9 +54,7 @@ export type PreparationResult =
 /** the closed list the recipes.course CHECK enforces */
 const COURSES = new Set(["breakfast", "starter", "main", "side", "dessert", "drink", "snack"]);
 const DISH_FORMS = new Set(["soup", "salad", "sandwich", "bake", "stew", "bowl"]);
-const PROTEINS = new Set([
-  "chicken", "beef", "pork", "lamb", "fish", "seafood", "egg", "vegetarian", "vegan",
-]);
+// proteins are `isPrincipalProtein` from core, the one list every site reads
 
 export function prepareRecipe(input: RecipeInput): PreparationResult {
   const title = asText(input.title, 200);
@@ -81,9 +79,7 @@ export function prepareRecipe(input: RecipeInput): PreparationResult {
       course: COURSES.has(String(input.course)) ? String(input.course) : null,
       cuisine: asText(input.cuisine, 40) || null,
       dishForm: DISH_FORMS.has(String(input.dishForm)) ? String(input.dishForm) : null,
-      principalProtein: PROTEINS.has(String(input.principalProtein))
-        ? String(input.principalProtein)
-        : null,
+      principalProtein: isPrincipalProtein(input.principalProtein) ? input.principalProtein : null,
       sourceName: asText(input.sourceName, 200),
       ingredients: parsed.map((ingredient, index) => ({
         position: index,

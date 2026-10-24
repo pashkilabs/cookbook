@@ -70,3 +70,17 @@ export {
   type ShoppingListRequest,
   type WithheldLine,
 } from "./instacart.js";
+
+/*
+ * One list of proteins, read by the column's CHECK test, both model schemas, both validation
+ * sets, the chips, the form and the chapters — because it was spelled out in nine places and a
+ * value present in some of them is silently dropped or silently invisible.
+ */
+export {
+  PRINCIPAL_PROTEINS,
+  PRINCIPAL_PROTEIN_ENUM,
+  isPrincipalProtein,
+  type PrincipalProtein,
+} from "./proteins.js";
+
+export { consensusLabels, type LabelConsensus } from "./consensus.js";

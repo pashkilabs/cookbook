@@ -115,6 +115,17 @@ export const TOP_LEVEL: readonly Chapter[] = [
 export const MAINS_BY_PROTEIN: readonly Chapter[] = [
   { slug: "pork", label: "Pork", icon: "pork.png", source: "pork", holds: (r) => r.principal_protein === "pork" },
   { slug: "chicken", label: "Chicken", icon: "poultry.png", source: "chicken", holds: (r) => r.principal_protein === "chicken" },
+  /*
+   * Turkey and duck borrow the platter rather than the bird.
+   *
+   * `poultry.png` is unmistakably a chicken's face — drawn, not generic — so lending it to Turkey
+   * would put a chicken on the tile beside the Chicken tile. There is no turkey and no duck
+   * drawing, and a plate of cuts claims nothing false about either. Duck has no recipes in the
+   * library at all and therefore never renders: `counted` drops empty chapters, which is exactly
+   * why a value can be added here before a drawing exists for it.
+   */
+  { slug: "turkey", label: "Turkey", icon: "meat-platter.png", source: "turkey", holds: (r) => r.principal_protein === "turkey" },
+  { slug: "duck", label: "Duck", icon: "meat-platter.png", source: "duck", holds: (r) => r.principal_protein === "duck" },
   { slug: "beef", label: "Beef", icon: "beef.png", source: "beef", holds: (r) => r.principal_protein === "beef" },
   { slug: "lamb", label: "Lamb", icon: "lamb.png", source: "lamb", holds: (r) => r.principal_protein === "lamb" },
   { slug: "fish", label: "Fish", icon: "fish.png", source: "fish", holds: (r) => r.principal_protein === "fish" },

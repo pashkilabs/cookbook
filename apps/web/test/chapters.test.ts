@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { PRINCIPAL_PROTEINS } from "@pashki/core";
 import {
   AT_A_TIME,
   MAINS_BY_PROTEIN,
@@ -175,5 +176,34 @@ describe("the routes", () => {
     for (const chapter of [...TOP_LEVEL, ...MAINS_BY_PROTEIN]) {
       expect(encodeURIComponent(chapter.slug)).toBe(chapter.slug);
     }
+  });
+});
+
+/**
+ * A value the column can hold and no chapter holds is in the database and on no screen.
+ *
+ * This is the half of widening an enum that nothing else checks. `turkey` reached the column and
+ * the model's schema in one change; had `MAINS_BY_PROTEIN` been left alone, a turkey recipe would
+ * have counted towards Mains, matched none of its subdivisions, and appeared nowhere — not even in
+ * "Everything else", whose `holds` is `principal_protein === null`. Silent, and worse than the
+ * misclassification it was fixing, because a wrong chapter is at least a chapter.
+ *
+ * Asserted through `holds` rather than against the slugs, because `vegan` deliberately has no
+ * chapter of its own: Meat-free holds both. What matters is that every value is held by
+ * *something*, which is what decides whether a recipe can be seen.
+ */
+describe("every protein the column can hold has somewhere to appear", () => {
+  it.each([...PRINCIPAL_PROTEINS])("a main whose protein is %s lands in a chapter", (protein) => {
+    const recipe = r("main", null, protein);
+    const holders = MAINS_BY_PROTEIN.filter((chapter) => chapter.holds(recipe));
+    expect(holders.map((chapter) => chapter.slug)).toHaveLength(1);
+  });
+
+  it("gives turkey and duck a tile that is not the chicken's face", () => {
+    const icons = ["turkey", "duck"].map(
+      (slug) => MAINS_BY_PROTEIN.find((chapter) => chapter.slug === slug)?.icon,
+    );
+    expect(icons).toEqual(["meat-platter.png", "meat-platter.png"]);
+    expect(icons).not.toContain("poultry.png");
   });
 });

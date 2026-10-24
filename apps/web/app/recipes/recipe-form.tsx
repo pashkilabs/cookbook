@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { parseIngredientList, formatAsWritten } from "@pashki/core";
+import { PRINCIPAL_PROTEINS, parseIngredientList, formatAsWritten } from "@pashki/core";
 
 /**
  * One form for creating and editing.
@@ -145,7 +145,7 @@ export function RecipeForm(
           <label htmlFor="principalProtein">Protein</label>
           <select id="principalProtein" value={values.principalProtein} onChange={set("principalProtein")}>
             <option value="">None or unclear</option>
-            {["chicken", "beef", "pork", "lamb", "fish", "seafood", "egg", "vegetarian", "vegan"].map((p) => (
+            {PRINCIPAL_PROTEINS.map((p) => (
               <option key={p} value={p}>{p[0]!.toUpperCase() + p.slice(1)}</option>
             ))}
           </select>

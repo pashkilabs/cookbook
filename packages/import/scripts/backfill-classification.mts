@@ -84,7 +84,7 @@ for (const family of familyIds.map((id) => ({ id, name: id.slice(0, 8) }))) {
       admin.from("recipe_ingredients").select("amount, unit, item_text, note, position").eq("recipe_id", recipe.id).is("deleted_at", null).order("position"),
       admin.from("recipe_steps").select("text, position").eq("recipe_id", recipe.id).is("deleted_at", null).order("position"),
     ]);
-    const cls = await classifyRecipe({
+    const read = await classifyRecipe({
       provider: cascade.provider, model: cascade.models[0]!,
       recipe: {
         title: recipe.title as string,
@@ -96,19 +96,27 @@ for (const family of familyIds.map((id) => ({ id, name: id.slice(0, 8) }))) {
         steps: (steps.data ?? []).map((s: any) => s.text),
       },
     });
-    if (!cls) { console.log(`  ${recipe.title}: model returned nothing, left unstamped to retry`); continue; }
+    if (!read) { console.log(`  ${recipe.title}: every reading failed, left unstamped to retry`); continue; }
     // stamped whatever the answer, so a correct null is finished work rather than a retry
     const patch = {
-      course: cls.course,
-      dish_form: cls.dishForm,
-      principal_protein: cls.principalProtein,
+      course: read.classification.course,
+      dish_form: read.classification.dishForm,
+      principal_protein: read.classification.principalProtein,
       classified_at: new Date().toISOString(),
       classified_with: current,
+      // how firm the answer is, stored beside it: never gated on, and the only thing that tells
+      // a reader which rows are a coin-flip (§61)
+      classified_agreement: read.agreement,
+      classified_readings: read.readings,
     };
     if (!dryRun) {
       const { error } = await admin.from("recipes").update(patch).eq("id", recipe.id);
       if (error) { console.log(`  ${recipe.title}: WRITE FAILED ${error.message}`); continue; }
     }
-    console.log(`  ${String(recipe.title).slice(0,34).padEnd(35)} course=${String(patch.course).padEnd(9)} form=${String(patch.dish_form).padEnd(8)} protein=${patch.principal_protein}`);
+    console.log(
+      `  ${String(recipe.title).slice(0,34).padEnd(35)} course=${String(patch.course).padEnd(9)} ` +
+        `form=${String(patch.dish_form).padEnd(8)} protein=${String(patch.principal_protein).padEnd(11)} ` +
+        `${read.readings} readings, protein agreed ${read.agreement.principalProtein}`,
+    );
   }
 }

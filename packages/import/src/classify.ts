@@ -1,3 +1,4 @@
+import { PRINCIPAL_PROTEIN_ENUM, READINGS_NEEDED, consensusLabels, isPrincipalProtein } from "@pashki/core";
 import type { LlmProvider, ModelConfig } from "./provider.js";
 
 /**
@@ -44,7 +45,9 @@ export const CLASSIFY_JSON_SCHEMA = {
     },
     principalProtein: {
       type: ["string", "null"],
-      enum: ["chicken", "beef", "pork", "lamb", "fish", "seafood", "egg", "vegetarian", "vegan", null],
+      // from `@pashki/core`, with the column's CHECK compared against the same list by a test:
+      // nine places spelled these out, and a value missing from one of them is a wrong answer
+      enum: PRINCIPAL_PROTEIN_ENUM,
     },
   },
 } as const;
@@ -77,9 +80,7 @@ export interface RecipeClassification {
 /** the closed lists the columns' CHECK constraints enforce, so a bad label never reaches one */
 const COURSES = new Set(["breakfast", "starter", "main", "side", "dessert", "drink", "snack"]);
 const DISH_FORMS = new Set(["soup", "salad", "sandwich", "bake", "stew", "bowl"]);
-const PROTEINS = new Set([
-  "chicken", "beef", "pork", "lamb", "fish", "seafood", "egg", "vegetarian", "vegan",
-]);
+// proteins are `isPrincipalProtein` from core — the same list the schema's enum is built from
 
 const pick = (allowed: Set<string>, value: unknown): string | null =>
   typeof value === "string" && allowed.has(value) ? value : null;
@@ -107,7 +108,25 @@ export function classificationPrompt(recipe: {
   ].join("\n");
 }
 
-export async function classifyRecipe(options: {
+/**
+ * The fields a classification carries, in the order a reader meets them.
+ *
+ * Exported so the consensus, the agreement column and any caller counting them read one list —
+ * the same reasoning as the proteins: a field spelled in several places is a field that will be
+ * spelled in one of them only.
+ */
+export const CLASSIFICATION_FIELDS = ["course", "cuisine", "dishForm", "principalProtein"] as const;
+
+export interface ClassificationReading {
+  classification: RecipeClassification;
+  /** per field, the chosen value's share of the readings that came back, 0..1 */
+  agreement: Record<(typeof CLASSIFICATION_FIELDS)[number], number>;
+  /** how many of the readings returned a usable answer — one is not a consensus */
+  readings: number;
+}
+
+/** one look at one recipe: validated here, so a value outside the lists never reaches a vote */
+async function oneReading(options: {
   provider: LlmProvider;
   model: ModelConfig;
   recipe: { title: string; ingredients: readonly string[]; steps: readonly string[] };
@@ -128,7 +147,89 @@ export async function classifyRecipe(options: {
     // 40 is the column's limit; a model writing a sentence has not answered the question
     cuisine: cuisine.length > 0 && cuisine.length <= 40 ? cuisine : null,
     dishForm: pick(DISH_FORMS, json.dishForm),
-    principalProtein: pick(PROTEINS, json.principalProtein),
+    principalProtein: isPrincipalProtein(json.principalProtein) ? json.principalProtein : null,
+  };
+}
+
+/**
+ * Classify a recipe by reading it three times and voting, field by field.
+ *
+ * ---------------------------------------------------------------------------
+ * Why three readings live in here and not in the callers
+ * ---------------------------------------------------------------------------
+ *
+ * There are two callers — the backfill script and the save path — and the last time a model
+ * change had two sites, the eval was wired up, watched to work, and production went on sending an
+ * Anthropic model id to Together. A caller that *can* take one reading eventually does. So the
+ * single reading is private and `classifyRecipe` is the only thing exported: taking one is not an
+ * option either of them has.
+ *
+ * ---------------------------------------------------------------------------
+ * Why voting at all, when agreement is not correctness
+ * ---------------------------------------------------------------------------
+ *
+ * `COMPONENT_TRUST` records that three readings agreeing perfectly were still wrong four times in
+ * eleven, on the reasoning that three runs at temperature zero are one opinion sampled thrice.
+ * That is right about what agreement *means* and wrong about the premise: `openai/gpt-oss-120b`
+ * is a reasoning model and temperature zero does not make it deterministic. The same recipe and
+ * the same prompt returned `[null, chicken, null]` and `[pork, seafood, seafood]` — so the samples
+ * differ, and a vote is worth the difference between noise and bias. Measured on the eight
+ * misclassified recipes, three of seven moved between readings and four were stably wrong.
+ * **Voting fixes the first kind and cannot touch the second**, which is why it landed beside a
+ * widened enum rather than instead of one.
+ *
+ * ---------------------------------------------------------------------------
+ * The cost, said out loud
+ * ---------------------------------------------------------------------------
+ *
+ * Three inference calls per recipe where there was one. They run together rather than in
+ * sequence, so the wall clock is the slowest call and not their sum — which matters because the
+ * save path runs inside a serverless function with a duration cap, and three sixty-second
+ * timeouts in series would be killed before the write, paying for work nothing stores.
+ */
+export async function classifyRecipe(options: {
+  provider: LlmProvider;
+  model: ModelConfig;
+  recipe: { title: string; ingredients: readonly string[]; steps: readonly string[] };
+  /** how many readings to take; only a measurement harness has any business changing it */
+  readings?: number;
+}): Promise<ClassificationReading | null> {
+  const wanted = Math.max(1, options.readings ?? READINGS_NEEDED);
+
+  const readings = await Promise.all(
+    Array.from({ length: wanted }, async () => {
+      try {
+        return await oneReading(options);
+      } catch {
+        // a provider failure is not a reading — dropped rather than counted as disagreement
+        return null;
+      }
+    }),
+  );
+
+  const agreed = consensusLabels(readings, CLASSIFICATION_FIELDS);
+  if (!agreed) return null;
+
+  /*
+   * One surviving reading reports no agreement at all, following `componentsFor`: a row built on
+   * a single answer during an outage must not look more confident than one three readings agreed
+   * on, because the figure a person reads is the only thing standing between them and a chapter
+   * that lies.
+   */
+  const alone = agreed.readings === 1;
+  const agreement = Object.fromEntries(
+    CLASSIFICATION_FIELDS.map((field) => [field, alone ? 0 : agreed.agreement[field]]),
+  ) as ClassificationReading["agreement"];
+
+  return {
+    classification: {
+      course: agreed.chosen.course,
+      cuisine: agreed.chosen.cuisine,
+      dishForm: agreed.chosen.dishForm,
+      principalProtein: agreed.chosen.principalProtein,
+    },
+    agreement,
+    readings: agreed.readings,
   };
 }
 

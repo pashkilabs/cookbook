@@ -139,3 +139,4 @@ export {
   type PhotographedLine,
 } from "./shopping-photo.js";
 export { CLASSIFY_PROMPT_FINGERPRINT, classificationProvenance } from "./prompt-version.js";
+export { CLASSIFICATION_FIELDS, type ClassificationReading } from "./classify.js";

@@ -1131,7 +1131,9 @@ export type Database = {
       }
       recipes: {
         Row: {
+          classified_agreement: Json | null
           classified_at: string | null
+          classified_readings: number | null
           classified_with: string | null
           components: Json | null
           components_agreed_on_count: number | null
@@ -1162,7 +1164,9 @@ export type Database = {
           visibility: string
         }
         Insert: {
+          classified_agreement?: Json | null
           classified_at?: string | null
+          classified_readings?: number | null
           classified_with?: string | null
           components?: Json | null
           components_agreed_on_count?: number | null
@@ -1193,7 +1197,9 @@ export type Database = {
           visibility?: string
         }
         Update: {
+          classified_agreement?: Json | null
           classified_at?: string | null
+          classified_readings?: number | null
           classified_with?: string | null
           components?: Json | null
           components_agreed_on_count?: number | null

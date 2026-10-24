@@ -13,6 +13,8 @@
  * client contexts.
  */
 
+import { PRINCIPAL_PROTEIN_ENUM, isPrincipalProtein } from "@pashki/core";
+
 /** Which model to call. A second model is a row here, never a branch in code. */
 export interface ModelConfig {
   /** provider key, e.g. "openai" — resolved by whatever wires up an LlmProvider */
@@ -234,7 +236,7 @@ export const RECIPE_JSON_SCHEMA: JsonSchema = {
     },
     principalProtein: {
       type: ["string", "null"],
-      enum: ["chicken", "beef", "pork", "lamb", "fish", "seafood", "egg", "vegetarian", "vegan", null],
+      enum: PRINCIPAL_PROTEIN_ENUM,
       description: "The protein the dish is built around, or null.",
     },
   },
@@ -401,8 +403,8 @@ export function validateRecipePayload(value: unknown): ValidationResult {
       course: COURSES.has(String(candidate.course)) ? String(candidate.course) : null,
       cuisine: trimmedOrNull(candidate.cuisine),
       dishForm: DISH_FORMS.has(String(candidate.dishForm)) ? String(candidate.dishForm) : null,
-      principalProtein: PROTEINS.has(String(candidate.principalProtein))
-        ? String(candidate.principalProtein)
+      principalProtein: isPrincipalProtein(candidate.principalProtein)
+        ? candidate.principalProtein
         : null,
     },
   };
@@ -411,9 +413,6 @@ export function validateRecipePayload(value: unknown): ValidationResult {
 /** the closed list the column's CHECK enforces — kept here so a bad label never reaches it */
 const COURSES = new Set(["breakfast", "starter", "main", "side", "dessert", "drink", "snack"]);
 const DISH_FORMS = new Set(["soup", "salad", "sandwich", "bake", "stew", "bowl"]);
-const PROTEINS = new Set([
-  "chicken", "beef", "pork", "lamb", "fish", "seafood", "egg", "vegetarian", "vegan",
-]);
 
 function trimmedOrNull(value: unknown): string | null {
   if (typeof value !== "string") return null;

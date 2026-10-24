@@ -44,14 +44,13 @@ export const COURSES = [
 
 /**
  * Fixed order so chips do not reshuffle as recipes arrive; which of them *appear* is decided by
- * the household's own data, not by this list.
+ * the household's own data, not by this list. The order — and the values — live in `@pashki/core`,
+ * because nine places spelled them out and `turkey` was missing from all nine.
  *
  * Kid-friendly is deliberately absent: it is not a protein, and it now sits with the household's
  * other judgement filters where a reader does not have to notice that one chip in a row is unlike
  * the rest.
  */
-export const PROTEINS = [
-  "chicken", "beef", "pork", "lamb", "fish", "seafood", "egg", "vegetarian", "vegan",
-] as const;
+export { PRINCIPAL_PROTEINS as PROTEINS } from "@pashki/core";
 
 export const label = (key: string) => key[0]!.toUpperCase() + key.slice(1);

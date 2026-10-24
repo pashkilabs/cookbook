@@ -54,16 +54,82 @@ describe("classifying a recipe that is already saved", () => {
       course: "main", cuisine: "Italian", dishForm: "soup", principalProtein: "pork",
       title: "SOMETHING ELSE", steps: ["overwrite me"],
     });
-    const result = await classifyRecipe({ provider, model: MODEL, recipe: RECIPE });
-    expect(Object.keys(result!).sort()).toEqual(["course", "cuisine", "dishForm", "principalProtein"]);
+    const read = await classifyRecipe({ provider, model: MODEL, recipe: RECIPE });
+    expect(Object.keys(read!.classification).sort()).toEqual(["course", "cuisine", "dishForm", "principalProtein"]);
   });
 
   it("drops a label the column's CHECK would refuse rather than failing the recipe", async () => {
     const { provider } = answering({
       course: "brunch", cuisine: "x".repeat(60), dishForm: "casserole", principalProtein: "tofu",
     });
-    const result = await classifyRecipe({ provider, model: MODEL, recipe: RECIPE });
-    expect(result).toEqual({ course: null, cuisine: null, dishForm: null, principalProtein: null });
+    const read = await classifyRecipe({ provider, model: MODEL, recipe: RECIPE });
+    expect(read!.classification).toEqual({ course: null, cuisine: null, dishForm: null, principalProtein: null });
+  });
+
+  it("names turkey, which it could not before, and a model answering it is believed", async () => {
+    // regression: `turkey` was in none of the nine places these values were spelled, so "Ground
+    // Turkey Rice Bowls" came back `pork` three readings out of three — a closed list makes a
+    // model reach for the nearest value rather than decline
+    const { provider } = answering({ course: "main", cuisine: null, dishForm: "bowl", principalProtein: "turkey" });
+    const read = await classifyRecipe({ provider, model: MODEL, recipe: RECIPE });
+    expect(read!.classification.principalProtein).toBe("turkey");
+    expect(CLASSIFY_JSON_SCHEMA.properties.principalProtein.enum).toContain("turkey");
+    expect(CLASSIFY_JSON_SCHEMA.properties.principalProtein.enum).toContain("duck");
+  });
+
+  it("reads the recipe three times and stores how much they agreed", async () => {
+    // two readings say pork and one says seafood: the answer is pork, and the row says 0.67 so a
+    // person can see it was not unanimous. Agreement is recorded and never gated on (§61).
+    const answers = ["pork", "seafood", "pork"];
+    let call = 0;
+    const provider: LlmProvider = {
+      key: "fake",
+      async extract() {
+        const principalProtein = answers[call] ?? null;
+        call += 1;
+        return { json: { course: "main", cuisine: null, dishForm: null, principalProtein }, usage: { model: MODEL.model } };
+      },
+    };
+    const read = await classifyRecipe({ provider, model: MODEL, recipe: RECIPE });
+    expect(call).toBe(3);
+    expect(read!.classification.principalProtein).toBe("pork");
+    expect(read!.agreement.principalProtein).toBe(0.67);
+    expect(read!.agreement.course).toBe(1);
+    expect(read!.readings).toBe(3);
+  });
+
+  it("declines rather than picking one when three readings disagree three ways", async () => {
+    const answers = ["pork", "beef", "chicken"];
+    let call = 0;
+    const provider: LlmProvider = {
+      key: "fake",
+      async extract() {
+        const principalProtein = answers[call];
+        call += 1;
+        return { json: { course: "main", cuisine: null, dishForm: null, principalProtein }, usage: { model: MODEL.model } };
+      },
+    };
+    const read = await classifyRecipe({ provider, model: MODEL, recipe: RECIPE });
+    expect(read!.classification.principalProtein).toBeNull();
+    expect(read!.agreement.principalProtein).toBe(0);
+  });
+
+  it("reports no agreement at all when only one reading came back", async () => {
+    let call = 0;
+    const provider: LlmProvider = {
+      key: "fake",
+      async extract() {
+        call += 1;
+        if (call > 1) throw new Error("provider is down");
+        return { json: { course: "main", cuisine: null, dishForm: null, principalProtein: "beef" }, usage: { model: MODEL.model } };
+      },
+    };
+    const read = await classifyRecipe({ provider, model: MODEL, recipe: RECIPE });
+    // the answer is kept — a lone reading is better than no classification — but a row built
+    // during an outage must not read as confidently as one three readings agreed on
+    expect(read!.classification.principalProtein).toBe("beef");
+    expect(read!.readings).toBe(1);
+    expect(read!.agreement.principalProtein).toBe(0);
   });
 
   it("sends one recipe per prompt, so one household's recipes never share a prompt", () => {
@@ -73,7 +139,7 @@ describe("classifying a recipe that is already saved", () => {
     expect(prompt).toContain("Scald the milk.");
   });
 
-  it("returns null when the model answers nothing, so the recipe is left alone", async () => {
+  it("returns null when every reading answers nothing, so the recipe is left alone", async () => {
     const { provider } = answering(null);
     expect(await classifyRecipe({ provider, model: MODEL, recipe: RECIPE })).toBeNull();
   });

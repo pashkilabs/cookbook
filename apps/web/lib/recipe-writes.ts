@@ -2,6 +2,7 @@ import { maybeRow, rows } from "./rows";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { prepareRecipe, type PreparedRecipe } from "./recipe-input";
 import { refusal } from "./refusal";
+import { serviceClient } from "./service-client";
 
 /**
  * The child rows of a recipe, written for both create and edit.
@@ -285,13 +286,38 @@ export async function attachRecipePhoto(
  * entering it; asking them to find a second control to make it findable is the same failure four
  * features have already hit here. A recipe added by hand was invisible to browse entirely.
  *
- * **Why it is not wasteful.** It runs only when all four fields are empty, which is the same
- * `classified_at is null` cursor the backfill uses — so a person who set the fields themselves
- * pays nothing, and neither does a re-save.
+ * **Why it is not wasteful.** It runs only when all four fields are empty, so a person who set
+ * them themselves pays nothing, and a row already classified by the current prompt and model is
+ * left alone.
  *
  * **Why a failure is silent.** The recipe is the point. A model that is down, rate-limited or
- * unconfigured must not stop somebody saving their grandmother's rolls; the row simply stays
- * unstamped and the backfill picks it up later, which is what an unstamped row means.
+ * unconfigured must not stop somebody saving their grandmother's rolls; the row simply keeps an
+ * older stamp and the backfill picks it up later, which is what a stale stamp means.
+ *
+ * ---------------------------------------------------------------------------
+ * regression: this could not run, and could not have written anything if it had
+ * ---------------------------------------------------------------------------
+ *
+ * Two faults, each the mirror of the other, and together they made an entire feature unreachable
+ * while every check stayed green.
+ *
+ * The gate was `classified_at`, and `createRecipeFrom` stamps `classified_at` on **every** insert
+ * — so this returned early on every recipe that had just been created, which is every recipe it
+ * is ever called about. Each half was right on its own: the insert stamps because saving an
+ * imported recipe genuinely is an attempt, and this skipped stamped rows because re-asking is
+ * waste. The join was never walked. The gate is `classified_with` now, which is the column added
+ * precisely to tell "attempted" from "attempted with what is running today".
+ *
+ * And the write named `classified_at` and `classified_with`, which `authenticated` holds **no
+ * UPDATE grant on** — deliberately, since a client able to stamp its own provenance could mark a
+ * row current without asking a model. PostgREST refuses the whole statement with *permission
+ * denied for table recipes*, and the result was discarded, so the refusal never surfaced. Proven
+ * by attempting it: the same UPDATE naming only `principal_protein` succeeds.
+ *
+ * So the read stays with the caller's own client — row-level security decides which recipe this
+ * is allowed to be about — and the **write holds the service role**, exactly as the backfill does.
+ * That client bypasses RLS, so the update is pinned to the id this function was handed and to the
+ * family that row is already known to belong to.
  */
 export async function classifyIfUnclassified(
   supabase: SupabaseClient,
@@ -302,17 +328,19 @@ export async function classifyIfUnclassified(
   const cascade = cascadeFromEnv();
   if (!cascade) return;
 
+  const current = classificationProvenance(cascade.models[0]!.model);
+
   const recipe = maybeRow(
     await supabase
     .from("recipes")
-    .select("id, title, course, cuisine, dish_form, principal_protein, classified_at")
+    .select("id, family_id, title, course, cuisine, dish_form, principal_protein, classified_with")
     .eq("id", recipeId)
     .is("deleted_at", null)
     .maybeSingle(),
     "recipe",
   );
-  if (!recipe || recipe.classified_at) return;
-  // nothing to overwrite is the precondition, not just "unstamped"
+  if (!recipe || recipe.classified_with === current) return;
+  // nothing to overwrite is the precondition: a person's own answer is not a gap to fill
   if (recipe.course || recipe.cuisine || recipe.dish_form || recipe.principal_protein) return;
 
   const [ings, steps] = await Promise.all([
@@ -321,7 +349,7 @@ export async function classifyIfUnclassified(
   ]);
 
   try {
-    const cls = await classifyRecipe({
+    const read = await classifyRecipe({
       provider: cascade.provider,
       model: cascade.models[0]!,
       recipe: {
@@ -333,24 +361,30 @@ export async function classifyIfUnclassified(
         steps: (steps.data ?? []).map((row) => row.text as string),
       },
     });
-    if (!cls) return;
-    await supabase
+    if (!read) return;
+    const { error } = await serviceClient()
       .from("recipes")
       // cuisine included here and not in the backfill: this reads the same stored shape, but a
       // hand-typed recipe has no prose anywhere, so there is no better moment to ask (§54)
       .update({
-        course: cls.course,
-        dish_form: cls.dishForm,
-        principal_protein: cls.principalProtein,
+        course: read.classification.course,
+        dish_form: read.classification.dishForm,
+        principal_protein: read.classification.principalProtein,
         classified_at: new Date().toISOString(),
         /*
          * What produced this answer, so a changed prompt or model makes the row eligible again
          * while a correct null stays settled (§90). `classified_at` says only that something
          * happened, which is why 49 rows carried a wrong null that nothing would ever retry.
          */
-        classified_with: classificationProvenance(cascade.models[0]!.model),
+        classified_with: current,
+        classified_agreement: read.agreement,
+        classified_readings: read.readings,
       })
-      .eq("id", recipeId);
+      .eq("id", recipeId)
+      // the service role bypasses RLS, so the household is named rather than relied upon
+      .eq("family_id", recipe.family_id as string);
+    // a refused write is the thing that hid this feature for two months: it is reported now
+    if (error) console.warn(`[pashki] classification not stored for ${recipeId}: ${error.message}`);
   } catch (thrown) {
     // unstamped is exactly what "not yet classified" means; the backfill will find it
     console.warn(`[pashki] could not classify ${recipeId}: ${String(thrown)}`);
