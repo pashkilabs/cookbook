@@ -111,6 +111,7 @@ export default async function ShoppingPage({
           plannedCount={week.plannedCount}
           byAisle={week.byAisle}
           groupedLines={week.groupedLines}
+          groups={week.groups}
           leftovers={week.leftovers}
           suggestions={week.suggestions}
           pantry={week.pantry}

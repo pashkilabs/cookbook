@@ -307,15 +307,28 @@ for (const [text, group] of [
   }).catch(() => null);
   if (response?.ok()) groupedItems += 1;
 }
-if (groupsMade.length < 2 || groupedItems < 4) {
+/*
+ * A **recipe-derived** line filed under a group, which the typed items above cannot stand in for.
+ *
+ * The control appears on every row and the sections are built from one consolidation, so a picture
+ * with only typed items in its groups would show neither the thing §92 was built for nor the shape
+ * that replaced it. `flour` comes from the fixture recipes.
+ */
+const filedItem = await setup.request.put(`${base}/api/shopping-item-groups`, {
+  data: { itemKey: "flour", groupId: groupsMade[0]?.id },
+}).catch(() => null);
+const filedStuck = Boolean(filedItem?.ok());
+
+if (groupsMade.length < 2 || groupedItems < 4 || !filedStuck) {
   console.error(
-    `COULD NOT MEASURE: ${groupsMade.length} of 2 groups and ${groupedItems} of 4 typed items stuck, `
-    + "so the grouped shopping list and the household's group section are not exercised",
+    `COULD NOT MEASURE: ${groupsMade.length} of 2 groups, ${groupedItems} of 4 typed items and `
+    + `${filedStuck ? "the" : "NOT the"} recipe-derived line stuck, so the grouped shopping list `
+    + "and the household's group section are not exercised",
   );
   process.exit(2);
 }
 
-console.log(`  setup: household ${household.familyId.slice(0, 8)} with ${made.length} recipes, all ${classified} classified, ${groupsMade.length} shopping groups and ${groupedItems} typed items`);
+console.log(`  setup: household ${household.familyId.slice(0, 8)} with ${made.length} recipes, all ${classified} classified, ${groupsMade.length} shopping groups, ${groupedItems} typed items and a filed recipe line`);
 
 await page0.close();
 
@@ -552,7 +565,31 @@ for (const viewport of VIEWPORTS) {
         if (getComputedStyle(el).clipPath !== "none") continue;
         // a box so narrow that a word cannot fit is a broken box, whatever the stylesheet says
         if (box.width < 40 && text.length > 8) {
-          out.squeezed.push({ text: text.slice(0, 40), width: Math.round(box.width), height: Math.round(box.height) });
+          /*
+           * **The chain, not just the box.** Reporting "6px wide" names the victim and not the
+           * cause, and I guessed at the cause twice — once wrongly — before printing this. An
+           * element is narrow because an ancestor is, so walk up and show where the width went,
+           * with the flex properties that decide who shrinks. Same reasoning as the overflow
+           * culprits above: print the thing rather than search for the shape you imagined.
+           */
+          const chain = [];
+          for (let up = el; up && up !== document.body && chain.length < 6; up = up.parentElement) {
+            const style = getComputedStyle(up);
+            const b = up.getBoundingClientRect();
+            chain.push(
+              `${up.tagName.toLowerCase()}.${(up.className || "").toString().split(" ")[0] || "-"}`
+              + ` ${Math.round(b.width)}px`
+              + (style.display.includes("flex") || style.display.includes("grid") ? ` ${style.display}` : "")
+              + (style.flex !== "0 1 auto" ? ` flex:${style.flex}` : "")
+              + (style.minWidth !== "0px" && style.minWidth !== "auto" ? ` min-width:${style.minWidth}` : ""),
+            );
+          }
+          out.squeezed.push({
+            text: text.slice(0, 40),
+            width: Math.round(box.width),
+            height: Math.round(box.height),
+            chain,
+          });
         }
         /*
          * If every candidate was filtered as "has an overflowing child", nothing is reported and
@@ -836,6 +873,7 @@ for (const viewport of VIEWPORTS) {
     }
     for (const box of found.squeezed.slice(0, 4)) {
       console.error(`  FAIL ${label}: "${box.text}" is in a ${box.width}px box and ${box.height}px tall — it is wrapping per character`);
+      for (const step of box.chain ?? []) console.error(`         ${step}`);
       problems += 1;
     }
     if (found.wider === 0 && found.squeezed.length === 0) console.log(`  ok   ${label}`);

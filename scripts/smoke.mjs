@@ -804,6 +804,133 @@ try {
         );
       }
 
+      /*
+       * -------------------------------------------------------------------
+       * Filing a RECIPE-DERIVED line, which is the whole reason for §92
+       * -------------------------------------------------------------------
+       *
+       * One walk across four boundaries, in order: file the item by the key the list rendered →
+       * the standing table → `buildShoppingWeek`'s precedence → the screen, and then **a second
+       * week**, because standing-not-weekly is the one change from `shopping_ticks`'s shape and a
+       * single week cannot tell the two apart.
+       *
+       * `double cream` comes from the fixture recipe, not from anything typed — under the morning's
+       * shape it had no row and could not be grouped at all. On the real week that was 39 of 75
+       * lines, so this is the difference between a control on half the list and one on all of it.
+       *
+       * **Its own group**, because the block above deletes `groupId` and the first version of this
+       * filed into it: `PUT 400 "no such group"`, and the two assertions beneath then failed in
+       * exactly the shape of the bug being hunted. A probe owns its fixture.
+       */
+      const shelfName = `Kumquat Warehouse ${Date.now().toString(36).slice(-5)}`;
+      const shelf = await call("POST", "/api/shopping-groups", { body: { name: shelfName } });
+      const before = await call("GET", `/shopping?week=${monday}`);
+      const beforeText = visible(typeof before.body === "string" ? before.body : "");
+      const itemCount = (text) => Number((text.match(/(\d+) items? (?:from|\u00b7)/) ?? [])[1] ?? NaN);
+      const countBefore = itemCount(beforeText);
+
+      const filed = await call("PUT", "/api/shopping-item-groups", {
+        body: { itemKey: "double-cream", groupId: shelf.body?.id },
+      });
+      const afterFiling = await call("GET", `/shopping?week=${monday}`);
+      const filedText = visible(typeof afterFiling.body === "string" ? afterFiling.body : "");
+      /*
+       * The control is "Anything else you need": if the list did not render, every claim below
+       * would be about an absent page (§86).
+       */
+      if (!(afterFiling.status === 200 && filedText.includes("Anything else you need"))) {
+        skip(
+          "a recipe's own ingredient can be filed under a group",
+          `the shopping screen did not render (HTTP ${afterFiling.status}), so nothing was measured`,
+        );
+        skip("and it moves rather than being listed twice", "the screen did not render");
+      } else {
+        const inSection = new RegExp(`${shelfName}[\\s\\S]{0,400}double cream`).test(filedText);
+        record(
+          "a recipe's own ingredient can be filed under a group",
+          filed.status === 200 && inSection,
+          filed.status !== 200
+            ? `PUT ${filed.status} ${JSON.stringify(filed.body?.error ?? null)}`
+            : inSection
+              ? "the cream is under the group"
+              : foundDetail(filedText, "double cream", "the cream did not move into the group"),
+        );
+        /*
+         * **Moved, not duplicated** — measured by the screen's own item total rather than by
+         * counting mentions of the name.
+         *
+         * The first version counted occurrences of "double cream" and reported `4`, which was
+         * never evidence of anything: the label appears in the row's name, in "of double cream",
+         * and in the checkbox's own label, filed or not. The total is one number a person can
+         * check against the rows, and the fault this replaces — an item in its aisle *and* under a
+         * group — would raise it by one.
+         */
+        const countAfter = itemCount(filedText);
+        record(
+          "and it moves rather than being listed twice",
+          Number.isFinite(countBefore) && countBefore === countAfter,
+          !Number.isFinite(countBefore) || !Number.isFinite(countAfter)
+            ? `could not read the item total (${countBefore} then ${countAfter})`
+            : `${countBefore} items before, ${countAfter} after`,
+        );
+      }
+
+      /*
+       * Standing, not weekly: the same assignment holds on a week nothing was filed for. This is
+       * the assertion that distinguishes §92 from a copy of `shopping_ticks`.
+       */
+      const otherWeek = "2027-02-01";
+      const alsoThere = await call("POST", "/api/shopping-extras", {
+        body: { text: "1 pint double cream", weekStart: otherWeek },
+      });
+      const next = await call("GET", `/shopping?week=${otherWeek}`);
+      const nextText = visible(typeof next.body === "string" ? next.body : "");
+      record(
+        "and where an item is bought holds on every week, not just the one it was filed on",
+        alsoThere.status === 200 && next.status === 200
+          && new RegExp(`${shelfName}[\\s\\S]{0,400}double cream`).test(nextText),
+        next.status !== 200
+          ? `HTTP ${next.status} — the other week did not render`
+          : foundDetail(nextText, shelfName, "the group did not carry to another week"),
+      );
+      if (typeof alsoThere.body?.id === "string") {
+        await call("DELETE", `/api/shopping-extras?id=${alsoThere.body.id}`);
+      }
+
+      /*
+       * The tick follows the item, because the key never moved. Keys were namespaced by group for
+       * one morning (`g:<id>:<key>`), which would have orphaned a tick on every regroup; an item is
+       * in exactly one group, so it is one line with one identity.
+       *
+       * Both halves asserted: the item is under its **new** group and the trolley still holds it.
+       * Checking only the trolley would pass over a refile that did nothing at all.
+       */
+      const tickedIt = await call("POST", "/api/shopping-ticks", {
+        body: { weekStart: monday, itemKey: "double-cream" },
+      });
+      const annexe = `${shelfName} Annexe`;
+      const refiled = await call("PUT", "/api/shopping-item-groups", {
+        body: { itemKey: "double-cream", groupName: annexe },
+      });
+      const stillTicked = await call("GET", `/shopping?week=${monday}`);
+      const tickText = visible(typeof stillTicked.body === "string" ? stillTicked.body : "");
+      const moved = new RegExp(`${annexe}[\\s\\S]{0,400}double cream`).test(tickText);
+      record(
+        "and a tick survives the item being refiled, because the key does not move",
+        tickedIt.status === 200 && refiled.status === 200 && stillTicked.status === 200
+          && moved && /1 in the trolley/.test(tickText),
+        tickedIt.status !== 200
+          ? `tick ${tickedIt.status}`
+          : refiled.status !== 200
+            ? `refile ${refiled.status} ${JSON.stringify(refiled.body?.error ?? null)}`
+            : !moved
+              ? "the refile did not move the item, so the surviving tick proves nothing"
+              : foundDetail(tickText, "1 in the trolley", "the tick was lost when the item was refiled"),
+      );
+
+      // leave the household as it was found: the item goes back to no group
+      await call("PUT", "/api/shopping-item-groups", { body: { itemKey: "double-cream" } });
+
       if (typeof inGroup.body?.id === "string") {
         await call("DELETE", `/api/shopping-extras?id=${inGroup.body.id}`);
       }

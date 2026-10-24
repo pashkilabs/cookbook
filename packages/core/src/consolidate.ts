@@ -25,6 +25,21 @@ interface Bucket {
  * that package divides across the recipes that wanted it and what's left over.
  * That leftover is what lets the planner suggest a second recipe to finish it.
  */
+/**
+ * The identity a shopping line gets — the catalog's key when it knows the item, else its own name.
+ *
+ * Exported because **two callers must not derive this twice.** `consolidate` mints it, and the
+ * shopping read path needs to ask the inverse question — which typed requests feed this line — to
+ * resolve a line's group. A second copy of this expression is how `ground-beef` and `ground beef`
+ * become two items that never merge, so there is one copy and `consolidate` itself calls it.
+ *
+ * Takes the item as parsed, not as typed: a caller with raw text runs `parseIngredientList` first,
+ * which is the same order `consolidate` does it in.
+ */
+export function lineKeyFor(catalog: Catalog, item: string): string {
+  return catalog.find(item)?.key ?? normaliseName(item) ?? item;
+}
+
 export function consolidate(
   entries: ConsolidationEntry[],
   catalog: Catalog,
@@ -41,7 +56,7 @@ export function consolidate(
       if (excludeStaples && !entry.keepStaples && isStaple(ingredient.item)) continue;
 
       const item = catalog.find(ingredient.item);
-      const key = item ? item.key : normaliseName(ingredient.item) || ingredient.item;
+      const key = lineKeyFor(catalog, ingredient.item);
 
       let bucket = buckets.get(key);
       if (!bucket) {

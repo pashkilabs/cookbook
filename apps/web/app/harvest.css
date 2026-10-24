@@ -829,13 +829,86 @@
 
 .h-aisle { padding: 0 var(--space-xl); margin-bottom: var(--space-xl); }
 
-.h-buy { display: flex; align-items: flex-start; gap: var(--space-sm); padding: var(--space-md) 0; border-bottom: 1px solid var(--border); }
+/*
+ * `flex-wrap` because the row now holds a variable number of controls — the crossed-off block, the
+ * pantry chip and the group chip — and a strip of those is the shape that overflows a 390px row
+ * (§81). The group chip is `nowrap` like every chip, so without this a long group name pushes the
+ * page wider than the screen and takes every docked bar with it.
+ */
+.h-buy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-md) 0;
+  border-bottom: 1px solid var(--border);
+}
+/*
+ * Where this item is bought — a quiet affordance, deliberately not a chip.
+ *
+ * It sits on every row of the list, so it is sized and coloured like `.h-buy-of`: the row's action
+ * is "Have it" and this is a utility beside it. The first version reused `.h-chip`, which on a
+ * `<button>` takes the primary fill, and the screenshot showed fifty terracotta buttons shouting
+ * down the list.
+ */
+.h-buy-where {
+  flex: 0 0 auto;
+  padding: var(--space-xs) 0;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: var(--type-meta-size);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.h-buy-where:disabled { cursor: default; opacity: 0.5; }
 .h-buy:last-child { border-bottom: 0; }
-/* the checkbox is a label and wraps what is crossed off, so it takes the row's width */
-.h-buy > .h-check { flex: 1; min-width: 0; align-items: flex-start; }
+/*
+ * The checkbox is a label wrapping what gets crossed off, so it takes the row's width — and it
+ * needs a **flex-basis**, not just `flex: 1`.
+ *
+ * `min-width: 0` is what lets a long ingredient name break instead of widening the page (§85), and
+ * with a third control in the row — the group chip — it is also what let the name be squeezed to
+ * **6px wide and 255px tall, one character per line**, because an item that can shrink to nothing
+ * shrinks rather than letting its siblings wrap. Caught by `pnpm shots` on the phone in both
+ * themes; no stylesheet could have shown it.
+ *
+ * A 55% basis makes the chips wrap below when they will not fit beside it, which is what
+ * `flex-wrap` on the row is for. Both are needed: the wrap gives them somewhere to go, the basis
+ * is what makes them go there.
+ */
+.h-buy > .h-check { flex: 1 1 100%; min-width: 0; align-items: flex-start; }
+/*
+ * The row's controls sit below the crossed-off block rather than beside it, and that is a measured
+ * trade rather than a preference. Sharing the line cost the block about 55px, which was enough to
+ * drop the day chips from two per row to one — so a seven-day line grew from four rows of chips to
+ * eight. Giving the block the full width keeps the chips dense and puts "Have it" and "Where?"
+ * together on a line of their own, which also reads as what they are: the row's actions.
+ */
+.h-buy > .h-chip, .h-buy > .h-buy-where { align-self: center; }
 .h-buy-what { flex: 1; min-width: 0; }
-.h-buy-top { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-md); }
-.h-buy-name { font-size: var(--type-body-l-size); line-height: var(--type-body-l-line); color: var(--text); }
+/*
+ * The name and the package decision, and **it wraps**.
+ *
+ * `.h-buy-amount` is `flex: none` — correctly, it is the product and must not be abbreviated — so
+ * in a narrow row it takes what it needs and the name takes what is left. Measured at 390px with a
+ * third control in the row: `h-buy-top` 139px, the amount 133px, the name **6px wide and 255px
+ * tall**, one character per line. Printed by `pnpm shots` as an ancestor chain after I had guessed
+ * at the cause twice; no stylesheet shows this.
+ *
+ * Wrapping puts the amount on its own line instead of crushing the name, which is the right trade:
+ * both are readable on two lines and neither is readable on one.
+ */
+.h-buy-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+.h-buy-name { font-size: var(--type-body-l-size); line-height: var(--type-body-l-line); color: var(--text); min-width: 0; overflow-wrap: break-word; }
 /*
  * The package decision, loud and on the right. "1 pint" beside "Tue ½ cup · Fri 1 cup" is the
  * whole product: one pint bought instead of two half-pints and waste.
@@ -859,6 +932,25 @@
  * tint would be saying something about status. Same reason `.h-check-pantry` uses one.
  */
 .h-shop-group { padding-top: var(--space-md); border-top: 1px solid var(--border); }
+
+/*
+ * The open group picker on a line: a select, sometimes a naming field, and two buttons.
+ *
+ * `flex-wrap` because that is a variable number of controls in a strip, which is the shape that
+ * overflows a 390px row — and `min-width: 0` on it because it is itself a flex child holding them
+ * (§81). The naming field is allowed to take the whole next line rather than being squeezed in
+ * beside a select that is already 11rem.
+ */
+.h-line-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+  flex: 1 1 100%;
+  margin-top: var(--space-xs);
+}
+.h-line-group > .h-extras-input { flex: 1 1 8rem; min-width: 0; }
 
 .h-meal { padding: 0 var(--space-xl); margin-bottom: var(--space-xl); }
 .h-meal-items { margin: var(--space-sm) 0 0; padding: 0; list-style: none; }

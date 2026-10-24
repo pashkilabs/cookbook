@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   consolidate,
   createCatalog,
+  lineKeyFor,
   linesCoveredByBase,
   parseIngredientList,
   recipesUsingLeftovers,
@@ -182,9 +183,9 @@ export async function buildShoppingWeek(
    *
    * Grouped by person so the `uses` row says who asked.
    */
-  const extraEntries = (only: (typeof extras)[number][] = extras): ConsolidationEntry[] => {
+  const extraEntries = (): ConsolidationEntry[] => {
     const byPerson = new Map<string, string[]>();
-    for (const extra of only) {
+    for (const extra of extras) {
       const texts = byPerson.get(extra.addedById) ?? [];
       texts.push(extra.text);
       byPerson.set(extra.addedById, texts);
@@ -210,33 +211,82 @@ export async function buildShoppingWeek(
   };
 
   /**
-   * A section of the list per group, consolidated **within** the group and nowhere else.
+   * ---------------------------------------------------------------------------
+   * Which group a line is in. **The precedence lives here and nowhere else.**
+   * ---------------------------------------------------------------------------
    *
-   * Why its own consolidation rather than one bucket with the rest: a group is a different trip or
-   * a different destination, so merging "flour" for Costco with Tuesday's flour would buy one bag
-   * in the wrong place. Inside a group it still merges — two people asking for paper towels at
-   * Costco is one purchase.
+   *   1. a standing assignment for the item's key — what somebody chose on the list;
+   *   2. failing that, the group named by the extras feeding the line, when they agree;
+   *   3. failing that, no group.
    *
-   * **The tick key is namespaced by the group id**, which is what stops a tick leaking between
-   * sections: paper towels at Costco and paper towels at the main store are two things to pick up,
-   * and one tick for both would cross them off together. The id rather than the name, so renaming
-   * Costco does not lose a week's ticks.
+   * Rule 2 is what makes yesterday's behaviour a special case of this one rather than a second
+   * system: a typed item filed under Costco in the add box still shows under Costco with nothing
+   * stored against its key. And it is deliberately **only** consulted when the extras agree — a
+   * line that a recipe and a person both ask for has no inherited answer, because the person's
+   * request is not the item.
+   *
+   * This replaces a separate `consolidate` call per group, which was the morning's shape and was
+   * wrong in a way only the real data showed: Paige's unquantified "Ground Beef" contributed
+   * nothing to `needed`, so grouping it left `beef — BUY 2 lb + 1 lb` in MEAT & SEAFOOD and a bare
+   * `beef` under COSTCO. One bucket, one line, one amount, and the group is a label on it.
+   *
+   * Tick keys are therefore **not** namespaced any more. An item is in exactly one group, so it is
+   * one line with one identity, and somebody who ticked paper towels has bought them whatever
+   * group they are filed under.
    */
-  const groupedSections = (catalogue: ReturnType<typeof createCatalog>) =>
-    groups
-      .map((group) => {
-        const mine = extras.filter((extra) => extra.groupId === group.id);
-        if (mine.length === 0) return null;
-        const lines = consolidate(extraEntries(mine), catalogue, { system }).map((line) => ({
-          ...line,
-          key: `g:${group.id}:${line.key}`,
-        }));
-        return { id: group.id, name: group.name, lines };
-      })
-      .filter((section): section is { id: string; name: string; lines: ShoppingLine[] } => section !== null);
+  const standing = new Map(
+    rows(
+      await supabase
+        .from("shopping_item_groups")
+        .select("item_key, group_id")
+        .eq("family_id", familyId)
+        .is("deleted_at", null),
+      "this household's item groups",
+    ).map((row) => [row.item_key as string, row.group_id as string]),
+  );
 
-  // what the aisles are built from: everything **not** in a group, which has its own section
-  const ungrouped = () => extras.filter((extra) => !extra.groupId);
+  /**
+   * The group named by every extra feeding a line, when they name the same one.
+   *
+   * `lineKeyFor` is `consolidate`'s own derivation, exported rather than copied — asking which
+   * requests feed a line is the inverse of minting its key, and two spellings of that expression
+   * is how `ground-beef` and `ground beef` become two items that never merge.
+   */
+  const inheritedGroup = (line: ShoppingLine): string | null => {
+    const asking = extras.filter((extra) =>
+      parseIngredientList([extra.text]).some(
+        (parsed) => parsed.item && lineKeyFor(catalog, parsed.item) === line.key,
+      ),
+    );
+    if (asking.length === 0 || asking.some((extra) => !extra.groupId)) return null;
+    const first = asking[0]!.groupId;
+    return asking.every((extra) => extra.groupId === first) ? first : null;
+  };
+
+  const groupFor = (line: ShoppingLine): string | null =>
+    standing.get(line.key) ?? inheritedGroup(line);
+
+  /**
+   * The list split into the main trip and a section per group.
+   *
+   * Aisle order is preserved inside each: `groupByAisle` has already run, and a group's lines come
+   * out in the order they were in, because that order is the catalog's and not this function's.
+   */
+  const partition = (lines: ShoppingLine[]) => {
+    const assigned = new Map<string, ShoppingLine[]>();
+    const main: ShoppingLine[] = [];
+    for (const line of lines) {
+      const groupId = groupFor(line);
+      if (!groupId || !groupNames.has(groupId)) main.push(line);
+      else assigned.set(groupId, [...(assigned.get(groupId) ?? []), line]);
+    }
+    return {
+      main,
+      grouped: groups
+        .filter((group) => (assigned.get(group.id) ?? []).length > 0)
+        .map((group) => ({ id: group.id, name: group.name, lines: assigned.get(group.id)! })),
+    };
+  };
 
   const asExtras = () =>
     extras.map((extra) => ({
@@ -262,14 +312,15 @@ export async function buildShoppingWeek(
 
   if (planned.length === 0) {
     // typed items still have to appear — see `extraEntries`
-    const only = consolidate(extraEntries(ungrouped()), catalog, { system });
+    const only = consolidate(extraEntries(), catalog, { system });
+    const split = partition(only);
     return {
       week: {
         lines: only,
         extras: asExtras(),
         groups,
-        groupedLines: groupedSections(catalog),
-        byAisle: groupByAisle(only),
+        groupedLines: split.grouped,
+        byAisle: groupByAisle(split.main),
         leftovers: [], suggestions: [], plannedCount: 0,
         pantry: (pantryRows.data ?? []).map((row) => ({ id: row.id, name: row.name })),
         ticked: new Set((tickRows.data ?? []).map((row) => row.item_key)),
@@ -388,10 +439,16 @@ export async function buildShoppingWeek(
    * "salt" has run out of salt — the default drops it, silently, which is the fault the design
    * pass found by running this rather than reading it.
    */
-  entries.push(...extraEntries(ungrouped()));
+  entries.push(...extraEntries());
 
   const lines = consolidate(entries, catalog, { pantry, deductPantry: true, system });
   const leftovers = significantLeftovers(lines);
+  /*
+   * The aisles are the main trip; a grouped line is lifted out of them into its own section.
+   * `lines` stays whole — the count on the screen and the share text are about everything there is
+   * to buy, grouped or not, and a figure a person can count the rows against.
+   */
+  const split = partition(lines);
 
   // Candidates are the household's other recipes — the ones not already planned this week.
   const candidateRows = rows(
@@ -421,8 +478,8 @@ export async function buildShoppingWeek(
       lines,
       extras: asExtras(),
       groups,
-      groupedLines: groupedSections(catalog),
-      byAisle: groupByAisle(lines),
+      groupedLines: split.grouped,
+      byAisle: groupByAisle(split.main),
       leftovers,
       suggestions: suggested.slice(0, 6).map((recipe) => ({
         id: recipe.id,

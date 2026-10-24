@@ -1,5 +1,6 @@
 "use client";
 
+import { GroupPicker, NewGroupField, NEW_GROUP } from "./group-picker";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -32,6 +33,8 @@ export function ShoppingList(props: {
    * group id upstream, so ticking Costco's paper towels does not tick the main trip's.
    */
   groupedLines: Array<{ id: string; name: string; lines: ShoppingLine[] }>;
+  /** the household's groups, for the per-line picker — the same list the add box offers */
+  groups: Array<{ id: string; name: string }>;
   leftovers: ShoppingLine[];
   suggestions: Array<{ id: string; title: string; uses: string[] }>;
   pantry: Array<{ id: string; name: string }>;
@@ -102,6 +105,32 @@ export function ShoppingList(props: {
         return next;
       });
     }
+  }
+
+  /*
+   * Which group each line is currently in, by the key the list renders.
+   *
+   * Built from `groupedLines` rather than fetched: the server has already resolved the precedence —
+   * standing row, then inherited from the extras feeding the line, then none — and a second answer
+   * computed here is a second place that can disagree with it.
+   */
+  const groupOf = new Map(
+    props.groupedLines.flatMap((group) => group.lines.map((line) => [line.key, group.id] as const)),
+  );
+
+  /**
+   * File an item under a group, or take it out of one.
+   *
+   * The key sent back is the one the list rendered — this screen never derives it, and neither
+   * does the route, so `consolidate` stays the only thing that decides what merges with what.
+   */
+  async function fileItem(line: ShoppingLine, choice: { groupId?: string; groupName?: string }) {
+    const ok = await call(`group-${line.key}`, "/api/shopping-item-groups", "PUT", {
+      itemKey: line.key,
+      ...choice,
+    });
+    // the line moves between sections, so the list itself changes — re-read rather than guess
+    if (ok) router.refresh();
   }
 
   async function togglePantry(line: ShoppingLine) {
@@ -288,6 +317,25 @@ export function ShoppingList(props: {
         >
           {inPantry ? "Not in pantry" : "Have it"}
         </button>
+
+        {/*
+          * Where this item is bought, on **every** line.
+          *
+          * A group is a property of the item, not of one request for it, so a recipe-derived line
+          * is as groupable as a typed one — which is the whole reason the assignment is keyed on
+          * the consolidated line key rather than stored on `shopping_extras`. On the week this was
+          * measured that is the difference between a control on 36 lines and a control on all 75.
+          *
+          * Closed until asked for, because a picker on every row of a fifty-line list is a wall of
+          * dropdowns between somebody and their shopping.
+          */}
+        <LineGroup
+          line={line}
+          groups={props.groups}
+          current={groupOf.get(line.key) ?? ""}
+          busy={busy !== null}
+          onFile={(choice) => fileItem(line, choice)}
+        />
       </div>
     );
   };
@@ -478,5 +526,87 @@ export function ShoppingList(props: {
         </section>
       )}
     </>
+  );
+}
+
+/**
+ * The group control for one line: a chip until somebody taps it, then the picker.
+ *
+ * **The picker is `GroupPicker`, imported** — the same control the add box uses, feeding the same
+ * `findOrCreateGroup`. A second picker with its own matching is how "costco" and "Costco" come
+ * back as two groups, which is the fault the table was built to remove.
+ *
+ * The chip names the current group rather than saying "Group", because a row that is already filed
+ * under Costco should say so where somebody is looking, and the same control then changes it.
+ */
+function LineGroup({
+  line,
+  groups,
+  current,
+  busy,
+  onFile,
+}: {
+  line: ShoppingLine;
+  groups: Array<{ id: string; name: string }>;
+  current: string;
+  busy: boolean;
+  onFile: (choice: { groupId?: string; groupName?: string }) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [choice, setChoice] = useState(current);
+  const [named, setNamed] = useState("");
+
+  if (!open) {
+    const name = groups.find((group) => group.id === current)?.name;
+    /*
+     * **"Move", not the group's name.** A filed line is rendered inside that group's own section,
+     * so a chip repeating "Costco" under a COSTCO heading says nothing — it was noise on every row
+     * of the section, which only the screenshot showed. The heading says where it is; the control
+     * says what can be done about it.
+     *
+     * And quiet rather than a filled chip: `.h-chip` on a button takes the primary fill, so this
+     * rendered as loud as "Have it" on every line of a fifty-line list. It is a utility, not the
+     * row's action.
+     */
+    return (
+      <button
+        type="button"
+        className="h-buy-where"
+        disabled={busy}
+        title={name ? `Bought at ${name} — tap to move it` : "Say where this is bought"}
+        onClick={() => { setChoice(current); setNamed(""); setOpen(true); }}
+      >
+        {name ? "Move" : "Where?"}
+      </button>
+    );
+  }
+
+  const naming = choice === NEW_GROUP;
+  return (
+    /* `min-width: 0` on the strip: it holds a select and two buttons in a flex row (§81) */
+    <span className="h-line-group" style={{ minWidth: 0 }}>
+      <GroupPicker
+        groups={groups}
+        value={choice}
+        onChange={setChoice}
+        disabled={busy}
+        label={`Where ${line.label} is bought`}
+      />
+      {naming && <NewGroupField value={named} onChange={setNamed} disabled={busy} />}
+      <button
+        type="button"
+        className="h-secondary"
+        disabled={busy || (naming && named.trim().length === 0)}
+        onClick={() => {
+          onFile(naming ? { groupName: named.trim() } : choice ? { groupId: choice } : {});
+          setOpen(false);
+        }}
+      >
+        Save
+      </button>
+      <button type="button" className="h-chip" disabled={busy} onClick={() => setOpen(false)}>
+        Cancel
+      </button>
+    </span>
   );
 }

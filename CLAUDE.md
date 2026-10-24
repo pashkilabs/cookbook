@@ -1291,6 +1291,28 @@ guessing.
   covered (`pnpm shots`, nine mains, both themes). **Two probes, one rule, and neither pretending
   to be both.**
 
+- **An aggregate over a period the feature did not exist in is not evidence.** Asked whether a
+  per-line control would be usable, I computed the typed-versus-recipe-derived split across five
+  weeks of the real household and got **10% typed** — a decisive-looking number, reported as the
+  answer, and **0% by construction for three of those weeks** because `shopping_extras` was created
+  the day before. The honest denominator was the two weeks in which a typed item could occur, where
+  it is **100% and 48%**, and it pointed the opposite way to the aggregate.
+
+  What makes this worth naming is that the aggregate was both the **more natural thing to compute**
+  — one query over the whole table, no date reasoning — and the **more convincing thing to report**,
+  because a figure over five weeks sounds better founded than a figure over two. Volume read as
+  rigour. So before dividing by anything, ask **when the numerator first became possible**, and set
+  the denominator to that window; a long baseline that predates the mechanism is padding with
+  structural zeroes, not evidence.
+
+  Two companions found in the same session, both from the same instinct of computing the easy figure:
+  a per-group tally over one PostgREST read would have silently under-reported past the 1000-row cap
+  and made a *delete confirmation* say "nothing is in it" about a group holding forty; and a harness
+  fed `item_text` to the parser where production feeds `amount + unit + item_text`, so every reading
+  was `need 0 g, BUY —` and three consolidation questions got the same confident wrong answer.
+  §83 is the same family from the value side — *count the values before writing a threshold against
+  them.* This is the time side: **count the weeks the thing could have happened in.**
+
 - **An assertion that something is missing is worthless without evidence that something else is
   present.** The chapter tree changed what `/recipes` renders on the `browse` layout — a contents
   page lists *chapters*, so no recipe title appears — and `"a recipe naming an avoided allergen is

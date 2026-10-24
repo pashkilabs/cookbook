@@ -5797,3 +5797,64 @@ middleware to re-set the cookie on every navigation so the last write is usually
 (cheap, does nothing for a long-open tab), additionally disable client-side `autoRefreshToken` and
 let middleware own refreshes (complete, breaks a tab left open across an expiry), or accept a
 weekly re-sign-in on iOS and say so in the product.
+
+## §92 — A group belongs to the item, not to one request for it
+
+Reverses part of §91, which shipped the same day. §91 put a group on `shopping_extras` — a typed
+**request** — and the shape looked right because the groups came from handwritten lists and the
+handwritten lists arrive as typed extras. Measured against the real household, it is wrong twice.
+
+**A recipe-derived line has no row, so it could not be grouped at all.** On the week of 2026-10-26
+that is **39 of 75 lines**; the control would have been absent from half the list, and absent
+without explanation, since nothing on screen distinguishes a line that has a row from one that
+does not.
+
+**And a line both a recipe and a person ask for appeared twice, with the amount on the wrong one.**
+Four such lines that week — all of them Paige's meat items, which are precisely the Costco items.
+Run through the real `consolidate`:
+
+```
+ONE BUCKET    recipes + Paige       beef   need 2¾ lb   BUY 2 lb + 1 lb
+TWO BUCKETS   recipes alone         beef   need 2¾ lb   BUY 2 lb + 1 lb
+              Paige under Costco    beef   need 0 g     BUY —
+```
+
+She wrote "Ground Beef" with no quantity, so her request adds nothing to `needed`. File it under
+Costco and the list says `beef` with no amount under COSTCO and `beef — buy 2 lb + 1 lb` under
+MEAT & SEAFOOD. One item, two places, the figure attached to the shop she is not going to. I had
+predicted a **split** purchase and was wrong about the mechanism — the duplication is worse, and
+only running it showed which.
+
+**So `shopping_item_groups(family_id, item_key, group_id)`**, keyed on the consolidated line key —
+the identity `consolidate` mints and `shopping_ticks` already uses. One `consolidate` call again,
+the group a label on a line rather than a separate bucket, and tick keys back to the bare key: an
+item is in exactly one group, so it is one line with one identity, and a tick survives a refile
+because nothing about the key moved.
+
+**Standing, not week-scoped**, which is the one change from `shopping_ticks`'s shape. Ticking is
+per trip; *"we buy beef at Costco"* is a standing fact. Week-scoping would mean refiling 36 items
+every Monday and a photographed Costco list teaching the app nothing that outlived the week. The
+cost is that a one-off — *this week I'll grab it at Costco* — has to be moved back afterwards.
+
+**The key-moves hazard, measured rather than argued.** `shopping_ticks` has used this scheme since
+August: **8 of 155 ticks are orphaned, 5%** — `15oz can whole kernel corn`, `whole bone-in pork
+butt`. Already shipped and already accepted, and an orphaned *assignment* is harmless where an
+orphaned tick is not: the item is simply ungrouped when it returns, and standing scope means it
+usually is not orphaned at all.
+
+**Precedence, stated once in `buildShoppingWeek` and nowhere else:** a standing row for the item's
+key; failing that, the group named by the extras feeding the line when they agree; failing that,
+none. Rule 2 is what makes §91's behaviour a special case of this one rather than a competing
+system — a typed item filed in the add box still shows under its group with nothing stored against
+its key — and it is deliberately only consulted when the extras agree, because a line a recipe also
+asks for has no inherited answer.
+
+**One picker, lifted not rewritten** (`app/shopping/group-picker.tsx`). Both callers hand their
+choice to routes that call `findOrCreateGroup`, so there is one normalisation and one answer to
+whether a typed name is a new group. A second picker with its own matching is how "costco" and
+"Costco" come back as two groups, which is the fault §91's table exists to remove.
+
+**What would reverse this.** A household that genuinely buys the same item in two places in one
+week — half the beef at Costco and half at HEB — which this cannot express, because an item is in
+exactly one group. Nothing has asked for it, and the shape that could express it is the one just
+removed for producing a duplicate nobody wanted.

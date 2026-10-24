@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { rows } from "./rows";
+import { maybeRow, rows } from "./rows";
 
 export interface ShoppingGroup {
   id: string;
@@ -152,4 +152,81 @@ export async function listGroupsWithCounts(
       return { ...group, items: count ?? 0 };
     }),
   );
+}
+
+/**
+ * File an item under a group, or take it out of one — standing, across every week.
+ *
+ * **Ensure-then-set, not upsert.** PostgREST renders a merge-duplicates upsert as
+ * `ON CONFLICT DO UPDATE SET` *every column in the payload*, keys included, and `family_id` and
+ * `item_key` carry an INSERT grant and deliberately no UPDATE grant — moving a row to another key
+ * would silently regroup a different item (§26). The failure wording blames the table, so reach for
+ * this shape first rather than after the 400.
+ *
+ * `null` takes the item out of every group, which is a soft delete rather than a removal: clients
+ * hold no DELETE, and the unique index excludes tombstones so regrouping later re-inserts cleanly.
+ */
+export async function setItemGroup(
+  supabase: SupabaseClient,
+  familyId: string,
+  itemKey: string,
+  groupId: string | null,
+): Promise<string | null> {
+  const live = maybeRow(
+    await supabase
+      .from("shopping_item_groups")
+      .select("id")
+      .eq("family_id", familyId)
+      .eq("item_key", itemKey)
+      .is("deleted_at", null)
+      .maybeSingle(),
+    "this item's group",
+  );
+
+  if (groupId === null) {
+    if (!live) return null; // already in no group; saying so twice is not an error
+    const { error } = await supabase
+      .from("shopping_item_groups")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", live.id)
+      .eq("family_id", familyId);
+    return error?.message ?? null;
+  }
+
+  if (live) {
+    const { error } = await supabase
+      .from("shopping_item_groups")
+      .update({ group_id: groupId })
+      .eq("id", live.id)
+      .eq("family_id", familyId);
+    return error?.message ?? null;
+  }
+
+  const { error } = await supabase
+    .from("shopping_item_groups")
+    .insert({ family_id: familyId, item_key: itemKey, group_id: groupId });
+  if (!error) return null;
+
+  /*
+   * The index refused it, so another writer filed the same item between the read and the insert.
+   * Set theirs rather than reporting a failure: the person asked for this item to be in that group
+   * and there is now a row to say so.
+   */
+  const theirs = maybeRow(
+    await supabase
+      .from("shopping_item_groups")
+      .select("id")
+      .eq("family_id", familyId)
+      .eq("item_key", itemKey)
+      .is("deleted_at", null)
+      .maybeSingle(),
+    "this item's group",
+  );
+  if (!theirs) return error.message;
+  const retry = await supabase
+    .from("shopping_item_groups")
+    .update({ group_id: groupId })
+    .eq("id", theirs.id)
+    .eq("family_id", familyId);
+  return retry.error?.message ?? null;
 }

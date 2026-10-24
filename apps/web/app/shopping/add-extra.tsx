@@ -1,5 +1,6 @@
 "use client";
 
+import { GroupPicker, NewGroupField, NEW_GROUP } from "./group-picker";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -35,7 +36,7 @@ export function AddExtra({
    * to Household to make a group first means nobody makes one. `""` is no group, which is what most
    * items have and always will — a recipe-derived item has no opinion about where to buy it.
    *
-   * `__new` opens an inline field rather than navigating. The create path normalises exactly as the
+   * `NEW_GROUP` opens an inline field rather than navigating. The create path normalises exactly as the
    * match path does, so "costco" typed here when "Costco" exists resolves to Costco and says so
    * rather than making a near twin (§91).
    */
@@ -61,7 +62,7 @@ export function AddExtra({
         body: JSON.stringify({
           text: typed,
           weekStart,
-          ...(group === "__new"
+          ...(group === NEW_GROUP
             ? newGroup.trim()
               ? { groupName: newGroup.trim() }
               : {}
@@ -135,43 +136,17 @@ export function AddExtra({
             maxLength={200}
             disabled={busy}
           />
-          {/*
-            * The group control, beside the item. `h-extras-group` rather than a bare select so it
-            * can shrink: a non-shrinking control in a flex row is what put the page 176px past the
-            * viewport once already (§81).
-            */}
-          <select
-            className="h-extras-group"
-            value={group}
-            aria-label="Which group this is for"
-            disabled={busy}
-            onChange={(event) => setGroup(event.target.value)}
-          >
-            <option value="">No group</option>
-            {groups.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.name}
-              </option>
-            ))}
-            <option value="__new">New group…</option>
-          </select>
+          {/* the one picker, lifted into `group-picker` — see there for why it is not two */}
+          <GroupPicker groups={groups} value={group} onChange={setGroup} disabled={busy} />
           <button type="submit" className="h-secondary" disabled={busy || text.trim().length === 0}>
             Add
           </button>
         </div>
       </form>
 
-      {group === "__new" && (
+      {group === NEW_GROUP && (
         <div className="h-extras-row">
-          <input
-            className="h-extras-input"
-            value={newGroup}
-            aria-label="Name the new group"
-            placeholder="Costco, Trader Joes, Boo Basket…"
-            maxLength={60}
-            disabled={busy}
-            onChange={(event) => setNewGroup(event.target.value)}
-          />
+          <NewGroupField value={newGroup} onChange={setNewGroup} disabled={busy} />
         </div>
       )}
 

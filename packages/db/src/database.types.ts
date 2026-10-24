@@ -1343,6 +1343,51 @@ export type Database = {
           },
         ]
       }
+      shopping_item_groups: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          family_id: string
+          group_id: string
+          id: string
+          item_key: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          family_id: string
+          group_id: string
+          id?: string
+          item_key: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          family_id?: string
+          group_id?: string
+          id?: string
+          item_key?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shopping_item_groups_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shopping_item_groups_group"
+            columns: ["group_id", "family_id"]
+            isOneToOne: false
+            referencedRelation: "shopping_groups"
+            referencedColumns: ["id", "family_id"]
+          },
+        ]
+      }
       shopping_ticks: {
         Row: {
           created_at: string
