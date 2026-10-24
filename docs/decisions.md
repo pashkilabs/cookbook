@@ -5858,3 +5858,121 @@ whether a typed name is a new group. A second picker with its own matching is ho
 week — half the beef at Costco and half at HEB — which this cannot express, because an item is in
 exactly one group. Nothing has asked for it, and the shape that could express it is the one just
 removed for producing a duplicate nobody wanted.
+
+## §93 — Protein accuracy, measured: a missing value, a vote, and a prompt that is next
+
+**The earlier fix measured the wrong thing, and both of us read it as working.** "16 mains with no
+protein down to 2" counts how many rows *got* an answer. Nobody counted how many got the right one.
+Null-rate is not accuracy, and the two can move in opposite directions — a classifier that names
+something for every dish has a perfect null-rate and no accuracy at all.
+
+### Hand-scored, before anything changed
+
+Every one of the 76 live recipes in the real library, adjudicated by hand and **written to a file
+before the fixes landed**, so the re-score compares against a fixed judgement rather than a fresh
+one. The adjudication corrected 10 rows; the other 66 were scored correct as stored.
+
+| label | n | right | precision |
+|---|---|---|---|
+| beef | 14 | 14 | 100% |
+| chicken | 21 | 18 | 86% |
+| pork | 19 | 14 | **74%** |
+| fish / seafood | 4 | 4 | 100% |
+| egg | 2 | 1 | 50% |
+| lamb | 1 | 0 | **0%** |
+| *(declined)* | 15 | 15 | 100% |
+
+**All 10 errors were false positives.** Not one recipe was wrongly declined. 51 of 61 named
+proteins were right (84%); of the 23 recipes that have no principal protein, 15 were correctly
+declined (65% recall). Pork was the worst label and Pork is the chapter somebody opened, which is
+how this started.
+
+The direction is what named the causes, and an overall rate would have hidden it. A classifier that
+wrongly declines needs a better prompt; one that wrongly asserts needs a value, a tie-break and a
+prompt — three different repairs.
+
+### Three causes, and what each fix reached
+
+**1. A value absent from the enum becomes the nearest available one.** `turkey` was in none of the
+nine places the values were spelled. "Ground Turkey Rice Bowls" — the word is in the title — came
+back `pork` three readings out of three, and `turkey` three of three the moment the value existed.
+Forced to a closed list, a model picks a neighbour rather than declining, and the answer arrives
+confident and well-formed. Added turkey on evidence (one recipe) and duck on the failure mode
+(none): its absence costs a duck recipe becoming chicken, its presence costs a chapter that does
+not render.
+
+**2. Temperature zero is not determinism.** The classifier stored **one** reading where
+`componentsFor` stores three. The same recipe and prompt returned `[null, chicken, null]` and
+`[pork, seafood, seafood]`. It votes now, per field, and a tie declines — because the error
+direction is measured, so "Not sorted yet" beats a chapter that lies.
+
+**3. The prompt, which is what is left.** Explicitly tested as the brief asked: with turkey
+available, is `pork` still the shrug? No — `Annie's Mac & Cheese` became `chicken` 3 of 3 and
+`Peanut butter balls` stayed `pork` 3 of 3. The missing value was not pulling unrelated dishes into
+pork, so the no-protein instruction is genuinely not landing.
+
+### The re-score, through the shipping path
+
+76 recipes re-classified by the backfill, three readings each, scored against the file written
+beforehand.
+
+| | errors | named-protein precision | declined (recall) | whole library |
+|---|---|---|---|---|
+| before | 10 | 51/61 = 84% | 15/23 = 65% | 66/76 = 87% |
+| after | **6** | 52/58 = **90%** | 18/23 = **78%** | 70/76 = **92%** |
+
+**Six fixed and two broken, which is the honest shape of it.** Ground Turkey, the shrimp linguine,
+the peanut chilli noodles, the pizza dough, the stuffing and the berry salad all came right. Two
+that had been right went wrong — `Garlic Butter Shrimp` to pork, `PB Cookie Dough S'mores Bites` to
+pork. Consensus narrowed the noise; it did not remove it.
+
+### What is left is two associations, not a general weakness
+
+The six remaining errors fall into two clusters, and both are bias rather than variance:
+
+- **Butter pulls a dish into pork.** Four recipes name butter or PB in the title; **three are wrong
+  and all three are `pork`** (`Garlic Butter Shrimp`, `Peanut butter balls`, `PB Cookie Dough
+  S'mores Bites`). The fourth, `Cultured Butter`, is correctly null. Of the 23 recipes with no
+  protein, the 3 that name butter produced 2 pork errors and the 20 that do not produced zero —
+  every non-butter false positive is `chicken`. **n is 4, so this is a lead and not a finding**,
+  but it is specific enough to write a prompt against, which "the instruction is not landing" was
+  not.
+- **A rich, cheesy, no-protein dish becomes chicken** — `Annie's Mac & Cheese` and `Fresh Basil
+  Pesto` twice.
+
+The prompt's only concrete mapping is *"Sausage, bacon and ham are pork"*, and it names no dairy at
+all. That is the next change, and it is deliberately not made here: the brief's order was measure,
+then fix the value, then vote, then re-measure, then re-word — because a retune judged against a
+spread of five is measuring the weather.
+
+### The agreement is recorded and gated on by nothing
+
+| agreement | recipes | right |
+|---|---|---|
+| 1.0 | 66 | 64 (97%) |
+| 0.67 | 8 | 4 (50%) |
+| ≤ 0.33 | 2 | 2 |
+
+That separation points the opposite way from §61, where agreement did not separate partitions at
+all — and it is 8 recipes, so it is not a basis for anything. What it does support is the half of
+§61 that was always sound: **low agreement is evidence of trouble, high agreement is evidence of
+nothing.** Four of the six errors carry agreement below 1, so a person asking "which of these
+should I check" has an answer. Gating on it would be the §61 mistake, made with a smaller sample.
+
+### And the save path had never worked
+
+Found by extending its write. `classifyIfUnclassified` gated on `classified_at`, which
+`createRecipeFrom` stamps on every insert — so it returned early on every recipe it was ever called
+about. And its update named `classified_at` and `classified_with`, which `authenticated` holds no
+UPDATE grant on deliberately, so PostgREST refused the whole statement; the result was discarded
+and the refusal never surfaced. Proven by attempting it against a real database, with a control:
+the same UPDATE naming only `principal_protein` succeeds. The gate is `classified_with` now, the
+write holds the service role and names its family, and a refused write is logged.
+
+### What would reverse this
+
+A turkey drawing arriving, which would replace the platter the tile borrows — beside Pork's pig and
+Beef's cow it reads as a placeholder, which is the honest cost of adding a value before its
+artwork. And duck earning its chapter by a recipe existing. The enum itself would widen again the
+first time the library acquires something it cannot name: the measurement that justified turkey is
+a count of the library, and that count changes.

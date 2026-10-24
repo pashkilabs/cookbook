@@ -170,7 +170,7 @@ const made = [];
 /*
  * A library shaped like the real one, because the tree's behaviour turns entirely on the data.
  *
- * Nine mains, so Mains is over the cap and **divides** — five mains would render the undivided
+ * Ten mains, so Mains is over the cap and **divides** — five mains would render the undivided
  * shape and tell us nothing about the screen this release is for. Two soups, one of them also a
  * main, so the deliberate `dish_form`/`course` overlap is on screen. No snacks at all, which is
  * what the real library has, so the shot shows eight tiles and not nine. Three with no course, so
@@ -187,6 +187,12 @@ for (const [title, course, minutes, dishForm, protein] of [
   ["Weeknight Chicken Traybake", "main", "45", null, "chicken"],
   ["Slow Beef Ragu", "main", "180", null, "beef"],
   ["Pan-fried Salmon", "main", "20", null, "fish"],
+  /*
+   * One turkey, because `turkey` reached the column, the schema and the chapters in one change and
+   * **a value with no recipe behind it renders nowhere**. Route coverage is not state coverage: the
+   * grid would have photographed nine tiles and been quoted as covering a tenth.
+   */
+  ["Ground Turkey Rice Bowls", "main", "30", "bowl", "turkey"],
   ["A recipe with a deliberately very long title indeed", "main", "", null, null],
   ["Tomato and basil soup", "starter", "30", "soup", null],
   ["Greek Salad", "side", "15", "salad", null],
@@ -349,6 +355,9 @@ const SCREENS = [
   // the tree (§86): the divided chapter, a protein leaf, a small leaf, and the unsorted row
   { name: "chapter-main", path: "/recipes/c/main", layout: "browse", marker: "Mains" },
   { name: "chapter-pork", path: "/recipes/c/main/pork", layout: "browse", marker: "Pork" },
+  // the new leaf, asserted rather than only photographed: a chapter whose tile is in the grid and
+  // whose page 404s is the same silence as a value with no chapter at all
+  { name: "chapter-turkey", path: "/recipes/c/main/turkey", layout: "browse", marker: "Turkey" },
   { name: "chapter-soup", path: "/recipes/c/soup", layout: "browse", marker: "Soups" },
   { name: "chapter-unsorted", path: "/recipes/c/unsorted", layout: "browse", marker: "Not sorted yet" },
   /*

@@ -308,6 +308,59 @@ models be good enough. Do not add a silent-save path.
   indistinguishable from a success. `check:parity` compares schema and privileges; it does
   not compare contents, and nothing does.
 
+- **A null-rate is not an accuracy, and "16 mains with no protein down to 2" counted answers
+  rather than correct answers.** The fix was reported as working and was read that way by both of
+  us. What it measured was how many rows *got* an answer; nobody measured how many got the right
+  one. Hand-scoring every non-null label in the real library gave **10 wrong of 61**, and the Pork
+  chapter — the one somebody actually opened — was the worst of them at 14 of 19.
+
+  **The direction of the errors is what named the cause, and an aggregate rate would have hidden
+  it.** All 10 were false positives: a protein asserted where there was none, or the nearest
+  available one. Zero false negatives, and the 15 correct nulls were all correct. A classifier that
+  wrongly *declines* needs a better prompt; one that wrongly *asserts* on dishes with no protein,
+  and reaches for a neighbour when the right value is missing from the enum, needs a value and a
+  tie-break. Those are different repairs and the overall rate cannot tell them apart — nor can a
+  per-row accuracy, which is why precision is reported per label (beef 14/14, chicken 18/21, pork
+  14/19, lamb 0/1).
+
+  So: **a classification change is only ever measured by hand-scoring a held-out set**, the
+  adjudication is written to a file *before* the fix lands so the re-score compares against a fixed
+  judgement rather than a fresh one, and the report says which way the errors point. Same family as
+  *a proxy can rot without failing* — but earlier: this proxy was never measuring the thing, not
+  even once.
+
+- **Temperature 0 is not determinism on a reasoning model, and most of this repo assumed it was.**
+  `openai/gpt-oss-120b` at `temperature: 0` returned `[null, chicken, null]` and
+  `[pork, seafood, seafood]` for the same recipe and the same prompt. The sampler is fixed; a
+  mixture-of-experts model is not.
+
+  Audited, because the assumption is load-bearing in more than one place and the answer is not
+  uniform:
+
+  - **`eval.mts` already knows** — it takes `PASHKI_EVAL_RUNS`, prints a mean and a spread, names
+    any fixture whose status moved, and when run once says *"ONE RUN — a sample, not a
+    measurement."* That is the honest shape and it was already there.
+  - **`COMPONENT_TRUST`'s reasoning rested on it**: *"three runs of one model at temperature zero
+    are not three independent opinions; they are one opinion sampled three times."* The conclusion
+    — agreement is consistency, not correctness — stands. The premise is false, and the difference
+    matters: identical samples make voting pointless, varying samples make it worth exactly the
+    distance between a variance error and a bias error.
+  - **The classifier stored one reading** where `componentsFor` stores a consensus of three. Fixed.
+  - **`measure-components`** was corrected earlier, for this (14, 18 and 19 of thirty on the
+    identical prompt).
+  - **`promptKey` is unaffected as a key and affected as a story.** It is correct that the same
+    inputs should reuse a stored answer; what it stores is **one draw of a distribution**, frozen.
+    Nothing is stale and nothing is wrong, and "the cached answer" is a sample rather than the
+    model's view.
+  - **"18/18 across the caption set"** is quoted as settled in `classify.ts` and inside a
+    migration's reasoning, and it is one run. Treat it as a point estimate with no error bar.
+
+  The rule that follows is the one already written for model output — **report a range or a mean,
+  never a single run** — plus the one this adds: **a measurement harness must repeat before it
+  compares, and a production path that stores a single sample is storing a coin-flip.** Where an
+  answer is kept rather than recomputed, three readings and a recorded agreement is the cheap
+  version of an error bar.
+
 - **An example in a schema description is a silent default.** `COMPONENTS_JSON_SCHEMA`
   described a component's name as *"what a cook would call it — 'the sauce', 'guacamole'"*,
   and eight paragraphs of instruction said nothing about naming at all. So the field was
