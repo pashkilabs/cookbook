@@ -457,8 +457,11 @@ models be good enough. Do not add a silent-save path.
   - **"18/18 across the caption set"** was quoted as settled in `classify.ts` and inside a
     migration's reasoning, and it was one run. **Re-measured over three runs it reproduces on no
     axis**: course 16.0/18 (±1.0), cuisine 16.7 (±0.5), dishForm 12.7 (±1.0), protein 15.7 (±0.5).
-    The spreads are tight, so the four-point gap is not noise — a single hand run was simply high.
-    Closed by `measure-captions.mts` (decisions §96); `classify.ts` carries the table.
+    The spreads are tight, so the gaps are not noise — and they do not tell one story: course was
+    2.0 high, cuisine 1.3, and **protein replicated at +0.7**. A single run is therefore unbiased
+    and imprecise rather than optimistic, which makes **a 100% figure the one most worth
+    re-measuring**: it is the only score noise cannot push upward, so it is the likeliest to be a
+    lucky draw. Closed by `measure-captions.mts` (§96); `classify.ts` carries the table.
   - **`80.4% ± 2.8` already had its error bar** — five runs, per-field spreads, `servings` at ±6.6
     declared unfit to compare models on, seven of thirty-five fixtures changing status between
     runs. Worth knowing because a brief asked me to go and measure it: **a figure can look

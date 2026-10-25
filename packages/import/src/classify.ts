@@ -34,7 +34,9 @@ import type { LlmProvider, ModelConfig } from "./provider.js";
  *     principalProtein  15.7/18   15-16 (±0.5)
  *
  * So the expectation below — that cuisine suffers most on a stored recipe — is right about the
- * direction and was calibrated against a figure four points too high. `dishForm` is the weak axis
+ * direction and was calibrated against a figure 1.3 points high (course was 2.0 high; protein
+ * replicated at +0.7, so a single run is unbiased and imprecise rather than optimistic, and a
+ * 100% score is the one most worth re-measuring). `dishForm` is the weak axis
  * on captions too, and for the same reason the protein axis is weak here: **the model reaches
  * rather than declining**, and `bowl` is what it reaches for (9 of 16 wrong answers across all
  * four axes and all three runs).

@@ -2553,7 +2553,10 @@ that lies and is unfalsifiable to somebody browsing. **A confident wrong answer 
 worse than an empty field**, and this is the clearest case of it the project has
 measured.
 
-Cuisine is still inferred at import, where the prose exists and it scores 18/18. It
+Cuisine is still inferred at import, where the prose exists and it scores 18/18 — **re-measured
+over three runs that is 16.7/18 (±0.5); see §96.** The comparison this section rests on survives
+the correction, which is the point of recording it here rather than editing the table above: 93%
+from a caption against 82% from a stored recipe, and the direction was never the close call. It
 is also editable — the edit screen carries all four fields now, which is what makes
 running a backfill safe at all, since the review screen only exists at import and
 no already-saved recipe will pass through it again.
@@ -6250,8 +6253,23 @@ measure:captions`:
 | principalProtein | **15.7/18** | 15–16 (±0.5) |
 
 **It reproduces on no axis.** 7 of 18 captions moved verdict between runs. The spreads are tight —
-±1 or less — which means the gap between 18/18 and 16.0 is not noise: the original figure was a
-single hand run and it was four points high on the axis the migration's reasoning leans on.
+±1 or less — which means the gaps are not noise.
+
+**And the earlier figure was not uniformly high, which is the interesting part.** §93's table
+scored the same eighteen captions on three of these axes, and the deltas are not one story:
+
+| axis | then | now | |
+|---|---|---|---|
+| course | 18/18 | 16.0 | **−2.0** |
+| cuisine | 18/18 | 16.7 | **−1.3** |
+| protein | 15/18 | 15.7 | **+0.7** — replicated |
+| dishForm | *not scored then* | 12.7 | the weak axis, never measured on captions before |
+
+So protein replicated inside its own spread and the two perfect scores did not. A single run is
+not biased high; it is **unbiased and imprecise**, which is why it lands on 18/18 sometimes and why
+a 100% figure is the one most worth re-measuring — it is the only score that cannot be beaten
+upward by noise. (I wrote "four points high" in the first draft of this section. It was two, on
+course. A figure about figures gets computed, not asserted.)
 
 `classify.ts` now carries the measured table. The copy inside the migration is **deliberately not
 edited** — it has been applied to both environments, and a belief that editing an applied
