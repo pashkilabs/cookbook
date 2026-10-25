@@ -919,6 +919,42 @@ models be good enough. Do not add a silent-save path.
   not have succeeded has measured nothing* already covers an empty database; this is its sibling,
   where the data exists and is wrong because something else in the suite moved it.
 
+- **A measurement with a known-zero expectation can only be failed in one direction, and zero is
+  also what total suppression looks like.** Caught by Stephen, mid-change, and it is the one shape
+  on this list where **the expected value and the failure mode are the same number**.
+
+  The setup looked airtight. `venison`, `goat`, `veal` and `duck` are zero in the real library, so
+  any use of those labels across the 76 is a false positive **by definition** — no adjudication, no
+  judgement, no ambiguity, which is a genuinely strong property and the reason the measurement was
+  worth running. Then a naming bar was added to stop the model reaching for them, and the count
+  came back at the expected zero.
+
+  **A bar that silenced those four labels completely — including for a recipe that names the animal
+  in its title and its ingredients — scores exactly the same zero.** The number cannot tell the two
+  apart, and zero is the result nobody re-examines because it is the result that was wanted.
+
+  So a known-zero measurement needs a **positive control**: a case where the right answer *is* the
+  label, proving the permission half fires. Both counts get reported together, because each alone
+  is half an answer — `0 of 76` says the assertion stopped, `4 of 4` says the permission still
+  works, and only the pair says the rule discriminates.
+
+  Distinct from the neighbours, which is why it is here rather than folded into one of them.
+  *Silence reads as success* is about a check that cannot distinguish no-result from pass. *A probe
+  that could not have succeeded* is about the setup. This probe runs correctly, produces a real
+  number, and that number is simultaneously the success signal and the signature of the mechanism
+  having died. Nearest relative is §95's missing population — there the library had no `vegetarian`
+  recipe so an over-correction was invisible; here the invisibility is the measurement's headline
+  figure rather than a gap beside it.
+
+  **And the control's subject had to be built, not borrowed.** The brief named the four recipes
+  already added to `shot.mjs` for screenshot coverage. That fixture gives **every** recipe the same
+  body — `2 cups flour / 1 pint double cream / spinach`, steps `Mix. Bake.` — and writes the
+  protein with a PATCH rather than inferring it, so "Five-spice Duck Legs" is flour and cream with
+  `duck` stamped on the row. Asked about that, a model would likely still answer `duck` from the
+  title, and the control would have **passed while measuring title inference instead of the naming
+  condition** — the adjacent-claim fault, arriving inside the fix for a different one. A fixture
+  built to render a tile and a fixture built to ask a question cannot be the same list.
+
 - **A smoke check that calls an endpoint proves the endpoint, and nothing else.** It is
   not evidence a feature exists and must never be allowed to stand in for one. Two of
   the last three things built — caption paste and screenshot upload — had **no way in

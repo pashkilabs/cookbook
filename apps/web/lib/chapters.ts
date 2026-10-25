@@ -121,20 +121,27 @@ export const TOP_LEVEL: readonly Chapter[] = [
  */
 export const MAINS_BY_PROTEIN: readonly Chapter[] = [
   { slug: "pork", label: "Pork", icon: "pork.png", source: "pork", holds: (r) => r.principal_protein === "pork" },
-  { slug: "chicken", label: "Chicken", icon: "poultry.png", source: "chicken", holds: (r) => r.principal_protein === "chicken" },
+  { slug: "chicken", label: "Chicken", icon: "chicken.png", source: "chicken", holds: (r) => r.principal_protein === "chicken" },
   /*
-   * Turkey and duck borrow the platter rather than the bird.
+   * Every protein now has its own drawing, including the ones this household will never cook.
    *
-   * `poultry.png` is unmistakably a chicken's face — drawn, not generic — so lending it to Turkey
-   * would put a chicken on the tile beside the Chicken tile. There is no turkey and no duck
-   * drawing, and a plate of cuts claims nothing false about either. Duck has no recipes in the
-   * library at all and therefore never renders: `counted` drops empty chapters, which is exactly
-   * why a value can be added here before a drawing exists for it.
+   * Turkey and duck borrowed `meat-platter.png` because no bird but the chicken had been drawn,
+   * and lending the chicken's face to Turkey would have put a chicken on the tile beside the
+   * Chicken tile. Both have their own now, and `poultry.png` is renamed `chicken.png` to match
+   * the enum value it serves — the old name invited exactly that lending.
+   *
+   * `veal`, `venison` and `goat` are here with zero recipes in this library, and that costs
+   * nothing on any screen: `counted` drops empty chapters, which is why a value can be added
+   * before anybody cooks one. It is also why the icon has to exist up front — the tile appears
+   * the moment a household's first venison lands, and a mask pointing at a 404 paints nothing.
    */
-  { slug: "turkey", label: "Turkey", icon: "meat-platter.png", source: "turkey", holds: (r) => r.principal_protein === "turkey" },
-  { slug: "duck", label: "Duck", icon: "meat-platter.png", source: "duck", holds: (r) => r.principal_protein === "duck" },
+  { slug: "turkey", label: "Turkey", icon: "turkey.png", source: "turkey", holds: (r) => r.principal_protein === "turkey" },
+  { slug: "duck", label: "Duck", icon: "duck.png", source: "duck", holds: (r) => r.principal_protein === "duck" },
   { slug: "beef", label: "Beef", icon: "beef.png", source: "beef", holds: (r) => r.principal_protein === "beef" },
+  { slug: "veal", label: "Veal", icon: "veal.png", source: "veal", holds: (r) => r.principal_protein === "veal" },
   { slug: "lamb", label: "Lamb", icon: "lamb.png", source: "lamb", holds: (r) => r.principal_protein === "lamb" },
+  { slug: "goat", label: "Goat", icon: "goat.png", source: "goat", holds: (r) => r.principal_protein === "goat" },
+  { slug: "venison", label: "Venison", icon: "venison.png", source: "venison", holds: (r) => r.principal_protein === "venison" },
   { slug: "fish", label: "Fish", icon: "fish.png", source: "fish", holds: (r) => r.principal_protein === "fish" },
   { slug: "seafood", label: "Seafood", icon: "seafood.png", source: "seafood", holds: (r) => r.principal_protein === "seafood" },
   { slug: "egg", label: "Eggs", icon: "eggs.png", source: "eggs", holds: (r) => r.principal_protein === "egg" },

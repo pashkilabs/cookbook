@@ -17,7 +17,7 @@
  * array — the migration's CHECK — are compared against this list by a test.
  *
  * ---------------------------------------------------------------------------
- * Why turkey and duck, and why not more
+ * Why these, and why the first cut of this list was reasoned from the wrong population
  * ---------------------------------------------------------------------------
  *
  * Measured, not guessed. `turkey` was absent, and "Ground Turkey Rice Bowls with Bang Bang Sauce"
@@ -25,24 +25,41 @@
  * not become null; it becomes the nearest available one**, confidently, and nothing downstream has
  * grounds to object.
  *
- * `duck` is in the library zero times. It is here anyway, because the cost of its absence is that
- * failure again — a duck recipe becoming `chicken`, which is the kind of wrong a person notices
- * and cannot correct from the screen — and the cost of its presence is a chapter that does not
- * render until a duck arrives. The two are not symmetric.
+ * `duck` is in this library zero times and is here anyway, because the cost of its absence is that
+ * failure again — a duck recipe becoming `chicken`, wrong in a way a person notices and cannot
+ * correct from the screen — while the cost of its presence is a chapter that does not render until
+ * a duck arrives. Those are not symmetric. A measured round later put numbers on both halves: duck
+ * was used twice and wrong twice under one prompt, and **zero times** under the next, so the cost
+ * of presence is a prompt problem rather than an enum problem (decisions §95, §97).
  *
- * Nothing else was added, and the library is why: across all 76 recipes' titles, ingredients,
- * notes and steps there is no tofu, tempeh, seitan, paneer, venison, goat, veal, rabbit or bison,
- * one chickpea and no lentils. Plant-protein dishes have `vegetarian` and `vegan` already, and the
- * classifier's instructions fold tofu into them in words. This is the same discipline the dish-form
- * list was written with: assert what is known rather than build a taxonomy nobody has asked for.
+ * `veal`, `venison` and `goat` close the same gap for households that are not this one. The
+ * earlier version of this comment justified stopping at eleven by counting *this* library — "no
+ * venison, goat, veal, rabbit or bison" — and that is **the wrong population for the question**.
+ * A library with none of a thing says nothing about anybody else's: Stephen has no venison, a
+ * hunting family in Texas does, and the app is public signup. Same error as judging the protein
+ * fill rate library-wide when the question was about Mains (§85).
+ *
+ * **The chapter cost really is zero**, which is what makes this cheap: `counted` drops empty
+ * chapters, so a value with no recipes shows nothing on any screen. The only cost a value carries
+ * is a model reaching for it, and that is governed by the classifier's naming bar — what the app
+ * may *store* and what the classifier may *assert* are different questions with different fixes.
+ *
+ * Still not a taxonomy. Plant-protein dishes have `vegetarian` and `vegan`, and the classifier's
+ * instructions fold tofu into them in words. Goose, rabbit, bison, tofu-distinct-from-vegetarian
+ * and shellfish-distinct-from-seafood are deliberately out of this pass: each needs a drawing, and
+ * the sheet has ten.
  */
 export const PRINCIPAL_PROTEINS = [
+  // grouped so a picker reads in a sensible order: birds, bovine, then the other red meats
   "chicken",
   "turkey",
   "duck",
   "beef",
+  "veal",
   "pork",
   "lamb",
+  "goat",
+  "venison",
   "fish",
   "seafood",
   "egg",

@@ -6365,3 +6365,126 @@ A second model. Every figure above is `openai/gpt-oss-120b` on the text tier, an
 narrow enough (±1 or less on three axes) that a model comparison on this set is now meaningful —
 which it was not when the baseline was one run. `dishForm` at ±1.0 and 12.7/18 is the axis with
 room to move.
+
+## §97 — Ten protein icons, three new enum values, and a naming bar that turned out to be for something else
+
+The artwork and the enum are one change; the classifier's naming bar is a second, measured
+separately. What the round actually established is that **the handoff's reasoning about what the
+bar was for was wrong in a way only a positive control could show.**
+
+### The icons
+
+Ten 192×192 RGBA PNGs, alpha carrying the ink, rendered as CSS masks so the colour comes from a
+token. `poultry.png` becomes `chicken.png` — a rename as well as a swap, because the old name is
+what invited lending the chicken's face to Turkey. `turkey.png` and `duck.png` end the borrowed
+`meat-platter.png`; `veal`, `venison` and `goat` are new.
+
+**The file-to-name mapping was verified rather than eyeballed**, because two of the ten are cow
+heads and a thumbnail cannot settle which is veal. Mean stroke width from the alpha channel
+(`2 × ink area ÷ edge length`) ranks all ten, and **the ranking and the visible animal agree on
+every one** — the hornless calf is lowest in both my metric (4.72) and the handoff's (3.51), and
+duck is the outlier in both (8.58 / 5.34). `veal.png` also has the least ink of the set at 3552 px
+and the flattest bounding box, which is what a calf's head is.
+
+**The "about 10% lighter" claim replicates and is not uniform**, measured on the five names present
+in both sheets: chicken/poultry −12%, beef −18%, pork −6%, lamb −18%, **fish ±0%**. Mean −11%, so
+the headline holds while beef and lamb carry almost all of it and fish is unchanged.
+
+**And it does not read as a mismatch at 52px, because the two sheets never share a grid.** The
+contents page is entirely the old sheet and the Mains subdivision entirely the new one; they meet
+only at the chapter hero, where the old plate sits above the new animals separated by a title and a
+count. The plate does read slightly heavier there. At 52px a 10% stroke difference is sub-pixel.
+
+Shipped as supplied. No filtering, no thickening.
+
+### The enum: 11 values to 14
+
+`veal`, `venison`, `goat`, by migration, through the one list in `@pashki/core` that the nine sites
+read. The earlier migration justified stopping at eleven by counting this library — "no venison,
+goat, veal, rabbit or bison" — and the count was right while **the population was wrong**. A
+library with none of a thing says nothing about anybody else's; this is public signup, and the same
+error as judging the protein fill rate library-wide when the question was about Mains.
+
+The chapter cost is zero because `counted` drops empty chapters. The *classifier* cost was the open
+question, and it is also zero: **0 uses of `venison`, `goat`, `veal` or `duck` across 228 readings**
+of the real library with the wider enum and no bar. `lamb` likewise 0. So a value with no instances
+costs nothing on this library under this prompt, which settles §95's duck objection on measurement
+rather than on argument.
+
+### The naming bar, and what the control found
+
+The handoff's premise was that the bar would stop the model reaching for rare meats. **On the
+measurement available that premise was already satisfied** — the count was zero before the bar
+existed. The bar's measured value is entirely in the other direction, and only one instrument could
+see it.
+
+| | before the bar | after |
+|---|---|---|
+| Five-spice Duck Legs | duck ×3 | duck ×3 |
+| **Veal Milanese** | **beef / beef / beef** | **veal / veal / veal** |
+| Venison Stew with Juniper | venison ×3 | venison ×3 |
+| Slow-cooked Goat Curry | goat ×3 | goat ×3 |
+| Dark Braised Short Ribs *(decoy)* | beef ×3 | beef ×3 |
+| Seven-hour Shoulder with Gin *(decoy)* | lamb ×3 | lamb ×3 |
+| rare uses across the 76 | 0 | 0 |
+| errors on the 76 | 3 / 3 / 2 | 1 / 3 / 3 |
+
+`4 veal cutlets, bone in`, beaten thin, crumbed, fried in butter — and the answer was `beef`,
+unanimously, every run. **The value was in the enum, on a chapter, with an icon, and the classifier
+would not produce it.** That is §93's nearest-available-value failure in a new costume: there the
+value was *absent* and the model reached for the neighbour; here it was **present** and still
+reached for the neighbour, because veal sits semantically inside beef in a way goat and venison sit
+inside nothing. Adding a value to a closed list does not make it reachable.
+
+The bar fixed it, 3 of 3, on a row that was **stable under the unchanged system** — the first clean
+pre-registered test in three rounds, since the last two both named rows that were already moving on
+their own. Error count on the 76 is unchanged within its overlap, both decoys held, so the
+prohibition clause is not suppressing beef or lamb on juniper, redcurrant or a seven-hour braise.
+
+### Why the control exists at all
+
+A known-zero measurement **cannot fail in the over-suppression direction**: a bar that silenced
+those four labels completely scores the same zero as one that works, and zero is the result nobody
+re-examines because it is the result that was wanted. Recorded in CLAUDE.md as its own shape, since
+it is the only one on that list where the expected value and the failure mode are the same number.
+
+The control's subjects had to be **built, not borrowed**. The brief named the four recipes added to
+`shot.mjs`, and that fixture gives every recipe the same body — `2 cups flour / 1 pint double cream
+/ spinach` — and writes the protein with a PATCH rather than inferring it. Asked about flour and
+cream, a model would most likely still answer `duck` from the title, and the control would have
+passed while measuring title inference instead of the naming condition.
+
+### Three faults the renderer found that no count would have
+
+1. **Three recipes silently failed to create.** `veal`, `venison` and `goat` reached the code before
+   the migration reached hosted, so three inserts came back 23514 and the fixture's
+   `if (body.id)` dropped them. It printed **"21 recipes, all 21 classified"** — true about what it
+   created, silent about the 24 attempted — and the Mains grid photographed seven tiles and looked
+   entirely correct. §86 one step earlier in the pipeline: the renderer learned to check that a
+   *classification* stuck and never checked the recipe existed to classify. Now exit 2, naming the
+   recipe and suggesting `db:push`.
+2. **The fixture paid for 72 model readings it discarded.** `classifyIfUnclassified` returns early
+   when any classification field is set, and the fixture set none on the POST, so every one of 24
+   saves asked a model three times and the PATCH overwrote the answer moments later.
+3. **A save latency outlier nobody can explain yet.** The dev server's own log: `POST /api/recipes`
+   at 4480, 2810, 2601, 3801, 5708 ms — then **526061 ms** and **305548 ms**, both returning 200.
+   A direct probe of `classifyRecipe` ran 1.4–2.3s on eight of nine calls with one at **222s**,
+   against a documented 45-second per-request ceiling and **no retry loop anywhere in the
+   provider**. So something exceeded a deadline the code says cannot be exceeded. Most likely the
+   ~1,400 model calls this session put through one key, and **not reproducible under light load** —
+   recorded as observed and unexplained rather than diagnosed, and the renderer's timeouts were
+   widened with those numbers in a comment rather than quietly.
+
+### What would reverse this
+
+The icons: nothing short of new artwork. The enum: a measured false positive on a shipped prompt —
+the cost side is now measured, so that is a one-line check rather than a judgement. The bar: a
+recipe that names an animal coming back null, which is what `measure:rare-proteins` exists to catch
+and must be re-run after any prompt edit touching the protein paragraph.
+
+### Still missing, for Stephen to choose
+
+Goose, rabbit, bison, tofu as distinct from vegetarian, shellfish as distinct from seafood. Each
+needs a drawing and the sheet has ten. Also `veal` and `venison` belong in `UNCOUNTABLE` in
+`format.ts` beside `beef`, `pork` and `lamb` — "2 veals" is never what anybody meant. `duck` and
+`goat` do not: a duck is a countable bird.

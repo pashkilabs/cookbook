@@ -199,11 +199,30 @@ describe("every protein the column can hold has somewhere to appear", () => {
     expect(holders.map((chapter) => chapter.slug)).toHaveLength(1);
   });
 
-  it("gives turkey and duck a tile that is not the chicken's face", () => {
+  /*
+   * **This assertion reversed when the artwork arrived, and the old one read as the stronger of
+   * the two.** It used to require `meat-platter.png` on both tiles — correct while no turkey or
+   * duck had been drawn, and it would have defended the borrowed platter against the real icons.
+   * It points at a design decision, not a rule, so: if the drawings are ever withdrawn this flips
+   * back, and nothing else in the suite would say so.
+   *
+   * What survives either way is the part that was never about the platter: no tile may wear the
+   * chicken's face but Chicken.
+   */
+  it("gives every bird its own drawing rather than lending the chicken's face", () => {
     const icons = ["turkey", "duck"].map(
       (slug) => MAINS_BY_PROTEIN.find((chapter) => chapter.slug === slug)?.icon,
     );
-    expect(icons).toEqual(["meat-platter.png", "meat-platter.png"]);
+    expect(icons).toEqual(["turkey.png", "duck.png"]);
+    expect(icons).not.toContain("chicken.png");
     expect(icons).not.toContain("poultry.png");
+  });
+
+  it("names a file for every protein, since a chapter appears the moment a household has one", () => {
+    // a mask pointing at a missing file paints nothing in both themes with no error anywhere;
+    // check-chapter-icons.mjs asserts the file exists, this asserts one was named at all
+    const withoutIcon = MAINS_BY_PROTEIN.filter((chapter) => chapter.slug !== "unassigned")
+      .filter((chapter) => !chapter.icon);
+    expect(withoutIcon.map((chapter) => chapter.slug)).toEqual([]);
   });
 });

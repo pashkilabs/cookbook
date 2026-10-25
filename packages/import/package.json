@@ -46,6 +46,7 @@
     "allergens": "tsx scripts/allergen-population.mts",
     "measure:classification": "tsx scripts/measure-classification.mts",
     "measure:captions": "tsx scripts/measure-captions.mts",
+    "measure:rare-proteins": "tsx scripts/measure-rare-proteins.mts",
     "backfill:classification": "tsx scripts/backfill-classification.mts",
     "catalog:gap": "tsx scripts/catalog-gap.mts",
     "repair:split-items": "tsx scripts/repair-split-items.mts",

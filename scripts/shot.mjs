@@ -110,7 +110,30 @@ const AUTH = { Authorization: `Bearer ${token.access_token}` };
 
 const page0 = await browser.newContext({ viewport: { width: WIDTH, height: HEIGHT }, extraHTTPHeaders: AUTH });
 await page0.addCookies([cookie]);
+const API_TIMEOUT = 600_000;
 const setup = await page0.newPage();
+/*
+ * Playwright's 30s per-request default is too tight for this fixture, and the reason is worth
+ * writing down rather than just widening.
+ *
+ * The dev server's own log for one run: `POST /api/recipes` at 4480, 2810, 2601, 3801 and 5708 ms
+ * — and then **526061 ms** and **305548 ms**, both returning 200. Nine and five minutes, against a
+ * documented 45-second per-request ceiling on the inference call and no retry loop anywhere in
+ * the provider, so whatever hung was not the classifier and is not explained. A direct timing
+ * probe of `classifyRecipe` at the same hour ran 1.4-2.3s, eight calls of nine, with one at 222s.
+ *
+ * It is most likely load this session put on hosted Supabase and Together, so the honest status is
+ * **observed, unexplained, and not reproducible under light load**. Widening the timeout is
+ * therefore the right call for a renderer — it must not fail on a slow dependency and report that
+ * as a layout verdict — and it is NOT a fix. A fixture that waits is still a fixture that waited.
+ */
+setup.setDefaultTimeout(API_TIMEOUT);
+page0.setDefaultTimeout(API_TIMEOUT);
+/*
+ * And `setDefaultTimeout` does NOT govern `page.request` — an APIRequestContext takes its timeout
+ * per call, so every write below passes it explicitly. Assuming it propagated would have left the
+ * widening doing nothing and the run failing at 30s with a comment above it claiming otherwise.
+ */
 await setup.goto(`${base}/api/health`);
 
 /*
@@ -132,7 +155,7 @@ const MONDAY = (() => {
   return d;
 })();
 
-const provisioned = await setup.request.post(`${base}/api/household`, { data: {} });
+const provisioned = await setup.request.post(`${base}/api/household`, { timeout: API_TIMEOUT, data: {} });
 const household = await provisioned.json().catch(() => ({}));
 if (!household.familyId) {
   console.error(`COULD NOT MEASURE: no household was provisioned (HTTP ${provisioned.status()}) ${JSON.stringify(household).slice(0, 120)}`);
@@ -170,8 +193,9 @@ const made = [];
 /*
  * A library shaped like the real one, because the tree's behaviour turns entirely on the data.
  *
- * Ten mains, so Mains is over the cap and **divides** — five mains would render the undivided
- * shape and tell us nothing about the screen this release is for. Two soups, one of them also a
+ * Fourteen mains, so Mains is over the cap and **divides** — five mains would render the undivided
+ * shape and tell us nothing about the screen this release is for. Four of the fourteen exist only
+ * to put a protein chapter on screen that nothing had ever filled. Two soups, one of them also a
  * main, so the deliberate `dish_form`/`course` overlap is on screen. No snacks at all, which is
  * what the real library has, so the shot shows eight tiles and not nine. Three with no course, so
  * the unsorted row has something behind it.
@@ -193,6 +217,20 @@ for (const [title, course, minutes, dishForm, protein] of [
    * grid would have photographed nine tiles and been quoted as covering a tenth.
    */
   ["Ground Turkey Rice Bowls", "main", "30", "bowl", "turkey"],
+  /*
+   * One of each protein that has only ever existed as an enum value — duck, veal, venison, goat.
+   * Exactly the same reason as the turkey line above, and the reason has now been paid for twice:
+   * a chapter whose value nothing carries renders nowhere, so the grid photographs the tiles it
+   * already had and the run is quoted as covering the ones it could not show. These four tiles
+   * have **never been in a screenshot**, and duck's has been in the tree since October.
+   *
+   * It also puts the new artwork on screen, which is the only way to see it: no guard reads a
+   * PNG's pixels, and the share glyph shipped at 7px with every check green.
+   */
+  ["Five-spice Duck Legs", "main", "120", null, "duck"],
+  ["Veal Milanese", "main", "35", null, "veal"],
+  ["Venison Stew with Juniper", "main", "150", "stew", "venison"],
+  ["Slow-cooked Goat Curry", "main", "180", null, "goat"],
   ["A recipe with a deliberately very long title indeed", "main", "", null, null],
   ["Tomato and basil soup", "starter", "30", "soup", null],
   ["Greek Salad", "side", "15", "salad", null],
@@ -205,9 +243,29 @@ for (const [title, course, minutes, dishForm, protein] of [
   ["Another one nobody has sorted", "", "", null, null],
   ["A third unsorted recipe", "", "", null, null],
 ]) {
-  const response = await setup.request.post(`${base}/api/recipes`, {
+  const response = await setup.request.post(`${base}/api/recipes`, { timeout: API_TIMEOUT,
     data: {
       title, servings: "4", timeMinutes: minutes, sourceName: "", sourceUrl: "",
+      /*
+       * The classification goes in on the POST, not only on the PATCH below, and that is a
+       * **speed** fix rather than a correctness one.
+       *
+       * `classifyIfUnclassified` returns early when any classification field is already set, and
+       * without these three the save path asked a model about all 24 recipes — three readings
+       * each, 72 calls, every answer overwritten by the PATCH moments later. A save is normally
+       * 1.7-2.3s of that, which 24 of would be tolerable; what killed the run was one call in
+       * three measured at **222 seconds** returning nothing, against a documented 45-second
+       * per-request ceiling with no retry loop. Playwright gave up on a POST that had returned
+       * 200. Whatever that outlier is, a fixture should not be in its path for answers it
+       * discards.
+       *
+       * The PATCH stays: it is the write whose response is checked (§86), and it is what proves a
+       * classification stuck rather than silently 400ing. This just stops the fixture paying a
+       * model to answer a question it is about to overrule.
+       */
+      course: course || undefined,
+      dishForm: dishForm ?? undefined,
+      principalProtein: protein ?? undefined,
       /*
        * `spinach` carries **no amount**, deliberately. 118 of 1407 live ingredient lines are like
        * that, and the screen rendered them as "0 spinach" — so without one here the fix for that
@@ -217,7 +275,30 @@ for (const [title, course, minutes, dishForm, protein] of [
     },
   });
   const body = await response.json().catch(() => ({}));
-  if (body.id) made.push({ id: body.id, title, minutes, course, dishForm, protein });
+  /*
+   * A POST that creates nothing is exit 2, not a quiet `continue`.
+   *
+   * This used to be `if (body.id) made.push(...)`, and it hid exactly the fault it was most likely
+   * to meet. `veal`, `venison` and `goat` reached the code before the migration reached hosted, so
+   * three inserts came back 23514 check-violation, three recipes were skipped, and the run
+   * reported **"21 recipes, all 21 classified"** — true about what it created and silent about the
+   * 24 it attempted. The Mains grid then photographed seven tiles and looked entirely correct.
+   *
+   * That is §86 one step earlier in the pipeline: the renderer learned to check that a
+   * *classification* stuck and never checked that the recipe existed to classify. The count it
+   * prints is of survivors, so a denominator nobody states cannot disagree with it.
+   */
+  if (!body.id) {
+    console.error(
+      `COULD NOT MEASURE: creating "${title}" returned HTTP ${response.status()} ` +
+        `${JSON.stringify(body).slice(0, 180)}\n` +
+        `  A recipe the fixture could not create is a chapter the screenshots cannot show. If this ` +
+        `names a protein, check the migration reached this database:\n` +
+        `  pnpm --filter @pashki/db db:push`,
+    );
+    process.exit(2);
+  }
+  made.push({ id: body.id, title, minutes, course, dishForm, protein });
 }
 /*
  * Classify them, so the chapter tree has chapters — and send the WHOLE recipe.
@@ -235,6 +316,7 @@ let classified = 0;
 for (const [i, recipe] of made.entries()) {
   const patched = await setup.request
     .patch(`${base}/api/recipes/${recipe.id}`, {
+      timeout: API_TIMEOUT,
       data: {
         title: recipe.title,
         servings: "4",
@@ -265,7 +347,7 @@ for (const [i, recipe] of made.entries()) {
      */
     const day = new Date(MONDAY);
     day.setUTCDate(day.getUTCDate() + ((i + n) % 7));
-    await setup.request.post(`${base}/api/plan-entries`, {
+    await setup.request.post(`${base}/api/plan-entries`, { timeout: API_TIMEOUT,
       data: { recipeId: recipe.id, date: day.toISOString().slice(0, 10) },
     }).catch(() => {});
   }
@@ -294,7 +376,7 @@ if (classified < made.length) {
  */
 const groupsMade = [];
 for (const name of ["Costco", "Boo Basket"]) {
-  const response = await setup.request.post(`${base}/api/shopping-groups`, { data: { name } })
+  const response = await setup.request.post(`${base}/api/shopping-groups`, { timeout: API_TIMEOUT, data: { name } })
     .catch(() => null);
   const body = await response?.json().catch(() => null);
   if (body?.id) groupsMade.push({ id: body.id, name });
@@ -308,7 +390,7 @@ for (const [text, group] of [
 ]) {
   const groupId = group === null ? undefined : groupsMade[group]?.id;
   if (group !== null && !groupId) continue;
-  const response = await setup.request.post(`${base}/api/shopping-extras`, {
+  const response = await setup.request.post(`${base}/api/shopping-extras`, { timeout: API_TIMEOUT,
     data: { text, weekStart: MONDAY.toISOString().slice(0, 10), ...(groupId ? { groupId } : {}) },
   }).catch(() => null);
   if (response?.ok()) groupedItems += 1;
