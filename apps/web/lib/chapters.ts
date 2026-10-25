@@ -45,10 +45,17 @@
  * ---------------------------------------------------------------------------
  *
  * §85 recorded that `principal_protein` is named on **25 of 67** recipes and refused the fridge
- * layout on that ceiling. That measurement stands and the refusal stands. But inside Mains the
- * same column is named on **22 of 32**, because Mains is where the classifier succeeds — so the
- * subdivision covers 22 and names the other 10 "Everything else", which is a different and
- * workable proposition from hiding 42 of a library.
+ * layout on that ceiling. The refusal was right when it was made, and both of its figures have
+ * since moved: a backfill, a `turkey` value, a consensus of three readings and two prompt
+ * corrections put the library at **54 of 76 = 71%** and Mains at **53 of 57 = 93%** (measured
+ * 2026-10-24, decisions §93–§95). The denominator moved too — Mains is 57 rather than 32, because
+ * the same classifier fills in `course`.
+ *
+ * So the subdivision this file does is now comfortable rather than marginal, and **the ceiling
+ * that justified refusing the fridge layout is no longer the ceiling that was refused**. That is
+ * not a licence to build it: it is a note that the premise is stale, and that the question is open
+ * again rather than settled. Re-measure before quoting either figure — a fill rate is a property
+ * of the subset and of the week it was taken in.
  */
 import type { RecipeRow } from "./recipe-search";
 
