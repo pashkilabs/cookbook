@@ -45,6 +45,7 @@
     "gen:corpus": "tsx scripts/gen-corpus.mts",
     "allergens": "tsx scripts/allergen-population.mts",
     "measure:classification": "tsx scripts/measure-classification.mts",
+    "measure:captions": "tsx scripts/measure-captions.mts",
     "backfill:classification": "tsx scripts/backfill-classification.mts",
     "catalog:gap": "tsx scripts/catalog-gap.mts",
     "repair:split-items": "tsx scripts/repair-split-items.mts",

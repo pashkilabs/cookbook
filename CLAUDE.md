@@ -454,14 +454,53 @@ models be good enough. Do not add a silent-save path.
     inputs should reuse a stored answer; what it stores is **one draw of a distribution**, frozen.
     Nothing is stale and nothing is wrong, and "the cached answer" is a sample rather than the
     model's view.
-  - **"18/18 across the caption set"** is quoted as settled in `classify.ts` and inside a
-    migration's reasoning, and it is one run. Treat it as a point estimate with no error bar.
+  - **"18/18 across the caption set"** was quoted as settled in `classify.ts` and inside a
+    migration's reasoning, and it was one run. **Re-measured over three runs it reproduces on no
+    axis**: course 16.0/18 (±1.0), cuisine 16.7 (±0.5), dishForm 12.7 (±1.0), protein 15.7 (±0.5).
+    The spreads are tight, so the four-point gap is not noise — a single hand run was simply high.
+    Closed by `measure-captions.mts` (decisions §96); `classify.ts` carries the table.
+  - **`80.4% ± 2.8` already had its error bar** — five runs, per-field spreads, `servings` at ±6.6
+    declared unfit to compare models on, seven of thirty-five fixtures changing status between
+    runs. Worth knowing because a brief asked me to go and measure it: **a figure can look
+    unqualified in the places that quote it while the file that produced it states the spread.**
+    Read the source of a number before re-measuring it.
 
   The rule that follows is the one already written for model output — **report a range or a mean,
   never a single run** — plus the one this adds: **a measurement harness must repeat before it
   compares, and a production path that stores a single sample is storing a coin-flip.** Where an
   answer is kept rather than recomputed, three readings and a recorded agreement is the cheap
   version of an error bar.
+
+  **Audited by counting, since the question was which figures repeat: nine scripts call a model and
+  three repeat** (`eval.mts`, `measure-classification`, `measure-captions`). The four that measure
+  and do not are `measure-components`, `measure-consensus`, `ab-consensus` and `base-population`.
+
+  **A per-row consensus is not a run-to-run spread**, and `measure-components` is where those get
+  confused: it reads each recipe three times and takes the consensus — correctly reproducing the
+  shipping path — and then runs the set **once**. So `ROLE ACCURACY: 34/46`, quoted in
+  `components.ts` to justify eight role definitions, has no error bar, while the neighbouring
+  metric in that file's own history moved 14, 18 and 19 of thirty on an identical prompt.
+
+  **And it cannot be re-measured today at all**, which is a harder failure than a missing spread:
+  its input is `/tmp/clean.json`, which `gen-corpus.mts` produces and `/tmp` has cleared. Three
+  sibling scripts already guarded that read by name; these two died on an ENOENT stack, and both
+  used `cascadeFromEnv()!` so a missing provider threw a null dereference. Both now report three
+  outcomes with distinct exit codes, both branches run.
+
+- **The harness built to give a figure an error bar produced a false one on its first real run.**
+  `measure-captions` lost **9 of 18** captions to the provider in run 3, and the across-runs section
+  averaged that run's absolute `right` count beside two complete runs: `course mean 13.7/18, spread
+  8–17 (±4.5)`, where the 8 was out of 9 and the 17 out of 18. The instability list inflated the
+  same way — 13 of 18 "moved", half of them never read, and `unread` beside a verdict is not a
+  verdict that moved.
+
+  **A spread computed across different denominators reads exactly like a finding**, and the
+  `9 NOT MEASURED` line naming the nine captions was printed *directly above it*. Same family as
+  the aggregate over weeks the feature did not exist in: a denominator holding rows the numerator
+  could not have come from. So a repeating harness needs three things beyond the loop — **retry
+  before believing a loss**, a spread computed **only over the subjects measured in every run**,
+  and the word **PARTIAL** on a run that lost any, because the arithmetic will otherwise average
+  whatever it is given and print a number with a ± on it.
 
 - **An example in a schema description is a silent default.** `COMPONENTS_JSON_SCHEMA`
   described a component's name as *"what a cook would call it — 'the sauce', 'guacamole'"*,

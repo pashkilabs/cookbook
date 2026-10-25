@@ -4,9 +4,24 @@ import { inferComponents } from "../src/components.js";
 import { consensusPartition } from "../../core/src/partitions.js";
 import { COMPONENT_LABELS, scoreComponents } from "../../core/eval/fixtures/components.js";
 
-const cascade = cascadeFromEnv()!;
-const recipes: Array<{ id: string; recipe_ingredients: Array<{ position: number; amount: number | null; unit: string | null; item_text: string }> }> =
-  JSON.parse(readFileSync("/tmp/clean.json", "utf8"));
+/*
+ * Three outcomes with distinct exit codes, because a measurement that cannot run must not look
+ * like one that did. Both of these used to throw instead: `cascadeFromEnv()!` on a missing
+ * provider, and an ENOENT stack on a corpus `/tmp` had cleared. A crash is the safe direction and
+ * a poor diagnosis — three sibling scripts already name the command that fixes it, these did not.
+ */
+const cascade = cascadeFromEnv();
+if (!cascade) {
+  console.error("COULD NOT MEASURE: no inference cascade — check PASHKI_LLM_* in apps/web/.env.local");
+  process.exit(3);
+}
+let recipes: Array<{ id: string; recipe_ingredients: Array<{ position: number; amount: number | null; unit: string | null; item_text: string }> }>;
+try {
+  recipes = JSON.parse(readFileSync("/tmp/clean.json", "utf8"));
+} catch {
+  console.error("COULD NOT MEASURE: /tmp/clean.json missing — run gen:corpus first.");
+  process.exit(2);
+}
 const byId = new Map(recipes.map((r) => [r.id, r]));
 
 const single = { right: 0, wrong: 0, declined: 0 };

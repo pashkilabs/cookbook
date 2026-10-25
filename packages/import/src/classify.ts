@@ -21,9 +21,23 @@ import type { LlmProvider, ModelConfig } from "./provider.js";
  * A thinner input than a caption, and it will show
  * ---------------------------------------------------------------------------
  *
- * The 18/18 measurement was on captions, where prose carries the answer: "MARRY ME ITALIAN
+ * The caption measurement was on captions, where prose carries the answer: "MARRY ME ITALIAN
  * SAUSAGE SOUP for Valentine's Day" gives course and cuisine free. A stored recipe has lost that
  * — the title survives, the ingredients and steps survive, and everything around them is gone.
+ *
+ * **That measurement said 18/18 and it was one hand run. Re-measured over three runs** by
+ * `pnpm --filter @pashki/import measure:captions` (decisions §96), it reproduces on no axis:
+ *
+ *     course            16.0/18   15-17 (±1.0)
+ *     cuisine           16.7/18   16-17 (±0.5)
+ *     dishForm          12.7/18   12-14 (±1.0)
+ *     principalProtein  15.7/18   15-16 (±0.5)
+ *
+ * So the expectation below — that cuisine suffers most on a stored recipe — is right about the
+ * direction and was calibrated against a figure four points too high. `dishForm` is the weak axis
+ * on captions too, and for the same reason the protein axis is weak here: **the model reaches
+ * rather than declining**, and `bowl` is what it reaches for (9 of 16 wrong answers across all
+ * four axes and all three runs).
  *
  * Cuisine is the field that suffers, because it lived in the prose. Expect more declines, and
  * treat that as correct rather than as a weakness: a null shows as absent, and a wrong answer

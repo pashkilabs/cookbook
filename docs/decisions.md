@@ -6216,3 +6216,134 @@ too, and nobody would argue for removing lamb from a recipe app.
 
 **Reversal condition:** if `duck` is used, wrongly, under a shipped prompt, remove it. The cost side
 is measured now, so that is a one-line check rather than a judgement.
+
+## §96 — The temperature audit: which figures have an error bar, and which cannot be re-measured
+
+The brief: *"the caption tier at 80.4% ±2.8 is cited as settled and was the basis for choosing a
+model — three runs of that gives it an error bar, and one figure with a spread tells you whether
+the others need one."*
+
+### The premise is already satisfied, and that is the useful part
+
+**`80.4% ± 2.8` is the five-run figure.** `packages/core/eval/README.md` measures it over five runs
+of `openai/gpt-oss-120b` + `google/gemma-4-31B-it` and prints a spread per field — `item` ±2.2,
+`amount` ±3.1, `sections` ±4.7, and `servings` **±6.6**, with the explicit conclusion that
+*"`servings` is too unstable to compare models on"*. It also names the noise floor directly: **seven
+of thirty-five fixtures changed status between runs.**
+
+So the figure with a spread exists, and it already answers the question it was supposed to answer:
+the others need one. A field whose spread is ±6.6 means two models thirteen points apart are
+indistinguishable from one run each.
+
+### The figure that had none: "18/18 across the caption set"
+
+Quoted as settled in `classify.ts` and inside the reasoning of
+`20260818120000_dish_form_and_protein.sql`, which is the migration that created `dish_form` and
+`principal_protein`. Re-measured over three runs with `pnpm --filter @pashki/import
+measure:captions`:
+
+| axis | mean | spread |
+|---|---|---|
+| course | **16.0/18** | 15–17 (±1.0) |
+| cuisine | **16.7/18** | 16–17 (±0.5) |
+| dishForm | **12.7/18** | 12–14 (±1.0) |
+| principalProtein | **15.7/18** | 15–16 (±0.5) |
+
+**It reproduces on no axis.** 7 of 18 captions moved verdict between runs. The spreads are tight —
+±1 or less — which means the gap between 18/18 and 16.0 is not noise: the original figure was a
+single hand run and it was four points high on the axis the migration's reasoning leans on.
+
+`classify.ts` now carries the measured table. The copy inside the migration is **deliberately not
+edited** — it has been applied to both environments, and a belief that editing an applied
+migration's comment is harmless is a guess about the CLI I have not printed. It is named here
+instead: that file's `18/18` is superseded.
+
+### Why the measurement had no runner, which is worse than having no error bar
+
+Everything needed to reproduce 18/18 was already in the repository: eighteen caption files under
+`packages/core/eval/intake/captions`, `CAPTION_CLASS_EXPECTATIONS` and `CAPTION_AXIS_EXPECTATIONS`
+covering all four axes with a hand-written `why` on most rows, and three scorers that keep
+`right`, `declined` and `wrong` apart on the argument that *"a decline and a wrong answer move the
+prompt in opposite directions"*. **Nothing joined them.** The only consumer of that file was a unit
+test of the scoring functions, and the expectations were not exported from `eval/index.ts` at all.
+
+So the number came from a hand run whose answers were never written down — reproducible in
+principle and an anecdote in practice, by the eval README's own test: *"a number you cannot
+re-measure is an anecdote."* `measure-captions.mts` is the join, and it asserts the join in **both**
+directions before measuring anything (an expectation with no caption file; a caption no expectation
+covers), exits 2 on either, and is mutation-tested both ways.
+
+### `bowl` is the catch-all, and it is the same failure as §95
+
+`dishForm` is the weak axis at 12.7/18, and its errors are not scatter. **`bowl` is 9 of the 16
+wrong answers across all four axes and all three runs** — on a chicken wrap, a sheet-pan
+crunchwrap, a brothy rice and a pasta — against a prompt that says *"Most dishes are none of them;
+answer null rather than reaching."*
+
+That is §95's finding on a second axis, a second measurement set and a different prompt: **the
+model reaches rather than declining, and each axis has one value it reaches for.** Protein reaches
+for `pork`; form reaches for `bowl`. Both prompts already say "answer null"; neither makes `null`
+the positively right answer for the common case. One change would address both axes, and it is the
+same change §95 named.
+
+### The inventory: which measurements repeat
+
+Of the nineteen scripts under `packages/import/scripts` plus `eval.mts`, **nine call a model** and
+**three repeat**:
+
+| | repeats | |
+|---|---|---|
+| `eval.mts` | yes | `PASHKI_EVAL_RUNS`, mean + spread + fixtures that moved |
+| `measure-classification.mts` | yes | `--runs=N`, built for §94's control run |
+| `measure-captions.mts` | yes | new, this section |
+| `measure-components.mts` | **no** | consensus of three *per row*, one run of the set |
+| `measure-consensus.mts` | **no** | |
+| `ab-consensus.mts` | **no** | |
+| `base-population.mts` | **no** | |
+| `backfill-classification.mts` | n/a | a shipping path, and it stores a consensus of three |
+| `probe-provider.mts` | n/a | a liveness probe, not a measurement |
+
+**A per-row consensus is not a run-to-run spread**, and `measure-components` is the case that shows
+why they get confused: it reads each recipe three times and takes the consensus, which correctly
+reproduces the shipping path, and then runs the set **once**. So `ROLE ACCURACY: 34/46`, quoted in
+`components.ts` where it justifies eight role definitions in the prompt, has no error bar — and the
+neighbouring metric in that same file's history moved **14, 18 and 19 of thirty** on an identical
+prompt.
+
+### And that figure cannot be re-measured at all today
+
+`measure-components` reads `/tmp/clean.json`, which `gen-corpus.mts` produces and `/tmp` has since
+cleared. Three sibling scripts already guarded that read with `COULD NOT MEASURE: /tmp/clean.json
+missing — run gen:corpus first` and exit 2. `measure-components` and `measure-consensus` did not:
+they died on an ENOENT stack, and both also used `cascadeFromEnv()!`, so a missing provider threw a
+null dereference instead of saying so. Both now report three outcomes with distinct exit codes
+(3 for no provider, 2 for no corpus), verified by running both branches.
+
+A crash is the safe direction and a poor diagnosis. The rule this breaks is the project's own: a
+measurement that cannot run must not look like one that did — and must say which of the two it is.
+
+### The harness produced a false error bar on its first real run
+
+Worth recording because it is the fault the tool exists to prevent, inside the tool, within the
+hour of writing it.
+
+Run 3 **lost 9 of 18 captions to the provider**, and the across-runs section averaged that run's
+absolute `right` count beside two complete runs. It printed `course mean 13.7/18, spread 8–17
+(±4.5)` — where the 8 was out of 9 and the 17 out of 18. **A spread computed across different
+denominators reads exactly like a finding**, and the `9 NOT MEASURED` line naming the nine captions
+was printed directly above it. The instability list was inflated the same way: 13 of 18 "moved",
+where half of those were simply never read and `unread` beside a verdict is not a verdict that
+moved.
+
+Same family as the aggregate over weeks the feature did not exist in (§90) — a denominator that
+includes rows the numerator could not have come from. Three repairs: **retry** three times before
+believing a loss, because a skip infrastructure timing could have caused gets retried before it is
+believed; compute the spread **only over the captions read in every run**, naming the excluded ones;
+and call such a run **PARTIAL** in words, with "re-run before quoting these figures".
+
+### What would reverse any of this
+
+A second model. Every figure above is `openai/gpt-oss-120b` on the text tier, and the spreads are
+narrow enough (±1 or less on three axes) that a model comparison on this set is now meaningful —
+which it was not when the baseline was one run. `dishForm` at ±1.0 and 12.7/18 is the axis with
+room to move.
