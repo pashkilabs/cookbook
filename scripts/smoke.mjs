@@ -2727,9 +2727,18 @@ try {
    * of them** — the recipe saves cleanly whether or not a classification follows.
    *
    * So the assertion is about the row and not about the endpoint: a recipe saved with every
-   * classification field empty must come back carrying a provenance stamp and three readings. The
-   * readings count is what separates "a model answered" from "the write was permitted" — a refused
-   * UPDATE leaves both columns null while the POST still returns 200.
+   * classification field empty must come back carrying a provenance stamp. The stamp is what
+   * separates "a model answered" from "the write was permitted" — a refused UPDATE leaves both
+   * columns null while the POST still returns 200.
+   *
+   * **The readings count is a second claim and it is about the provider, not the feature.** This
+   * check demanded `classified_readings === 3` and went red against production with 1 reading —
+   * which is `classifyRecipe` behaving exactly as designed, since a lone reading is kept on the
+   * argument that it beats no classification at all. Two of three calls had failed, transiently:
+   * the retry came back with 3. So the consensus half is NOT CHECKED rather than FAILED when the
+   * provider degrades, because a degraded provider is could-not-measure and this suite is read as
+   * a verdict on the deployment. The permission half still asserts on every run — it is the half
+   * that was dead and that nothing noticed.
    *
    * This recipe is created last on purpose: a model decides its course, and every check above that
    * depends on what this household owns is written against a fixture that names its own.
@@ -2752,12 +2761,25 @@ try {
       `/recipes?id=eq.${unclassifiedId}&select=course,principal_protein,classified_with,classified_readings`,
     );
     const row = stored?.[0] ?? {};
+    const readings = row.classified_readings ?? 0;
     record(
       "a recipe saved with no course is classified on save, and the write is permitted",
-      Boolean(row.classified_with) && row.classified_readings === 3,
-      `stamp ${row.classified_with ? "present" : "ABSENT"}, ${row.classified_readings} readings, ` +
+      Boolean(row.classified_with) && readings >= 1,
+      `stamp ${row.classified_with ? "present" : "ABSENT"}, ${readings} readings, ` +
         `course=${row.course}, protein=${row.principal_protein}`,
     );
+    if (readings >= 1 && readings < 3) {
+      skip(
+        "and the stored classification is the consensus of three readings",
+        `only ${readings} of 3 readings came back — the provider degraded, which is not a fault in the save path`,
+      );
+    } else {
+      record(
+        "and the stored classification is the consensus of three readings",
+        readings === 3,
+        `${readings} readings`,
+      );
+    }
   }
 
   const path = `${familyId}/smoke-${stamp}.jpg`;
