@@ -6072,3 +6072,147 @@ two uses on unstable rows is inside the noise, and §93's reversal condition (a 
 is unchanged — but the honest version of "added on the failure mode" is that **an enum value with no
 instances is a guess the model can now make**, and that cost was not in the reasoning when it was
 added.
+
+## §95 — The peanut-butter contradiction: resolved, measured, and reverted
+
+§94 left a contradiction in `CLASSIFY_INSTRUCTIONS` and named it as the next change. The dairy
+sentence says peanut butter is not a principal protein *in any quantity*; eight lines later the
+prompt says to answer `vegetarian` when "beans, lentils, tofu or **another plant protein** is what
+the dish is built on". Peanut butter is a plant protein. Both rules are correct and they disagree,
+and the model resolved the disagreement by reaching for `vegetarian` — 4 uses, 0 right.
+
+The fix was a **precedence** rather than another prohibition: define "built on" as the substance of
+the dish, and say which rule wins. One axis, re-scored against the same 76-recipe adjudication over
+three runs.
+
+**It was rejected by its own measurement.** Recorded here because a change that was measured and
+rejected is worth as much on the record as one that shipped, and more than one that was reasoned
+about and never measured.
+
+### The stability check, which came first this time
+
+Last round's correction (§94) was that **a prediction about one row is only a test when that row is
+stable under the unchanged system**. Checked before editing anything, and the answer disqualified
+the straightforward form of the prediction:
+
+| recipe | pre-dairy prompt | dairy prompt | truth |
+|---|---|---|---|
+| PB COOKIE DOUGH S'MORES BITES | null / pork / null | null / null / pork | null |
+| Peanut butter balls | pork / pork / pork | vegetarian / vegetarian / pork | null |
+| PEANUT CHILLI NOODLES | vegan / pork / vegan | vegetarian / null / vegetarian | null |
+
+None of the three target rows was stable, so the pre-registration had to claim *null in all three
+runs* rather than *null*, and a single run landing on null could not have been evidence. Writing it
+that way is the only reason the result below is readable at all.
+
+### The result
+
+| | errors | named precision | declined | library | `vegetarian` uses | unstable |
+|---|---|---|---|---|---|---|
+| dairy prompt (3 runs) | 2 / 1 / 3 — mean **2.0** | 53/55 = 96% | 21/23 | 74/76 | **4**, 0 right | 3 of 76 |
+| precedence (3 runs) | 3 / 2 / 2 — mean **2.33** | 53/56 = 95% | 21/23 | 74/76 | **0** | 1 of 76 |
+
+**The sentence did exactly what it said and the error count did not move.** `vegetarian` went to
+zero uses — the contradiction was real and resolving it closed that label completely. The accuracy
+is flat, inside the noise, and the labels underneath are worse:
+
+| row | dairy prompt | precedence | |
+|---|---|---|---|
+| PB S'MORES | null / null / pork | **null / null / null** | the only gain: now stable and right |
+| Peanut butter balls | vegetarian ×2 / pork | **pork / pork / pork** | wrong before, wrong now, and in the worse chapter |
+| PEANUT CHILLI NOODLES | vegetarian ×2 / null | **pork / pork / pork** | **was right 1 run in 3; now right in none** |
+| Spinach and Berries Salad | null / null / null | egg / null / null | a new error, unstable |
+
+### Why: the inputs, printed rather than guessed
+
+`Peanut butter balls` is bananas, honey, peanut butter, oats and chocolate chips. `PEANUT CHILLI
+NOODLES` is noodles, peanut butter, peanuts, tahini, tamari, chilli oil and sesame. **Neither
+recipe contains any animal product at all**, so `pork` is not the nearest anchor winning — there is
+no anchor. It is a confabulation, and the likeliest source is the word *balls* and the step "roll
+into balls" for the first, nothing identifiable for the second.
+
+So the diagnosis in §94 — *"butter has no home and the nearest cured-meat anchor wins"* — was
+wrong about the mechanism. It read as right because every label it produced was plausible.
+
+### The finding, which is larger than the change
+
+**A prohibition does not produce a decline. It produces the next-best assertion.**
+
+Three relocations of one error, and the third landed where the first was:
+
+```
+pre-dairy        pork        (no rule about dairy)
+dairy sentence   vegetarian  (peanut butter excluded → reach for the plant label)
+precedence       pork        (plant label closed → reach back for a meat)
+```
+
+Every version of this prompt has excluded *more*, and the answer has moved around the enum without
+ever arriving at `null`. That is the closed-list failure of §93 — *an absent value does not become
+null, it becomes the nearest available one* — showing up a second way: not a value missing from the
+list, but a value the prompt has talked the model out of.
+
+**And it names what the real axis is.** Every error in this library, under every prompt version, is
+a false positive; the 23 correct declines have never been the problem. The prompt has been tuned
+three times to say what a dish is *not*, and nothing in it has ever made `null` a positively right
+answer for a dish with no protein. That is the next change, and it is a different axis from all
+three of these.
+
+### Why revert rather than keep
+
+Flat accuracy would be a weak reason on its own. Three things together are not:
+
+- `PEANUT CHILLI NOODLES` loses its one-in-three chance of being right. A **stably** wrong answer
+  never self-corrects on a re-ask, where an unstable one sometimes does — so halving the
+  instability (3 of 76 → 1) is a cost here rather than a gain.
+- A dessert labelled `pork` lands in the Pork chapter, which is the visible failure that started
+  §93. A peanut-butter dessert labelled `vegetarian` is also wrong and lands somewhere plausible.
+- It introduced a new error on a row that had been right three times out of three.
+
+### The prediction scorecard — inverted a second time
+
+| row | predicted | confidence I recorded | outcome |
+|---|---|---|---|
+| Peanut butter balls | null 3/3 | **high** — a dessert, two rules agree | **failed**, `pork` 3/3 |
+| PB S'MORES | null 3/3 | **medium** — *"this edit does not address it"* | **landed** 3/3, the only one |
+| PEANUT CHILLI NOODLES | null 3/3 | **low** | **failed**, `pork` 3/3 |
+
+Twice now my per-row confidence ordering has been exactly backwards, and both times the row I
+explicitly argued the change would *not* touch is the one that moved. The transferable part: **my
+reasoning about which row a prompt edit will move is not worth recording as a confidence** — the
+aggregate and the stability table carry the information, and the per-row prediction is only useful
+as a falsifiable claim, not as a ranking.
+
+### What this measurement could not see, stated before it ran
+
+The adjudication is 23 nulls, 52 meat/fish and 1 egg: **no recipe in this library is built on a
+plant protein**. So an edit that narrows `vegetarian` into unreachability and one that narrows it
+correctly score identically here, and the cost of over-correcting is invisible — §83's
+out-of-range threshold, arriving as a label. 74/76 means "no row in this library contradicts the
+rule", not "the rule is right".
+
+### Duck stays, and the reasoning that would have removed it is measured wrong
+
+Asked whether to remove `duck` on the evidence that it is used wrongly and never rightly. The
+evidence generalises further than duck — every label with **no true instance in this library** is
+worthless, across nine samples of three prompts:
+
+| | times used | right |
+|---|---|---|
+| labels with at least one true instance | 448 | 432 = **96%** |
+| labels with zero true instances | 8 | **0** |
+
+`vegetarian` 0/4, `vegan` 0/2, `duck` 0/2. That is a real cost and it was not in §93's reasoning.
+
+**It still does not imply removal, and this round is why.** Closing off `vegetarian` did not make
+those rows answer `null` — it made them answer `pork`, 3 of 3, stably. So removing `duck` would not
+make a duck recipe decline; it would make it answer `chicken`, which is precisely what §93 measured
+directly when `turkey` was missing (`pork`, 3 readings of 3). Two independent measurements say the
+same thing: **a shorter list relocates the error, it does not remove it.**
+
+Two further reasons. The measured cost of duck's *presence* is now zero — 0 uses across six runs of
+the two prompts since the dairy sentence landed, where both wrong uses were under the prompt before
+it. And the enum is product-wide while this library is one household: `lamb` has zero instances here
+too, and nobody would argue for removing lamb from a recipe app.
+
+**Reversal condition:** if `duck` is used, wrongly, under a shipped prompt, remove it. The cost side
+is measured now, so that is a one-line check rather than a judgement.

@@ -218,6 +218,26 @@ models be good enough. Do not add a silent-save path.
   example become a default. The digest is now the **first and required** argument to `promptKey`,
   because the thing that failed twice was a sentence in a comment, and a type error is a mechanism.
 
+- **A fingerprint covers the inputs it names, and the function that *assembles* the content is one
+  of them.** `classificationProvenance` hashes the instructions, the schema and the model id —
+  `prompt-version.ts` working exactly as designed — and that is still not the whole prompt. What
+  the model is shown is ingredient lines built by `classificationLines`, and **the builder is
+  nowhere in the digest**. An ingredient with no unit joins an empty string between amount and
+  item, so every stored classification in the library was computed from text reading `2  eggs`
+  with a double space. Tidying that whitespace would change what every answer was derived from
+  while **every row kept a stamp saying it was current**, and nothing would re-ask.
+
+  **That is the exact fault the stamp exists to prevent, one layer below where anybody looks for
+  it.** `promptKey` fingerprinted every input the recipe carries and omitted the prompt; this
+  fingerprints the prompt and omits the renderer of the content. Third instance of one shape, and
+  each time the uncovered input was the one that felt like plumbing rather than an input.
+
+  Found because a test I wrote failed: I asserted `3 eggs` from memory against my own function's
+  `3  eggs`. So the defence is that test — it pins the exact text and says why in its name, because
+  a tidy-up then has to delete an assertion that explains itself. The question to ask of any
+  derived key: **list every function whose output reaches the model, and check the digest covers
+  all of them**, not only the strings spelled out in a prompt constant.
+
 - **A permission nothing has exercised is a permission you do not have.** Every object
   in the photo bucket had been written by the import service as `service_role`, which
   **bypasses RLS entirely** — so `storage.objects` having no INSERT policy at all was
@@ -346,6 +366,22 @@ models be good enough. Do not add a silent-save path.
   moved least. So pre-register *which rows can carry evidence*, not only what you expect them to
   do, and the way to find out is one control run.
 
+  **Stephen's correction of his own brief, recorded as his:** *"I said write the prediction first
+  and that was half the rule. Two of my three named rows reached their predicted answer under the
+  unchanged prompt — they were never tests. Which rows can carry evidence is itself a
+  pre-registration, and the control run is what establishes it. The control was the single most
+  useful thing in that round and I did not ask for it."* The missing half is the cheaper half: a
+  control run is the same command with nothing changed.
+
+  **It bound immediately, on the very next change.** The three rows the precedence edit targets
+  were checked for stability first, per this rule, and **none of the three was stable** — across
+  six samples of two prompts, `PB S'MORES` went null/pork/null then null/null/pork, `PEANUT CHILLI
+  NOODLES` vegan/pork/vegan then vegetarian/null/vegetarian, and `Peanut butter balls` was the one
+  stable row in that corner (pork 3/3) until the dairy sentence destabilised it. So no single-run
+  answer on any of them could be evidence, and the prediction had to be written as *null in all
+  three runs* rather than as *null*. Checking stability first changed what the prediction could
+  say — which is the whole of the rule, arriving as work rather than as a maxim.
+
   And my confidence ordering was **inverted**. The one clean primary test *failed* — `Peanut butter
   balls` was `pork` in all four control samples and came back `vegetarian`, a different wrong
   answer — while both secondaries I rated lower landed 3 of 3, including the pesto I called
@@ -367,6 +403,33 @@ models be good enough. Do not add a silent-save path.
   resolved by the model in a direction nobody chose. So before adding a rule, grep the prompt for
   what it already permits about the same noun, and expect a conflict to surface as a *new* wrong
   answer rather than as the old one persisting.
+
+  **And resolving the contradiction moved it a third time, back to where it started.** The
+  precedence fix was right about the conflict and did exactly what it said — `vegetarian` went from
+  4 uses to **0** — and the error count did not move: 2/1/3 errors became 3/2/2, and both peanut
+  recipes answered **`pork`, 3 runs of 3**. One chain, three prompts:
+  `pork` → `vegetarian` → `pork` (decisions §95, measured and **reverted**).
+
+  So the rule is sharper than "read what the prompt permits". **A prohibition does not produce a
+  decline; it produces the next-best assertion.** Same shape as §93's closed list — *an absent
+  value does not become null, it becomes the nearest available one* — except the value is not
+  missing from the enum, the prompt has talked the model out of it. Printing the two inputs is what
+  settled it: neither recipe contains **any animal product at all**, so `pork` was never "the
+  nearest cured-meat anchor winning" as §94 claimed; it is a confabulation with nothing behind it,
+  and the §94 diagnosis read as right because every label it produced was plausible.
+
+  Two consequences worth carrying. **Excluding is not the same tool as declining** — three prompt
+  versions have each said what a dish is *not*, every error in the library is a false positive, and
+  nothing has ever made `null` the positively right answer for a dish with no protein. And a
+  **stably** wrong answer is worse than an unstable one where the fix is a re-ask: halving the
+  instability (3 of 76 → 1) cost `PEANUT CHILLI NOODLES` its one-run-in-three of being right, which
+  is why the measurement said revert rather than ship a flat accuracy.
+
+  **The prediction ordering was inverted a second time**, and the pattern is now the finding rather
+  than the anecdote: both times the row I argued the change would *not* touch is the one that moved,
+  and both times my high-confidence row failed. My per-row reasoning about which row a prompt edit
+  will move is not worth recording as a confidence — the aggregate and the stability table carry the
+  information. Record the per-row claim because it is falsifiable, not because it is ranked.
 
 - **Temperature 0 is not determinism on a reasoning model, and most of this repo assumed it was.**
   `openai/gpt-oss-120b` at `temperature: 0` returned `[null, chicken, null]` and
