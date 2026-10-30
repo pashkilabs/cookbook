@@ -349,6 +349,35 @@ models be good enough. Do not add a silent-save path.
   *a proxy can rot without failing* — but earlier: this proxy was never measuring the thing, not
   even once.
 
+- **The expectations can be the thing that is wrong, and that is the hole in the advice directly
+  above.** A held-out set built by hand is itself a measurement, and nobody measures it.
+
+  The section scorer reported `ASSIGNED 4/6` on its first run — two real pages where the reader's
+  line-to-heading counts disagreed with the expectation. **Both disagreements were the
+  expectation's.** `Bang Bang Chicken Bowl` and `Greek Chicken Bowl` had been written from the
+  survey's *totals*, 17 and 16, split across their headings by eye. The pages say 4/6/7 and 9/7, and
+  the published ingredient order confirms it: mayonnaise through Sriracha is the sauce, rice through
+  sesame seeds is the bowl. The reader was 6/6 all along.
+
+  **The instinct it defeats is the one that feels like rigour.** A scorer disagreeing with your code
+  reads as the scorer doing its job, so the next move is to go and fix the code — and here that
+  would have broken a correct reader to satisfy a guess. The rule is the symmetric one:
+  **a disagreement between a reader and its ground truth is evidence about one of them, not about
+  the reader.** So re-derive the expectation from the source *before* touching the code, every time.
+
+  The cause is recognisable and is this file's oldest lesson pointed somewhere new: the expectations
+  were written from a **summary** — a survey's row — rather than from the thing itself. *Print the
+  thing, then search what came back*, applied to building ground truth rather than to debugging. A
+  figure copied out of one of my own earlier reports is not an observation.
+
+  Distinct from its neighbours. *A test can encode the bug as the specification* is an assertion
+  written from observed behaviour, so it reproduces whatever it found; this one was written from
+  neither the behaviour nor the source, but from an aggregate. *The instrument was wrong, not weak*
+  is a correct answer on the wrong axis; this is a correct instrument and a wrong answer key. And
+  correcting it is **not** the same as writing a fixture from the output it judges — the test is
+  whether the new expectation was read from the source and checked against something independent
+  (here, the published ingredient order), or copied from what the reader happened to return.
+
 - **A control run of the *unchanged* prompt disqualified two of my three pre-registered
   predictions, before the change landed.** Stephen's brief asked for a prediction written first —
   *"a re-score after a prompt change measures whether you fixed the thing you named or something

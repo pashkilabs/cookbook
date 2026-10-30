@@ -6590,3 +6590,15 @@ groups by name.
 A re-read must be **offered, not applied**: it would overwrite a household's edits, and nothing
 about a stale section justifies that. The rate-limited source stays **UNKNOWN rather than "no
 sections"** wherever this is reported.
+
+**The shape, agreed and not yet built** — it waits until `20261029090000_section_length` has reached
+hosted and smoke is green, because an unverifiable write path against production is not worth
+handing over blind:
+
+- offered on the recipe page only where the recipe has a `source_url` **and** no sections;
+- writes **only** the `section` column, matched by position, which the alignment check is what makes
+  safe — no other field of a household's recipe is touched;
+- reports three outcomes **as counts, not only per recipe**: `4 applied, 3 no grouping, 1 could not
+  read`. The counts are what say whether to try again later, and **could-not-read must never
+  collapse into no-grouping** — the Spare Rib 429 is the case that proves it, and a 429 reported as
+  "nothing to do" is a silent wrong answer about a recipe that does have sections.
