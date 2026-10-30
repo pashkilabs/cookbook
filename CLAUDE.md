@@ -193,6 +193,28 @@ models be good enough. Do not add a silent-save path.
   bumping is part of the change, not a follow-up — and record what each version *means*, since
   a bare integer gives the next reader nothing to compare against.
 
+  **Third instance, and it was me, in the session I had quoted this entry back at somebody.** The
+  ingredient-section reader shipped (§98), a fresh import of thecozycook.com returned nineteen flat
+  lines, and the diagnosis correctly ruled out the deployed commit (production *was* on the right
+  one), the two-call-sites hypothesis (the route and the scorer both call `mapRecipeNode` with the
+  page HTML) and an old recipe mistaken for a new one — before reaching the cache row, which said
+  `extractor_version: 2` with `fetched_at` thirteen minutes before the import. Fresh by both
+  policies, so the new reader never ran.
+
+  What makes this instance worth its own paragraph is that **a passing measurement is what made it
+  easy to skip**. `score:sections` read 6/6 against the live page, which was a true statement about
+  a function nothing in production was calling. A green scorer feels like coverage of the feature
+  and is coverage of the function.
+
+  So the reminder is now a guard: `packages/import/test/extractor-version.test.ts` fingerprints the
+  whole `ExtractedRecipe` for a fixed page and pins it **per version**, so changing what the
+  extractor produces fails until the version is bumped and its new digest recorded — the move
+  `prompt-version.ts` already makes for prompts. **Mutation-testing it found two holes in it**: the
+  first fixture had no `For the …` heading, so a mutant stripping that prefix was a no-op and
+  passed, and `fingerprint` lowercases, so upper-casing every section moved nothing. A guard whose
+  fixture cannot express the change it guards against has nothing to watch — arriving inside a guard
+  built to prevent a different failure.
+
 - **There was more than one cache, and only one of them had a version.** `EXTRACTOR_VERSION`
   governs the *import* cache and is the subject of the trap above. The **palate note** and the
   **component partition** are two further caches, keyed by `promptKey`, and nothing governed them

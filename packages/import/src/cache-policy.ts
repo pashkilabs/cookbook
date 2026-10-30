@@ -63,12 +63,25 @@
  *      cuisine are inferred. Entries written at 1 carry an empty steps array and neither
  *      classification field — a wrong recipe, served confidently, exactly what the stamp exists
  *      to expire.
+ *   3  ingredient sections are read from the card's DOM, since `recipeIngredient` is flat by
+ *      specification (§98). Entries written at 2 carry no `section` on any line, so a recipe whose
+ *      source groups its ingredients is served as one flat list — which is the bug that change was
+ *      made to fix, preserved by the cache for thirty days per fetch.
  *
- * This sat at 1 through both changes. The stamp worked; nobody turned it. Recording the meanings
- * rather than only the number is the cheap half of not repeating that — a bare integer gives a
- * later reader nothing to compare their change against.
+ * This sat at 1 through both of the changes that made 2 necessary. The stamp worked; nobody turned
+ * it. Recording the meanings rather than only the number is the cheap half of not repeating that —
+ * a bare integer gives a later reader nothing to compare their change against.
+ *
+ * **And it then sat at 2 through the change that made 3 necessary, by me, in the same session I
+ * had quoted this comment back at somebody.** The section reader shipped, a fresh import of
+ * thecozycook.com returned nineteen flat lines, and the diagnosis ran through the deployed commit,
+ * the two-call-sites hypothesis and the recipe's `created_at` before reaching the cache. The row
+ * said `extractor_version: 2`, `fetched_at` thirteen minutes before the import: `fresh` by both
+ * policies, so the new reader never ran. **A change to what the extractor produces is a bump, in
+ * the same commit — the measurement passing is what makes this easy to skip**, because 6/6 against
+ * the live page is a true statement about a function nothing was calling.
  */
-export const EXTRACTOR_VERSION = 2;
+export const EXTRACTOR_VERSION = 3;
 
 /** How long an entry is served before the page is read again. */
 export const CACHE_MAX_AGE_DAYS = 30;
