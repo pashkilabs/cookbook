@@ -1,4 +1,5 @@
 import { parseIngredientList, stripTags } from "@pashki/core";
+import { sectionedIngredients } from "./ingredient-groups.js";
 import type { ExtractedRecipe } from "./types.js";
 import {
   firstString,
@@ -146,6 +147,16 @@ export interface MapOptions {
   baseUrl: string;
   sourceUrl: string;
   sourceName: string | null;
+  /*
+   * The page's own markup, for the one field structured data cannot carry.
+   *
+   * Required rather than optional, and deliberately: every caller has the HTML in hand, and making
+   * it optional would let a new call site silently opt out of ingredient grouping while every test
+   * stayed green. Widening a gate is how `fetcher` became optional and broke the one test that
+   * actually supplied one. Pass "" to mean "there is no page", which is a claim rather than an
+   * omission.
+   */
+  html: string;
 }
 
 /** A JSON-LD Recipe node to the shape the review screen and the schema expect. */
@@ -164,9 +175,13 @@ export function mapRecipeNode(options: MapOptions): ExtractedRecipe {
     title: stripTags(title).trim(),
     servings: parseServings(node.recipeYield),
     totalMinutes,
-    // the parser drops anything that isn't an ingredient, so headings in the list
-    // do not become phantom rows
-    ingredients: parseIngredientList(ingredientLines),
+    /*
+     * The parser drops anything that isn't an ingredient, so a heading that *is* in the list does
+     * not become a phantom row — and `sectionedIngredients` recovers the headings that are not in
+     * the list at all, which on these pages is all of them. `recipeIngredient` is flat by
+     * specification; the groups live in the card's DOM.
+     */
+    ingredients: sectionedIngredients(ingredientLines, options.html).ingredients,
     steps: parseSteps(node.recipeInstructions),
     imageUrl: parseImageUrl(node.image, index, baseUrl),
     sourceUrl: options.sourceUrl,

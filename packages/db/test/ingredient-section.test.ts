@@ -88,12 +88,31 @@ describe.skipIf(instance === null)("the heading a recipe wrote", () => {
     expect(back.data?.section).toBeNull();
   });
 
-  // a heading is a label, not a paragraph; the column refuses one long enough to be a mistake
-  it("refuses a section longer than a heading could be", async () => {
+  /*
+   * **This bound moved from 80 to 200, so this assertion inverted.** It required 81 characters to
+   * be refused, which was right against the old CHECK and would now defend a limit that a real
+   * heading nearly hit: The BEST Meatball Recipe writes
+   * "For Sauce (Or you may substitute 3-4 cups of your favorite, quality marinara sauce)" — 83
+   * characters, one past the old cap and the reason for `20261029090000_section_length`.
+   *
+   * It points at a judgement about how long a heading can be, not at a rule, so if that judgement
+   * changes again this flips again. What does not change is that there *is* a bound: a section
+   * arriving at a thousand characters is markup the reader misread.
+   */
+  it("accepts a heading that is prose, since real ones run to eighty-odd characters", async () => {
     const { error } = await household.client.from("recipe_ingredients").insert({
       family_id: household.familyId, recipe_id: recipeId, position: 3,
       item_text: "sugar", amount: 1, unit: "cup", note: "", is_estimated: false,
-      section: "x".repeat(81),
+      section: "For Sauce (Or you may substitute 3-4 cups of your favorite, quality marinara sauce)",
+    });
+    expect(error).toBeNull();
+  });
+
+  it("refuses a section longer than a heading could be", async () => {
+    const { error } = await household.client.from("recipe_ingredients").insert({
+      family_id: household.familyId, recipe_id: recipeId, position: 4,
+      item_text: "flour", amount: 1, unit: "cup", note: "", is_estimated: false,
+      section: "x".repeat(201),
     });
     expect(error).not.toBeNull();
   });

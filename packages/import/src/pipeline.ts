@@ -219,7 +219,7 @@ function extractTier(
   }
 
   if (!node) return null;
-  return mapRecipeNode({ node, index, baseUrl, sourceUrl, sourceName });
+  return mapRecipeNode({ node, index, baseUrl, sourceUrl, sourceName, html });
 }
 
 /**

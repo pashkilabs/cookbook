@@ -6488,3 +6488,105 @@ Goose, rabbit, bison, tofu as distinct from vegetarian, shellfish as distinct fr
 needs a drawing and the sheet has ten. Also `veal` and `venison` belong in `UNCOUNTABLE` in
 `format.ts` beside `beef`, `pork` and `lamb` — "2 veals" is never what anybody meant. `duck` and
 `goat` do not: a duck is a countable bird.
+
+## §98 — Ingredient sections were never captured from structured data, because schema.org cannot carry them
+
+Reported: a source writes "Meatballs:" and "Sauce:", the stored recipe is one flat list, and the
+method's "combine all sauce ingredients" sends the cook back to the URL. **Not the §77 gap** —
+per-step ingredient mapping was deferred because nothing in the data could supply it, and a section
+heading is written on the page. The information exists and was being discarded, so this is capture
+and storage rather than inference.
+
+### Where it was lost, which was none of the four candidates
+
+| | verdict |
+|---|---|
+| the page's recipe markup | **the loss point.** `recipeIngredient` is a flat array of strings; schema.org has no concept of ingredient groups. The headings live only in the card's DOM. |
+| `EXTRACTION_INSTRUCTIONS` | silent about sections — a real §54 gap for captions and photographs, and irrelevant to these two, which never reach tier 2. Its own change. |
+| the schema | not guilty. `recipe_ingredients.section` has existed since `20260909090000`. |
+| `parseIngredientList` | **not guilty, and I reported otherwise first.** Its call site's comment — *"the parser drops anything that isn't an ingredient, so headings do not become phantom rows"* — reads like a deliberate discard, and I said I had found the bug in one line. Printing it showed `["For the sauce:", "1 cup heavy cream"]` returning `section: "For the sauce"`. It handles headings correctly and would have worked had the headings been in the array. |
+
+Everything downstream was already built: the recipe page and cook mode both render contiguous runs,
+and six recipes already stored sections from other paths. **Only capture was missing**, which is why
+this is a reader rather than a feature.
+
+### Structural assignment, not a heading line pushed through the text channel
+
+The obvious shape is to splice `"Sauce:"` into the ingredient array and let `parseIngredientList` do
+the rest. It is wrong here. `headingOf` requires a trailing colon and **refuses any candidate
+containing a quantity**, because in free text `2 cups flour:` is an ingredient — heuristics for an
+ambiguous channel. An `<h4>` inside an ingredient-group container is not ambiguous.
+
+Routed through the text channel, the real heading `"For Sauce (Or you may substitute 3-4 cups of
+your favorite, quality marinara sauce)"` would be refused for containing "3-4 cups" and would then
+**parse as an ingredient**, putting a sentence of prose on somebody's shopping list. An ingredient
+read as a heading disappears; a heading read as an ingredient gets bought. There is a regression
+test named for it.
+
+### The alignment check is what makes a regex reader safe
+
+Group sizes must sum to exactly the published ingredient count, or the recipe stores flat with a
+note saying why. Measured before being relied on: across every sourced recipe in the library,
+**8 of 8 that declare groups have sizes summing exactly to the published count**, and the two
+reported recipes slice at indices 0/6/13 and 0/7/12.
+
+Following `microdata.ts`, this is a regex rather than a DOM parser, so the last run's count can
+overrun its list. The alignment check turns that into a missed grouping rather than a wrong one —
+the right direction, because a heading over the wrong run tells the cook to put the parmesan in the
+marinade.
+
+**Unnamed runs are counted, and the first version did not.** Cards commonly place a few ingredients
+above the first heading; skipping those blocks dropped their rows from the total, failed the
+alignment check, and cost a recipe with one ungrouped line at the top **every** section it had. They
+now carry a null heading, which is what they are. That case was one of the two controls the brief
+named, and it would otherwise have shipped broken.
+
+### Measured per field, because an aggregate hides assignment
+
+`pnpm --filter @pashki/import score:sections`, six real pages through the shipping mapper:
+
+| | |
+|---|---|
+| DETECTED a grouping, and only where there is one | **6/6** |
+| VERBATIM headings, in the page's own words | **6/6** |
+| ASSIGNED every line to the right run | **6/6** |
+
+Two controls are recipes with no grouping at all, which must come back entirely unsectioned — the
+over-assertion direction a set of grouped recipes cannot fail in.
+
+**The first run scored ASSIGNED 4/6 and both disagreements were mine.** `Bang Bang Chicken Bowl` and
+`Greek Chicken Bowl` were written from the survey's totals, 17 and 16, split across the headings by
+eye — a guess wearing the costume of an expectation. The pages say 4/6/7 and 9/7, and the published
+ingredient order confirms the boundaries. Corrected from the pages, not from the output; the
+distinction is that the blocks were read and checked against the ingredient order rather than copied
+from what the reader returned.
+
+### Sections must never reach the shopping list
+
+You buy half and half once whether it is for the sauce or the meatballs. `consolidate` has never
+read the field, and that is now two assertions in `packages/core/test/consolidate.test.ts` rather
+than a property nobody states — **mutation-tested** by appending the section to the bucket key,
+which fails both. §92's one-bucket fault, asked about a new column before it could happen.
+
+### The CHECK, 80 to 200
+
+One real heading measured 79 characters against a cap of 80. That is not a margin; it is a
+constraint that has not failed yet. The failure it would cause is quiet — the insert fails, the
+route reports the recipe rather than the column, and the symptom is "this recipe would not save" for
+a reason nothing names. `20261029090000_section_length` raises it to 200 and asserts the bound by
+attempting three writes: the real 83-character heading, an empty string, and 201 characters.
+
+Its first probe failed on `family_id`, because **every app table carries it NOT NULL** and omitting
+it raises 23502 before either foreign key — so the migration failed with a message about a column
+rather than about the section it was testing.
+
+### What is recoverable, and what a backfill would be worth
+
+Of 80 recipes: **45 have a `source_url`**, 44 fetched, 1 rate-limited. **8 declare ingredient groups
+in their source** — 18% of the sourced, 10% of the library — and all 8 align. Those eight are the
+ones where it matters: every one is a two-or-three-component dinner whose method refers to its
+groups by name.
+
+A re-read must be **offered, not applied**: it would overwrite a household's edits, and nothing
+about a stale section justifies that. The rate-limited source stays **UNKNOWN rather than "no
+sections"** wherever this is reported.

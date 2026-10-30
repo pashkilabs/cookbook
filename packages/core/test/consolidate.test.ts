@@ -308,3 +308,50 @@ describe("a line with nothing to buy", () => {
     expect(rice?.pantryDeducted).toBe(true);
   });
 });
+
+/*
+ * §92's one-bucket fault, asked about a new column.
+ *
+ * `section` is a presentation label: the recipe page and cook mode group by it so "combine all
+ * sauce ingredients" is answerable at the stove. **It must not reach the consolidation key.** You
+ * buy half and half once whether it is for the sauce or the meatballs, and a section in the key
+ * would split one purchase into two half-pints — the exact waste the shopping list exists to
+ * prevent.
+ *
+ * This holds today because `consolidate` never reads the field. That is worth an assertion rather
+ * than a comment: nothing else would notice a future change threading it through, and the symptom
+ * is a quietly duplicated line that reads as a catalog gap.
+ */
+describe("a section never reaches the shopping list", () => {
+  /** the same lines a card would give, with the page's grouping applied */
+  const sectioned = (label: string, runs: [string, string[]][]): ConsolidationEntry => ({
+    label,
+    ingredients: runs.flatMap(([section, lines]) =>
+      parseIngredientList(lines).map((line) => ({ ...line, section })),
+    ),
+  });
+
+  it("buys half and half once when two sections of one recipe both call for it", () => {
+    const lines = consolidate(
+      [sectioned("Spaghettios", [
+        ["Sauce", ["1/2 cup half and half"]],
+        ["Mini Meatballs", ["3 tablespoons half and half"]],
+      ])],
+      catalog,
+      { excludeStaples: false },
+    );
+    expect(lines.filter((line) => line.label.toLowerCase().includes("half"))).toHaveLength(1);
+  });
+
+  it("merges the same item across two recipes that section it differently", () => {
+    const lines = consolidate(
+      [
+        sectioned("one", [["For the sauce", ["1 cup heavy cream"]]]),
+        recipe("two", ["1 cup heavy cream"]),
+      ],
+      catalog,
+      { excludeStaples: false },
+    );
+    expect(lines.filter((line) => line.label.toLowerCase().includes("cream"))).toHaveLength(1);
+  });
+});
