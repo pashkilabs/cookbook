@@ -243,19 +243,24 @@ needs a store, and that is worth doing at the same time as custom SMTP.
 many addresses at whatever rate Supabase allows. A CAPTCHA or an IP limiter belongs with
 opening signup.
 
-**A new household has no entitlement, so it can read and not write** — decisions §9 working
-as intended, since absence is not an unmetered allowance. Real issuance is a billing webhook
-blocked on Apple's outside-purchase rules.
+**A new household is founded entitled** (§100), with a window that is *unbounded until billing
+exists and revisited when it does*. It used to be founded with nothing — decisions §9 working
+as intended, since absence is not an unmetered allowance — and that was right about issuance and
+wrong about the result: with nothing to sell, a refused write is a wall with no door, and the
+first person to meet it was Stephen's sister on her first screen.
 
-For local work, `PASHKI_DEV_ISSUE_ENTITLEMENT=true` makes sign-up issue one so a created
-household can actually write. **It is not a trial and not a free tier** — both are open
-questions in `docs/decisions.md`, and the numbers in `lib/dev-entitlement.ts` are
-development values rather than policy. It is off unless set to exactly `"true"`, it logs a
-warning every time it fires, and it is named for what it is so that finding it set in a
-deployed environment reads as a mistake. It is deliberately not also gated on `NODE_ENV`:
-`next start` serves a production build, so that check cannot tell a laptop from a
-deployment and would only break the workflow the flag exists for. When there is a real
-deployment, gate it on that platform's own environment marker.
+The values live in `lib/founding-entitlement.ts`. The window is a stated sentinel rather than a
+null, because `valid_until` is NOT NULL on purpose — *"issuance must state the window rather than
+inherit one silently."* The **50 imports per 30 days** is the one meter that stays, because an
+import costs an inference call and signup is public; it is a cost guard rather than a tier, and
+50 is measured — the busiest real household-month on the hosted project is 40.
+
+Two things that look like details and are not. The counter's `resetsAt` is a **real date**:
+`platform_spend_quota` rolls over only `if resets is not null and now() > resets`, so the
+`resetsAt: null` every earlier entitlement carried made `periodDays: 30` decorative. And issuance
+**ensures rather than overwrites**, because provisioning runs on every confirmed sign-in and
+`issueEntitlement` is an upsert that replaces `quota_json` — issuing unconditionally would refill
+the meter on every sign-in.
 
 **No design system.** `packages/ui` does not exist; `app/globals.css` is plain enough to
 read and not worth keeping. Building one inside one screen is how it ends up living here.

@@ -5,7 +5,8 @@
  * **This is not billing and it is not a free tier.** Production issuance is a webhook that does
  * not exist yet, blocked on the billing decision. This is an operator granting access to a named
  * household, one at a time, on purpose — the deliberate opposite of
- * `PASHKI_DEV_ISSUE_ENTITLEMENT`, which grants it to whoever happens to sign up.
+ * the founding entitlement (§100), which every new household now gets automatically. This is the
+ * operator path: re-issuing, a larger import cap, or whatever billing eventually needs.
  *
  * That distinction is the whole reason this exists. The flag is a switch that says *everyone*;
  * with a public domain, no CAPTCHA and no IP rate limit on signup, that is an unpriced free tier

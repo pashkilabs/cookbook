@@ -1077,8 +1077,8 @@ try {
     const contents = visible(String((await call("GET", "/recipes")).body ?? ""));
     record(
       "browse renders the recipe book's contents page, not a flat list",
-      contents.includes("The Lundall Recipe Book") && contents.includes("h-contents-grid"),
-      foundDetail(contents, "The Lundall Recipe Book"),
+      contents.includes("Let's get cooking") && contents.includes("h-contents-grid"),
+      foundDetail(contents, "Let's get cooking"),
     );
     /*
      * Masked, not drawn. An `<img>` onto `public/chapters` bakes the ink in and renders at
@@ -1616,7 +1616,19 @@ try {
        * of its heading. So the rotation marker is reported as evidence and never gated on: it is a
        * property of the library, not of the setting.
        */
-      const BROWSE = "The Lundall Recipe Book";
+      /*
+       * The contents page's eyebrow, not its title. The title was a hard-coded "The Lundall
+       * Recipe Book" shown to every household, and three checks in this file asserted it — so
+       * they were green about a string no household but one should ever have seen, and would
+       * have failed the fix that removed it.
+       *
+       * **A straight apostrophe, and `shot.mjs` uses a curly one for the same words.** The page
+       * renders `&rsquo;`; `visible()` normalises it to `'` and Playwright's `textContent` does
+       * not. So the correct spelling depends on which tool is reading, and the version that
+       * looks right is wrong in one of them — searching the served HTML for `Let’s` here finds
+       * nothing and reads exactly like the eyebrow being absent.
+       */
+      const BROWSE = "Let's get cooking";
       const ownerSees = visible(String((await call("GET", "/recipes")).body ?? ""));
       const memberBefore = await screenAsInvitee("/recipes");
       const memberOnBrowse = memberBefore.text.includes(BROWSE);
@@ -1698,7 +1710,10 @@ try {
        * shown *"new row violates row-level security policy for table member_settings"*. Every
        * policy and every grant was correct; `household_can_write` is ANDed into the insert policy
        * on every household table and her household had no entitlement, because production issues
-       * none — `PASHKI_DEV_ISSUE_ENTITLEMENT` is local-only and there is no billing flow yet.
+       * one — but an *unbounded* one since §100, so this probe removes it to reach the state.
+       * It was written when production issued none at all, and it is kept now that no real
+       * household is in this state: the lapsed path returns the moment windows are real, and a
+       * check is cheapest to keep correct while nothing depends on it.
        *
        * **This script could not have caught it, and the reason is the gap.** It covers the insert
        * thoroughly — a fresh owner and a fresh invitee both create their row here, as
@@ -1739,10 +1754,24 @@ try {
             `the same write failed with the entitlement restored (HTTP ${control.status}), so the refusal above proves nothing`,
           );
         } else {
+          /*
+           * Asserted on what both branches share, not on one branch's sentence.
+           *
+           * This said `includes("read-only")` and failed the moment §100 gave `42501` two
+           * wordings — *"its subscription window has passed"* for a lapsed household and *"does
+           * not have a subscription"* for one that never had one. This probe **deletes** the
+           * entitlement, so it reaches the second, and the check was asserting the first: a
+           * phrase from the state it is not in.
+           *
+           * The claim was never about the phrase. It is that a person is told about a
+           * subscription and told they can still read, in words, instead of being shown
+           * Postgres. Both branches say both of those; neither says "read-only" any more.
+           */
           const mechanism = /row-level security|member_settings|violates|42501/i.test(said);
+          const inWords = /subscription/i.test(said) && /readable/i.test(said);
           record(
             "a household with no entitlement is refused in words, not in Postgres",
-            refused.status === 403 && said.includes("read-only") && !mechanism,
+            refused.status === 403 && inWords && !mechanism,
             `HTTP ${refused.status} (wanted 403) — ${
               mechanism ? `named the mechanism: "${said.slice(0, 90)}"` : `said "${said.slice(0, 90)}"`
             }`,
@@ -1797,7 +1826,7 @@ try {
         );
       } else {
         const spent = await screenAsInvitee(`/invite/${mintedToken}`);
-        const landedInApp = spent.text.includes("What you cook") || spent.text.includes("The Lundall Recipe Book");
+        const landedInApp = spent.text.includes("What you cook") || spent.text.includes("Let's get cooking");
         const toldItIsSpent = spent.text.includes("already been used");
         record(
           "a member who opens their own spent invitation is sent into the app",

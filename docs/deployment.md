@@ -54,7 +54,6 @@ Seven variables. Six are required; the app refuses to start without them rather 
 | `PASHKI_TOKEN_KEY_ID` | `dev-1` |
 | `PASHKI_TOKEN_PRIVATE_KEY` | **must be a real multi-line PEM** — see below |
 | `NEXT_PUBLIC_SITE_URL` | `https://cookbook.pashki.com`, **Production scope only** — see below |
-| `PASHKI_DEV_ISSUE_ENTITLEMENT` | **deliberately absent** — see below |
 
 **Turborepo filters the environment per task.** A variable set on the host but not declared in
 `turbo.json` is stripped before the build sees it: `NEXT_PUBLIC_*` passes by framework inference,
@@ -77,13 +76,22 @@ stopping a session being handed to a host we do not control.
 Everything except those two routes works on a preview. **Auth is tested locally against Mailpit,
 or against production.**
 
-### `PASHKI_DEV_ISSUE_ENTITLEMENT` is not set, and should not be
+### Every household is founded entitled, and `PASHKI_DEV_ISSUE_ENTITLEMENT` is gone
 
-The flag issues an entitlement to whoever signs up. The domain is public, signup has no CAPTCHA
-and no IP rate limit, so on a deployed host it is an unpriced free tier for anyone who finds the
-URL. It exists for a developer running the app locally before billing is built.
+The flag used to gate issuance, so a deployed signup produced a **read-only household** — a meter
+gating nothing, because there is no subscription to sell. Since §100 provisioning issues an
+entitlement itself, **unbounded until billing exists and revisited when it does**, and the flag
+and `lib/dev-entitlement.ts` have been deleted rather than left set to a value nothing reads.
 
-Households are entitled **one at a time, by an operator**:
+The old argument against it was that the domain is public with no CAPTCHA and no IP rate limit,
+so auto-issuance is an unpriced free tier for anyone who finds the URL. That risk is real and it
+is a *cost* risk rather than a revenue one, so it is answered where it lives: the founding
+entitlement carries a **renewing cap of 50 imports per 30 days**, and an import is the only thing
+a household can do that spends money. `/api/health` reports the window and the cap under
+`configured.entitlement`, so a deployment can say which policy it is running.
+
+Households can still be entitled **one at a time, by an operator** — for re-issuing, for a larger
+cap, or for whatever billing eventually needs:
 
 ```bash
 pnpm --filter @pashki/db issue:entitlement --email someone@example.com --dry-run
@@ -91,7 +99,13 @@ pnpm --filter @pashki/db issue:entitlement --email someone@example.com --days 36
 ```
 
 The address must already have a household — provisioning happens at first confirmed sign-in and
-nowhere else, so a person signs up, confirms, signs in once, and *then* is granted access.
+nowhere else.
+
+Issuance **ensures rather than overwrites** on the provisioning path: `issueEntitlement` is an
+upsert that replaces `quota_json` wholesale, and provisioning runs on every confirmed sign-in, so
+issuing unconditionally would hand a household its monthly imports back each time somebody signed
+in. The useful consequence is that a household that somehow has no entitlement is healed on its
+owner's next sign-in rather than by a hand-written UPDATE.
 
 ### Local credentials
 

@@ -6768,3 +6768,181 @@ changed from a ceiling to a schedule**, and it says so. Two households in the te
 cannot pass, plus an assertion that none of `25`, `67` or `42` is quoted again, plus a separate
 sentence for a household with no dinners in it (`0 of 0` is a ratio outside the range the data
 occupies, §83).
+
+## §100 — Every household is founded entitled: unbounded until billing exists
+
+A new household was read-only from its first second. `issueDevelopmentEntitlement` was gated on
+`PASHKI_DEV_ISSUE_ENTITLEMENT`, which is local-only and must not be set on Vercel, so **public
+signup produced an app that could read everything and change nothing.**
+
+The reasoning behind that gate was sound and it was about *issuance*: production entitlements come
+from billing, there is no billing, so nothing should issue one. What it missed is that **the meter
+was gating nothing**. There is no subscription to sell, so a refused write is not an upsell — it is
+a wall with no door. §99 found the first person to meet it, on her first screen.
+
+### The decision, stated so it can be reversed
+
+**Unbounded until billing exists, revisited when it does.** The reversal condition is the arrival
+of a real subscription window, not a date and not a usage level. `issue:entitlement` stays as the
+manual operator path — re-issuing, a larger cap, and whatever billing eventually calls.
+
+### "Unbounded" has to be written as a date
+
+`valid_until` and `grace_until` are NOT NULL with no default, and the migration says why:
+*"issuance must state the window rather than inherit one silently."* That rule is right, and it
+means the only way to say "no window" is a date far enough away to be obviously not a real one. So
+a named sentinel, `2099-12-31T23:59:59.000Z`, rather than a quietly enormous number — a reader who
+finds it in a row should be able to tell it from an expiry somebody chose. Deliberately not
+`9999-12-31`: a value at the edge of what a timestamp holds invites a different class of bug than
+one that is merely far away.
+
+### The one meter that stays, and the number is measured
+
+An import costs an inference call and signup is public, so an unbounded *window* with an unbounded
+*import rate* is an unbounded cost. Those are different questions that the single word
+"entitlement" runs together, and only one of them is about revenue.
+
+**50 imports per 30 days.** Measured across every household on the hosted project: the busiest real
+household-month is **40** — one household in August, importing a collection — and every other
+household-month is in single figures. 25, the old development value, would have refused that
+household mid-import. It is a cost guard, not a tier; the tier design sets the real one.
+
+### Two things that look like details and are not
+
+**`resetsAt` must be a real date.** `platform_spend_quota` rolls a counter over only
+`if resets is not null and now() > resets`. Every entitlement ever issued here — **98 of 98 on the
+hosted project**, from the development path, from `smoke.mjs`, and from `issue:entitlement` —
+carries `resetsAt: null` beside `periodDays: 30`. A period with no anchor never elapses, so none of
+them has ever rolled over: they are one-off allowances wearing a monthly label. Nothing noticed
+because nothing has run out — the highest `used` anywhere is 92 against a limit of 500, and the
+households capped at 50 are in single figures. **A quota nobody has exhausted is a rollover nobody
+has tested**, which is the same shape as a permission nothing has exercised. Fixed forward; the
+existing rows are listed below as an offer rather than applied.
+
+**Issuance ensures rather than overwrites.** `provisionForConfirmedAccount` runs on *every*
+confirmed sign-in — that is what makes it idempotent and lets two routes call it without
+coordinating — and `issueEntitlement` is an **upsert that replaces `quota_json` wholesale**, by
+design, so a replayed billing webhook updates a window rather than duplicating it. Both correct,
+and composing them naively gives a quota that can never bind: issuing unconditionally would hand a
+household its monthly imports back every time somebody signed in, and the meter would read as
+present while enforcing nothing. So it reads first. The useful side effect is that an existing
+household with no entitlement — twelve on the hosted project — is **healed on its owner's next
+sign-in** rather than by a hand-written UPDATE against production.
+
+Both are regression-tested and both mutants are caught, one test each.
+
+### What was kept rather than deleted
+
+**The honest second branch in `refusal()`.** *"Its subscription window has passed"* is untrue of a
+household that never had one, so `42501` now has three sentences: `none`, `lapsed`, and one true of
+both for the callers that do not know which. Kept after this change made every household entitled,
+on purpose — it describes a state no real household is in, which is exactly when a branch is cheap
+to have correct, and the lapsed path returns the moment windows are real.
+
+**The unentitled smoke check from §99.** Same reasoning. It removes the entitlement to reach a
+state nothing is in now, and it is the only thing asserting that §9's read-only degradation reaches
+a person in words rather than in Postgres.
+
+**And it failed on this change, correctly, which is worth recording.** It asserted
+`said.includes("read-only")` — a phrase from the *lapsed* sentence — while the probe deletes the
+entitlement and therefore reaches the *none* sentence, which the same change had just introduced.
+A check written one commit earlier, asserting a wording rather than the property the wording
+carries. It now requires "subscription" and "readable", which both branches say and neither will
+drop without the claim itself changing. **Assert what every acceptable answer shares, not the
+sentence the one you looked at happened to use** — the same lesson as a marker copied off a screen,
+one layer down in the message instead of the page.
+
+### Offered, not applied
+
+98 production entitlements carry `resetsAt: null`. Setting it to `now() + periodDays` would make
+their monthly allowance real for the first time. It is a write to production data and nobody has
+hit a limit, so it is an offer rather than part of this change.
+
+## §101 — The new-family path, rendered: a second fixture with nothing in it
+
+Every screenshot this project had ever taken was of a household with 24 recipes, 2 shopping
+groups, a planned week and a filed recipe line. Smoke is the same — it provisions data before it
+touches anything. **So the state every real family is in for its first ten minutes had never been
+rendered**, and it is the state Stephen is now showing people.
+
+Emptiness is the worst possible blind spot for the guards that exist, because **it is inside every
+permitted range**. A blank page has no horizontal overflow, no text box too narrow for a word, no
+contrast failure, no undersized glyph and no unstyled sheet. Every check here passes on nothing at
+all.
+
+### What was built
+
+`pnpm shots` now renders **two households**: the seeded one at three widths, and a second,
+provisioned and left empty, at 390 and 1024 in both themes. A whole second session rather than a
+flag, because the thing under test is a household and not a query parameter — and in the same run
+rather than behind `--empty`, because a pass somebody has to remember is one that stops happening.
+158 screenshots.
+
+It goes through **every** assertion the seeded pass does, which is the reason it is a fixture in
+the existing loop rather than a second tool that would check less. It adds exactly one: **does this
+screen say anything to a household that has nothing?** Measured inside `main` with the tab bar
+removed, because the tab bar renders five labels on every screen and counting those would report on
+the navigation while claiming to report on the page. The threshold is deliberately low — this is
+"is there an empty state at all", not "is it good", which is a question for a person looking at the
+picture. The text it finds is printed either way, and that printout is the thing to read.
+
+Two exit-2 guards on the fixture itself, for the reason §86 exists: it asserts the household
+provisioned, and that it really is empty. The emptiness check first called `GET /api/recipes`,
+**which does not exist** — the route is POST-only, a 404 parses as no JSON, and no JSON reads as no
+recipes, so it would have certified any household as empty. It asks the database with
+`count=exact` now.
+
+### The answer to the brief's question, and it is not the one expected
+
+*"A page with nothing on it is the most likely answer and the worst one."* It is not what happens.
+**Every one of the fourteen screens says something**, and several say it well: `/today` offers
+*"No dinner planned. Pick one below, or open the week"* and then *"No dinners in your recipes yet.
+Import one, or set a course on a recipe you already have"*; `/shopping` says *"No list yet — give
+some recipes a day on the planner and the shopping list writes itself"*; `/planner` says *"Nothing
+shortlisted for this week"*. The empty states exist and are good.
+
+What the pass found instead were three faults that are **only visible to a household that is new**,
+and one of them is the worst kind.
+
+### 1. "The Lundall Recipe Book" was hard-coded, and three checks asserted it
+
+The contents page's `<h1>` and the chapter pages' back link were the literal string
+`The Lundall Recipe Book`. **Every household in the world opened a cookbook with Stephen's surname
+on it.** It now renders `family.name`, which is what the household called itself at signup and what
+`/household` already shows.
+
+The part worth recording is not the literal, it is that **three green checks were asserting it**:
+`shot.mjs`'s marker for the browse screen, and two in `smoke.mjs`. They would have **failed the
+fix**. This is the second instance of a test encoding the bug as the specification — the first was
+the per-member layout — and the mechanism here is more ordinary and so more likely to recur: a
+marker gets chosen by copying what the page says, so it can only ever confirm what the page says.
+
+The discriminator that would have caught it, and the rule now: **a marker must be content the
+screen renders for every household, not content it rendered for the one you looked at.** All three
+now use the eyebrow, *"Let's get cooking"*, which belongs to no household.
+
+### 2. "A recipe lands here when it is course is main."
+
+`Chapter.source` is dropped into *"A recipe lands here when it is {source}."* and eight of the
+eleven chapters read `"course is main"`, `"course is side"`, `"no course recorded"` and their
+siblings. The strings had been written for a frame that was never used; only `"shaped like a soup"`
+and `"shaped like a salad"` happened to fit.
+
+It renders **only in a chapter with nothing in it**, so a library of 24 recipes could never show it.
+Fixed to complements, with `chapters.test.ts` refusing a `source` that puts a second verb in the
+sentence — the narrow condition, after two broader attempts fired on correct strings
+(`"a main course"` contains the word "course"; `"no meat"` contains a space). Both mutants caught.
+
+### 3. Nine chips that filter nothing
+
+The four non-`browse` layouts drew the full course filter bar — Appetizers, Soup, Salad, Mains,
+Sides, Desserts, Drinks, Breakfast, Snacks — above *"Your cookbook is empty"*. `COURSES` is a
+static list, so the chips do not know the library is empty, and nine filters over zero recipes
+assert that there is something here to filter. Suppressed when the library is empty, which is a
+different condition from a search that found nothing and wants a different screen.
+
+### What it does not cover
+
+`/` and `/recipes/blend` are still unrendered, and the dynamic routes still need a fixture id.
+The empty pass skips 1440, deliberately: `main` caps at `60rem`, so past 960px a wider screen only
+widens the margins, which is the least interesting question to ask of a page with nothing on it.

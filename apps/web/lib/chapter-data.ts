@@ -21,6 +21,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 export interface ChapterData {
   familyId: string;
+  /** what this household calls itself — the chapter pages used to say "The Lundall Recipe Book" */
+  familyName: string;
   hits: SearchHit[];
   /** how many the allergen filter removed — stated on the page, never a silent absence */
   hiddenByAllergen: number;
@@ -48,6 +50,9 @@ export async function chapterData(): Promise<ChapterData | null> {
 
   return {
     familyId: family.id,
+    /* the household's own name — the contents page and the chapter pages said "The Lundall
+       Recipe Book" to everybody, hard-coded, for as long as the chapter tree has existed */
+    familyName: family.name,
     hits: found.hits,
     hiddenByAllergen: found.hiddenByAllergen ?? 0,
     avoidedAllergens: family.avoidedAllergens,

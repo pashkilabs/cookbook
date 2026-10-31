@@ -8,9 +8,37 @@
  *
  * Shared so every write path says the same thing. There are three now; there will be more.
  */
-export function refusal(error: { code?: string; message: string }): string {
+/**
+ * What is known about the household's entitlement, where the caller knows it.
+ *
+ * `"lapsed"` and `"none"` are the same refusal from Postgres and two different things to say to a
+ * person — *"your subscription window has passed"* is simply untrue of somebody who never had
+ * one, and that was the sentence Stephen's sister would have been shown once §99's fix landed
+ * and before §100's did.
+ *
+ * Kept after §100 made every household entitled, on purpose. The branch is now describing a state
+ * no real household is in, which is exactly when it is cheap to have correct — and the lapsed
+ * path returns the moment windows are real, which the unbounded entitlement's own reversal
+ * condition says will happen.
+ */
+export type EntitlementState = "lapsed" | "none";
+
+export function refusal(
+  error: { code?: string; message: string },
+  entitlement?: EntitlementState,
+): string {
   if (error.code === "42501") {
-    return "This household is read-only — its subscription window has passed. Everything here is still readable.";
+    if (entitlement === "none") {
+      return "This household does not have a subscription, so it cannot be changed. Everything here is still readable.";
+    }
+    if (entitlement === "lapsed") {
+      return "This household is read-only — its subscription window has passed. Everything here is still readable.";
+    }
+    /*
+     * Neither known. True of both states rather than guessing one: the previous wording asserted
+     * a window had passed on every path that did not know, which is thirteen of the fifteen.
+     */
+    return "This household is read-only — it has no active subscription. Everything here is still readable.";
   }
   if (error.code === "23505") {
     return "Somebody else changed that at the same moment. Reload and try again.";
@@ -57,8 +85,8 @@ export function statusFor(error: { code?: string }): number {
 export class WriteRefused extends Error {
   readonly status: number;
 
-  constructor(error: { code?: string; message: string }, what: string) {
-    super(`${what}: ${refusal(error)}`);
+  constructor(error: { code?: string; message: string }, what: string, entitlement?: EntitlementState) {
+    super(`${what}: ${refusal(error, entitlement)}`);
     this.name = "WriteRefused";
     this.status = statusFor(error);
   }

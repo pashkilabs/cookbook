@@ -226,3 +226,59 @@ describe("every protein the column can hold has somewhere to appear", () => {
     expect(withoutIcon.map((chapter) => chapter.slug)).toEqual([]);
   });
 });
+
+/*
+ * ---------------------------------------------------------------------------
+ * The sentence an empty chapter says
+ * ---------------------------------------------------------------------------
+ *
+ * `source` is dropped into *"A recipe lands here when it is {source}."* — so it has to be a
+ * complement, because the frame already supplies the verb. Eight of the eleven read
+ * `"course is main"`, `"no course recorded"` and their siblings, which composed into
+ * **"A recipe lands here when it is course is main."**
+ *
+ * Nothing caught it because the sentence only renders in a chapter with nothing in it, and every
+ * screenshot this project had ever taken was of a household with 24 recipes. It was found by
+ * rendering a household with none — `pnpm shots` now does, as a second fixture.
+ */
+describe("what an empty chapter tells somebody", () => {
+  const SENTENCE = (source: string) => `A recipe lands here when it is ${source}.`;
+
+  it("composes into one sentence with one verb, not two", () => {
+    for (const chapter of TOP_LEVEL) {
+      const said = SENTENCE(chapter.source);
+      // the frame owns the "is"; a second one means `source` smuggled in a clause of its own
+      const verbs = said.match(/\bis\b/g) ?? [];
+      expect(verbs.length, `"${said}"`).toBe(1);
+    }
+  });
+
+  /*
+   * The narrowest condition, after two broader ones fired on correct strings: `"a main course"`
+   * contains "course" as an English word, and forbidding the word would have failed the fix.
+   * What must not appear is a **column name** — the snake_case spelling nothing outside the
+   * schema uses — because that is the tell that a string was written from the query rather than
+   * for the reader.
+   */
+  it("never names a database column at somebody reading a cookbook", () => {
+    for (const chapter of TOP_LEVEL) {
+      for (const column of ["dish_form", "principal_protein", "deleted_at", "family_id"]) {
+        expect(chapter.source.toLowerCase(), chapter.slug).not.toContain(column);
+      }
+    }
+  });
+
+  /*
+   * The protein pages use a different frame — *"when its protein is {source}"* — so their
+   * sources are bare nouns and the rule above would be wrong about them. Asserted separately
+   * rather than exempted, because two frames are the reason the first set drifted.
+   */
+  it("reads as one sentence on the protein pages too, under their different frame", () => {
+    for (const part of MAINS_BY_PROTEIN) {
+      const said = `A main lands here when its protein is ${part.source}.`;
+      // one verb, same rule. NOT "a single word": `vegetarian` is "no meat", which is correct
+      // here and would have been refused by the obvious stricter version of this.
+      expect((said.match(/\bis\b/g) ?? []).length, `"${said}"`).toBe(1);
+    }
+  });
+});

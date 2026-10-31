@@ -428,10 +428,116 @@ await page0.close();
  * it. "Each screen names something only it renders" was the stated intent and this is the first
  * version that does it: a chapter page has to say *its own chapter name* to count as rendered.
  */
+/*
+ * ---------------------------------------------------------------------------
+ * A second household, with nothing in it
+ * ---------------------------------------------------------------------------
+ *
+ * Every screenshot this tool has ever taken was of a household with 24 recipes, 2 shopping
+ * groups, a planned week and a filed recipe line. Smoke is the same — it provisions data before
+ * it touches anything. **So the state every real family is in for its first ten minutes has never
+ * been rendered**, and emptiness is inside every permitted range: a blank page has no overflow,
+ * no squeezed text, no contrast failure and no undersized glyph. Every guard here passes on
+ * nothing at all.
+ *
+ * It is a whole second session rather than a flag, because the thing being tested is a household
+ * and not a query parameter — and it is in the same run rather than behind `--empty`, because a
+ * pass somebody has to remember is one that stops happening. The cost is bounded by rendering it
+ * at two widths instead of three: 1440 only widens the margins of a capped column, which is the
+ * least interesting question to ask of a page that has nothing on it.
+ */
+let emptyHouseholdId = null;
+const emptyToken = await session();
+const emptyCookie = {
+  name: `sb-${ref}-auth-token`,
+  value: `base64-${Buffer.from(JSON.stringify(emptyToken)).toString("base64")}`,
+  domain: new URL(base).hostname,
+  path: "/",
+};
+const EMPTY_AUTH = { Authorization: `Bearer ${emptyToken.access_token}` };
+const emptyContext = await browser.newContext({
+  viewport: { width: WIDTH, height: HEIGHT },
+  extraHTTPHeaders: EMPTY_AUTH,
+});
+await emptyContext.addCookies([emptyCookie]);
+const emptySetup = await emptyContext.newPage();
+emptySetup.setDefaultTimeout(API_TIMEOUT);
+{
+  const response = await emptySetup.request.post(`${base}/api/household`, {
+    timeout: API_TIMEOUT,
+    data: {},
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!body.familyId) {
+    console.error(
+      `COULD NOT MEASURE: the empty household did not provision — HTTP ${response.status()}. ` +
+        `Without it the empty pass would photograph "this account has no household yet" on every ` +
+        `screen and report it clean, which is the fault this tool was built from.`,
+    );
+    process.exit(2);
+  }
+  /*
+   * And assert it really is empty, which is the other half. A fixture that silently inherited
+   * recipes would photograph the seeded state twice and prove nothing.
+   *
+   * Asked of the database rather than of the app: the first version of this called
+   * `GET /api/recipes`, **which does not exist** — the route is POST-only. A 404 parses as no
+   * JSON, no JSON reads as no recipes, and the check would have reported an empty household for
+   * any household at all. A probe that cannot fail, written inside the guard against probes that
+   * cannot fail.
+   */
+  const counted = await fetch(
+    `${SUPABASE}/rest/v1/recipes?family_id=eq.${body.familyId}&deleted_at=is.null&select=id`,
+    { headers: { apikey: SERVICE, authorization: `Bearer ${SERVICE}`, Prefer: "count=exact" } },
+  );
+  if (!counted.ok) {
+    console.error(`COULD NOT MEASURE: could not count the empty household's recipes — HTTP ${counted.status}`);
+    process.exit(2);
+  }
+  const rows = await counted.json();
+  if (!Array.isArray(rows) || rows.length !== 0) {
+    console.error(`COULD NOT MEASURE: the "empty" household has ${rows?.length ?? "?"} recipe(s) in it.`);
+    process.exit(2);
+  }
+  emptyHouseholdId = body.familyId;
+}
+await emptySetup.close();
+
+/*
+ * What a household with nothing sees. Markers are **optional here on purpose**: a marker has to
+ * be content only that screen renders, and what these screens render when there is nothing is
+ * precisely the question — guessing one would assert my expectation rather than measure the page.
+ * Where a marker is absent the run prints what the screen actually said, which is the thing to
+ * read.
+ */
+const EMPTY_SCREENS = [
+  { name: "today", path: "/today" },
+  { name: "recipes-rotation", path: "/recipes", layout: "rotation" },
+  { name: "recipes-browse", path: "/recipes", layout: "browse" },
+  { name: "recipes-time", path: "/recipes", layout: "time" },
+  { name: "recipes-protein", path: "/recipes", layout: "protein" },
+  { name: "recipes-decide", path: "/recipes", layout: "decide" },
+  // the contents page of a library of zero, and a chapter that cannot have anything in it
+  { name: "chapter-main", path: "/recipes/c/main", layout: "browse" },
+  { name: "chapter-pork", path: "/recipes/c/main/pork", layout: "browse" },
+  { name: "chapter-unsorted", path: "/recipes/c/unsorted", layout: "browse" },
+  { name: "planner", path: "/planner" },
+  { name: "shopping", path: "/shopping" },
+  { name: "household", path: "/household" },
+  { name: "recipe-new", path: "/recipes/new" },
+  { name: "import", path: "/recipes/import" },
+];
+
 const SCREENS = [
   { name: "today", path: "/today", marker: "Today" },
   { name: "recipes-rotation", path: "/recipes", layout: "rotation", marker: "What you cook" },
-  { name: "recipes-browse", path: "/recipes", layout: "browse", marker: "The Lundall Recipe Book" },
+  /*
+   * The marker is the eyebrow, not the title. It was "The Lundall Recipe Book" — a literal the
+   * page hard-coded for every household in the world, so this check **asserted the bug as the
+   * specification** and would have failed the fix. The eyebrow is on the contents page in every
+   * state and belongs to no household.
+   */
+  { name: "recipes-browse", path: "/recipes", layout: "browse", marker: "Let\u2019s get cooking" },
   { name: "recipes-time", path: "/recipes", layout: "time", marker: "Recipes" },
   { name: "recipes-decide", path: "/recipes", layout: "decide", marker: "Recipes" },
   // the tree (§86): the divided chapter, a protein leaf, a small leaf, and the unsorted row
@@ -496,16 +602,37 @@ const lightBytes = new Map();
 let pressedCandidates = 0;
 let pressedComparable = 0;
 
-for (const viewport of VIEWPORTS) {
+/*
+ * Two households, same assertions. The empty one goes through every overflow, squeezed-text,
+ * contrast, selected-state and glyph check the seeded one does — which is the point of putting it
+ * through this loop rather than writing a second tool that would check less.
+ */
+const FIXTURES = [
+  { key: "", what: "seeded", screens: SCREENS, cookie, auth: AUTH, viewports: VIEWPORTS, mustSaySomething: false },
+  {
+    key: "empty-",
+    what: "empty household",
+    screens: EMPTY_SCREENS,
+    cookie: emptyCookie,
+    auth: EMPTY_AUTH,
+    viewports: VIEWPORTS.slice(0, 2),
+    mustSaySomething: true,
+  },
+];
+
+for (const fixture of FIXTURES) {
+ if (fixture.key) console.log(`\n  — ${fixture.what}: ${emptyHouseholdId.slice(0, 8)}, nothing in it —`);
+ for (const viewport of fixture.viewports) {
  for (const theme of ["light", "dark"]) {
-  for (const { name, path, layout, marker, signedOut } of SCREENS) {
+  for (const { name: screenName, path, layout, marker, signedOut } of fixture.screens) {
+    const name = `${fixture.key}${screenName}`;
     const context = await browser.newContext({
       viewport: { width: viewport.width, height: viewport.height },
       colorScheme: theme === "dark" ? "dark" : "light",
       deviceScaleFactor: 2,
-      ...(signedOut ? {} : { extraHTTPHeaders: AUTH }),
+      ...(signedOut ? {} : { extraHTTPHeaders: fixture.auth }),
     });
-    if (!signedOut) await context.addCookies([cookie]);
+    if (!signedOut) await context.addCookies([fixture.cookie]);
     const page = await context.newPage();
     if (layout) {
       await page.request.patch(`${base}/api/household`, { data: { recipeLayout: layout } });
@@ -947,7 +1074,13 @@ for (const viewport of VIEWPORTS) {
     }
 
     const body = await page.textContent("body");
-    if (!body?.includes(marker) || body.includes("no household yet")) {
+    if (body?.includes("no household yet")) {
+      console.error(`  COULD NOT MEASURE ${name} (${viewport.name} ${theme}): no household — nothing below is about this screen`);
+      problems += 1;
+      await context.close();
+      continue;
+    }
+    if (marker && !body?.includes(marker)) {
       console.error(`  COULD NOT MEASURE ${name} (${viewport.name} ${theme}): the page did not render its own content`);
       problems += 1;
       await context.close();
@@ -955,6 +1088,42 @@ for (const viewport of VIEWPORTS) {
     }
 
     const label = `${name} (${viewport.name} ${theme})`;
+
+    /*
+     * ---------------------------------------------------------------------------
+     * Does this screen say anything to a household that has nothing?
+     * ---------------------------------------------------------------------------
+     *
+     * The one assertion the empty pass adds, and the only one the existing checks cannot make:
+     * **a blank page passes all of them.** No overflow, no squeezed text, no contrast failure, no
+     * undersized glyph — emptiness is inside every permitted range, so without this the run would
+     * report a wall of `ok` for screens with nothing on them.
+     *
+     * Measured inside `main` and with the tab bar removed, because the tab bar renders five
+     * labels on every screen — counting those would be the adjacent-claim fault this file already
+     * collects: a check reporting on the navigation and read as reporting on the page.
+     *
+     * The threshold is low on purpose. This is not "is the empty state good", which is a question
+     * for a person looking at the picture; it is "is there an empty state at all". The text it
+     * found is printed either way, because that is the thing to read.
+     */
+    if (fixture.mustSaySomething) {
+      const said = await page.evaluate(() => {
+        const main = document.querySelector("main") ?? document.body;
+        const clone = main.cloneNode(true);
+        for (const el of clone.querySelectorAll("nav, .h-tabbar, .h-docked, script, style")) el.remove();
+        return (clone.textContent || "").replace(/\s+/g, " ").trim();
+      });
+      if (said.length < 25) {
+        console.error(
+          `  FAIL ${label}: renders nothing to a household with no recipes — main holds ` +
+            (said.length ? `only "${said}"` : "no text at all"),
+        );
+        problems += 1;
+      } else {
+        console.log(`       says: "${said.slice(0, 110)}${said.length > 110 ? "…" : ""}"`);
+      }
+    }
     if (found.wider > 0) {
       console.error(`  FAIL ${label}: the page is ${found.wider}px wider than the viewport`);
       for (const c of (found.culprits ?? []).slice(0, 3)) {
@@ -970,6 +1139,7 @@ for (const viewport of VIEWPORTS) {
     if (found.wider === 0 && found.squeezed.length === 0) console.log(`  ok   ${label}`);
     await context.close();
   }
+ }
  }
 }
 

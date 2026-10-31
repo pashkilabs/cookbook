@@ -14,6 +14,7 @@
  * tells it whether it is testing the commit it thinks it is.
  */
 import { anthropicModelMismatch, textWiringFault } from "@pashki/import";
+import { FOUNDING } from "@/lib/founding-entitlement";
 import { krogerConfig, krogerKeyFingerprint } from "@/lib/kroger";
 import { REQUIRED_MIGRATION } from "@/lib/schema-version";
 
@@ -148,7 +149,15 @@ export async function GET() {
         drainSecret: present("PASHKI_DRAIN_SECRET"),
         drainSecretFingerprint: await fingerprint(process.env.PASHKI_DRAIN_SECRET),
         drainSecretLength: process.env.PASHKI_DRAIN_SECRET?.length ?? 0,
-        devEntitlement: process.env.PASHKI_DEV_ISSUE_ENTITLEMENT === "true",
+        /*
+         * Was `devEntitlement`, reporting a flag that gated issuance. Every household is now
+         * founded entitled (§100), so the interesting fact is no longer whether a switch is on —
+         * it is what the window says, because "unbounded" is a decision with a reversal condition
+         * and a deployment should be able to show which one it is running.
+         */
+        entitlement:
+          `founded until ${FOUNDING.unboundedUntil.slice(0, 10)}, ` +
+          `${FOUNDING.importsPerMonth} imports per ${FOUNDING.periodDays} days`,
 
         /*
          * The model ids, as values — the one deliberate exception to booleans-only above.

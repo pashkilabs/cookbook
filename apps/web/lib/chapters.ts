@@ -78,7 +78,19 @@ export interface Chapter {
   icon: string;
   /** which rows belong here */
   holds: (recipe: Classified) => boolean;
-  /** stated on the chapter's own page, so somebody can see what put a recipe in it */
+  /**
+   * Stated on the chapter's own page, so somebody can see what put a recipe in it.
+   *
+   * **A complement, because the sentence supplies the verb**: *"A recipe lands here when it is
+   * {source}."* These read `"course is main"` and `"no course recorded"` until somebody rendered
+   * an empty chapter, which produced *"A recipe lands here when it is course is main."* on eight
+   * of the eleven chapters. The strings had been written for a frame that was never used, and the
+   * only state that shows them is one no fixture had ever been in — every screenshot this project
+   * has taken was of a household with 24 recipes, so every chapter was full.
+   *
+   * `chapters.test.ts` refuses a `source` containing a verb, which is the narrow condition that
+   * separates a complement from the clause these were.
+   */
   source: string;
 }
 
@@ -89,25 +101,25 @@ export interface Chapter {
  * the cooking, "Not sorted yet" last because it is the one chapter somebody opens to empty.
  */
 export const TOP_LEVEL: readonly Chapter[] = [
-  { slug: "main", label: "Mains", icon: "dinner.png", source: "course is main", holds: (r) => r.course === "main" },
+  { slug: "main", label: "Mains", icon: "dinner.png", source: "a main course", holds: (r) => r.course === "main" },
   { slug: "soup", label: "Soups", icon: "soup.png", source: "shaped like a soup", holds: (r) => r.dish_form === "soup" },
   { slug: "salad", label: "Salads", icon: "salad.png", source: "shaped like a salad", holds: (r) => r.dish_form === "salad" },
-  { slug: "side", label: "Sides", icon: "sides.png", source: "course is side", holds: (r) => r.course === "side" },
+  { slug: "side", label: "Sides", icon: "sides.png", source: "a side", holds: (r) => r.course === "side" },
   /* skewers, not the meat platter: the platter was drawn for something else and only ever borrowed
      because the first sheet had nothing for this chapter. Paige commissioned the skewers to close
      that gap, so the platter is now spare and nothing should reference it — a reader who "restores"
      it is undoing the fix, not finding one. Measured against the set before swapping: ink 18.6%
      against a median of 17.4%, aspect 0.807 to poultry's 0.815, so it needs no special size. */
-  { slug: "starter", label: "Appetisers", icon: "skewers.png", source: "course is starter", holds: (r) => r.course === "starter" },
-  { slug: "snack", label: "Snacks", icon: "snacks.png", source: "course is snack", holds: (r) => r.course === "snack" },
-  { slug: "dessert", label: "Desserts", icon: "desserts.png", source: "course is dessert", holds: (r) => r.course === "dessert" },
-  { slug: "breakfast", label: "Breakfast", icon: "breakfast.png", source: "course is breakfast", holds: (r) => r.course === "breakfast" },
-  { slug: "drink", label: "Drinks", icon: "cocktail.png", source: "course is drink", holds: (r) => r.course === "drink" },
+  { slug: "starter", label: "Appetisers", icon: "skewers.png", source: "an appetiser", holds: (r) => r.course === "starter" },
+  { slug: "snack", label: "Snacks", icon: "snacks.png", source: "a snack", holds: (r) => r.course === "snack" },
+  { slug: "dessert", label: "Desserts", icon: "desserts.png", source: "a dessert", holds: (r) => r.course === "dessert" },
+  { slug: "breakfast", label: "Breakfast", icon: "breakfast.png", source: "breakfast", holds: (r) => r.course === "breakfast" },
+  { slug: "drink", label: "Drinks", icon: "cocktail.png", source: "a drink", holds: (r) => r.course === "drink" },
   {
     slug: "unsorted",
     label: "Not sorted yet",
     icon: "groceries.png",
-    source: "no course recorded",
+    source: "not sorted into a chapter yet",
     holds: (r) => r.course === null,
   },
 ];

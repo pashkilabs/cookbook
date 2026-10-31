@@ -63,7 +63,7 @@ export default async function ChapterPage({ params }: { params: Promise<{ chapte
       <main>
         <div className="h-contents">
           <p className="meta" style={{ margin: 0 }}>
-            <Link href="/recipes">&lsaquo; The Lundall Recipe Book</Link>
+            <Link href="/recipes">&lsaquo; {data.familyName}</Link>
           </p>
 
           <div className="h-chapter-hero">

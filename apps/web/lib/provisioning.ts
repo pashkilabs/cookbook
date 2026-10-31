@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { platformStore } from "./platform";
-import { issueDevelopmentEntitlement } from "./dev-entitlement";
+import { issueFoundingEntitlement } from "./founding-entitlement";
 
 /**
  * Provisioning happens at **first confirmed sign-in**, not at sign-up.
@@ -101,13 +101,19 @@ export async function provisionForConfirmedAccount(accessToken: string): Promise
     displayName,
   });
 
-  const entitlement = await issueDevelopmentEntitlement(provisioned.family.id);
+  /*
+   * Every new household is entitled (§100). This was gated on a development flag, which meant
+   * public signup produced a read-only app — a meter gating nothing, since there is nothing to
+   * sell yet. `created` is false on a repeat call, and issuance is an upsert on
+   * (family_id, app_key), so calling this on every confirmed sign-in is safe.
+   */
+  const entitlement = await issueFoundingEntitlement(provisioned.family.id);
 
   return {
     status: "provisioned",
     familyId: provisioned.family.id,
     created: provisioned.created,
-    canWrite: entitlement.issued,
+    canWrite: entitlement.entitled,
   };
 }
 

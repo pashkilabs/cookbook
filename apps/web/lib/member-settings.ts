@@ -1,8 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { maybeRow } from "./rows";
-import { WriteRefused } from "./refusal";
+import { WriteRefused, type EntitlementState } from "./refusal";
 import { platformStore } from "./platform";
 import { isRecipeLayout, type RecipeLayout } from "./recipe-layout";
+import { evaluateAccess } from "@pashki/platform-client";
 
 /**
  * How *this person* reads the recipe book — their layout, and whether they have been asked.
@@ -170,7 +171,13 @@ export async function writeRecipeLayout(
    * subscription window may read everything and change nothing (§9). What was wrong was that the
    * mechanism's wording reached a person, naming Postgres instead of the reason.
    */
-  if (ensured.error) throw new WriteRefused(ensured.error, "saving how you read the recipe book");
+  if (ensured.error) {
+    throw new WriteRefused(
+      ensured.error,
+      "saving how you read the recipe book",
+      await entitlementState(familyId),
+    );
+  }
 
   /*
    * The stamp always; the layout only when one was chosen. A dismissal that carried the layout
@@ -244,4 +251,25 @@ function stored(row: { recipe_layout: string; recipe_layout_asked_at: string | n
     layout: isRecipeLayout(row.recipe_layout) ? row.recipe_layout : UNCHOSEN,
     askedAt: row.recipe_layout_asked_at,
   };
+}
+
+
+/**
+ * Whether this household never had an entitlement or had one that ran out.
+ *
+ * Only ever called on a refusal, so the extra seam read costs nothing on the path that works.
+ * It exists because `42501` is one code for two situations a person would describe differently,
+ * and this is the write path where somebody actually met the difference (§99).
+ *
+ * Returns `undefined` rather than guessing when the read itself fails — a wrong explanation is
+ * worse than a general one, and `refusal` has a sentence that is true of both.
+ */
+async function entitlementState(familyId: string): Promise<EntitlementState | undefined> {
+  try {
+    const entitlement = await platformStore().findEntitlement(familyId, "recipes");
+    if (!entitlement) return "none";
+    return evaluateAccess(entitlement, new Date()).canWrite ? undefined : "lapsed";
+  } catch {
+    return undefined;
+  }
 }

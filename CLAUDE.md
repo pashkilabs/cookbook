@@ -1604,6 +1604,99 @@ guessing.
   §83 is the same family from the value side — *count the values before writing a threshold against
   them.* This is the time side: **count the weeks the thing could have happened in.**
 
+- **Emptiness is inside every permitted range, so a blank screen passes every guard here.** No
+  horizontal overflow, no text box too narrow for a word, no contrast failure, no undersized
+  glyph, no missing stylesheet — a page with nothing on it satisfies all of them. And **every
+  screenshot this project had ever taken was of a household with 24 recipes**, because `shot.mjs`
+  seeds before it shoots and smoke provisions before it touches anything. The state every real
+  family is in for its first ten minutes had never been rendered once.
+
+  `pnpm shots` now renders a **second household with nothing in it** through the same loop, so it
+  gets every existing assertion plus one those cannot make: *does this screen say anything at all*,
+  measured inside `main` with the tab bar removed (five labels on every screen would otherwise
+  report on the navigation while claiming to report on the page). The answer was reassuring —
+  fourteen of fourteen say something — and the three faults it did find were each invisible to a
+  full library. **Ask what state your fixture is always in, because that is the state your tool
+  cannot see.**
+
+- **A marker copied from the page can only ever confirm the page, and three of them were asserting
+  a surname.** `The Lundall Recipe Book` was a hard-coded literal in the contents `<h1>` and the
+  chapter back link, so **every household in the world opened a cookbook with Stephen's name on
+  it** — and `shot.mjs`'s browse marker plus two checks in `smoke.mjs` asserted that exact string.
+  All three green, all three would have **failed the fix**.
+
+  Second instance of *a test encoding the bug as the specification*, and the mechanism is more
+  ordinary than the first: nobody decided to enshrine it, a marker was simply chosen by reading
+  what the screen said. So the rule is a question to ask when choosing one: **would this marker
+  still be right for a different household?** It is now the eyebrow, "Let's get cooking", which
+  belongs to nobody. Same family as *print the thing, then search what came back* — except the
+  thing printed was correct and what it showed should never have been there.
+
+- **Strings written for a frame that is never used sit wrong forever, if the only state that
+  renders them is one no fixture is in.** `Chapter.source` goes into *"A recipe lands here when it
+  is {source}."* and eight of eleven chapters read `"course is main"`, `"no course recorded"` and
+  their siblings — composing into **"A recipe lands here when it is course is main."** Two happened
+  to fit, which is why it never looked systematically wrong to anybody reading the array.
+
+  It renders **only in an empty chapter**, so 24 recipes could never show it. The guard is one verb
+  per sentence, and getting it narrow took two tries that both fired on correct strings — `"a main
+  course"` contains the word "course", `"no meat"` contains a space. *Name the narrowest condition
+  that separates the legitimate case*, again, and the broader version would have been switched off
+  for crying wolf on the fix itself.
+
+- **A gate can be correct about its own question and wrong about the result.** Entitlement
+  issuance was gated behind `PASHKI_DEV_ISSUE_ENTITLEMENT` with a sound argument: production
+  entitlements come from billing, there is no billing, so nothing should issue one. Every word of
+  that is about **issuance**, and the consequence was about **households** — public signup produced
+  an app that could read everything and change nothing. With nothing to sell, a refused write is
+  not an upsell, it is a wall with no door, and the first person through the door met it on her
+  first screen.
+
+  The tell was available: ask what the gate is *protecting*, and if the answer is revenue that does
+  not exist yet, the gate is costing something and buying nothing. §100 makes the window unbounded
+  until billing exists, and keeps the **import cap**, because an import costs an inference call and
+  that is a real cost rather than a notional one. *The window and the rate are different questions
+  that the word "entitlement" runs together.*
+
+- **Idempotent + upsert = a meter that never binds, and both halves are right.**
+  `provisionForConfirmedAccount` runs on **every** confirmed sign-in, deliberately, which is what
+  lets two routes call it without coordinating. `issueEntitlement` is an **upsert that replaces
+  `quota_json` wholesale**, deliberately, so a replayed billing webhook updates a window rather
+  than duplicating it. Compose them and a household gets its monthly imports back every time
+  somebody signs in: the quota is present on the row, visible in the API, and enforces nothing.
+
+  Not a bug in either piece, and neither comment is wrong — the hazard lives in the sentence
+  neither of them had to write. So when calling an idempotent writer from an idempotent caller,
+  **ask what the writer overwrites**, not whether it is safe to call twice. The fix is to *ensure*
+  rather than issue: read first, write only when absent. Its side effect is the better half —
+  existing households with no entitlement heal on next sign-in instead of by a hand-written UPDATE.
+
+- **A quota nobody has exhausted is a rollover nobody has tested.** `platform_spend_quota` renews a
+  counter only `if resets is not null and now() > resets`, and **98 of 98** entitlements on the
+  hosted project carry `resetsAt: null` beside `periodDays: 30` — from the development path, from
+  smoke, and from `issue:entitlement` alike. A period with no anchor never elapses, so every one of
+  them is a **one-off allowance wearing a monthly label**, and a household that spent its 50
+  imports would have been refused the 51st forever.
+
+  Invisible because the highest `used` anywhere is 92 against a limit of 500 and everyone else is
+  in single figures. Same family as *a permission nothing has exercised*, with the trigger being
+  **volume** rather than privilege: the branch that was never taken is the one behind a number
+  nobody has reached. So for any limit, ask what happens at the limit and whether anything has
+  been there — and note that `periodDays` beside a null anchor is a field **arguing with itself**,
+  which is the same shape as a number in a comment disagreeing with the codebase.
+
+- **The probe I wrote inside the guard against unmeasurable probes could not fail.** Checking that
+  the new empty-household fixture really is empty, I called `GET /api/recipes` — **which does not
+  exist**, the route is POST-only. A 404 body parses as no JSON, no JSON reads as no recipes, so
+  the check would have certified *any* household as empty, including the seeded one. Written in the
+  same hour, in the same file, as a comment explaining that a fixture must assert the state it
+  depends on.
+
+  The cheap defence is the one this file keeps arriving at from new directions: **a probe's first
+  job is to show it could have failed.** Here that meant asking the database with `count=exact`
+  instead of asking an endpoint whose existence I had assumed — *print the thing* applied to a
+  route rather than to a payload.
+
 - **A report that names the mechanism is two hypotheses, and the specific one is the one nobody
   checks.** *"saving how you read the recipe book: new row violates row-level security policy for
   table member_settings"* arrived with a diagnosis attached: it is the INSERT path, it has never run

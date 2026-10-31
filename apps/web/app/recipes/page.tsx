@@ -153,6 +153,8 @@ export default async function RecipesPage({
    */
   const layout = reader.layout;
   const searching = q.length > 0 || filter !== null || chosen !== null || protein !== null;
+  /* nothing at all, as opposed to nothing matching — the two want different screens */
+  const libraryEmpty = hits.length === 0 && !searching;
 
   const narrowed = hits.filter(({ recipe }) => {
     const row = recipe as unknown as Record<string, string | null>;
@@ -388,7 +390,9 @@ export default async function RecipesPage({
         proteinsAvailable={proteinsAvailable}
         /* the contents page is the chapter list; course chips above it ask the same question
            twice, and drawing them costs the "one screen, no scroll" the layout is for */
-        chips={!(layout === "browse" && !searching)}
+        /* and never to a household with nothing: nine course chips above "your cookbook is
+           empty" are nine filters over zero recipes, which say there is something here */
+        chips={!libraryEmpty && !(layout === "browse" && !searching)}
       />
 
       {error && <p className="error">Could not read recipes: {error}</p>}
@@ -529,11 +533,24 @@ export default async function RecipesPage({
         * it. Every figure in the drawing was illustrative (§4 of the brief) and three of them were
         * wrong by more than rounding — Salads 6 is really 1, Appetisers 4 is really 1.
         */}
-      {layout === "browse" && !searching && (
+      {/*
+        * Not to a household with nothing. A contents page whose contents are empty is a title and
+        * a count of zero, and it rendered *below* the "your cookbook is empty" card — so the
+        * screen said it was empty, then introduced itself, then stopped. Looked at rather than
+        * reasoned about: the picture is what made the ordering obvious.
+        */}
+      {layout === "browse" && !searching && !libraryEmpty && (
         <section className="h-contents">
           <div className="h-contents-head">
             <Eyebrow>Let&rsquo;s get cooking</Eyebrow>
-            <h1 className="h-contents-title">The Lundall Recipe Book</h1>
+            {/*
+              * The household's own name. This was the literal "The Lundall Recipe Book", so every
+              * family in the world opened a cookbook with somebody else's surname on it — and the
+              * screenshot check asserted that exact string as the page's marker, which is a test
+              * encoding the bug as the specification. Found by rendering a household that is not
+              * Stephen's, which nothing had ever done.
+              */}
+            <h1 className="h-contents-title">{family.name}</h1>
             <p className="h-chapter-tally">
               {narrowed.length} {narrowed.length === 1 ? "recipe" : "recipes"}
             </p>
