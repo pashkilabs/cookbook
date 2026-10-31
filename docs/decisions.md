@@ -6602,3 +6602,169 @@ handing over blind:
   read`. The counts are what say whether to try again later, and **could-not-read must never
   collapse into no-grouping** — the Spare Rib 429 is the case that proves it, and a 429 reported as
   "nothing to do" is a silent wrong answer about a recipe that does have sections.
+
+## §99 — "New row violates row-level security policy": the policy was right, and the sentence reached a person
+
+Stephen's sister opened `/household`, chose how she wanted to read the recipe book, and was shown:
+
+```
+saving how you read the recipe book: new row violates row-level security
+policy for table "member_settings"
+```
+
+The brief that came with it named the cause: *"It is the INSERT path, and it has never run in
+production before. Stephen and Paige both had rows carried forward by the migration that created
+the table, so every write since has been an UPDATE."* Checked in the order it asked, printing
+rather than inferring, and **all three of its premises are false** — which is the thing most worth
+recording, because every one of them is plausible and two of them are the kind of thing nobody
+re-checks.
+
+### What was actually true
+
+**`member_settings` has an INSERT policy, and it is the standard one.**
+
+```sql
+create policy member_settings_insert_in_household on public.member_settings
+  for insert to authenticated
+  with check (
+    family_id in (select private.current_family_ids())
+    and private.household_can_write(family_id, 'recipes')
+  );
+```
+
+Byte-identical in shape to the one the loop in `20260811090300_row_level_security.sql` writes for
+every household table, with the column grants beside it:
+`grant insert (family_id, family_member_id, recipe_layout, recipe_layout_asked_at)`.
+
+**The INSERT path had run 57 times in production.** The migration created 15 rows in one batch at
+`2026-10-22T02:44:21`; every row after that has a distinct `created_at`, up to
+`2026-10-25T16:12:42`. Paige's own row is one of them — `03:59:46`, created by the app, not carried
+forward. So "never run before" was wrong, and the half of it about Paige was wrong in the same way.
+
+**Smoke already chooses a layout as a brand-new member, twice.** `scripts/smoke.mjs:1051` does it
+as the fresh owner and `:1645` does it **as an invitee** — both households with no row, so both are
+INSERTs as `authenticated`, and both were green throughout.
+
+**The cause was the entitlement.** She signed up through open signup and got her **own** household,
+created `2026-10-31T19:07:32` with zero entitlement rows — because production issues none.
+`PASHKI_DEV_ISSUE_ENTITLEMENT` is local-only and there is no billing flow yet (open question #1).
+So `household_can_write(family_id, 'recipes')` was false, the insert was refused, and §9 was working
+exactly as designed.
+
+Reproduced against the local stack as `authenticated`, four cases:
+
+| case | result |
+|---|---|
+| owner, entitled household, own member row | ok |
+| invited 2nd adult, entitled, own member row | ok |
+| owner, **no entitlement**, own member row | **REFUSED** `new row violates row-level security policy` |
+| no entitlement, SELECT | ok, 1 row — reads never depend on billing |
+
+### The bug, which is a different bug
+
+Nothing in the database was wrong. What was wrong is that **the mechanism's own wording reached a
+person**, with the wrong status.
+
+`apps/web/lib/refusal.ts` exists for precisely this, and its docstring says *"Shared so every write
+path says the same thing. There are three now; there will be more."* Fourteen write paths call it.
+`writeRecipeLayout` was the fifteenth and threw `ensured.error.message` raw, and the route's `catch`
+answered **400** — a bad-request for a request that was perfectly good.
+
+The reason the helper was not enough is worth keeping, because it is structural rather than an
+oversight: a path that **returns** a result uses `refusal()` + `statusFor()` and gets both halves
+(`createRecipeFrom` is that shape). A path that **throws** loses the code on the way out — a `catch`
+receives `unknown`, reads a message, and has nothing left to pick a status from. So `WriteRefused`
+carries both, `statusFor` moves next to `refusal` where it answers the same question about the same
+code, and `recipe-writes` re-exports it so its six callers are untouched.
+
+Mutation-tested through the route against local Postgres, both assertions independently:
+
+| mutant | result |
+|---|---|
+| `throw new Error(error.message)` — the original | **CAUGHT** — HTTP 400, `new row violates row-level security policy for table "member_settings"`, her string verbatim |
+| `WriteRefused` kept, route forced to `status: 400` | **CAUGHT** — right words, wrong status |
+| fix in place | 403, human sentence, no mechanism named, `/recipes` still 200 |
+
+### What else has only ever been updated
+
+The brief's broader question, and it has a short answer: **`member_settings` is the only app table
+whose rows a migration created.** The only other `insert … select` backfill in the whole migration
+set is `20260814094000_invitations.sql`, into `accounts` and `family_members` — platform tables with
+no client INSERT path at all.
+
+So the premise does not generalise, and the audit worth doing is the adjacent one: *which household
+tables have a client INSERT that something actually performs as `authenticated`?* Twelve of
+seventeen have a db test that does. Of the five that do not, four are reached by smoke through a
+route — `recipe_steps` via `POST /api/recipes`, `shortlist_entries` and `shopping_ticks` via their
+own routes, `member_settings` via `PATCH /api/household`.
+
+**One is reached by nothing: `ratings`.** It is inserted only from browser components
+(`verdicts.tsx`, `cooked.tsx`) — there is no ratings route, so smoke cannot touch it, and every db
+test inserts it as `admin`. Humans have exercised it 46 times in the real household, so this is not
+*a permission nothing has exercised*; it is the core of the product with no automated writer, and
+nothing would catch a regression. Logged, not fixed here: it wants a route or a browser-level check,
+and it is a separate change.
+
+### The smoke gap, which is also not the one the brief named
+
+Smoke covers the insert thoroughly. What it has never done is **write while unentitled**, because
+`smoke.mjs:438` grants an entitlement immediately after provisioning — *"an operator grant, so the
+write paths below are testing themselves rather than the meter."* That reasoning is right and it
+left the meter untested through the product: §9 is a guarantee the database keeps and the screens
+have to **translate**, and the translation is the part that had a hole in it.
+
+Added, asserting the words and the status rather than the refusal, with the entitlement removed and
+restored in a `finally`. The control is the point — a 403 alone would pass for a typo'd route or a
+signed-out session, so the same call runs again with the entitlement back and reports NOT MEASURED
+if *that* fails. Two checks, both green locally at 236:
+
+```
+ok  a household with no entitlement is refused in words, not in Postgres
+      — HTTP 403 (wanted 403) — said "…This household is read-only…"
+ok  and can still read everything while it cannot write
+      — HTTP 200 on /recipes with no entitlement
+```
+
+### Left for Stephen, because it is a product decision and it touches open question #1
+
+Two things this diagnosis surfaced and did not change.
+
+**Every public signup is read-only.** There is no billing flow, so an entitlement arrives only by
+`issue:entitlement --email`. Her first run of the app was a read-only one, and now it says so in
+words instead of in Postgres — but *"its subscription window has passed"* is not true of somebody
+who never had one. The sentence needs a second branch, and what it should say depends on what signup
+is supposed to offer, which is open question #1 and not answerable from the code.
+
+**A read-only household is asked the layout question forever.** The prompt is suppressed by
+`recipe_layout_asked_at`, and stamping it is a write, so it is refused along with everything else.
+Answer, be refused, return, be asked again. Making the layout writable without an entitlement is
+defensible — it is a *reading* preference, and the invariant chain's own words are "a lapsed
+household must stop being able to change settings while still being able to read its own kitchen" —
+but it means editing `assert_household_invariants`, which refused the migration until the predicate
+was there. That is a decision, not a fix.
+
+### And the stale figure in her screenshot
+
+`"Only 25 of your 67 recipes name a protein, so this would hide 42 of them."` — a hard-coded string
+literal at `apps/web/lib/recipe-layout.ts:87`, shown to every household.
+
+Measured against the hosted project on 2026-10-31: that household has **80 live recipes, 60 mains,
+and 53 of the 60 mains name a protein** (88%); 54 of 80 across the whole library. All three numbers
+in the sentence were wrong, and the claim it makes had **reversed** — it was a ceiling when written
+(*"the reversal condition is the classifier's protein rate, not a backlog"*) and the enum, the vote
+and the dairy sentence moved the rate. Per-household it ranges 67%–90% of mains.
+
+Two things it got wrong, and the second is the §85 lesson:
+
+- **A fill rate is a fact about a classifier on a date, not about a column.** An axis refused on one
+  measurement wants re-measuring after anything that touches the thing filling it.
+- **The denominator was the library and the question was about dinners.** A dessert naming no
+  protein is not a gap a fridge layout must cover. 37% of a library and 88% of its mains are the
+  same column answering two different questions.
+
+`notYet` is now a function of a `LibraryShape` read per household, and `protein` stays
+`ready: false` because `/recipes` still falls it through to the flat list — but **the reason has
+changed from a ceiling to a schedule**, and it says so. Two households in the test, so a constant
+cannot pass, plus an assertion that none of `25`, `67` or `42` is quoted again, plus a separate
+sentence for a household with no dinners in it (`0 of 0` is a ratio outside the range the data
+occupies, §83).

@@ -88,18 +88,61 @@ describe("the setting's values", () => {
 
   it("gives the deferred one a reason rather than the word 'soon'", () => {
     /*
-     * §71's pattern. "Soon" is a schedule and this is a ceiling: the classifier has run on 64 of
-     * 67 recipes and named a protein for 25, so waiting changes nothing. A household told "soon"
-     * about it would be told something untrue.
+     * §71's pattern: a count a person can check, not an adjective.
+     *
+     * The *kind* of reason has changed since this was written. It was a ceiling — 25 of 67 named,
+     * the classifier already run on 64, so waiting would not help — and it is now a schedule: the
+     * same household reads 53 of its 60 mains and `/recipes` has no protein screen. The assertion
+     * is unchanged because it was never about which of the two it is; it is about saying so with a
+     * number.
      */
     const deferred = LAYOUT_CHOICES.filter((c) => !c.ready);
     expect(deferred.map((c) => c.value)).toEqual(["protein"]);
     for (const choice of deferred) {
       expect(choice.notYet, choice.value).toBeTruthy();
-      expect(choice.notYet!.toLowerCase(), choice.value).not.toBe("soon");
-      // a count a person can check, not an adjective
-      expect(choice.notYet, choice.value).toMatch(/\d/);
+      const said = choice.notYet!({ total: 80, mains: 60, mainsNamingProtein: 53 });
+      expect(said.toLowerCase(), choice.value).not.toBe("soon");
+      expect(said, choice.value).toMatch(/\d/);
     }
+  });
+
+  /*
+   * regression: the reason was a hard-coded string — "Only 25 of your 67 recipes name a protein,
+   * so this would hide 42 of them" — shown to every household including one with three recipes and
+   * one with none. By the time it was read off a screenshot all three numbers were wrong and the
+   * claim had reversed: that household reads 53 of 60 mains.
+   *
+   * Two households, so a constant cannot pass. A single call cannot tell a computed sentence from
+   * a literal that happens to contain a digit.
+   */
+  it("reports each household's own figures, so the reason cannot be a constant", () => {
+    const protein = LAYOUT_CHOICES.find((c) => c.value === "protein")!;
+    const big = protein.notYet!({ total: 80, mains: 60, mainsNamingProtein: 53 });
+    const small = protein.notYet!({ total: 19, mains: 9, mainsNamingProtein: 6 });
+
+    expect(big).toContain("53");
+    expect(big).toContain("60");
+    expect(small).toContain("6");
+    expect(small).toContain("9");
+    expect(big).not.toBe(small);
+
+    // and none of the three numbers it used to quote at everybody
+    for (const stale of ["25", "67", "42"]) {
+      expect(big, `the old figure ${stale} is still being quoted`).not.toContain(stale);
+      expect(small, `the old figure ${stale} is still being quoted`).not.toContain(stale);
+    }
+  });
+
+  /*
+   * A household with nothing to sort. The figure is not merely zero — "0 of your 0 dinners name a
+   * protein" is arithmetic nobody asked for, and §83's point is that a ratio outside the range the
+   * data occupies says nothing. It is a different sentence.
+   */
+  it("says something true to a household with no dinners in it yet", () => {
+    const protein = LAYOUT_CHOICES.find((c) => c.value === "protein")!;
+    const empty = protein.notYet!({ total: 0, mains: 0, mainsNamingProtein: 0 });
+    expect(empty).not.toContain("0 of");
+    expect(empty.toLowerCase()).toContain("not built");
   });
 
   it("gives a ready layout no not-yet reason, so the two states cannot blur", () => {

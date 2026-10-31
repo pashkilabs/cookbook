@@ -81,7 +81,12 @@ export function Choosing({ total }: { total: number }) {
             className="h-choosing-option"
             disabled={busy || !choice.ready}
             // the reason a disabled option is disabled, said rather than implied
-            title={choice.ready ? choice.description : "Not built yet — the data for it is not there"}
+            /*
+             * "the data for it is not there" was the old reason and is no longer true — the
+             * classifier names a protein on most mains now, and the screen is what is missing.
+             * The in-context card has no room for the figure; `/household` carries it.
+             */
+            title={choice.ready ? choice.description : "Not built yet — this screen does not exist"}
             onClick={() => void answer(choice.value)}
           >
             <span>{choice.label}</span>

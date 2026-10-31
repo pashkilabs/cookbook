@@ -1604,6 +1604,76 @@ guessing.
   §83 is the same family from the value side — *count the values before writing a threshold against
   them.* This is the time side: **count the weeks the thing could have happened in.**
 
+- **A report that names the mechanism is two hypotheses, and the specific one is the one nobody
+  checks.** *"saving how you read the recipe book: new row violates row-level security policy for
+  table member_settings"* arrived with a diagnosis attached: it is the INSERT path, it has never run
+  in production, Stephen and Paige had rows carried forward by the migration so every write since
+  has been an UPDATE. Checked in the order asked, and **all three were false**:
+
+  - `member_settings` **has** an INSERT policy, byte-identical in shape to every other household
+    table's, with the column grants beside it;
+  - the INSERT path had run **57 times** in production — the migration wrote 15 rows in one batch at
+    `02:44:21` and every later row has its own timestamp, **Paige's among them** at `03:59:46`;
+  - `pnpm smoke` already chooses a layout as a fresh owner *and* as a fresh invitee, both with no
+    row, both INSERTs as `authenticated`, both green.
+
+  The cause was the **entitlement**: she signed up through open signup, got her own household with
+  zero entitlements because production issues none, and `household_can_write` refused the write. §9
+  working as designed.
+
+  **The first check answered the question and the list carried me past it.** Check 1 was "does it
+  have an INSERT policy at all" — the answer was *yes, and it is the standard one*, which already
+  says the policy is fine and the fault is elsewhere. Check 2 was "what does its WITH CHECK
+  compare?", which assumes the fault is still in the policy. An ordered checklist is **a hypothesis
+  with steps**, and a step that disconfirms it does not stop the list; nothing in the format makes a
+  disconfirming answer louder than a confirming one. So after each check, ask what it *rules out*,
+  not only what it found.
+
+  And the third face of a familiar trap: `new row violates row-level security policy` is the
+  identical string for a **missing** policy, a **wrong** WITH CHECK, and a **correct** policy
+  correctly refusing. Storage and tables already share this wording; so do all three causes. The
+  message names the mechanism, never the cause, so it cannot discriminate and reading it as "the
+  policy is broken" is a guess wearing a quotation's clothes.
+
+- **One write path out of fifteen did not use the shared translator, and a `throw` is why the helper
+  was not enough.** `refusal()` turns `42501` into *"This household is read-only"*; fourteen paths
+  call it and its own docstring says *"shared so every write path says the same thing"*.
+  `writeRecipeLayout` threw `error.message` raw and the route's `catch` answered **400**, so correct
+  behaviour reached a person as Postgres with a bad-request beside it.
+
+  The structural half, which is not an oversight: a path that **returns** a result keeps
+  `refusal()` *and* `statusFor()`. A path that **throws** loses the code on the way out — a `catch`
+  gets `unknown`, reads a message, and has nothing left to choose a status from, so every refusal
+  became a 400. `WriteRefused` carries both. **When a helper has to be called at a boundary that
+  erases its input, the helper is not the mechanism — the type is.**
+
+- **Smoke covered the insert and never covered the meter, which is one axis over.** `smoke.mjs`
+  grants an entitlement immediately after provisioning — *"an operator grant, so the write paths
+  below are testing themselves rather than the meter"* — right about what it buys, and it means **no
+  check in 236 ever wrote as an unentitled household**, the state every public signup is in. §9 is a
+  guarantee the database keeps and the **screens have to translate**; the keeping was tested and the
+  translating was not. Same family as `check-contrast` answering about luminance when the question
+  was palette: the instrument was green and pointed at a neighbouring axis of its own subject.
+
+  Also: of 17 household tables, 12 have a db test inserting as a client and 4 more are reached by
+  smoke through a route. **`ratings` is reached by nothing** — inserted only from browser
+  components, so there is no route for smoke to call and every db test uses `admin`. Humans have
+  written 46 of them, so the permission works; nothing would catch it breaking.
+
+- **A measured number in user-facing copy is a claim with an expiry date nobody set.** `/household`
+  told every household *"Only 25 of your 67 recipes name a protein, so this would hide 42 of them"*
+  — a hard-coded string. Measured the day somebody read it off a screenshot: that household has
+  **80 recipes, 60 mains, 53 of the 60 mains named**. All three numbers wrong, and the *claim* had
+  reversed — it was written as a ceiling (*"the reversal condition is the classifier's protein rate,
+  not a backlog"*) and the enum, the vote and the dairy sentence moved the rate to 88%.
+
+  Two faults. The denominator was **the library when the question was about dinners** — a dessert
+  naming no protein is not a gap a fridge layout has to cover, and 37% of a library and 88% of its
+  mains are the same column answering two questions (§85). And it was **one household's figures
+  shown to all of them**, including one with three recipes and one with none. Same shape as the
+  fixture's hard-coded week: a literal is a measurement frozen at the moment it was convenient. If a
+  sentence contains a number about the reader, compute it from the reader.
+
 - **An assertion that something is missing is worthless without evidence that something else is
   present.** The chapter tree changed what `/recipes` renders on the `browse` layout — a contents
   page lists *chapters*, so no recipe title appears — and `"a recipe naming an avoided allergen is

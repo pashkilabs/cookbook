@@ -1,7 +1,7 @@
 import { maybeRow, rows } from "./rows";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { prepareRecipe, type PreparedRecipe } from "./recipe-input";
-import { refusal } from "./refusal";
+import { refusal, statusFor } from "./refusal";
 import { serviceClient } from "./service-client";
 
 /**
@@ -51,10 +51,13 @@ export async function writeChildren(
   return null;
 }
 
-/** A read-only household is not a bad request; it is a household that may not write. */
-export function statusFor(error: { code?: string }): number {
-  return error.code === "42501" ? 403 : 400;
-}
+/**
+ * A read-only household is not a bad request; it is a household that may not write.
+ *
+ * Re-exported rather than defined here: it moved next to `refusal`, which answers the same
+ * question about the same code, after a write path translated the message and kept a 400.
+ */
+export { statusFor };
 
 /**
  * Create a recipe, its ingredients, its steps and its photo row.

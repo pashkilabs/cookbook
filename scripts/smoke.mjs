@@ -113,6 +113,9 @@ function sessionCookie(token) {
   return parts.join("; ");
 }
 
+/** set once the household exists; the read-only probe uses it to restore what it removed */
+let grantEntitlement = null;
+
 async function call(method, path, { body, auth = true, expect } = {}) {
   const headers = { "Content-Type": "application/json" };
   if (auth && session) {
@@ -434,15 +437,23 @@ try {
 
   if (!familyId) throw new Error("no household; the rest cannot be measured");
 
-  // an operator grant, so the write paths below are testing themselves rather than the meter
-  await restUpsert("POST", "/entitlements?on_conflict=family_id,app_key", {
-    family_id: familyId,
-    app_key: "recipes",
-    tier: "full",
-    quota_json: { imports: { limit: 50, used: 0, resetsAt: null, periodDays: 30 } },
-    valid_until: new Date(Date.now() + 86400000).toISOString(),
-    grace_until: new Date(Date.now() + 2 * 86400000).toISOString(),
-  });
+  /*
+   * An operator grant, so the write paths below are testing themselves rather than the meter.
+   *
+   * Hoisted into a function because the read-only probe takes it away and has to put back exactly
+   * the same thing — two copies of these values would let the probe restore a *different*
+   * entitlement and leave every later check measuring something else.
+   */
+  grantEntitlement = () =>
+    restUpsert("POST", "/entitlements?on_conflict=family_id,app_key", {
+      family_id: familyId,
+      app_key: "recipes",
+      tier: "full",
+      quota_json: { imports: { limit: 50, used: 0, resetsAt: null, periodDays: 30 } },
+      valid_until: new Date(Date.now() + 86400000).toISOString(),
+      grace_until: new Date(Date.now() + 2 * 86400000).toISOString(),
+    });
+  await grantEntitlement();
 
   // ---------------------------------------------------------------------------
   // 3. The product.
@@ -1677,6 +1688,75 @@ try {
         ownerBack.status === 200 && ownerBack.body?.recipeLayout === "browse",
         `HTTP ${ownerBack.status} — the owner still reads ${JSON.stringify(ownerBack.body?.recipeLayout ?? null)}, wanted "browse"`,
       );
+
+      /*
+       * ---------------------------------------------------------------------------
+       * A write by a household with **no entitlement** — the state every public signup is in
+       * ---------------------------------------------------------------------------
+       *
+       * Stephen's sister signed up, was asked how she reads the recipe book, answered, and was
+       * shown *"new row violates row-level security policy for table member_settings"*. Every
+       * policy and every grant was correct; `household_can_write` is ANDed into the insert policy
+       * on every household table and her household had no entitlement, because production issues
+       * none — `PASHKI_DEV_ISSUE_ENTITLEMENT` is local-only and there is no billing flow yet.
+       *
+       * **This script could not have caught it, and the reason is the gap.** It covers the insert
+       * thoroughly — a fresh owner and a fresh invitee both create their row here, as
+       * `authenticated`, and both were green throughout. What it never did was write while
+       * *unentitled*, because line 438 grants an entitlement immediately after provisioning so the
+       * write paths "test themselves rather than the meter". Reasonable, and it left the meter
+       * untested through the product: §9 is a guarantee the database keeps and the screens have to
+       * translate, and fourteen write paths translate it while the fifteenth did not.
+       *
+       * Asserted on the **words and the status**, not on the refusal. A refusal is correct; naming
+       * Postgres to a person is not, and a 400 says she sent a bad request when she did not.
+       *
+       * The control is the point: a 403 on its own would pass for any reason at all — a typo'd
+       * route, a signed-out session, a 403 from somewhere else entirely. So the same call is made
+       * again with the entitlement restored, and if *that* fails this block reports NOT MEASURED
+       * rather than a pass.
+       */
+      try {
+        await rest("DELETE", `/entitlements?family_id=eq.${familyId}`);
+
+        const refused = await call("PATCH", "/api/household", { body: { recipeLayout: "time" } });
+        const said = String(refused.body?.error ?? refused.body ?? "");
+
+        /*
+         * Reads never depend on billing — no SELECT policy in the schema references
+         * `household_can_write`, so read-only is the floor by construction. Checked here because
+         * it is the half that must NOT have changed, and a refusal that also broke reading would
+         * be a different and much worse bug wearing this one's clothes.
+         */
+        const stillReads = await call("GET", "/recipes");
+
+        await grantEntitlement();
+        const control = await call("PATCH", "/api/household", { body: { recipeLayout: "browse" } });
+
+        if (control.status !== 200) {
+          skip(
+            "a household with no entitlement is refused in words, not in Postgres",
+            `the same write failed with the entitlement restored (HTTP ${control.status}), so the refusal above proves nothing`,
+          );
+        } else {
+          const mechanism = /row-level security|member_settings|violates|42501/i.test(said);
+          record(
+            "a household with no entitlement is refused in words, not in Postgres",
+            refused.status === 403 && said.includes("read-only") && !mechanism,
+            `HTTP ${refused.status} (wanted 403) — ${
+              mechanism ? `named the mechanism: "${said.slice(0, 90)}"` : `said "${said.slice(0, 90)}"`
+            }`,
+          );
+          record(
+            "and can still read everything while it cannot write",
+            stillReads.status === 200,
+            `HTTP ${stillReads.status} on /recipes with no entitlement — reads must never depend on billing`,
+          );
+        }
+      } finally {
+        // whatever happened above, later checks need the household able to write
+        if (grantEntitlement) await grantEntitlement();
+      }
 
       /*
        * ---------------------------------------------------------------------------

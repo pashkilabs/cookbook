@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { LAYOUT_CHOICES, type RecipeLayout } from "@/lib/recipe-layout";
+import { LAYOUT_CHOICES, type LibraryShape, type RecipeLayout } from "@/lib/recipe-layout";
 import { LayoutPreview } from "./layout-preview";
 
 /**
@@ -21,7 +21,7 @@ import { LayoutPreview } from "./layout-preview";
  * same reason the in-context card does it: a household choosing between two options cannot see
  * what it is not being offered, and "not built yet" is a more honest screen than a shorter one.
  */
-export function ChoosingSetting({ current }: { current: string }) {
+export function ChoosingSetting({ current, library }: { current: string; library: LibraryShape }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +87,9 @@ export function ChoosingSetting({ current }: { current: string }) {
                 * The reason, not "not yet". §71's pattern: "soon" is a schedule and a ceiling is
                 * not, and a household is entitled to know which it is being given.
                 */}
-              {!choice.ready && choice.notYet && <span className="h-option-blocked">{choice.notYet}</span>}
+              {!choice.ready && choice.notYet && (
+                <span className="h-option-blocked">{choice.notYet(library)}</span>
+              )}
             </span>
           </button>
         ))}

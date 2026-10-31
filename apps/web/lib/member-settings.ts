@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { maybeRow } from "./rows";
+import { WriteRefused } from "./refusal";
 import { platformStore } from "./platform";
 import { isRecipeLayout, type RecipeLayout } from "./recipe-layout";
 
@@ -158,7 +159,18 @@ export async function writeRecipeLayout(
     },
     { onConflict: "family_member_id,family_id", ignoreDuplicates: true },
   );
-  if (ensured.error) throw new Error(`saving how you read the recipe book: ${ensured.error.message}`);
+  /*
+   * `WriteRefused`, not a bare message. This threw `ensured.error.message` raw, and it is the one
+   * write path in the app that did not go through `refusal()` — so the first person to open this
+   * on a household with no entitlement was told *"new row violates row-level security policy for
+   * table member_settings"*, with a 400 where every other path answers 403.
+   *
+   * Nothing about the policy or the grant was wrong. `household_can_write` is ANDed into the
+   * insert policy exactly as it is on every household table, and a household outside its
+   * subscription window may read everything and change nothing (§9). What was wrong was that the
+   * mechanism's wording reached a person, naming Postgres instead of the reason.
+   */
+  if (ensured.error) throw new WriteRefused(ensured.error, "saving how you read the recipe book");
 
   /*
    * The stamp always; the layout only when one was chosen. A dismissal that carried the layout
@@ -180,7 +192,36 @@ export async function writeRecipeLayout(
       .maybeSingle(),
     "saving how you read the recipe book",
   );
-  if (!row) throw new Error("saving how you read the recipe book: the row was not there to write");
+  /*
+   * Zero rows updated, which PostgREST reports as success with nothing in it rather than as an
+   * error — so this has to be read rather than assumed. There are two causes and they want
+   * different sentences: the update policy refused (a household inside its window for the insert
+   * above and outside it now is impossible, but a *tombstoned* member is not), or the row this
+   * call just ensured is soft-deleted.
+   *
+   * So it asks. A SELECT never depends on the entitlement, by construction — no policy in the
+   * schema can deny a read — so this read works precisely when the write did not, and the answer
+   * distinguishes the two instead of picking the likelier one. An extra round trip on a path that
+   * has already failed is cheap; a message that names the wrong cause is not.
+   */
+  if (!row) {
+    const existing = maybeRow(
+      await supabase
+        .from("member_settings")
+        .select("deleted_at")
+        .eq("family_id", familyId)
+        .eq("family_member_id", memberId)
+        .maybeSingle(),
+      "reading back how you read the recipe book",
+    );
+    if (existing?.deleted_at) {
+      throw new WriteRefused(
+        { message: "this person has been removed from the household" },
+        "saving how you read the recipe book",
+      );
+    }
+    throw new WriteRefused({ code: "42501", message: "the write was refused" }, "saving how you read the recipe book");
+  }
   return stored(row);
 }
 

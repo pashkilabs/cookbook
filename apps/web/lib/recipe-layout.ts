@@ -14,31 +14,63 @@
  * Two of the five are built. The measurements say why, and one is not a scheduling reason
  * ---------------------------------------------------------------------------
  *
- * Measured against the real library (67 recipes), the fields the five layouts stand on are:
+ * Measured against the real library, the fields the five layouts stand on are:
  *
  *   plan_entries       36 rows over 26 recipes   `rotation`  — built
  *   recipes.course     44 of 67 classified       `browse`    — built
- *   recipes.time_minutes 42 of 67                `time`      — deferred, see below
- *   recipes.principal_protein **25 of 67**       `protein`   — not viable, see below
- *   ratings + history  46 ratings, 10 recipes    `decide`    — deferred
+ *   recipes.time_minutes 42 of 67                `time`      — built since
+ *   recipes.principal_protein, see below         `protein`   — not built
+ *   ratings + history  46 ratings, 10 recipes    `decide`    — built since
  *
- * **`protein` is not a scheduling deferral.** The handoff called it "the best-populated field —
- * 55 of 66, better than course's 43". It is the *worst* populated of the three: **25 of 67**, under
- * every way of counting (live, including deleted, every household). And it will not fill in:
- * `classified_at` is set on **64 of 67**, so the classifier has already run on nearly everything
- * and **declined to name a protein for 39 of them**. A fridge layout today would offer Pork 11,
- * Chicken 9, Beef 2, Seafood 1, Fish 1, Vegetarian 1 — and hide 42. The reversal condition is the
- * classifier's protein rate, not a backlog.
+ * ---------------------------------------------------------------------------
+ * `protein` was refused for a ceiling, and the ceiling is gone
+ * ---------------------------------------------------------------------------
  *
- * `time` is a genuine scheduling deferral: 42 of 67 is workable with an honest "no time recorded"
- * group. `decide` needs one suggestion with a stated reason, which is §67's standard and a screen
- * of its own.
+ * The refusal said: **25 of 67**, the classifier had already run on 64 of them and declined 39, so
+ * a fridge layout would hide 42 and "the reversal condition is the classifier's protein rate, not
+ * a backlog." Every word of that was true when it was written.
+ *
+ * It is no longer true. After the enum gained `turkey` and `duck` (§97), the three-reading vote,
+ * and the dairy sentence, the same household reads **53 of its 60 mains** — 88% — and 54 of 80
+ * across the whole library. Measured 2026-10-31 against the hosted project.
+ *
+ * Two lessons, and the second is why the sentence below is a function:
+ *
+ *   - **A fill rate is a fact about a classifier on a date, not about a column.** An axis refused
+ *     on one measurement wants re-measuring after anything that touches the thing filling it.
+ *   - **The denominator was the library and the question was about dinners.** A dessert naming no
+ *     protein is not a gap a fridge layout has to cover; it is a recipe the layout should not be
+ *     asked about. Counting it as a miss is §85's mistake — a column's fill rate is a property of
+ *     the subset, and 37% of a library and 88% of its mains are the same column answering two
+ *     different questions.
+ *
+ * So `protein` stays `ready: false`, and the **reason has changed from a ceiling to a schedule**:
+ * `/recipes` falls the layout through to the flat list, which is the real blocker. It is said that
+ * way below, with the household's own figures rather than this household's.
+ *
+ * `time` and `decide` were deferred here and have since been built.
  */
 export const RECIPE_LAYOUTS = ["rotation", "browse", "time", "protein", "decide"] as const;
 export type RecipeLayout = (typeof RECIPE_LAYOUTS)[number];
 
 export const isRecipeLayout = (value: unknown): value is RecipeLayout =>
   typeof value === "string" && (RECIPE_LAYOUTS as readonly string[]).includes(value);
+
+/**
+ * What a household's library looks like, for the layouts whose readiness depends on it.
+ *
+ * `mains` and `mainsNamingProtein` rather than a single rate: a rate cannot say whether the
+ * denominator was big enough to mean anything, and 6 of 9 and 53 of 60 are the same percentage
+ * about two different amounts of evidence (§83).
+ */
+export interface LibraryShape {
+  /** live recipes in this household */
+  total: number;
+  /** of those, how many are mains — the only recipes a fridge layout is about */
+  mains: number;
+  /** of the mains, how many name a principal protein */
+  mainsNamingProtein: number;
+}
 
 /** the question, in the household's words — never "choose a layout" */
 export const LAYOUT_CHOICES: ReadonlyArray<{
@@ -48,13 +80,19 @@ export const LAYOUT_CHOICES: ReadonlyArray<{
   /** false where the data cannot support it yet — the option is shown as not ready, not hidden */
   ready: boolean;
   /**
-   * Why it is not ready, in the household's words — never "not yet".
+   * Why it is not ready, in **this household's** words — never "not yet".
    *
    * §71's pattern: say the thing rather than gesture at it. "Soon" and "this would hide 42 of
    * your recipes" are different promises, and a household is entitled to know which it is being
    * given. One is a schedule; the other is a **ceiling**, and a ceiling does not move by waiting.
+   *
+   * A **function** because the previous version was a string, and a string cannot be right for
+   * more than one household. It read *"Only 25 of your 67 recipes name a protein, so this would
+   * hide 42 of them"* — three numbers from one household on one day, shown to every household,
+   * including one with three recipes and one with none. By the time somebody read it out of a
+   * screenshot, all three were wrong and the claim they made had reversed.
    */
-  notYet?: string;
+  notYet?: (library: LibraryShape) => string;
 }> = [
   {
     value: "rotation",
@@ -80,11 +118,18 @@ export const LAYOUT_CHOICES: ReadonlyArray<{
     description: "Chicken, pork, fish — pick the thing you already have.",
     ready: false,
     /*
-     * A ceiling, stated. The classifier has run on 64 of 67 recipes and named a protein for 25,
-     * so this is not a backlog that fills in — and a household told "soon" about it would be told
-     * something untrue.
+     * A schedule, stated — which is a change of kind from the ceiling this used to report, and the
+     * honest answer now that the classifier names a protein on the large majority of mains. The
+     * screen is what is missing: `/recipes` falls `protein` through to the flat list.
+     *
+     * The figure is still given, because "not built yet" on its own is the gesture §71 forbids and
+     * because it is the number that would decide whether to build it. Over **mains**, since those
+     * are the only recipes the layout would sort.
      */
-    notYet: "Only 25 of your 67 recipes name a protein, so this would hide 42 of them.",
+    notYet: ({ mains, mainsNamingProtein }) =>
+      mains === 0
+        ? "Nothing here is a dinner yet, so there is nothing to sort by protein — and this screen is not built."
+        : `Not built yet. Your recipes would carry it: ${mainsNamingProtein} of your ${mains} dinners name a protein.`,
   },
   {
     value: "decide",

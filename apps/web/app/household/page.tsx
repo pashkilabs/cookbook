@@ -11,6 +11,7 @@ import { krogerConfig } from "@/lib/kroger";
 import { userClient } from "@/lib/supabase-server";
 import { platformStore } from "@/lib/platform";
 import { readMemberSettings } from "@/lib/member-settings";
+import { readLibraryShape } from "@/lib/library-shape";
 import { listGroupsWithCounts } from "@/lib/shopping-groups";
 import { MEMBER_COLOURS, invitationState } from "@pashki/platform-client";
 import { Roster } from "./roster";
@@ -75,6 +76,14 @@ export default async function HouseholdPage() {
    */
   const groups = await listGroupsWithCounts(supabase, family.id);
 
+  /*
+   * The shape of this household's library, for the one layout whose reason-for-not-being-ready is
+   * a fact about the data. It was a hard-coded sentence quoting 25 of 67 — one household's figures
+   * on one day, shown to every household, and wrong about that household by the time anybody read
+   * it off a screenshot.
+   */
+  const library = await readLibraryShape(supabase, family.id);
+
   // read here, not in the client component: `lib/kroger` holds a client secret and
   // `check-server-only` would refuse it in a "use client" file
   const krogerEnvironment = krogerConfig()?.environment ?? null;
@@ -126,7 +135,7 @@ export default async function HouseholdPage() {
           Yours alone — everybody here picks their own, and changing this changes nothing for
           anyone else.
         </p>
-        <ChoosingSetting current={mine.layout} />
+        <ChoosingSetting current={mine.layout} library={library} />
       </section>
 
       <section style={{ marginBottom: "2rem" }}>

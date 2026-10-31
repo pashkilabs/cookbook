@@ -2,6 +2,7 @@ import { provisionForConfirmedAccount } from "@/lib/provisioning";
 import { platformClient, platformStore } from "@/lib/platform";
 import { userClient } from "@/lib/supabase-server";
 import { memberIdFor, writeRecipeLayout } from "@/lib/member-settings";
+import { WriteRefused } from "@/lib/refusal";
 import { isRecipeLayout } from "@/lib/recipe-layout";
 
 /**
@@ -219,9 +220,14 @@ export async function PATCH(request: Request) {
       const saved = await writeRecipeLayout(supabase, family.id, memberId, layout);
       return Response.json({ recipeLayout: saved.layout, recipeLayoutAskedAt: saved.askedAt });
     } catch (thrown) {
+      /*
+       * The status comes from the refusal rather than from this `catch`. Everything here used to
+       * answer 400, so a read-only household — which is every household that has not been issued
+       * an entitlement by hand — got a bad-request for a request that was perfectly good.
+       */
       return Response.json(
         { error: thrown instanceof Error ? thrown.message : "that layout was refused" },
-        { status: 400 },
+        { status: thrown instanceof WriteRefused ? thrown.status : 400 },
       );
     }
   }
