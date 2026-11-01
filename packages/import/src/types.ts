@@ -111,12 +111,27 @@ export type ImportFailure =
    * Facebook, Instagram and TikTok never resolve. Rejected before a request is
    * made, with the route the user should take instead — four doomed attempts and a
    * timeout is a worse answer than an immediate one.
+   *
+   * **A link wrapper is not this.** `share.google`, a shortener and `l.facebook.com` all forward
+   * to a page that publishes the recipe, and sending somebody to the camera for one of those is
+   * the expensive half of the mistake. This kind means *there is nothing behind the link*.
    */
   | { kind: "blocked-platform"; url: string; platform: string; useInstead: "screenshot" | "video" }
   | { kind: "fetch-failed"; url: string; status?: number; detail: string }
-  | { kind: "not-html"; url: string; detail: string }
-  | { kind: "no-recipe-found"; url: string; triedTiers: Tier[] }
-  | { kind: "recipe-incomplete"; url: string; tier: Tier; missing: string[] }
+  /*
+   * `resolvedUrl` is present only when the link that was pasted is not the page that was read —
+   * a `share.google` wrapper, a shortener, a Facebook interstitial, an AMP variant.
+   *
+   * It exists for the sentence rather than for the data. "This page publishes no machine-readable
+   * recipe" is a true statement about the page and reads, to somebody who pasted a share link, as
+   * the app being unable to import the site they got it from. The wrapper is a *different class*
+   * from Facebook and TikTok, which never resolve at all: this one resolved, and then the
+   * destination had nothing. Saying which is which is the difference between "try a screenshot"
+   * and "this blog does not publish a recipe card".
+   */
+  | { kind: "not-html"; url: string; detail: string; resolvedUrl?: string }
+  | { kind: "no-recipe-found"; url: string; triedTiers: Tier[]; resolvedUrl?: string }
+  | { kind: "recipe-incomplete"; url: string; tier: Tier; missing: string[]; resolvedUrl?: string }
   /** every supplied screenshot failed to decode or was too large to send */
   | { kind: "no-usable-images"; rejected: Array<{ image: string; detail: string }> }
   /** screenshots were supplied but no vision model is configured */

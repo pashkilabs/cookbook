@@ -9,6 +9,21 @@ import type { ImportFailure } from "./types.js";
  * answer with the route they should take instead is a better one. Pulling the media
  * server-side is also ruled out by decisions §12 — the user shares the file.
  */
+/**
+ * Link wrappers that *do* resolve, declared before `BLOCKED` because they are its exceptions.
+ *
+ * `l.facebook.com` and `lm.facebook.com` are Facebook's outbound interstitials: they 302 to a
+ * destination somebody chose, and that destination is an ordinary recipe page. Both were matched
+ * by `/(^|\.)facebook\.com$/` and refused with *"Facebook links never resolve to a page
+ * containing the recipe. Take a screenshot instead"* — a sentence that is true of a Facebook
+ * **post** and false of a Facebook **redirect**, and the difference is the whole of the advice.
+ *
+ * So the condition is the two host names rather than the category they belong to: `facebook.com`
+ * itself, `m.facebook.com`, and any page under them stay blocked, because a post really does
+ * not publish the recipe.
+ */
+const RESOLVES_ANYWAY = /^(l|lm)\.facebook\.com$/i;
+
 const BLOCKED: Array<{ pattern: RegExp; platform: string; useInstead: "screenshot" | "video" }> = [
   { pattern: /(^|\.)facebook\.com$/i, platform: "Facebook", useInstead: "screenshot" },
   { pattern: /(^|\.)fb\.(com|watch)$/i, platform: "Facebook", useInstead: "screenshot" },
@@ -72,10 +87,20 @@ export interface NormalisedUrl {
  * private address. Checking the host cannot see that; only checking the address the
  * socket actually connected to can, which belongs in the `Fetcher` adapter rather than
  * here. Recorded as a gap rather than implied to be closed.
+ *
+ * **And what it did not cover and could: a redirect.** This runs on the URL a client
+ * submits, once. `createHttpFetcher` then asked `fetch` for `redirect: "follow"`, and a
+ * redirect is a new request to a host nothing had looked at — so a public wrapper
+ * answering `302 Location: http://127.0.0.1:…` was followed, and the body came back into
+ * `import_jobs.result_json`, which the submitting household can read. Measured, not
+ * reasoned about: this function refused `127.0.0.1` as input and the fetcher reached the
+ * same address through one hop and returned the page. A front-door guard on a door that
+ * opens onto a corridor. `isPrivateHost` is exported for that reason and the fetcher now
+ * follows redirects itself, checking every hop.
  */
 const INTERNAL_SUFFIX = /(^|\.)(localhost|local|internal|intranet|lan|corp|home\.arpa)$/i;
 
-function isPrivateHost(hostname: string): boolean {
+export function isPrivateHost(hostname: string): boolean {
   const host = hostname.replace(/^\[|\]$/g, "");
   if (INTERNAL_SUFFIX.test(host)) return true;
 
@@ -167,6 +192,7 @@ export function normaliseUrl(
 export function blockedPlatform(
   host: string,
 ): Extract<ImportFailure, { kind: "blocked-platform" }> | null {
+  if (RESOLVES_ANYWAY.test(host)) return null;
   for (const entry of BLOCKED) {
     if (entry.pattern.test(host)) {
       return {

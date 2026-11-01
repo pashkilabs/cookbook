@@ -1788,3 +1788,75 @@ guessing.
   interpolated one — arrived as `1<!-- --> hidden:` and the regex missed it. **The rule is not
   "remember the comments", it is that human text goes through `visible()`, including in a check
   written the same hour as the page.**
+
+- **A thing that works by accident has no symptom, and "does it fail?" is the wrong question to ask
+  of it.** `share.google` links were assumed broken and were never broken: `redirect: "follow"`
+  resolved the two hops since the fetcher was written, and a pasted share link imported with a
+  full recipe card, eleven ingredients, the right site name. Nothing needed building.
+
+  **That success is what hid three faults, all in what the import *kept* rather than what it
+  returned.** `source_url` stored the wrapper while the page read was `pipingpotcurry.com` — the
+  destination sat in a variable one line away, used as the base for relative links and discarded as
+  the source. The cache key is computed before the fetch, so every distinct share token for one
+  recipe was its own row and its own re-parse. And `l.facebook.com` was in the never-resolves list
+  beside `facebook.com`, so an interstitial that forwards perfectly well was answered with "take a
+  screenshot".
+
+  None of the three can produce a bug report. A wrapper that *fails* is a complaint; a wrapper that
+  succeeds while storing the wrong address is a recipe that works until somebody else's short link
+  expires. So the question for anything arriving through a path nobody designed for it is **not
+  whether it returns, but what it writes down** — and the general form is that a redirect, a retry,
+  a fallback and a cache hit all produce a correct-looking answer from a different input than the
+  one you think you handled.
+
+  It also inverted the usual direction of a premise check. The brief predicted the link failed and
+  said not to assume so; it resolved. The brief predicted AMP publishes worse markup; `?amp=true`
+  and the canonical extract **identically** on the one site still serving AMP, and most AMP URLs
+  now redirect to canonical or 404. **Two of the brief's three hypotheses were wrong and the work
+  was still exactly where it pointed** — which is the argument for measuring a premise rather than
+  for distrusting a brief.
+
+  Two of my own answers were unearned in the same round, both the oldest shape here. `grep '"@type"'
+  | head -12` ended one line above `Recipe` and I nearly reported the destination as publishing no
+  recipe markup. And flagging wrapper hosts by substring matched `t.co` inside `lemonsandzest.com`
+  and `simplehomeedit.com`, reporting three production recipes to repair where there are **zero**.
+  **Print the thing, then search what came back** — and a truncated list and an absent match look
+  identical to a finding.
+
+- **A guard on the entry point is not a guard on the path, and a redirect is a new request to a
+  host nothing has looked at.** `normaliseUrl` refuses a private address and is correct, tested, and
+  explicit in its own comment about why — the URL is fetched server-side by something holding the
+  service role, and the result is written to `import_jobs.result_json`, which the submitting
+  household can read. A request forgery with a return channel.
+
+  The fetcher then asked `fetch` for `redirect: "follow"`. Measured, both halves in one probe:
+
+  ```
+  normaliseUrl("http://127.0.0.1:64692/")  → { kind: "private-address" }
+  fetcher.page("http://127.0.0.1:64692/")  → 200, "INTERNAL ONLY"
+  ```
+
+  The function refused the address as input; the fetcher reached it through one hop and returned
+  the body. A front-door check on a door opening onto a corridor.
+
+  Not *a permission nothing has exercised* — this check runs on every import and answers correctly.
+  Not a stale or adjacent proxy either. **The check is right and the path goes around it**, and the
+  thing that put it one layer out of position is that `normaliseUrl` reads like the place where
+  "which hosts may we reach" is decided, because for the submitted URL it is. So: **for any guard
+  on an input, ask what else can become that input later** — a redirect, a `Location` header, a
+  canonical link, a retry against a fallback host, an unpacked archive's path.
+
+  **And the reason it had no test is the reason it was there.** `fetcher.ts` was the one module here
+  that touches the network and the only one with no test file: `redirect: "follow"` is a single
+  word, obviously correct for reaching a page, and nothing asked what it reached. Android's share
+  sheet is what turned redirect-following from incidental into load-bearing, and **a default becomes
+  load-bearing without being edited** — which is why the audit question is "what does this
+  one-word option now decide?" rather than "what have we changed?".
+
+  The fixture problem is worth knowing before writing the next one of these: every test server is on
+  loopback, which the shipped predicate correctly refuses, **so a fixture for the happy path cannot
+  express the happy path.** Injecting the predicate is widening a gate for a test, which this file
+  already has an entry about. The split that keeps both honest: the **refusal** tests construct the
+  fetcher with no options at all and exercise the real predicate; only the chain-following tests
+  override it, through one named constant with the reason attached. If that constant ever appears in
+  a refusal test, that test passes against a fetcher with no guard.

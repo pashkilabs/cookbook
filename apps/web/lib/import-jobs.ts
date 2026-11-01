@@ -63,6 +63,35 @@ export function describeJob(row: JobRow) {
   return base;
 }
 
+/**
+ * "That link forwarded to <host>" — the clause a wrapper's failure needs and nothing else does.
+ *
+ * Android's share sheet is how a phone user sends themselves a recipe, and what it hands over is
+ * `share.google/CB96RGAg…`. Those resolve: the measured one goes two hops to a page with a full
+ * recipe card. So when one *does* fail, the honest sentence has to separate the wrapper from the
+ * destination, because the default wording describes the page that was read and the person is
+ * looking at the link they pasted. Without this, "this page publishes no machine-readable recipe"
+ * reads as the app being unable to import a site it imports fine.
+ *
+ * Returns "" when nothing was forwarded, so the sentence is unchanged for an ordinary URL.
+ */
+function forwardedFrom(failure: { [key: string]: unknown }): string {
+  const asked = typeof failure.url === "string" ? failure.url : "";
+  const reached = typeof failure.resolvedUrl === "string" ? failure.resolvedUrl : "";
+  if (!reached) return "";
+  const host = (value: string) => {
+    try {
+      return new URL(value).hostname.replace(/^www\./, "");
+    } catch {
+      return "";
+    }
+  };
+  const from = host(asked);
+  const to = host(reached);
+  if (!from || !to || from === to) return "";
+  return `That ${from} link forwarded to ${to}. `;
+}
+
 /** Say what happened, and never claim a capability that is not built. */
 export function explainFailure(
   failure: { kind: string; [key: string]: unknown } | null,
@@ -73,16 +102,17 @@ export function explainFailure(
       return `${String(failure.platform ?? "That site")} links never resolve to a page containing the recipe.`;
     case "no-recipe-found":
       return (
+        forwardedFrom(failure) +
         "This page publishes no machine-readable recipe. Structured data and microdata both " +
         "found nothing, and reading the page text itself is not built yet."
       );
     case "recipe-incomplete":
-      return `The page had recipe data but not enough of it — missing ${
+      return `${forwardedFrom(failure)}The page had recipe data but not enough of it — missing ${
         Array.isArray(failure.missing) ? failure.missing.join(", ") : "required fields"
       }.`;
     case "fetch-failed":
     case "not-html":
-      return `That page could not be read (${String(failure.detail ?? failure.kind)}). Some sites refuse automated requests.`;
+      return `${forwardedFrom(failure)}That page could not be read (${String(failure.detail ?? failure.kind)}). Some sites refuse automated requests.`;
     case "private-address":
     case "invalid-url":
       return "That does not look like a recipe link.";

@@ -153,3 +153,44 @@ export function extractSiteName(html: string): string | null {
    */
   return stripTags(og?.[1] ?? "").trim() || null;
 }
+
+/**
+ * The URL a page says it is, when it disagrees with the URL we asked for.
+ *
+ * Two cases, both produced by a phone's share sheet. A **wrapper** — `share.google`, a shortener,
+ * a Facebook interstitial — answers a redirect, and `finalUrl` already has the answer. An **AMP**
+ * or parameterised variant does not redirect at all: `…/baked-chicken-breast-recipe/?amp=true`
+ * returns 200 and serves the recipe, so the only thing that knows the real address is the page's
+ * own `<link rel="canonical">`. Both of the pages measured for this publish one, and nothing here
+ * read it.
+ *
+ * **Only when the host agrees.** A canonical link is a claim a page makes about itself, and a page
+ * can claim anything — including somebody else's URL, which is a way to make a recipe appear to
+ * have come from a site that never published it, and to poison a shared cache keyed on it. So a
+ * cross-host canonical is ignored rather than trusted: within a host it is the page correcting our
+ * address, across hosts it is the page telling us about a page we have not read. `www.` is not a
+ * difference, because half the web's canonicals only differ by it.
+ */
+export function extractCanonicalUrl(html: string, finalUrl: string): string | null {
+  const matches = String(html ?? "").matchAll(
+    /<link\b[^>]*\brel=["']?canonical["']?[^>]*>/gi,
+  );
+  for (const tag of matches) {
+    const href = /\bhref=["']([^"']+)["']/i.exec(tag[0] ?? "")?.[1];
+    if (!href) continue;
+    let candidate: URL;
+    let base: URL;
+    try {
+      base = new URL(finalUrl);
+      candidate = new URL(href, finalUrl);
+    } catch {
+      return null;
+    }
+    if (candidate.protocol !== "http:" && candidate.protocol !== "https:") continue;
+    const bare = (host: string) => host.replace(/^www\./i, "").toLowerCase();
+    if (bare(candidate.hostname) !== bare(base.hostname)) continue;
+    candidate.hash = "";
+    return candidate.toString();
+  }
+  return null;
+}

@@ -78,6 +78,24 @@ describe("platforms that never resolve", () => {
       expect(blockedPlatform(host), host).toBeNull();
     }
   });
+
+  it("lets Facebook's outbound interstitials through, because those do resolve", () => {
+    /*
+     * regression: `l.facebook.com` and `lm.facebook.com` matched `/(^|\.)facebook\.com$/` and
+     * were refused with "Facebook links never resolve to a page containing the recipe — take a
+     * screenshot instead". That sentence is true of a Facebook *post* and false of a Facebook
+     * *redirect*, which forwards to whatever page somebody linked. A wrapper is a different class
+     * from a platform that has no recipe behind it, and sending somebody to the camera for a link
+     * that would have imported is the expensive half of the mistake.
+     */
+    for (const host of ["l.facebook.com", "lm.facebook.com", "L.Facebook.com"]) {
+      expect(blockedPlatform(host), host).toBeNull();
+    }
+    // and the carve-out is the two host names, not "anything under facebook.com"
+    for (const host of ["facebook.com", "www.facebook.com", "m.facebook.com", "ll.facebook.com"]) {
+      expect(blockedPlatform(host)?.kind, host).toBe("blocked-platform");
+    }
+  });
 });
 
 describe("resolving relative URLs", () => {

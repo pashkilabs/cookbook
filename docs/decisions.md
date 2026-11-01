@@ -6946,3 +6946,147 @@ different condition from a search that found nothing and wants a different scree
 `/` and `/recipes/blend` are still unrendered, and the dynamic routes still need a fixture id.
 The empty pass skips 1440, deliberately: `main` caps at `60rem`, so past 960px a wider screen only
 widens the margins, which is the least interesting question to ask of a page with nothing on it.
+
+## §102 — share.google already worked, and that is what made the three faults behind it invisible
+
+Stephen's sister pasted `https://share.google/CB96RGAgwmiOwPs7K` and was refused by the
+entitlement, which §100 fixed. The brief asked whether the *link* was a second problem and was
+explicit about not assuming it failed. It did not fail. Measured, with the production user agent:
+
+```
+share.google/CB96RGAgwmiOwPs7K
+  → 302 www.google.com/share.google?q=CB96RGAgwmiOwPs7K
+  → 301 pipingpotcurry.com/instant-pot-carrot-soup/   200, text/html
+```
+
+Two hops to a page with a complete JSON-LD `Recipe`. Through the real pipeline: tier 0, eleven
+ingredients, four steps, the right site name, the right image. **Nothing needed building for
+share.google to work.** `redirect: "follow"` had been doing it since the fetcher was written.
+
+Which is the whole problem. A wrapper that fails is a bug report; a wrapper that succeeds leaves
+three faults with no symptom.
+
+### 1. The resolved address was thrown away
+
+`extractTier` took `page.finalUrl` as the base for relative links — correct — and
+`normalised.fetchUrl` as `sourceUrl`. So the recipe stored
+`source_url = https://share.google/CB96RGAgwmiOwPs7K` while reading
+`pipingpotcurry.com`. The destination was in the same function, in a variable, one line away.
+
+That is the field "Open the original" links to, and the field the section backfill and every future
+re-read start from. A short link is somebody else's row in somebody else's database: the recipe
+works until Google rotates the token, and then the only address we kept is a stub.
+
+**It is not only the exotic links**, which is what makes it worth a version bump rather than a
+note. `delish.com/…/a24846620/…` 301s to `…/a51580/…`; sites redirect to their own canonical path,
+add or drop a trailing slash, and move http to https. Every one of those stored the pre-redirect
+form.
+
+And the **no-redirect** case needs a second source. `…/baked-chicken-breast-recipe/?amp=true`
+returns 200 and serves the recipe, so there is no hop to learn from — the page's own
+`<link rel="canonical">` is the only thing that knows. Both pages measured for this publish one;
+nothing here read it. `extractCanonicalUrl` does, **only when the host agrees**: a canonical is a
+claim a page makes about itself, and a cross-host one would let a scraper attribute a recipe to the
+site it copied and write into the shared cache under that site's key.
+
+`EXTRACTOR_VERSION` is 4. `extractor-version.test.ts` **records the same digest for 4 as for 3**,
+and that is a fact about the guard: it calls `mapRecipeNode` with a `sourceUrl` of its own, so a
+change in what the *pipeline* passes is invisible to it by construction. The bump came from
+reasoning about the cache, not from anything failing — which is the exact shape that guard was
+built to prevent, one layer up from where it looks. `pipeline.test.ts` now asks the question by
+name, and the resolve step is mutation-tested in three directions.
+
+### 2. The cache split, and could not be made not to
+
+The key is `hashUrl(normalised.href)`, computed **before** the fetch — which is the entire economy
+of a pre-fetch cache and cannot be given up. So a wrapper was a guaranteed miss and a guaranteed
+re-parse, and every distinct share token for one recipe was its own row. Measured:
+`c3432b47…` for the wrapper, `8ea5a223…` for the canonical, same recipe.
+
+So the cache is asked **twice**: once by the requested URL, and once by the resolved URL after the
+fetch, before extracting anything. One HTTP request is already spent by then; what the second
+lookup saves is the extraction and, at tier 2, the model call — the expensive half. A successful
+parse is written under both keys when they differ, because both are things a person will paste, and
+`import_cache` is one row set for the whole user base.
+
+### 3. The interstitials were in the blocked list
+
+`l.facebook.com` and `lm.facebook.com` matched `/(^|\.)facebook\.com$/` and were refused with
+*"Facebook links never resolve to a page containing the recipe. Take a screenshot instead."* True
+of a Facebook **post**; false of a Facebook **redirect**, which forwards to whatever page somebody
+linked.
+
+The brief's framing is the one that matters and it is now a comment in `url.ts`: **a wrapper is a
+different class from a platform with no recipe behind it.** Facebook, Instagram and TikTok never
+resolve, so rejecting them up front is right. A wrapper resolves perfectly well. Folding the two
+together sends somebody to the camera for a link that would have imported.
+
+The carve-out is the two host names, not "anything under facebook.com" — the narrowest condition
+that separates the legitimate case. `facebook.com`, `www.`, `m.` and `ll.facebook.com` all stay
+blocked, and both mutants are caught.
+
+### 4. And the one nobody asked about: the SSRF guard was on the front door only
+
+`normaliseUrl` refuses a private address, and the comment above `isPrivateHost` had already named
+the gap it could not close — a public name whose DNS points inward. It had not named the one it
+could: **a redirect is a request to a host nothing has looked at.**
+
+Measured rather than reasoned about. A server on `127.0.0.1` that answers `302 Location:
+http://127.0.0.1:<other>/`, fetched through the real `createHttpFetcher`:
+
+```
+normaliseUrl("http://127.0.0.1:64692/")  → { kind: "private-address" }
+fetcher.page("http://127.0.0.1:64692/")  → 200, "INTERNAL ONLY"
+```
+
+The function refused the address as input and the fetcher reached it through one hop and returned
+the body — which is written to `import_jobs.result_json`, which the household that submitted the
+URL can read. A request forgery with a return channel, which is the exact thing `isPrivateHost`'s
+own comment says it exists to prevent.
+
+The fetcher follows redirects itself now, checking every hop, and `MAX_HOPS` is 6 rather than the
+platform's 20: a browser's limit answers a browser's question, and a long chain here is far likelier
+to be a loop than a recipe. Six clears every wrapper shape measured.
+
+**The reason this had no test is the reason it was there.** `fetcher.ts` was the one module touching
+the network and the only one with no test file — `redirect: "follow"` is a single word, obviously
+correct for reaching a page, and nothing asked what it reached. Android's share sheet is what moved
+redirect-following from incidental to load-bearing, and a load-bearing line needs a test more than
+a convenient one does.
+
+One honest seam: every test server is on loopback, which the shipped predicate correctly refuses,
+so a fixture for the *happy* path cannot express the happy path. `refuseRedirectTo` is injectable
+and production passes nothing; the **refusal** tests construct the fetcher with no options at all,
+and only the chain-following tests override it. Both halves named, because widening a gate for a
+test is how `fetcher` became optional once before.
+
+### What the person sees when a wrapper does fail
+
+*"This page publishes no machine-readable recipe"* is true of the page that was read and reads, to
+somebody looking at the link they pasted, as the app being unable to import the site they got it
+from. So `not-html`, `no-recipe-found` and `recipe-incomplete` carry `resolvedUrl` when it differs
+from the request, and the sentence opens with *"That share.google link forwarded to
+pipingpotcurry.com."* It exists for the sentence, not for the data: the difference between "try a
+screenshot" and "this blog does not publish a recipe card" is which of the two addresses failed.
+
+### What was checked and turned out not to be a problem
+
+- **AMP markup is not worse.** The brief expected it to be. `?amp=true` and the canonical page on
+  delish extract **identically** — same title, 10 ingredients, 3 steps, same image. And most AMP
+  URLs no longer exist: `simplyrecipes.com/…/amp/` and `bonappetit.com/…/amp` both redirect to the
+  canonical, and `pipingpotcurry.com/…/amp/` 404s. AMP is a cache-key and `source_url` problem
+  here, not an extraction-quality one.
+- **No production data needs repairing.** All **59** recipes with a `source_url` on the hosted
+  project are on 45 real recipe hosts; zero wrappers, zero AMP paths. The sister's link never
+  landed, because the entitlement refused her first. *(My first pass flagged three — `t.co`
+  matched as a substring of `lemonsandzest.com` and `simplehomeedit.com`. Exact host comparison,
+  and the count is zero.)*
+- **`t.co`, `bit.ly`, `news.google.com` and the ampproject CDN** were never blocked and are not
+  special-cased. They are redirects, and resolving every redirect correctly is what this change
+  does; a per-shortener list would be a list to maintain for no behaviour.
+
+### What this does not cover
+
+A public hostname whose DNS record points at a private address. The host is checked on every hop
+now; the **address the socket connects to** is not, and only a custom dispatcher could. Unchanged
+from before and still recorded as a gap rather than implied closed.

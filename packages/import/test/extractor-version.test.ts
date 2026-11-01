@@ -63,9 +63,25 @@ const PAGE = `<!doctype html><html><head><script type="application/ld+json">${JS
 </ul></div>
 </body></html>`;
 
-/** the digest of the whole extracted recipe, per version — see the note above before editing */
+/**
+ * The digest of the whole extracted recipe, per version — see the note above before editing.
+ *
+ * **4 has the same digest as 3, and that is a fact about this guard rather than about version 4.**
+ * Version 4 changed `source_url` from the link that was pasted to the page that was read, which is
+ * a change in what `importRecipe` *passes* to `mapRecipeNode`. This fixture calls `mapRecipeNode`
+ * directly with a `sourceUrl` of its own, so it is structurally unable to notice. The bump is
+ * right — cached entries do carry the wrong field — and it was made because somebody reasoned
+ * about the cache, not because anything failed.
+ *
+ * Which is worth writing down rather than quietly recording the digest: a guard built from the
+ * lesson *a stamp only works if somebody turns it* is here passing a version it cannot measure,
+ * and an identical digest across a real bump would otherwise read as evidence that nothing
+ * changed. The question this fixture answers is "did `mapRecipeNode` move"; the question version 4
+ * needed was "did what reaches it move". `pipeline.test.ts` asks the second one by name.
+ */
 const SHAPE_BY_VERSION: Record<number, string> = {
   3: "1:7ro219",
+  4: "1:7ro219",
 };
 
 describe("the extractor's output shape is stamped", () => {

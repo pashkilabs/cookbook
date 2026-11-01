@@ -63,6 +63,15 @@
  *      cuisine are inferred. Entries written at 1 carry an empty steps array and neither
  *      classification field — a wrong recipe, served confidently, exactly what the stamp exists
  *      to expire.
+ *   4  `source_url` is the page that was **read** rather than the link that was pasted. A
+ *      `share.google` wrapper, a shortener, a Facebook interstitial and an AMP variant all
+ *      resolve to the recipe, and until now the resolved address was thrown away after the fetch
+ *      — so entries written at 3 carry whatever was pasted, and a re-read of one fetches a
+ *      redirect stub. It is not only the exotic cases: a site redirecting to its own canonical
+ *      path stored the stale path (measured: delish `a24846620` → `a51580`), and a trailing-slash
+ *      or http→https redirect stored the pre-redirect form. That is the field the section
+ *      backfill and every future re-read start from, which is what makes it worth a bump rather
+ *      than a cosmetic note.
  *   3  ingredient sections are read from the card's DOM, since `recipeIngredient` is flat by
  *      specification (§98). Entries written at 2 carry no `section` on any line, so a recipe whose
  *      source groups its ingredients is served as one flat list — which is the bug that change was
@@ -81,7 +90,7 @@
  * the same commit — the measurement passing is what makes this easy to skip**, because 6/6 against
  * the live page is a true statement about a function nothing was calling.
  */
-export const EXTRACTOR_VERSION = 3;
+export const EXTRACTOR_VERSION = 4;
 
 /** How long an entry is served before the page is read again. */
 export const CACHE_MAX_AGE_DAYS = 30;

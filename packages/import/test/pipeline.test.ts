@@ -348,3 +348,120 @@ describe("the URL a recipe records", () => {
     expect(outcome.urlHash).toBe(hashUrl("https://example.com/pie"));
   });
 });
+
+/**
+ * The level version 4 of the extractor actually changed.
+ *
+ * `extractor-version.test.ts` fingerprints `mapRecipeNode` and is blind to this by construction:
+ * the change is in what the pipeline *passes* it. So these are the assertions that fail if the
+ * resolve step is removed, and the reason the bump is not just a comment.
+ */
+describe("a wrapper resolves to the page it forwards to", () => {
+  const RECIPE_JSON = JSON.stringify({
+    "@type": "Recipe",
+    name: "Instant Pot Carrot Soup",
+    recipeIngredient: ["200 g carrots", "1 tbsp ginger"],
+    recipeInstructions: ["Blend.", "Serve."],
+  });
+  const DESTINATION = "https://pipingpotcurry.com/instant-pot-carrot-soup/";
+  const pageWith = (canonical?: string) =>
+    `<html><head>${canonical ? `<link rel="canonical" href="${canonical}" />` : ""}` +
+    `<script type="application/ld+json">${RECIPE_JSON}</script></head><body></body></html>`;
+
+  const fetcherFor = (requested: string, finalUrl: string, html: string) => ({
+    page: async (url: string) => {
+      if (url !== requested) throw new Error(`no fixture page for ${url}`);
+      return { finalUrl, contentType: "text/html", html };
+    },
+    bytes: async () => {
+      throw new Error("no image");
+    },
+  });
+
+  it("records the destination as the source, not the share link that was pasted", async () => {
+    // Stephen's sister pasted a share.google link. It resolves in two hops to a page with a full
+    // recipe card — and source_url kept the wrapper, so the section backfill and every re-read
+    // would fetch a redirect stub for the life of the recipe.
+    const wrapper = "https://share.google/CB96RGAgwmiOwPs7K";
+    const outcome = await importRecipe(wrapper, {
+      fetcher: fetcherFor(wrapper, DESTINATION, pageWith()),
+      skipPhoto: true,
+    });
+    if (!outcome.ok) throw new Error(`expected a recipe, got ${outcome.failure.kind}`);
+    expect(outcome.recipe.sourceUrl).toBe(DESTINATION);
+  });
+
+  it("uses the page's canonical link when nothing redirected, which is the AMP case", async () => {
+    // an AMP or ?amp=true variant answers 200 and serves the recipe, so there is no redirect to
+    // learn from — the page's own head is the only thing that knows its real address
+    const amp = "https://pipingpotcurry.com/instant-pot-carrot-soup/?amp=true";
+    const outcome = await importRecipe(amp, {
+      fetcher: fetcherFor(amp, amp, pageWith(DESTINATION)),
+      skipPhoto: true,
+    });
+    if (!outcome.ok) throw new Error(`expected a recipe, got ${outcome.failure.kind}`);
+    expect(outcome.recipe.sourceUrl).toBe(DESTINATION);
+  });
+
+  it("ignores a canonical link pointing at another site, which a page can claim freely", async () => {
+    const asked = "https://scraper.example/stolen-carrot-soup";
+    const outcome = await importRecipe(asked, {
+      fetcher: fetcherFor(asked, asked, pageWith(DESTINATION)),
+      skipPhoto: true,
+    });
+    if (!outcome.ok) throw new Error(`expected a recipe, got ${outcome.failure.kind}`);
+    // attributing this to pipingpotcurry.com would credit a site that never published it, and
+    // would let any page poison the shared cache under somebody else's key
+    expect(outcome.recipe.sourceUrl).toBe(asked);
+  });
+
+  it("caches the parse under both addresses, so neither link re-parses it", async () => {
+    const wrapper = "https://share.google/CB96RGAgwmiOwPs7K";
+    const cache = createFakeCache();
+    await importRecipe(wrapper, {
+      fetcher: fetcherFor(wrapper, DESTINATION, pageWith()),
+      cache,
+      skipPhoto: true,
+    });
+    expect(cache.puts).toEqual([
+      hashUrl(normaliseUrlHref(wrapper)),
+      hashUrl(normaliseUrlHref(DESTINATION)),
+    ]);
+
+    // and the next household pasting the real URL gets that parse rather than repeating it
+    const second = await importRecipe(DESTINATION, {
+      fetcher: {
+        page: async () => {
+          throw new Error("the destination should have come from the cache");
+        },
+        bytes: async () => {
+          throw new Error("no image");
+        },
+      },
+      cache,
+      skipPhoto: true,
+    });
+    if (!second.ok) throw new Error(`expected a cache hit, got ${second.failure.kind}`);
+    expect(second.fromCache).toBe(true);
+  });
+
+  it("says the link forwarded somewhere when the destination has no recipe", async () => {
+    // "this page publishes no machine-readable recipe" is true of the page and reads, to somebody
+    // holding a share link, as the app being unable to import the site they got it from
+    const wrapper = "https://share.google/nothing";
+    const outcome = await importRecipe(wrapper, {
+      fetcher: fetcherFor(wrapper, "https://example.com/not-a-recipe", PAGE_WITH_NO_RECIPE),
+      skipPhoto: true,
+    });
+    if (outcome.ok) throw new Error("expected no recipe");
+    if (outcome.failure.kind !== "no-recipe-found") throw new Error(outcome.failure.kind);
+    expect(outcome.failure.resolvedUrl).toBe("https://example.com/not-a-recipe");
+  });
+});
+
+/** the deduplicated form the cache keys on, so a test does not restate the normaliser's rules */
+function normaliseUrlHref(url: string): string {
+  const normalised = normaliseUrl(url);
+  if ("kind" in normalised) throw new Error(`fixture URL is not importable: ${url}`);
+  return normalised.href;
+}

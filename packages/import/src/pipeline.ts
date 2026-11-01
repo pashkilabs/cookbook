@@ -13,7 +13,7 @@ import {
   flattenNodes,
   type JsonObject,
 } from "./jsonld.js";
-import { extractMicrodata, extractSiteName } from "./microdata.js";
+import { extractCanonicalUrl, extractMicrodata, extractSiteName } from "./microdata.js";
 import { mapRecipeNode, missingFields } from "./recipe.js";
 import { extractWithLlm, pageToText } from "./tier2.js";
 import { decodeImage } from "./image.js";
@@ -29,10 +29,19 @@ const DETERMINISTIC_TIERS: Tier[] = ["structured-data", "microdata"];
  *
  *   1. Normalise and reject platforms that never resolve — no request at all.
  *   2. Ask the shared cache. A recipe doing the rounds is parsed once for everybody.
- *   3. Fetch the page once, then try each tier against the same HTML.
- *   4. Tier 2, only if the deterministic tiers found nothing and a cascade is
+ *   3. Fetch the page once, following redirects, and **resolve what was actually read**.
+ *   4. Ask the cache again under the resolved URL, before extracting anything.
+ *   5. Try each deterministic tier against the same HTML.
+ *   6. Tier 2, only if the deterministic tiers found nothing and a cascade is
  *      configured. A model is never the first attempt (decisions §6).
- *   5. Fetch and decode the image.
+ *   7. Fetch and decode the image.
+ *
+ * Step 3 is step 3 because a phone's share sheet does not hand over a recipe URL. It hands over
+ * `share.google/CB96RGAg…`, or a shortener, or a Facebook interstitial, and the recipe is two
+ * hops away. Those resolve perfectly well — which is exactly why they are dangerous to store: the
+ * extraction succeeds, and `source_url` keeps the wrapper, so the section backfill and every
+ * re-read fetch a redirect stub for the life of the recipe. Resolving is free, happens anyway, and
+ * was simply not being written down.
  *
  * Never throws for an expected condition. Every failure is a typed `ImportFailure`,
  * because each one is something the review screen has to explain to a person, and a
@@ -109,9 +118,50 @@ export async function importRecipe(url: string, options: ImportOptions): Promise
         kind: "not-html",
         url: normalised.fetchUrl,
         detail: `content type ${page.contentType}`,
+        ...(page.finalUrl !== normalised.fetchUrl ? { resolvedUrl: page.finalUrl } : {}),
       },
       attempts,
     };
+  }
+
+  /*
+   * What was actually read, which is not always what was asked for.
+   *
+   * `finalUrl` covers a wrapper, since following the redirect is what produced it. The canonical
+   * link covers the case with no redirect at all — an AMP or `?amp=true` variant returns 200 and
+   * serves the recipe, so the page's own head is the only thing that knows its real address.
+   * Measured on both: `share.google/…` resolves by redirect, `?amp=true` by canonical, and
+   * extraction from the AMP variant was byte-for-byte the same recipe.
+   */
+  // after the content-type check on purpose: a canonical link read out of something that is not
+  // HTML is a string found in a PDF, and `not-html` carries `finalUrl` for the same reason
+  const resolvedUrl = extractCanonicalUrl(page.html, page.finalUrl) ?? page.finalUrl;
+  const wasWrapped = resolvedUrl !== normalised.fetchUrl;
+
+  /*
+   * The cache, asked a second time under the address we ended up at.
+   *
+   * The first lookup cannot do this — the key is computed before the fetch, which is the whole
+   * economy of a pre-fetch cache. So a wrapper was a guaranteed miss and a guaranteed re-parse,
+   * and every distinct share token for one recipe was its own row. One HTTP request is already
+   * spent by the time we are here; what this saves is the extraction and, at tier 2, the model
+   * call — which is the expensive half.
+   */
+  const resolvedHash = wasWrapped ? resolvedCacheKey(resolvedUrl) ?? urlHash : urlHash;
+  if (options.cache && !options.refresh && resolvedHash !== urlHash) {
+    const cached = await options.cache.get(resolvedHash);
+    if (cached) {
+      const photo = options.skipPhoto ? null : await fetchPhoto(cached.recipe.imageUrl, options);
+      return {
+        ok: true,
+        recipe: cached.recipe,
+        tier: cached.tier,
+        attempts: [{ tier: cached.tier, outcome: "hit", detail: "from cache, by resolved URL" }],
+        photo,
+        fromCache: true,
+        urlHash: resolvedHash,
+      };
+    }
   }
 
   const siteName = extractSiteName(page.html) ?? normalised.host;
@@ -119,7 +169,7 @@ export async function importRecipe(url: string, options: ImportOptions): Promise
   let usedTier: Tier | null = null;
 
   for (const tier of DETERMINISTIC_TIERS) {
-    const found = extractTier(tier, page.html, page.finalUrl, normalised.fetchUrl, siteName);
+    const found = extractTier(tier, page.html, page.finalUrl, resolvedUrl, siteName);
     if (!found) {
       attempts.push({ tier, outcome: "no-data" });
       continue;
@@ -141,7 +191,7 @@ export async function importRecipe(url: string, options: ImportOptions): Promise
   if (!recipe && options.llm) {
     const llm = await extractWithLlm({
       content: pageToText(page.html),
-      sourceUrl: normalised.fetchUrl,
+      sourceUrl: resolvedUrl,
       sourceName: siteName,
       cascade: options.llm,
     });
@@ -150,7 +200,7 @@ export async function importRecipe(url: string, options: ImportOptions): Promise
       recipe = llm.recipe;
       usedTier = "llm";
       // the model is not asked for an image, so take whatever the markup offered
-      const fromMarkup = imageFromMarkup(page.html, page.finalUrl, normalised.fetchUrl, siteName);
+      const fromMarkup = imageFromMarkup(page.html, page.finalUrl, resolvedUrl, siteName);
       if (fromMarkup) recipe = { ...recipe, imageUrl: fromMarkup };
     }
   }
@@ -165,6 +215,7 @@ export async function importRecipe(url: string, options: ImportOptions): Promise
           url: normalised.fetchUrl,
           tier: incomplete.tier,
           missing: (incomplete.detail ?? "").split(", ").filter(Boolean),
+          ...(wasWrapped ? { resolvedUrl } : {}),
         },
         attempts,
       };
@@ -175,6 +226,7 @@ export async function importRecipe(url: string, options: ImportOptions): Promise
         kind: "no-recipe-found",
         url: normalised.fetchUrl,
         triedTiers: [...new Set(attempts.map((attempt) => attempt.tier))],
+        ...(wasWrapped ? { resolvedUrl } : {}),
       },
       attempts,
     };
@@ -189,6 +241,17 @@ export async function importRecipe(url: string, options: ImportOptions): Promise
   if (options.cache) {
     try {
       await options.cache.put(urlHash, { recipe, tier: usedTier });
+      /*
+       * Under both addresses when they differ, because both are things a person will paste.
+       *
+       * The next household to import the *canonical* URL gets this parse rather than repeating
+       * it, and so does the next one to paste this same wrapper. The rows carry identical
+       * content, which is what makes writing two of them a cache rather than a divergence —
+       * `import_cache` is one row set for the whole user base, so the saving compounds.
+       */
+      if (resolvedHash !== urlHash) {
+        await options.cache.put(resolvedHash, { recipe, tier: usedTier });
+      }
     } catch {
       // a cache write failing costs a re-parse next time, which is not worth failing
       // an import the user is watching
@@ -196,6 +259,20 @@ export async function importRecipe(url: string, options: ImportOptions): Promise
   }
 
   return { ok: true, recipe, attempts, photo, tier: usedTier, fromCache: false, urlHash };
+}
+
+/**
+ * The cache key for a resolved URL, or null if it cannot have one.
+ *
+ * Through `normaliseUrl` rather than hashed directly, so a wrapper's destination lands on the
+ * *same* key as somebody pasting that destination by hand — which is the entire point of writing
+ * the second row. Null rather than a throw for the case that cannot happen but would be silent if
+ * it did: a page whose canonical link or redirect target no longer parses. The caller falls back
+ * to the requested key, so a strange destination costs a duplicate row and never an import.
+ */
+function resolvedCacheKey(resolvedUrl: string): string | null {
+  const normalised = normaliseUrl(resolvedUrl);
+  return "kind" in normalised ? null : hashUrl(normalised.href);
 }
 
 function extractTier(

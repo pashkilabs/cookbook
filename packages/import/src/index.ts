@@ -45,7 +45,7 @@ export {
   type JsonObject,
   type JsonValue,
 } from "./jsonld.js";
-export { extractMicrodata, extractSiteName } from "./microdata.js";
+export { extractCanonicalUrl, extractMicrodata, extractSiteName } from "./microdata.js";
 export {
   CACHE_MAX_AGE_DAYS,
   EXTRACTOR_VERSION,
