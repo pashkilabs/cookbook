@@ -2035,3 +2035,55 @@ guessing.
   Worth adding to the list of things to ask a guard: **does it distinguish code from prose?** Every
   check here that greps a stylesheet or a component has this hazard, and a comment is the one place
   somebody writes a token name they do not mean.
+
+- **The Screen Wake Lock sentinel is released when the document becomes hidden, and does not come
+  back.** Switch apps, take a call, lock the phone by hand — the lock is gone, and returning to the
+  tab does not restore it. **An implementation without a `visibilitychange` re-acquisition works for
+  exactly as long as nobody touches the phone, which is the scenario the feature exists for.**
+
+  Three more details that are each a bug if omitted: a request made while the document is hidden is
+  refused with `NotAllowedError`, so the re-acquisition needs a visibility guard rather than an
+  optimistic retry; the sentinel's own `release` event fires both when the browser revokes the lock
+  and when you release it, so state follows reality only if you listen; and **a request in flight
+  outlives the effect that started it** — somebody who opens a screen and leaves within the round
+  trip holds a lock nothing can release, and the browser keeps the screen on for a page nobody is
+  looking at.
+
+  All of that is testable and `apps/web/test/wake-lock.test.tsx` tests it, with five mutants. What
+  is **not** testable is the thing the feature is for: that the screen actually stayed lit needs a
+  physical device and the OS timeout elapsing. That is an instrument reading the assertion rather
+  than the subject, so no test name claims it — they claim a lock was asked for, granted, re-asked
+  and released, which is a different sentence. **Say which of the two a green run proves.**
+
+  And no `NoSleep.js` or hidden-video fallback. It loops a video to fool the OS, costs battery, and
+  is a maintenance burden for a shrinking set of browsers — an honest "this browser can't" beats a
+  hack that drains the phone it is meant to help. A control that cannot do anything renders as
+  nothing, never as a dead toggle.
+
+- **A guard's claim can expire when a new screen is rendered, not when the code changes.** The
+  two-themes-must-differ check carried *"no screen here is colourless, so identical bytes cannot be
+  a legitimate outcome"* — true when written, and false the moment `/cook/[id]` was photographed for
+  the first time. `.h-cook` declares a complete fixed palette outside any media query, deliberately:
+  a dark screen in a bright kitchen whichever theme the phone is in. Two identical shots is the
+  correct outcome there.
+
+  Nothing was edited to make that guard wrong. **The population it reasoned over grew**, which is a
+  different trigger from the stale proxy (§54a, whose question changed under it) and from the
+  exemption that was wider than its reason — those were both about the check. This one was about the
+  world. So the question to ask when adding a screen, a table or a fixture is not only *does the
+  suite still pass* but **which standing claim was quantified over "every screen"?**
+
+  Narrowed by measurement rather than by name: identical bytes fail only when the palette *where the
+  page is painted* differs between passes. The first attempt read `--text` from
+  `document.documentElement`, which moves between themes even on cook mode — so it reported the
+  fault anyway, and the measurement looked like a fix. The honest reading is the token resolved at
+  the centre of the viewport, which inherits whatever wrapper set it. A list naming `cook` would
+  fail on the next palette-pinning screen; the page already states this about itself.
+
+- **A dev server degrades across repeated full runs, and the failure is a navigation timeout on a
+  different page each time.** Two consecutive `pnpm shots` runs died on `page.goto` after 30s —
+  first `/household`, then `/recipes` — with the server answering `curl` fine in between. Restarting
+  it and warming the route made both clean. This is the sibling of the note about `pnpm ship`
+  overwriting `.next` under a running server: **a long-lived dev server is a stale one**, and a
+  timeout that moves between pages is a server symptom rather than a page one. Retry before
+  believing it, and restart before retrying twice.

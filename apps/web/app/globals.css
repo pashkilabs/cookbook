@@ -408,6 +408,20 @@ button:hover, a.button:hover { opacity: 0.88; }
  * here would quietly restyle the 13 non-button elements carrying `quiet` and `danger` — the exact
  * blast radius the comment above says the real refactor has to account for.
  */
+/*
+ * The keep-awake control sits in the actions row, so it is a flex child holding words (§85).
+ *
+ * Its refusal line goes below the button rather than beside it — `.h-row-quiet` wraps, so a
+ * sentence as a sibling would push the remaining actions onto a new line and the row would reflow
+ * when the browser said no.
+ */
+.keep-awake {
+  min-width: 0;
+}
+.keep-awake .meta {
+  margin: var(--s1) 0 0;
+}
+
 .photo-upload label {
   display: inline-flex;
   align-items: center;

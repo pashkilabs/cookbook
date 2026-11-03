@@ -591,6 +591,29 @@
   line-height: var(--type-display-s-line);
   color: var(--text);
 }
+/*
+ * The refusal, which is a sentence rather than a badge.
+ *
+ * `.h-cook-awake` is a chip because it reports a *state worth noticing*. A refusal is an
+ * explanation for a screen that is about to dim, so it reads as text: no chip ground, no icon,
+ * muted. Deliberately not `--danger` — nothing is broken, the browser said no.
+ *
+ * Under the step count rather than in the header, because the first version put it beside the close
+ * control and the screenshot showed five words wrapped to three lines, squeezing a 44px target.
+ */
+.h-cook-asleep {
+  /*
+   * Its own gutter, because it is a direct child of `.h-cook` rather than of the header or the
+   * progress block, and those carry the horizontal padding themselves. The screenshot is what
+   * showed it: one line flush against the left edge while every other line on the screen started
+   * 20px in. It sits outside the progress block on purpose — a recipe with no method still opens,
+   * and its screen still dims.
+   */
+  margin: 0 0 var(--space-md);
+  padding: 0 var(--space-xl);
+  color: var(--text-muted);
+  font-size: var(--type-meta-size);
+}
 .h-cook-awake {
   display: inline-flex;
   align-items: center;

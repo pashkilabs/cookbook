@@ -15,6 +15,7 @@ import { RemoveRecipe } from "./remove";
 import { Verdicts } from "./verdicts";
 import { Preferences } from "./preferences";
 import { PhotoUpload } from "../photo-upload";
+import { KeepAwake } from "./keep-awake";
 import { PalateNotes } from "./palate";
 import { SplitButton } from "../blend/split";
 import { componentsKeyFor, palateNotesFor } from "@/lib/tastes";
@@ -519,6 +520,12 @@ export default async function RecipePage({
             * place anything can go.
             */}
           <PhotoUpload recipeId={recipe.id} label={photoUrl ? "Replace the photo" : "Add a photo"} />
+          {/*
+            * Beside the other actions rather than near the method, because it is a property of the
+            * *session* and not of the recipe. Cook mode takes the lock without asking; here it is
+            * a choice, and it renders nothing at all where the browser has no `wakeLock`.
+            */}
+          <KeepAwake />
           <RemoveRecipe recipeId={recipe.id} title={recipe.title} />
         </div>
       </div>

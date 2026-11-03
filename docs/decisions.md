@@ -7438,3 +7438,113 @@ should carry no requirements either. Adding `--s5` to the exemption list would h
 defect in *what the check reads*, and that list is deliberately two names. Mutation-tested three
 ways: clean with the fix (23 role tokens across 3 dark sites), still fires on a genuinely undefined
 role token, and reproduces the false alarm when the stripping is removed.
+
+## §104 — Keep the screen awake: the indicator was already honest, and the hook is now shared
+
+**§0 first, because the answer is the opposite of the one expected.** The "Screen on" indicator
+§4.3 asked for renders today, and there is a real lock behind it. `cook.tsx` has called
+`navigator.wakeLock.request("screen")` since that screen was built, renders the badge only on
+`awake === true`, re-acquires on `visibilitychange`, listens to the sentinel's `release` event and
+releases on unmount. **No cook-mode session has ever promised something the app did not do.** The
+only `wakeLock` references in the repo were those three lines, and nothing else mentioned it.
+
+What was missing was the recipe page, a shared implementation, and a test.
+
+### One hook, because a second implementation is a second bug
+
+`apps/web/lib/use-wake-lock.ts`. Cook mode and the recipe toggle are different **policies** —
+automatic against opt-in — over one piece of behaviour, and this project has paid for the
+alternative: the eval and the product built their model cascades in separate places, so wiring a
+provider into one verified nothing about the other. The policy is the caller's `wanted` flag; the
+sentinel lives in the hook.
+
+- **Cook mode**: `useWakeLock(true)`. No control, no choice — hands are busy and the lit screen is
+  the whole point.
+- **Recipe page**: a toggle, default off. Reading is not always cooking, and holding the screen on
+  for somebody deciding what to make on Thursday spends their battery on a guess.
+
+### Per device, in `localStorage`, and the agreement is worth stating
+
+A wake lock is a property of **the phone on the counter**, not of the person: the same account on a
+laptop wants a different answer. `member_settings` carries how somebody *browses*, which really is
+theirs wherever they are; this is not that. The useful consequence is that the feature touches no
+table — no entitlement, no RLS policy, no migration, and nothing for an unentitled household to be
+refused. `localStorage` can throw outright in a private window, so both the read and the write are
+wrapped and the failure mode is "the preference lasts this visit", not a screen that does not render.
+
+### The fault everyone ships, and the five mutants that prove it is not shipped here
+
+**The sentinel is released when the document becomes hidden and does not come back.** Switch apps,
+take a call, lock the phone by hand. An implementation without the `visibilitychange` re-acquisition
+works for exactly as long as nobody touches the phone, which is the scenario it exists for.
+
+`apps/web/test/wake-lock.test.tsx` — ten tests, and each of these mutants fails one:
+
+| mutant | caught by |
+|---|---|
+| no `visibilitychange` listener | the lock is not re-requested after hidden→visible |
+| re-request even when a lock is held | a second request on a visible→visible event |
+| no visibility guard | a request made while hidden, which `NotAllowedError` would refuse |
+| keep a lock that arrives after unmount | the sentinel is never released |
+| a refusal reported as idle | `refused` is not distinguishable from `idle` |
+
+The fourth is the one that is easy to omit and hard to notice: a request in flight outlives the
+effect that started it, so somebody who opens cook mode and leaves within the round trip holds a
+lock nothing can release — the browser keeps the screen on for a page nobody is looking at.
+
+### Three states, and the refusal is a sentence rather than a badge
+
+`holding` / `refused` / `unsupported`. The state reported is the **sentinel's**, never the request's
+— §78's fault is a claim on screen the person cannot check. `unsupported` renders nothing at all,
+on both screens: there is no decision to report to somebody whose browser has no such feature, and a
+toggle whose only outcome is an apology is a dead control. iOS Safari has had it since 16.4, Firefox
+since 126, Chrome and Edge for years.
+
+**No `NoSleep.js` and no hidden-video fallback.** It loops a video to fool the OS, costs battery,
+and is a maintenance burden for a shrinking set of browsers. An honest "this browser can't" beats a
+hack that drains the phone it is meant to help.
+
+Cook mode's refusal line **reverses an earlier call in that file** — *"refused — a low battery, or a
+policy. Not an error worth a message on a cooking screen."* Silence was the honest half, since the
+badge correctly did not appear. But "nothing" cannot separate a browser that cannot do this from one
+that would not, and the cost of not knowing is highest standing over a pan. The screenshot then
+corrected the placement twice: in the header corner five words wrapped to three lines and squeezed a
+44px close control, and as a direct child of `.h-cook` the line sat flush to the left edge while
+every other line started 20px in. **A badge is two words and a sentence is a sentence; they do not
+belong in the same slot.**
+
+### What was measured and what only a phone can settle
+
+**Measured, and all of it about the sentinel:** that a lock was requested, that the state reports it
+only when one is held, that it is re-requested after `visibilitychange`, that it is released on
+unmount and when the caller stops wanting it, and that a refusal reads as a refusal. Ten tests, five
+mutants.
+
+**Not measured, and not claimed anywhere:** that the screen actually stayed lit. That needs a
+physical device and the OS timeout elapsing. This is an instrument that reads the assertion rather
+than the subject — the shape already on this project's list — so no test name says the screen stayed
+on. They say a lock was asked for, granted, re-asked and released.
+
+**Stephen's step:** a phone in cook mode on the counter, left untouched past its screen timeout, on
+an iPhone and on Robyn's Android — and the same again after switching apps and coming back, which is
+the path the tests cover in a jsdom and a real browser may not honour identically.
+
+### Two things the renderer turned up on the way
+
+`/cook/[id]` had **never been rendered** — one of the four screens the `button`-scoping note names.
+It is in `pnpm shots` now, and because a headless browser refuses the lock, what it photographs is
+the **refusal** path, which nothing else could show.
+
+And it broke the two-themes-must-differ guard, correctly. `.h-cook` declares a **complete fixed
+palette** in `tokens.generated.css`, outside any media query — a dark screen in a bright kitchen
+whichever theme the phone is in — so two identical shots is exactly right there. The guard's claim
+beside it, *"no screen here is colourless, so identical bytes cannot be a legitimate outcome"*,
+stopped being true the moment cook mode was rendered.
+
+Narrowed **by measurement rather than by name**: identical bytes fail only when the palette in force
+*where the page is painted* differs between the passes. The first attempt read `--text` from
+`document.documentElement`, which moves between themes even on cook mode, so it reported the fault
+anyway — the honest reading is the token resolved at the centre of the viewport, which inherits
+whatever wrapper set it. A list naming `cook` would be a snapshot that the next palette-pinning
+screen fails on; the page already states this about itself. The exemption is printed at the end of
+the run, like the reachability one.

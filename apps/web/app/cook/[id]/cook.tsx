@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { useWakeLock } from "@/lib/use-wake-lock";
 
 export interface CookLine {
   id: string;
@@ -51,50 +52,19 @@ export function CookMode({
    * "Screen on" reports the lock, never the request
    * ---------------------------------------------------------------------------
    *
-   * §4.3 asks for a "Screen on" indicator that keeps the screen awake. The Screen Wake Lock API
-   * does that where it exists, and where it does not — or where the browser refuses, which it may
-   * on low battery — the honest thing is to show nothing. A badge reading "Screen on" above a
-   * phone that is about to sleep is the count-of-people rule's shape: a claim on screen that the
-   * person cannot check and the app has not verified.
+   * §4.3 asks for a "Screen on" indicator that keeps the screen awake, and the badge below renders
+   * only on a lock that is actually **held** — not on the request having been made. A badge over a
+   * phone that is about to sleep is a claim the person cannot check and the app has not verified.
    *
-   * So state is `null` until something is known, and the indicator renders only on a lock that is
-   * actually held. A browser can revoke one when the tab is hidden, so `release` re-arms it on
-   * the way back rather than leaving the badge lying.
+   * **No control here, and that is the design.** Hands are busy; the screen staying lit is the
+   * whole point of cook mode, so wanting it is not a question worth asking. The recipe page gets a
+   * toggle instead, because reading is not always cooking.
+   *
+   * The sentinel, the `visibilitychange` re-acquisition and the release all live in
+   * `useWakeLock` — shared with the recipe page's toggle, so a fix reaches both. This screen had
+   * its own copy of all of it, which was correct and was a second site.
    */
-  const [awake, setAwake] = useState<boolean | null>(null);
-  const lock = useRef<WakeLockSentinel | null>(null);
-
-  const hold = useCallback(async () => {
-    if (!("wakeLock" in navigator)) {
-      setAwake(false);
-      return;
-    }
-    try {
-      const sentinel = await navigator.wakeLock.request("screen");
-      lock.current = sentinel;
-      setAwake(true);
-      sentinel.addEventListener("release", () => {
-        lock.current = null;
-        setAwake(false);
-      });
-    } catch {
-      // refused — a low battery, or a policy. Not an error worth a message on a cooking screen.
-      setAwake(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void hold();
-    const revisit = () => {
-      if (document.visibilityState === "visible" && !lock.current) void hold();
-    };
-    document.addEventListener("visibilitychange", revisit);
-    return () => {
-      document.removeEventListener("visibilitychange", revisit);
-      void lock.current?.release();
-      lock.current = null;
-    };
-  }, [hold]);
+  const screen = useWakeLock(true);
 
   /*
    * A recipe with no method still opens.
@@ -121,7 +91,7 @@ export function CookMode({
           <h1 className="h-cook-title">{title}</h1>
         </div>
         <div className="h-cook-head-right">
-          {awake === true && (
+          {screen === "holding" && (
             <span className="h-cook-awake">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <circle cx="12" cy="12" r="4" fill="currentColor" />
@@ -159,6 +129,28 @@ export function CookMode({
             {servings !== null && <span className="h-cook-servings"> · for {servings}</span>}
           </p>
         </div>
+      )}
+
+      {/*
+        * A refusal says so, which reverses an earlier call in this file.
+        *
+        * It read "refused — a low battery, or a policy. Not an error worth a message on a cooking
+        * screen", and silence was the honest half: the badge correctly did not appear. But the
+        * three states have to be *visibly distinct*, and "nothing" cannot separate a browser that
+        * cannot do this from one that would not — and the cost of not knowing is highest exactly
+        * here, over a pan, with the screen about to go dark.
+        *
+        * Here rather than beside the close control, where the badge is: the first version put it
+        * in the header corner and the screenshot settled it — five words wrapped to three lines
+        * and squeezed a 44px target. A badge is two words and a sentence is a sentence; they do
+        * not belong in the same slot. And outside the progress block, because a recipe with no
+        * method still opens and its screen still dims.
+        *
+        * `unsupported` renders nothing at all. There is no decision to report to somebody whose
+        * browser has no such feature, and iOS Safari has had one since 16.4.
+        */}
+      {screen === "refused" && (
+        <p className="h-cook-asleep">This browser would not keep the screen on.</p>
       )}
 
       <main className="h-cook-step">

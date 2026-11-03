@@ -680,6 +680,17 @@ const SCREENS = [
     path: `/recipes/${asBlend.id}`,
     marker: "Nobody has cooked this",
   },
+  /*
+   * Cook mode, which has never been rendered — it is one of the four screens the `button`-scoping
+   * note names, and the one carrying the "Screen on" badge §4.3 asked for. A badge that reports a
+   * wake lock is exactly the kind of claim worth looking at rather than trusting: in a headless
+   * browser the request is normally refused, so what this photographs is the **refusal** path,
+   * which is the state nothing else could show.
+   *
+   * The marker is the eyebrow, which is on the screen in every state — a lock held, refused or
+   * unsupported all render it.
+   */
+  { name: "cook", path: `/cook/${withPhoto.id}`, marker: "Cook mode" },
   { name: "recipe-new", path: "/recipes/new", marker: "Add a recipe" },
   { name: "import", path: "/recipes/import", marker: "One link" },
   /*
@@ -708,6 +719,10 @@ let reachChecked = 0;
 const reachExempt = new Map();
 /* name -> the light shot's bytes, so the dark pass can prove the theme actually changed something */
 const lightBytes = new Map();
+/* and its resolved `--text`, which says whether the theme was *supposed* to change anything */
+const lightPalette = new Map();
+/* screens whose palette is the same in both themes by their own declaration — printed, not trusted */
+const pinnedPalettes = new Set();
 /* how much the selected-state check actually got to compare, summed over every screen and theme */
 let pressedCandidates = 0;
 let pressedComparable = 0;
@@ -788,6 +803,21 @@ for (const fixture of FIXTURES) {
         blocked,
         /* a token from the generated palette: present in light and dark, so its absence is the stylesheet's */
         text: getComputedStyle(document.documentElement).getPropertyValue("--text").trim(),
+        /*
+         * And the palette in force **where the page is actually painted**, which is not always the
+         * root's. Cook mode wraps everything in `.h-cook`, which declares a complete fixed palette
+         * — so the root token moves between themes while the screen's own does not, and reading the
+         * root said the theme had changed something when it had changed nothing visible. Custom
+         * properties inherit, so the element under the middle of the viewport resolves whatever
+         * palette governs the content there, whichever wrapper set it.
+         */
+        painted: (() => {
+          const at = document.elementFromPoint(
+            Math.floor(window.innerWidth / 2),
+            Math.floor(window.innerHeight / 2),
+          );
+          return getComputedStyle(at ?? document.body).getPropertyValue("--text").trim();
+        })(),
       };
     });
     if (styling.sheets === 0 || (styling.rules === 0 && styling.blocked === 0) || !styling.text) {
@@ -821,12 +851,37 @@ for (const fixture of FIXTURES) {
      */
     if (theme === "light") {
       lightBytes.set(`${viewport.name}:${name}`, png);
+      lightPalette.set(`${viewport.name}:${name}`, styling.painted);
     } else if (lightBytes.get(`${viewport.name}:${name}`)?.equals(png)) {
-      console.error(
-        `  COULD NOT MEASURE ${name} (${viewport.name} dark): byte-identical to the light shot, so the dark ` +
-          `palette never applied — these are one screenshot written twice, not two themes.`,
-      );
-      problems += 1;
+      /*
+       * Identical bytes used to be a flat failure, and that was wider than its reason.
+       *
+       * The reason is a 404'd stylesheet: no palette arrived, so both passes rendered the same
+       * colourless page and the run said "22 screenshots in both themes". The claim written beside
+       * it — *"no screen here is colourless, so identical bytes cannot be a legitimate outcome"* —
+       * stopped being true the moment cook mode was rendered. `.h-cook` declares a **complete
+       * fixed palette** in `tokens.generated.css`, unconditionally and outside any media query: it
+       * is a dark screen in a bright kitchen whichever theme the phone is in, so two identical
+       * shots is exactly right there.
+       *
+       * Narrowed by **measurement rather than by name**: if `--text` resolves to the same value in
+       * both passes, the screen has pinned its own palette and identical bytes follow from that.
+       * If `--text` differed and the pixels did not, the palette arrived and changed nothing, which
+       * is the original fault. A list naming `cook` would be a snapshot — the next screen that pins
+       * a palette would fail on its first run — and the page already states this about itself.
+       */
+      const before = lightPalette.get(`${viewport.name}:${name}`);
+      if (before && before === styling.painted) {
+        pinnedPalettes.add(name);
+      } else {
+        console.error(
+          `  COULD NOT MEASURE ${name} (${viewport.name} dark): byte-identical to the light shot while ` +
+            `the painted --text moved from ${before} to ${styling.painted}, so a dark palette reached ` +
+            `the content and changed nothing — ` +
+            `changed nothing — one screenshot written twice.`,
+        );
+        problems += 1;
+      }
     }
 
     /*
@@ -1533,6 +1588,17 @@ if (coverage) {
  * watch is the oldest shape in this project's notes — the undersized-glyph check reported clean
  * on its first mutation for exactly that reason, having lost its subject to a rewrite.
  */
+/*
+ * Which screens are exempt from the two-themes-must-differ check, read rather than assumed. The
+ * same reasoning as the reachability exemption list: a filter is a claim about what does not need
+ * checking, and this file has one of those that was wrong by being wider than its reason.
+ */
+if (pinnedPalettes.size > 0) {
+  console.log(
+    `  themes: ${[...pinnedPalettes].sort().join(", ")} render identically in both themes and ` +
+      `resolve the same --text in both, so each declares its own palette rather than having missed one.`,
+  );
+}
 console.log(
   reachChecked === 0
     ? "  reachability: NOTHING TO WATCH — no control was hit-tested on any screen."
