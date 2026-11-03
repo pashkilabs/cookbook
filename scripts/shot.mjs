@@ -654,6 +654,14 @@ let problems = 0;
 let shots = 0;
 /* how many controls the reachability check actually had to look at, summed over the whole run */
 let reachChecked = 0;
+/*
+ * And which ones it skipped, by class.
+ *
+ * Printed rather than trusted: an exemption nobody re-reads is an exemption nobody has measured,
+ * and the first version of the filter here silently excused every absolutely-positioned control —
+ * including the one real control this app puts over a photograph.
+ */
+const reachExempt = new Map();
 /* name -> the light shot's bytes, so the dark pass can prove the theme actually changed something */
 const lightBytes = new Map();
 /* how much the selected-state check actually got to compare, summed over every screen and theme */
@@ -917,6 +925,7 @@ for (const fixture of FIXTURES) {
      */
     const unreachable = await page.evaluate(() => {
       const out = [];
+      const exempt = [];
       let examined = 0;
       const selector =
         "main button, main a[href], main label, main input, main select, main textarea, main [role=button]";
@@ -928,27 +937,36 @@ for (const fixture of FIXTURES) {
         /* declared decorative: not a control, whatever its tag says */
         if (style.pointerEvents === "none") continue;
         /*
-         * Only controls in **normal flow**, and this is the narrow condition rather than a
-         * convenience — it is what separates the bug from the pattern that looks identical to it.
+         * Skip only what has declared itself **underneath**, which is narrower than "positioned".
          *
          * `.h-day-expand` is the planner's whole-row expander: `position: absolute; inset: 0;
          * z-index: 0`, with the title and facts lifted to `z-index: 1` above it. Its own rule says
-         * so — *"the whole row is the expander, beneath the content rather than wrapping it"* — so
-         * it is underneath **on purpose**, and the first version of this check reported it 144
-         * times across the run, 0 of 25 points reachable. A guard that fires that often on correct
-         * markup is one people switch off within a day, and it would have buried the one real
-         * finding in it.
+         * *"the whole row is the expander, beneath the content rather than wrapping it"* — so it is
+         * underneath on purpose, and the first version of this check reported it 144 times in one
+         * run. A guard that fires that often on correct markup is one people switch off within a
+         * day, and it would have buried the one real finding in it.
          *
-         * A control that declares `position: absolute` has made a layering decision. One in normal
-         * flow has not, and if something is painted over it, nothing chose that. The photo control
-         * was `position: static`.
+         * **The first fix for that was wrong by being wider than its own justification**, which is
+         * this file's recurring shape: it skipped everything with `position !== "static"`. The
+         * reason `.h-day-expand` is legitimate is the `z-index: 0`, not the `absolute` — and
+         * `.h-hero-back` is *also* absolute, with `z-index: 1`, over a photograph that may be
+         * anything. An unreachable icon button over a hero is precisely the bug this was written
+         * for, and the filter had just exempted the one that exists. The Harvest spec puts a
+         * favourite control there too.
          *
-         * **The gap this leaves, recorded rather than implied closed:** a positioned control that
-         * is genuinely covered is not checked. Closing it needs a way to tell "underneath by
-         * design" from "underneath by accident", and the only honest signal for that is an
-         * explicit `z-index`, which is what `.h-day-expand` has and what a mistake would not.
+         * So the condition is the declaration: a positioned control whose computed `z-index` is a
+         * number **at or below zero** has put itself at the base of its stacking context. `auto`, or
+         * anything positive, has not — those are checked. `.h-hero-back` is now checked and passes.
+         *
+         * What it still cannot tell apart, recorded rather than implied closed: `z-index: 0` written
+         * by mistake on a control that was meant to be on top. There is no signal for that, and the
+         * exemption list is printed at the end of the run so it is read rather than assumed.
          */
-        if (style.position !== "static") continue;
+        const layer = Number.parseInt(style.zIndex, 10);
+        if (style.position !== "static" && Number.isFinite(layer) && layer <= 0) {
+          exempt.push(`${el.tagName.toLowerCase()}.${(el.className || "").toString().split(" ")[0] || "-"}`);
+          continue;
+        }
         el.scrollIntoView({ block: "center", inline: "center" });
         /*
          * The largest **client rect**, not the bounding box.
@@ -968,6 +986,35 @@ for (const fixture of FIXTURES) {
           : el.getBoundingClientRect();
         /* the sr-only input pattern is a 1px box; it is reachable by keyboard and not by a finger */
         if (box.width < 2 || box.height < 2) continue;
+        /*
+         * A sample point outside the element's **rounded** shape is not a sample.
+         *
+         * `.h-hero-back` is a 44px circle. Four of a 5x5 grid's points sit in its corners, outside
+         * the arc, so `elementFromPoint` correctly returns the photograph behind it — and with the
+         * circle newly in scope that is 21 of 25 on markup that is perfect. The radius is a fact
+         * the element states about itself, so the check reads it rather than widening a threshold
+         * to absorb it.
+         */
+        const radiusOf = (value, against) =>
+          value.endsWith("%") ? (Number.parseFloat(value) / 100) * against : Number.parseFloat(value) || 0;
+        const corners = [
+          { rx: radiusOf(style.borderTopLeftRadius, box.width), cx: 0, cy: 0 },
+          { rx: radiusOf(style.borderTopRightRadius, box.width), cx: 1, cy: 0 },
+          { rx: radiusOf(style.borderBottomRightRadius, box.width), cx: 1, cy: 1 },
+          { rx: radiusOf(style.borderBottomLeftRadius, box.width), cx: 0, cy: 1 },
+        ];
+        const insideShape = (px, py) => {
+          for (const { rx, cx, cy } of corners) {
+            const r = Math.min(rx, box.width / 2, box.height / 2);
+            if (r <= 0) continue;
+            const ox = cx === 0 ? box.x + r : box.x + box.width - r;
+            const oy = cy === 0 ? box.y + r : box.y + box.height - r;
+            const beyondX = cx === 0 ? px < ox : px > ox;
+            const beyondY = cy === 0 ? py < oy : py > oy;
+            if (beyondX && beyondY && Math.hypot(px - ox, py - oy) > r) return false;
+          }
+          return true;
+        };
         const STEPS = [0.08, 0.25, 0.5, 0.75, 0.92];
         let reachable = 0;
         let sampled = 0;
@@ -978,6 +1025,7 @@ for (const fixture of FIXTURES) {
           for (const fx of STEPS) {
             const x = Math.min(Math.max(box.x + box.width * fx, 1), window.innerWidth - 2);
             const y = Math.min(Math.max(box.y + box.height * fy, 1), window.innerHeight - 2);
+            if (!insideShape(x, y)) continue;
             const hit = document.elementFromPoint(x, y);
             if (!hit) continue;
             sampled += 1;
@@ -1002,7 +1050,7 @@ for (const fixture of FIXTURES) {
           covered: coveredBy,
         });
       }
-      return { controls: out, examined };
+      return { controls: out, examined, exempt };
     });
     /*
      * **Any point at all**, and the route to that number is the useful part of this comment.
@@ -1023,6 +1071,7 @@ for (const fixture of FIXTURES) {
      * different facts, and the next instance will want to know which it is looking at.
      */
     reachChecked += unreachable.examined;
+    for (const name of unreachable.exempt) reachExempt.set(name, (reachExempt.get(name) ?? 0) + 1);
     for (const row of unreachable.controls) {
       if (row.reachable === row.sampled) continue;
       console.error(
@@ -1442,8 +1491,21 @@ if (coverage) {
  */
 console.log(
   reachChecked === 0
-    ? "  reachability: NOTHING TO WATCH — no normal-flow control was hit-tested on any screen."
-    : `  reachability: ${reachChecked} normal-flow control(s) hit-tested for something painted over them.`,
+    ? "  reachability: NOTHING TO WATCH — no control was hit-tested on any screen."
+    : `  reachability: ${reachChecked} control(s) hit-tested for something painted over them.`,
+);
+/*
+ * The exemption list, read rather than assumed. A filter is a claim about what does not need
+ * checking, and this one has already been wrong once by being wider than its reason.
+ */
+console.log(
+  reachExempt.size === 0
+    ? "  reachability: nothing exempted — no control declares itself underneath."
+    : `  reachability: exempted as underneath-by-declaration (position + z-index <= 0): ` +
+      [...reachExempt.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([name, count]) => `${name} x${count}`)
+        .join(", "),
 );
 console.log(
   pressedCandidates === 0

@@ -7199,3 +7199,54 @@ hit-tested and nothing reported; moved back between the hero and the sheet, 12 F
 `/` and `/recipes/blend` are still unrendered, and `/recipes/[id]/edit`, `/cook/[id]` and
 `/invite/[token]` still need a fixture id. The reachability check is blind to positioned controls,
 by the narrowing above.
+
+### §103a — Two corrections to the above, both from Stephen, and one of them was a false ok I built
+
+**The exemption was wider than the reason I gave for it.** `.h-day-expand` is legitimate because it
+declares `z-index: 0` while its siblings are lifted to `1` — I wrote that sentence and then
+implemented `position !== "static"`, which excuses *every* positioned control. `.h-hero-back` is
+`position: absolute; z-index: 1`, a 44px circle over a photograph that may be anything, and the
+Harvest spec puts a favourite control beside it. **So the filter exempted the one control of exactly
+the class the check was written for.**
+
+Narrowed to the declaration: a positioned control whose computed `z-index` parses to a number **at
+or below zero** has put itself at the base of its stacking context; `auto` or anything positive has
+not. Controls hit-tested went **2694 → 2892**, and the exemption list is now printed at the end of
+every run — `button.h-day-expand ×186` and nothing else.
+
+Proved both ways rather than argued. Giving `.h-hero img` and `.h-hero-empty` `z-index: 2` so the
+photograph paints over the back control produces 12 FAILs naming `img.photo` and
+`span.h-hero-empty`; with that reverted it is 21 of 21 points reachable.
+
+**21, not 25 — and that is the second fix, which the first narrowing made necessary.** A 44px circle
+has four of a 5×5 grid's points in its corners, outside the arc, where `elementFromPoint` correctly
+returns whatever is behind. Bringing `.h-hero-back` into scope would have reported it as a third
+covered on markup that is perfect. The radius is a fact the element states about itself, so a point
+outside the rounded shape is **not a sample** rather than a miss. Third source of false alarms in
+this one check, after the union box and the day-expander.
+
+**The shape worth keeping is not about CSS.** A guard being too broad in what it *forbids* is a false
+alarm and this project has an entry about narrowing one. An **exemption** being too broad is a false
+ok, it is silent, and it is attractive precisely when a check is firing noisily and you want it to
+stop. Both times here the correct reason was already written down in the comment beside the wrong
+condition. So: **implement the sentence you wrote, and print what the filter removed**, because an
+exemption nobody reads is an exemption nobody has measured.
+
+**And the client storage path had already run in production, which the brief had reasoned it could
+not have.** `PhotoUpload` the *component* was the only unreachable thing; `uploadRecipePhoto` the
+*function* is also called from `import-flow.tsx` and `paste-flow.tsx`, both reachable from the
+import screen, and all three go through `POST /api/recipes`, which builds a `userClient()`. Measured
+on the hosted project:
+
+| | |
+|---|---|
+| policies on `storage.objects` | `recipe_photos_write_in_household` (INSERT, `authenticated`), `recipe_photos_read_in_household` (SELECT, `authenticated`) |
+| objects in `recipe-photos` | 111 — **49 with an owner**, 62 written by the service role |
+| owned by real accounts | **36 objects, 2 people, 2026-08-18 → 2026-10-30** |
+| owned by harness accounts | 13 objects, 13 accounts, all 2026-11-03 |
+
+So this is **not** the `member_settings` shape: there the user-facing write had genuinely never
+executed, here it has executed 36 times over two and a half months by people who are not me. The
+right lesson is the inverse one — *a feature being unreachable from one screen is not the same as
+its path being untested*, and checking which was true took one query rather than an assumption in
+either direction.

@@ -1913,3 +1913,42 @@ guessing.
   component API and is not one*, because every rule is keyed on the element — `className="button"`
   on anything that is not a `<button>` or an `<a>` silently does nothing. Before the scoping pass:
   it will fix such a site rather than break it, and each is one more call site to find.
+
+- **An exemption too broad is a false ok, and both times the correct condition was already written
+  in the comment beside the wrong one.** The reachability check fired 144 times on
+  `.h-day-expand` — the planner's whole-row expander, `position: absolute; inset: 0; z-index: 0`
+  with its siblings lifted above it, underneath **by design**. I wrote that justification down and
+  then implemented `position !== "static"`, which excuses every positioned control. `.h-hero-back`
+  is `absolute; z-index: 1`: a 44px circle over a photograph, and the Harvest spec puts a favourite
+  control beside it. **The filter exempted the one control of exactly the class the check existed to
+  find.** Caught by Stephen reading the filter against its own stated reason.
+
+  The direction is what makes this worth its own entry. A guard too broad in what it **forbids** is
+  a false alarm — loud, annoying, and this file already has an entry about narrowing one. An
+  **exemption** too broad is silent, and it is most attractive at exactly the moment a check is
+  firing noisily and you want it to stop. So: **implement the sentence you wrote**, and **print what
+  the filter removed** — an exemption nobody reads is an exemption nobody has measured. The run now
+  ends with `exempted as underneath-by-declaration: button.h-day-expand x186` and nothing else.
+
+  Narrowing it then needed a third fix, which is the pattern to expect rather than a surprise: a
+  44px circle has four of a 5×5 grid's points **in its corners, outside the arc**, so bringing
+  `.h-hero-back` into scope reported it as a third covered on perfect markup. A point outside the
+  rounded shape is *not a sample* rather than a miss. Three sources of false alarm in one check —
+  the union box, the deliberate underlay, the rounded corner — and every one of them was found by
+  turning the threshold down and reading what came back, never by reasoning about the check.
+
+- **"Against local Supabase" was wrong, and the two halves of one verification ran against different
+  databases.** `pnpm check`'s database tests run against the local container. `pnpm shots` and the
+  dev server read `apps/web/.env.local`, which points at the **hosted project** — so every
+  screenshot, every fixture household and every photo upload in that run went to production. I
+  reported the whole thing as local.
+
+  This is the name-the-host rule arriving in its harder form. The first instance was a *missing*
+  host, where the phrase "confirmed served" concealed a laptop. This one **names a host and names
+  the wrong one**, in a sentence where one of the two commands really was local — so it reads as
+  precise. The harness has always run this way (102 harness accounts on hosted since 2026-10-20, a
+  deliberate arrangement, not something to fix), which is exactly why it is easy to say wrong.
+
+  So the rule gets a step: **name the host per command, not per session.** "pnpm check green against
+  local Postgres; pnpm shots clean against hosted" is two facts. "Verified against local" is one
+  sentence that is half false and reads as careful.
