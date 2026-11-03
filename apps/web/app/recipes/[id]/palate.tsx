@@ -16,7 +16,7 @@ export function PalateNotes({ notes }: { notes: readonly PalateNote[] }) {
   if (notes.length === 0) return null;
 
   return (
-    <aside className="notice" style={{ marginTop: "1.5rem" }}>
+    <aside className="notice">
       <h3 style={{ margin: "0 0 0.5rem" }}>What children often find demanding</h3>
       <p className="meta" style={{ marginTop: 0 }}>
         General, not about anyone in this household — nobody here has rated this.

@@ -456,10 +456,67 @@
 
 .h-sheet {
   position: relative;
-  margin: calc(-1 * var(--radius-sheet)) 0 0;
+  /*
+   * A bottom margin, because the sheet had none and the section below it began **flush against its
+   * edge**. Measured in every state: `.h-sheet` bottom and the first `section` top were the same
+   * number, while every section-to-section gap on the page is `--space-xxl`. The picture is what
+   * settled it — "Ingredients" sits on the boundary line between the parchment and the page.
+   *
+   * `--space-xxl` rather than `--space-xl`: this *is* a section boundary and it also crosses a
+   * surface edge, which wants at least as much air as two transparent sections get, not less.
+   *
+   * Not caused by scoping the overlap below — it was there before and after, and it is the second
+   * instance of the same rhythm problem in one column. One reported gap is one instance.
+   */
+  margin-bottom: var(--space-xxl);
   padding: var(--space-xxl) var(--space-xl) var(--space-xl);
   border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
   background: var(--surface);
+}
+/*
+ * Anything that follows the hero gets air. The sheet is the exception, because it overlaps.
+ *
+ * Three gaps in this one column were zero or negative, all for the same reason: the sheet's
+ * negative margin used to be the only thing that knew about this position, so every *other* block
+ * that can sit here has whatever top margin it happened to be born with. `aside.proposal` is
+ * `margin: 0 0 var(--s5)` and sat **flush against the photograph**; the palate note only looked
+ * right because `palate.tsx` carried an inline `marginTop: 1.5rem`, which is a layout rule in a
+ * component for one adjacency.
+ *
+ * **A universal selector, deliberately, and this is the one place it earns it.** The alternative is
+ * a rule per block — `.h-hero + .proposal`, `.h-hero + .notice` — which is exactly the shape that
+ * rots: a fourth block added here next year silently gets zero, and nothing fails. `.h-hero` is
+ * rendered on **one screen**, so the blast radius this file warns about is one adjacency rather
+ * than every component that will ever exist. The rule is the intent; a list would be a snapshot of
+ * today's children.
+ */
+.h-hero + * {
+  margin-top: var(--space-xxl);
+}
+/*
+ * The sheet overlaps the **hero**, not whatever happens to precede it.
+ *
+ * §4.2 lays the parchment over the photograph, and the way that was written was an unconditional
+ * `margin-top: calc(-1 * var(--radius-sheet))` on the sheet itself — a rule about a *relationship*
+ * expressed as a property of one side of it. So it applied to whatever the previous sibling turned
+ * out to be, and the previous sibling is optional: a blend's `aside.proposal`, or the palate note's
+ * `aside.notice`.
+ *
+ * Measured with the palate note present, at every width and in both themes: `.notice` carries
+ * `margin-bottom: var(--s5)` = 20px, which **collapses** with the -22px into **-2px** — the sheet
+ * starts two pixels above the callout's bottom. And `--card` aliases `--surface`, so the two paint
+ * `rgb(251, 247, 240)` in light and `rgb(40, 35, 30)` in dark. Identical fill, negative gap: one
+ * block with a hairline in it.
+ *
+ * This is the second fault from that one declaration and they are the same fault pointed at
+ * different siblings — the first painted the photo control under the sheet and made it unpressable
+ * (§103). Scoping it rather than deleting it is the point: the overlap against the photograph is
+ * the design and it still happens, on the adjacency it was written for. Where a callout
+ * intervenes, the sheet cannot overlap the hero anyway — it is two blocks away — so normal flow
+ * and `.notice`'s own 20px is the right answer there.
+ */
+.h-hero + .h-sheet {
+  margin-top: calc(-1 * var(--radius-sheet));
 }
 
 .h-chips { display: flex; flex-wrap: wrap; gap: var(--space-sm); margin-bottom: var(--space-md); }

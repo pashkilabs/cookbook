@@ -7361,3 +7361,80 @@ built: print the households it would delete and their counts, require the number
 and **refuse to run at all if the predicate matches any family holding an account that is not on a
 reserved domain.** The marker is a positive claim about what is disposable; the guard is the
 negative one.
+
+### §103c — Three zero gaps in one column, one declaration, and the fix is scoping rather than deleting
+
+The report: at 1043px the callout and the sheet touch with identical backgrounds and read as one
+block. Established rather than taken, and the arithmetic is exact.
+
+`.notice` carries `margin-bottom: var(--s5)` = **20px**. `.h-sheet` carried
+`margin: calc(-1 * var(--radius-sheet)) 0 0` = **-22px**. Adjacent siblings in a block container, so
+the margins **collapse**: `max(20, 0) + min(0, -22)` = **-2px**. The sheet starts two pixels above
+the callout's bottom. And `globals.css` has `--card: var(--surface)`, so both paint
+`rgb(251, 247, 240)` in light and `rgb(40, 35, 30)` in dark. Measured at 390 and 1043, both themes,
+identical in all four.
+
+**Scoped, not deleted** — the overlap against the photograph is the design (§4.2 lays the parchment
+over the picture) and it still happens:
+
+```css
+.h-hero + .h-sheet { margin-top: calc(-1 * var(--radius-sheet)); }
+```
+
+A rule about a *relationship* had been written as a property of one side of it, so it applied to
+whatever the previous sibling turned out to be — and that sibling is optional. **Second fault from
+this one declaration**: the first painted the photo control under the sheet and made it unpressable
+(§103). Same cause, different sibling. Where a callout intervenes the sheet cannot overlap the hero
+anyway, being two blocks away, so normal flow is the right answer there.
+
+### And the reported gap was one of three
+
+Rendering the column with **every** optional block above the sheet — a blend's `aside.proposal`, the
+palate note's `aside.notice`, and the allergen warning inside the sheet, which no fixture had ever
+put on one page — found two more, both pre-existing and neither reported:
+
+| boundary | was | now | why |
+|---|---|---|---|
+| hero → `aside.proposal` | **0px** | 28px | `.proposal` is `margin: 0 0 var(--s5)`; a blend sat flush against the photograph |
+| callout → sheet | **-2px** | 20px | the collapse above |
+| sheet → first `section` | **0px** | 28px | `.h-sheet` had no bottom margin; "Ingredients" sat on the parchment's edge |
+
+The third was settled by a picture rather than the number: 0 is in range for a *content* gap because
+the sheet's own 20px padding sits above it, and the screenshot shows the heading touching the
+boundary line between the parchment and the page. `--space-xxl` rather than `--space-xl`, because
+this is a section boundary *and* a surface edge, which wants at least the air two transparent
+sections get.
+
+The hero's own rule is now one rule rather than three, and that is a deliberate choice about which
+way this rots:
+
+```css
+.h-hero + * { margin-top: var(--space-xxl); }
+```
+
+**A universal selector, which this project has an entry warning about** — and it earns it here. The
+alternative is `.h-hero + .proposal`, `.h-hero + .notice`, and a fourth block added next year
+silently getting zero with nothing failing. `.h-hero` is rendered on **one screen**, so the blast
+radius is one adjacency rather than every component that will ever exist. The rule is the intent; a
+list would be a snapshot of today's children. `palate.tsx`'s inline `marginTop: 1.5rem` is deleted
+with it — a layout rule living in a component for one adjacency, which is why the palate note looked
+right and the proposal did not.
+
+Rendered after: hero **28** proposal **20** notice **20** sheet **28** section **28** — and with no
+callout, hero **-22** sheet, the designed overlap intact. `pnpm shots` carries a third recipe screen
+(`recipe-blend`) so the stacked case has a picture; 176 screenshots, zero problems.
+
+### The guard that failed on the comment describing the fix
+
+`check-theme-complete` scanned `harvest.css` for `var(--…)` **including inside comments**, so writing
+*"`.notice` carries `margin-bottom: var(--s5)`"* in a note about this made it demand a dark
+definition for `--s5` in all three dark sites. A spacing alias, named without the `space-` prefix the
+filter keys on, mentioned in prose and declared in no rule: three confident failures about something
+that paints nothing.
+
+Comments are stripped before matching now, which is the narrowest condition that separates it — a
+`var()` in a comment has never been a declaration, and a commented-out rule paints nothing so it
+should carry no requirements either. Adding `--s5` to the exemption list would have papered over a
+defect in *what the check reads*, and that list is deliberately two names. Mutation-tested three
+ways: clean with the fix (23 role tokens across 3 dark sites), still fires on a genuinely undefined
+role token, and reproduces the false alarm when the stripping is removed.

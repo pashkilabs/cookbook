@@ -1989,3 +1989,49 @@ guessing.
   confirmed, and **refuse to run if the predicate matches any family holding an account outside the
   reserved domains.** The marker is the positive claim about what is disposable; that refusal is the
   negative one, and only the pair is safe.
+
+- **A rule about a relationship, written as a property of one side of it, applies to whichever
+  neighbour turns up.** `.h-sheet` carried `margin: calc(-1 * var(--radius-sheet)) 0 0` because §4.2
+  lays the parchment over the photograph — a fact about `.h-hero + .h-sheet` expressed as a fact
+  about `.h-sheet`. Its previous sibling is **optional**, so it has now broken twice with the same
+  declaration and different neighbours: the photo control painted under it and unpressable (§103),
+  and a callout meeting it at **-2px** with an identical fill, because `.notice`'s
+  `margin-bottom: 20px` collapses with the -22 and `--card` aliases `--surface`.
+
+  The fix is scoping, never deleting — the overlap is the design. `.h-hero + .h-sheet`. And the test
+  for this shape before it bites: **read every margin that is negative, or unusually large, and ask
+  what it assumes about its neighbour.** If the answer names a specific element, the selector should
+  too.
+
+  **The reported gap was one of three, which is the half worth carrying.** Rendering that column
+  with every optional block present — a state no fixture had ever produced — showed hero→proposal at
+  **0px** (a blend sitting flush against the photograph) and sheet→section at **0px** ("Ingredients"
+  on the parchment's edge) beside the reported -2. All three had the same cause: the negative margin
+  was the only thing that knew about this position, so every *other* block that can sit here kept
+  whatever margin it was born with. One reported gap in a column is a sample.
+
+  It also resolved as one rule rather than three — `.h-hero + * { margin-top: var(--space-xxl) }`,
+  **a universal selector, which this file warns about and which earns it here**: `.h-hero` renders on
+  one screen, so the blast radius is one adjacency, and a list of `.h-hero + .proposal`,
+  `.h-hero + .notice` is a snapshot of today's children that a fourth block silently escapes. The
+  tell that a list was wrong was already there: the palate note looked right only because
+  `palate.tsx` carried an inline `marginTop: 1.5rem` — a layout rule hidden in a component for one
+  adjacency, which is why one of the two callouts was correct and the other was not.
+
+- **A guard read a comment as a declaration, and the comment was the one describing its own fix.**
+  `check-theme-complete` matched `var(--…)` across the whole of `harvest.css`, so writing
+  *"`.notice` carries `margin-bottom: var(--s5)`"* in a note about vertical rhythm made it demand a
+  dark definition for `--s5` in all three dark sites — a spacing alias, named without the `space-`
+  prefix its filter keys on, mentioned in prose and declared in no rule. Three confident failures
+  about something that paints nothing.
+
+  Narrowest condition: strip comments before matching. A `var()` in a comment has never been a
+  declaration, and a commented-out rule paints nothing, so it should carry no requirement either.
+  **The tempting fix was the exemption list** — `--s5` is right there beside `--chapter-icon` — and
+  it would have papered over a defect in *what the check reads* with a claim about *what the token
+  is*. Same trap as widening a filter to silence a noisy check: the exemption absorbs the symptom and
+  the defect stays.
+
+  Worth adding to the list of things to ask a guard: **does it distinguish code from prose?** Every
+  check here that greps a stylesheet or a component has this hazard, and a comment is the one place
+  somebody writes a token name they do not mean.

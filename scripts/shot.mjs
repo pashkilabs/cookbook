@@ -412,6 +412,40 @@ if (!uploaded.ok()) {
 }
 
 /*
+ * One recipe marked as a blend, so the column above the sheet is rendered with **two** callouts.
+ *
+ * `/recipes/[id]` can put three optional blocks between the hero and the sheet — a blend's
+ * `aside.proposal`, the palate note's `aside.notice`, and nothing — and the gap rules between them
+ * were wrong in all three states: the sheet's negative margin applied to whatever preceded it
+ * (§103c). A screen that only ever renders one of them cannot see the stacking.
+ *
+ * Set with the service role because nothing in the product writes `derived_at` except the blend
+ * composer, and the point here is the *layout* of a blend rather than the path that makes one. The
+ * write is asserted below for the usual reason: a recipe that is not a blend renders the ordinary
+ * page perfectly well, and the run would photograph it as a blend.
+ */
+const asBlend = made[2];
+const blended = await fetch(
+  `${SUPABASE}/rest/v1/recipes?id=eq.${asBlend.id}`,
+  {
+    method: "PATCH",
+    headers: {
+      apikey: SERVICE, authorization: `Bearer ${SERVICE}`,
+      "Content-Type": "application/json", Prefer: "return=representation",
+    },
+    body: JSON.stringify({ derived_at: new Date().toISOString() }),
+  },
+);
+const blendRows = await blended.json().catch(() => []);
+if (!blended.ok || !Array.isArray(blendRows) || blendRows.length !== 1) {
+  console.error(
+    `COULD NOT MEASURE: "${asBlend.title}" would not take derived_at (HTTP ${blended.status}), so the ` +
+      `blend screen would be an ordinary recipe page photographed under a blend's name`,
+  );
+  process.exit(2);
+}
+
+/*
  * A group with things in it, because the screens that render groups render nothing without one.
  *
  * `/household` grows a "How you group the list" section and `/shopping` groups the typed items
@@ -636,6 +670,16 @@ const SCREENS = [
    */
   { name: "recipe-with-photo", path: `/recipes/${withPhoto.id}`, marker: withPhoto.title },
   { name: "recipe-no-photo", path: `/recipes/${withoutPhoto.id}`, marker: withoutPhoto.title },
+  /*
+   * The blend, for the column above the sheet rather than for the blend feature: hero, proposal,
+   * palate note, sheet, all four stacked. The marker is the heading a proposal must carry before
+   * any claim (§60) — content only this state renders.
+   */
+  {
+    name: "recipe-blend",
+    path: `/recipes/${asBlend.id}`,
+    marker: "Nobody has cooked this",
+  },
   { name: "recipe-new", path: "/recipes/new", marker: "Add a recipe" },
   { name: "import", path: "/recipes/import", marker: "One link" },
   /*

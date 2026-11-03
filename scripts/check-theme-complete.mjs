@@ -95,8 +95,25 @@ for (const [, colour] of hand.matchAll(NAMED)) {
  */
 const INSTANCE = new Set(["chapter-icon", "chapter-icon-size"]);
 
+/*
+ * Comments are not declarations, and this check was reading them as such.
+ *
+ * It scanned the whole file for `var(--…)`, so **a sentence in a comment created a requirement**.
+ * Writing *"`.notice` carries `margin-bottom: var(--s5)`"* in a note about vertical rhythm made the
+ * check demand a dark definition for `--s5` in all three dark sites — a spacing alias, named
+ * without the `space-` prefix the filter below keys on, mentioned in prose and declared in no rule.
+ * Three confident failures about something that paints nothing.
+ *
+ * Stripping comments is the narrowest condition that separates it: a `var()` inside `/* … *` + `/`
+ * has never been a declaration, and a rule that is commented out paints nothing, so it should not
+ * carry requirements either. The alternative — adding `--s5` to `INSTANCE`, or widening the prefix
+ * filter — would paper over a defect in what the check reads rather than fixing it, and the note
+ * above is explicit that the exemption list stays a named list of two.
+ */
+const declarations = hand.replace(/\/\*[\s\S]*?\*\//g, " ");
+
 const referenced = new Set(
-  [...hand.matchAll(/var\(--([a-z0-9-]+)/g)]
+  [...declarations.matchAll(/var\(--([a-z0-9-]+)/g)]
     .map(([, name]) => name)
     .filter((name) => !/^(colour|member|space|size|radius|type|font|shadow)-/.test(name))
     .filter((name) => !INSTANCE.has(name)),
