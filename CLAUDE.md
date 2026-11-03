@@ -1705,7 +1705,8 @@ guessing.
 
   - `member_settings` **has** an INSERT policy, byte-identical in shape to every other household
     table's, with the column grants beside it;
-  - the INSERT path had run **57 times** in production — the migration wrote 15 rows in one batch at
+  - the INSERT path had run **57 times** in production (**once** for a *real* household; 56 were
+    harness fixtures — see the entry below on counting hosted figures) — the migration wrote 15 rows in one batch at
     `02:44:21` and every later row has its own timestamp, **Paige's among them** at `03:59:46`;
   - `pnpm smoke` already chooses a layout as a fresh owner *and* as a fresh invitee, both with no
     row, both INSERTs as `authenticated`, both green.
@@ -1952,3 +1953,39 @@ guessing.
   So the rule gets a step: **name the host per command, not per session.** "pnpm check green against
   local Postgres; pnpm shots clean against hosted" is two facts. "Verified against local" is one
   sentence that is half false and reads as careful.
+
+- **Every figure quoted from the hosted project counted the harness, because the harness runs there.**
+  "98 of 98 entitlements with a null quota anchor", "twelve unentitled households", "57
+  `member_settings` INSERTs since the migration" — all three were counted across all rows, and the
+  hosted project holds **129 harness households against 4 real ones**. Split by kind: **1 of 2**, **2**,
+  and **1**.
+
+  **The conclusions held and the evidence did not, which is the combination that makes this easy to
+  miss.** The null anchor is a fact about a condition in a SQL statement, so the mechanism was never
+  in doubt — what shrank was the exposure, from "every household" to one entitlement. And §99's
+  specific claim survived exactly: the row I attributed to a real member really was written by the
+  INSERT path seventy-five minutes after the migration's batch. It was the *number beside it* that
+  was 98% synthetic.
+
+  So: **a count from a database the test harness writes to is a count of your own fixtures until you
+  split it.** And split it by something durable — every harness account here signs up on a reserved
+  domain (`@example.com`, `@example.invalid`, `@pashki.test`), which classifies accounts, then
+  households through `family_members`, then every app row through `family_id`. A `smoke-`/`shot-`
+  *prefix* was the first attempt and missed `pashki-smoke+…`, under-counting the harness and so
+  over-counting the real.
+
+  One distinction worth keeping rather than dismissing the harness rows entirely: **a harness account
+  is a genuine `authenticated` client against the real database with real RLS.** That is synthetic
+  *data*, not a synthetic *permission* — the opposite of a service-role test. Those 91 harness rows
+  are good evidence the policy works and no evidence that anybody has used the feature.
+
+- **A deletion predicate fails in the opposite direction from every other predicate in these notes.**
+  Everything else here under-reports: a probe that measured nothing looks like a pass, a filter too
+  broad silently excuses its subject, a guard with no fixture reports clean. A predicate that selects
+  rows **to delete** fails by matching too much, and it is silent and irreversible.
+
+  Written down before building the harness teardown rather than after. Whatever selects disposable
+  rows must print the households it would remove and their counts, require the number to be
+  confirmed, and **refuse to run if the predicate matches any family holding an account outside the
+  reserved domains.** The marker is the positive claim about what is disposable; that refusal is the
+  negative one, and only the pair is safe.

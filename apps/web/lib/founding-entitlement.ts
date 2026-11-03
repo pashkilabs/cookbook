@@ -66,6 +66,12 @@ const PERIOD_DAYS = 30;
  * carries `resetsAt: null` beside `periodDays: 30`. A period with no anchor never elapses, so
  * none of them has ever rolled over: they are one-off allowances wearing a monthly label.
  *
+ * **That 98 was almost all harness rows, which matters for the scale and not for the mechanism.**
+ * Re-counted by household kind — a harness account always signs up on a reserved domain, so they
+ * separate cleanly — it is **1 of 2 real households' entitlements** with a null anchor, beside 112
+ * of 123 harness ones. The condition in the spending statement is wrong either way; what shrank is
+ * the exposure, from "every household" to one.
+ *
  * Nothing has noticed because nothing has run out. The highest `used` anywhere is 92 against a
  * limit of 500, and the households capped at 50 are in single figures — so this is a wall that
  * exists and has not been walked into, which is the same shape as a permission nothing has
@@ -109,9 +115,10 @@ export async function issueFoundingEntitlement(
      * would read as present and enforce nothing — a guard whose existence is not its assertion.
      *
      * So this **ensures** rather than issues. The useful side effect is that an existing
-     * household that has no entitlement — there are twelve on the hosted project, Stephen's
+     * household that has no entitlement — **two** real ones on the hosted project, Stephen's
      * sister's among them — is healed on its owner's next sign-in, rather than by a hand-written
-     * UPDATE against production.
+     * UPDATE against production. (The figure said twelve until the hosted counts were split by
+     * household kind; the other ten are harness fixtures, which heal and then are never seen.)
      */
     const existing = await platformStore().findEntitlement(familyId, "recipes");
     if (existing) {

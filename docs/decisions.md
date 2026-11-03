@@ -6636,7 +6636,9 @@ Byte-identical in shape to the one the loop in `20260811090300_row_level_securit
 every household table, with the column grants beside it:
 `grant insert (family_id, family_member_id, recipe_layout, recipe_layout_asked_at)`.
 
-**The INSERT path had run 57 times in production.** The migration created 15 rows in one batch at
+**The INSERT path had run 57 times in production** — *and 56 of those were harness fixtures; see
+§103b, which re-counts this by household kind and finds it had run **once** for a real household.*
+The migration created 15 rows in one batch at
 `2026-10-22T02:44:21`; every row after that has a distinct `created_at`, up to
 `2026-10-25T16:12:42`. Paige's own row is one of them — `03:59:46`, created by the app, not carried
 forward. So "never run before" was wrong, and the half of it about Paige was wrong in the same way.
@@ -6811,7 +6813,7 @@ household mid-import. It is a cost guard, not a tier; the tier design sets the r
 
 **`resetsAt` must be a real date.** `platform_spend_quota` rolls a counter over only
 `if resets is not null and now() > resets`. Every entitlement ever issued here — **98 of 98 on the
-hosted project**, from the development path, from `smoke.mjs`, and from `issue:entitlement` —
+hosted project**, *of which 1 belongs to a real household: see §103b*, from the development path, from `smoke.mjs`, and from `issue:entitlement` —
 carries `resetsAt: null` beside `periodDays: 30`. A period with no anchor never elapses, so none of
 them has ever rolled over: they are one-off allowances wearing a monthly label. Nothing noticed
 because nothing has run out — the highest `used` anywhere is 92 against a limit of 500, and the
@@ -6826,7 +6828,8 @@ design, so a replayed billing webhook updates a window rather than duplicating i
 and composing them naively gives a quota that can never bind: issuing unconditionally would hand a
 household its monthly imports back every time somebody signed in, and the meter would read as
 present while enforcing nothing. So it reads first. The useful side effect is that an existing
-household with no entitlement — twelve on the hosted project — is **healed on its owner's next
+household with no entitlement — **two** real ones on the hosted project (§103b said twelve before
+the counts were split by household kind) — is **healed on its owner's next
 sign-in** rather than by a hand-written UPDATE against production.
 
 Both are regression-tested and both mutants are caught, one test each.
@@ -7250,3 +7253,111 @@ executed, here it has executed 36 times over two and a half months by people who
 right lesson is the inverse one — *a feature being unreachable from one screen is not the same as
 its path being untested*, and checking which was true took one query rather than an assumption in
 either direction.
+
+### §103b — Which hosted figures were about real households, and whether the harness has ever touched one
+
+Every figure this project has quoted from the hosted project was counted across **all** rows, and
+the hosted project is where the harness runs. Re-counted by household kind. A harness account always
+signs up on a reserved domain — `@example.com` (`shot.mjs`), `@example.invalid` (smoke, two
+addresses), `@pashki.test` (smoke's thin account) — so `accounts.email` classifies the account,
+`family_members.account_id` classifies the household, and `family_id` classifies every app row.
+
+**129 harness households, 4 real, 3 with no account at all.** Harness accounts go back to
+**2026-08-13**, not 20 October: the earlier count of "102 since 20 October" used a `smoke-`/`shot-`
+*prefix*, which misses `pashki-smoke+…`. The domain is the better marker and it is durable.
+
+| figure, as quoted | all rows | real households only |
+|---|---|---|
+| entitlements with `resetsAt: null` (§96, §100) | 98 of 98 | **1 of 2** (112 of 123 harness) |
+| households with no `recipes` entitlement (§100) | twelve | **2** (+6 harness, +3 with no account) |
+| `member_settings` rows since the migration (§99) | 57 | **1** (91 harness) |
+
+**Which conclusions move, and which do not.**
+
+The null quota anchor is a fact about the condition in the spending statement, so the mechanism is
+unchanged — what shrinks is the exposure, from "every household on the project" to one real
+entitlement. §100's healing-on-sign-in reaches **two** real households rather than twelve.
+
+§99 is the interesting one, because **the specific claim survives and the evidence behind it does
+not**. The row I attributed to a real member is real and is exactly where I said: created
+`2026-10-22 03:59:46`, seventy-five minutes after the migration's 15-row batch at `02:44:21`, in a
+real household. So "that row was written by the INSERT path, not carried forward by the migration"
+is correct. "The INSERT path had run **57 times** in production" is not — it had run **once** for a
+real household, and 91 times for harness ones.
+
+And the policy claim is barely weakened at all, which is worth separating out: **a harness account
+is a genuine `authenticated` client against the real database with real row-level security.** That
+is synthetic *data*, not a synthetic *permission* — the opposite of the service-role tests §99 was
+written about. The 91 harness rows are evidence the policy works; they are not evidence that real
+families have used it.
+
+### Has a harness run ever written to a real household?
+
+**No, on three independent signals.**
+
+| | |
+|---|---|
+| harness accounts' household memberships | 131 — **all** in harness households, 0 in real ones |
+| households mixing harness and real accounts | **0** |
+| `storage.objects` by owner against path | harness owners wrote 15 objects, **all** under harness `family_id` paths; real owners wrote 36, all under real paths |
+
+And the reason is structural rather than lucky: every run signs up a **new** account, provisions its
+**own** household, and every app table is `family_id`-scoped under RLS — a harness session holds a
+token that cannot address another family's rows. The one surface that bypasses RLS is the service
+role, and every service-role call in `smoke.mjs` is addressed either by an id the fixture created
+itself (`recipes?id=eq.${recipeId}`) or at the shared grocery catalog. **That is the discipline to
+keep rather than a fault to fix**: a service-role call that took a family id from a query rather
+than from its own fixture is the one way this property would break, and nothing checks it.
+
+### Can harness rows be identified after the fact?
+
+Yes, durably, and **not by creation time**. The chain above is complete for every table carrying
+`family_id`. Three gaps, all small and worth naming:
+
+- **3 families with no account at all** (2026-08-19). Unclassifiable by this rule in either
+  direction; they hold no recipes.
+- **`import_cache`** — 65 rows since 2026-08-13, no `family_id`, one row per URL for the entire user
+  base by design (architecture §11). Harness imports write into the cache real households read. Not
+  a write *to* a household, but the one shared surface.
+- **`recipes.created_by` is NULL on all 1584 rows**, harness and real alike. The one app column that
+  records who records nothing. Classification does not need it — `family_id` is enough — but a
+  future question about *which person* did something has no answer.
+
+### What a separate project would cost, against a marker plus teardown
+
+**A second hosted project.** Pro is $25/month including one project; each additional project starts
+at about **$10/month** — one Micro or Nano is covered by the $10 compute credit, a Small is about
+$15 — plus disk over 8 GB at $0.125/GB. *Confirm against the live pricing page before committing;
+these are today's published figures.*
+
+The money is the smaller half. A second project means a second set of secrets, a second `db:push`
+target, `check:parity` becoming a three-way comparison, `set:site-url` and `set:smtp` run twice —
+and, worst, **it removes the property the hosted harness exists for**. The harness runs against
+hosted because local and hosted disagree about default privileges, about `mailer_autoconfirm`, and
+about which rows exist; a harness project that drifts from production answers the same question
+local already answers, more expensively.
+
+**A marker plus teardown.** The marker exists already and needs nothing. Teardown is bounded by a
+cascade that is deliberate: `families` carries `ON DELETE CASCADE` and
+`assert_no_family_propagation_triggers` refuses the soft-delete trigger on it by name, because *"a
+household going away is a device wipe and a hard delete that cascades, not a million tombstones."*
+So one statement over 129 harness families removes:
+
+```
+recipes 1492 · recipe_ingredients 7471 · recipe_steps 5713 · plan_entries 1981
+import_jobs 42 · photos 22 · ratings 6
+```
+
+Two things the cascade cannot do, both already documented here: **storage objects cannot be deleted
+with SQL** — `storage.protect_delete()` refuses it, so the 24 objects under harness paths go through
+the Storage API's `.remove()` — and **auth users** need the admin endpoint, about 131 of them.
+
+So: one SQL delete, one Storage sweep, one admin loop, reporting three outcomes. An hour to write.
+
+**The hazard is inverted from everything else in these notes, which is the reason to be careful.**
+Every other predicate here fails by under-reporting — a probe that measured nothing looks like a
+pass. A *deletion* predicate fails by over-deleting, silently and irreversibly. So whatever is
+built: print the households it would delete and their counts, require the number to be confirmed,
+and **refuse to run at all if the predicate matches any family holding an account that is not on a
+reserved domain.** The marker is a positive claim about what is disposable; the guard is the
+negative one.
