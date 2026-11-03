@@ -387,8 +387,6 @@ export default async function RecipePage({
       )}
       </div>
 
-      {/* the placement Stephen was reaching for: an existing recipe with no picture had no way
-          to get one, on any screen. Labelled by what it does to the recipe you can see. */}
       {/*
         * A blend says so, first, before anything it might be mistaken for.
         *
@@ -415,8 +413,6 @@ export default async function RecipePage({
 
       {/* the general-knowledge half, kept apart from any observation (§57a) */}
       <PalateNotes notes={palate} />
-
-      <PhotoUpload recipeId={recipe.id} label={photoUrl ? "Replace the photo" : "Add a photo"} />
 
       {/*
         * The parchment sheet, overlapping the hero by 22px (§4.2).
@@ -511,6 +507,18 @@ export default async function RecipePage({
           <Link className="button quiet" href={`/recipes/${recipe.id}/edit`}>
             Edit
           </Link>
+          {/*
+            * The photo control, moved here from between the hero and the sheet.
+            *
+            * It was placed there to sit beside the picture it changes, and `.h-sheet` carries
+            * `margin-top: calc(-1 * var(--radius-sheet))` — it is *designed* to overlap whatever
+            * precedes it, because §4.2 lays the parchment over the photograph. So the control was
+            * painted under the sheet with 2.5px of 20.5 showing, and `elementFromPoint` returned
+            * the sheet at its middle in all twelve width/theme/photo combinations: not a styling
+            * fault, a control nobody could tap. The gap between the hero and the sheet is not a
+            * place anything can go.
+            */}
+          <PhotoUpload recipeId={recipe.id} label={photoUrl ? "Replace the photo" : "Add a photo"} />
           <RemoveRecipe recipeId={recipe.id} title={recipe.title} />
         </div>
       </div>

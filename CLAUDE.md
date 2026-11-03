@@ -1860,3 +1860,56 @@ guessing.
   fetcher with no options at all and exercise the real predicate; only the chain-following tests
   override it, through one named constant with the reason attached. If that constant ever appears in
   a refusal test, that test passes against a fetcher with no guard.
+
+- **A control with a perfect box that nobody can press is invisible to every check that measures the
+  control.** "Add a photo" on a recipe page had a correct 408×20 box, a correct colour, a correct
+  container — and `.h-sheet`'s `margin-top: calc(-1 * var(--radius-sheet))`, which exists because
+  §4.2 lays the parchment *over* the photograph, painted over 18 of its 20.5px.
+  `document.elementFromPoint` returned `div.h-sheet` at its middle in **all twelve** width × theme ×
+  photo-state combinations. The add-photo feature has been unreachable since it shipped.
+
+  **This is the fourth instrument the family entry above predicted, and it arrived exactly as
+  described: answering correctly about something nobody had asked.** `check-contrast` reads colour,
+  the overflow check measures against the viewport, the squeezed-text check measures the element's
+  own box, the glyph check wants an `svg[width]`. Every one of them was green and right. None of
+  them can ask **what is painted on top of this**, because that is not a fact about the element —
+  and a control is the one kind of element for which it is the only question that matters.
+
+  `pnpm shots` now hit-tests every normal-flow control. Three things in building it generalise
+  further than the check:
+
+  - **Scroll before you hit-test.** `elementFromPoint` reads the viewport, so a control below the
+    fold answers `null` — which is *not* "covered". The first version reported `none` for
+    everything past the fold: a could-not-measure wearing a pass.
+  - **The largest client rect, not the bounding box.** An inline link wrapping across two lines has
+    a bounding box that is the *union* of its line boxes, covering the blank tail of line one where
+    a neighbour legitimately sits. That mistake produced 16 confident findings on correct markup.
+  - **Narrow to `position: static`.** `.h-day-expand` is the planner's whole-row expander —
+    `absolute; inset: 0; z-index: 0`, title lifted above it — underneath **by design**, and its own
+    rule says so. The first version reported it **144 times** in one run. A control that declares a
+    position has made a layering decision; one in normal flow has not.
+
+  **And the threshold went down rather than up.** "Fewer than half the points" caught the real bug
+  by **1.5 points of 25**, which only looked safe because the bug landed on the right side of it.
+  Turning it to zero is what exposed the union-box error. So: **turn a new guard's threshold down
+  until something fires, once, before trusting the number it ships with** — a threshold is where a
+  guard goes to stop being falsifiable, and a margin you have not probed is a margin you are
+  guessing at.
+
+- **A clipped glyph is not the glyph it looks like, and `.button` on a `<label>` matches nothing.**
+  Two small things from the same bug, both worth a line.
+
+  The report described a clipped **"P"**. The label reads *"Replace the photo"* — **R and P share
+  their top half**, so an R cut off at the bowl is a P. Before that landed I had spent a step on
+  `.h-hero-empty`, which renders `title.charAt(0)` in `--text-muted` and therefore fits the measured
+  colour just as well. **Rendering the second state is what settled it**: the no-photo recipe shows
+  "A" from "Add a photo" in the same position, which no amount of reading either element could have
+  told me. A letter identified from a fragment is a hypothesis.
+
+  And `globals.css` has `button, a.button` — so `<label className="button">` matches **neither**,
+  and fell through to the `label` element rule: 12.8px, muted, no fill, no tap target. **Fifth fault
+  from that one unscoped rule and it points the opposite way to the other four.** Those were an
+  element selector reaching components that never asked for it. This is a class that *reads like a
+  component API and is not one*, because every rule is keyed on the element — `className="button"`
+  on anything that is not a `<button>` or an `<a>` silently does nothing. Before the scoping pass:
+  it will fix such a site rather than break it, and each is one more call site to find.

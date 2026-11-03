@@ -7090,3 +7090,112 @@ screenshot" and "this blog does not publish a recipe card" is which of the two a
 A public hostname whose DNS record points at a private address. The host is checked on every hop
 now; the **address the socket connects to** is not, and only a custom dispatcher could. Unchanged
 from before and still recorded as a gap rather than implied closed.
+
+## §103 — A control with a perfect box that nobody could press, and the screen it was on had never been rendered
+
+The report: at 440px the photo control on a recipe page renders as a single clipped **"P"** at the
+top-left of the header card, above the chips — 20×40 device px, `#B5AC9D`, nothing beside it. Not
+`display: none`, not a permission gate, not the invisible-ink class.
+
+Reproduced exactly, and the glyph is the first thing worth stating because it sent me the wrong way
+first. `.h-hero-empty` renders `recipe.title.charAt(0).toUpperCase()` in `--text-muted` — a single
+muted letter — so the measured colour fits it as well as it fits the control, and I spent a step
+believing it. **Rendering the with-photo state settled it in one picture:** the label reads
+*"Replace the photo"*, and the visible fragment of an **R** clipped at the bowl is a **P**. The two
+letters share their top half. A clipped glyph is not the glyph it looks like.
+
+### Fault 1 — `.button` on a `<label>` matches nothing at all
+
+`globals.css` has `button, a.button { … }`. `PhotoUpload` renders `<label className="button">`,
+which is neither — so it took the `label` element rule instead (`display: block; font-size: 0.8rem;
+color: var(--muted)`) and rendered as 12.8px of muted text, 358×20.5, no fill, no border, no tap
+target against a 44px minimum.
+
+**Fifth fault from that one unscoped rule, and it points the opposite way to the other four.** Those
+were an element selector reaching components that never asked for it. This is a class that reads
+like a component API and is not one, because every rule is keyed on the element — so
+`className="button"` on anything but a `<button>` or an `<a>` silently does nothing. Worth knowing
+before the scoping pass: it will *fix* this site rather than break it, and it is one more call site
+to find.
+
+Fixed with `.photo-upload label` rather than by widening the selector to `.button`, because widening
+it here would restyle the 13 non-button elements carrying `quiet` and `danger` — the exact blast
+radius the note above that rule says the real refactor has to account for.
+
+### Fault 2 — it was painted under the sheet, and unpressable
+
+The serious one. `<PhotoUpload>` sat between `.h-hero` and `.h-sheet`, and `.h-sheet` carries
+`margin: calc(-1 * var(--radius-sheet)) 0 0` because §4.2 lays the parchment *over* the photograph.
+It is `position: relative` with an opaque `background`, so it paints over whatever precedes it.
+Measured: **18 of the label's 20.5px covered**, and `document.elementFromPoint` returned
+`div.h-sheet` at the label's middle and bottom in **all twelve** width × theme × photo-state
+combinations.
+
+So this was never a styling fault. **The add-photo feature has been unreachable from the product
+since it shipped** — the eighth thing here built without a way in, and this one had its control
+built, labelled and in the DOM.
+
+The gap between the hero and the sheet is not a place anything can go. The control moved into
+`.h-row-quiet` beside *Pair this with…*, *Edit* and *Remove*, which is where the page's actions live.
+
+### Fault 3 — found by rendering the screen at all
+
+`ul.ingredients li` is a **descendant** selector, and `.substitution` renders its own `<ul>` of
+options inside an ingredient line — so it matched those too and beat `.substitution li
+{ display: block }` on specificity (0,1,2 against 0,1,1). Three spans written to stack became a flex
+row, and *"one for one"* rendered in a **23px box, 87px tall — one character per line**, at every
+width in both themes.
+
+Fourth instance here of a selector whose subject is wider than its intent: `button` governing every
+component written after it, `.h-icon` never resetting that rule's padding, `.h-check input` clipping
+a text field to 1px, and this. `> li`, plus `flex-wrap` on the line and `flex: 1 1 100%; min-width: 0`
+on the `<details>` so it drops below the text instead of being squeezed to min-content beside it.
+
+### Why nothing saw any of it
+
+`/recipes/[id]` is one of the four screens the `button`-scoping note names as unrendered by the
+harness. It is rendered now, in **both photo states** — the hero is a different element in each, the
+label is different text, and the sheet starts at a different y, so neither is a shot of the other.
+The photo goes in through `POST /api/recipes` rather than the service role, so the client storage
+policy is actually exercised, and a refused upload is **exit 2**: a recipe whose upload failed
+renders the other state perfectly and the run would photograph it twice.
+
+### The new instrument: can a finger reach this control?
+
+`check-contrast` reads colour, the overflow check measures against the viewport, the squeezed-text
+check measures the element's own box, and the glyph check wants an `svg[width]`. **A control with a
+correct 408×20 box, correctly coloured, inside a correct container, is invisible to all of them** —
+the question is what is painted *on top of* it, and only a layout engine can answer that.
+
+So `pnpm shots` now scrolls every normal-flow control to the centre, samples a 5×5 grid over its
+largest client rect, and fails when any point lands on something that is not the control. Three
+things in it are worth more than the check:
+
+- **Scroll first.** `elementFromPoint` reads the viewport, so a control below the fold answers
+  `null` — which is *not* "covered". The first version reported `none` for everything past the fold:
+  a silence that reads exactly like a pass.
+- **The largest client rect, not the bounding box.** An inline link wrapping across two lines has a
+  bounding box that is the union of its line boxes, covering the blank tail of line one where a
+  neighbour legitimately sits.
+- **`position: static` only.** `.h-day-expand` is the planner's whole-row expander — `absolute;
+  inset: 0; z-index: 0`, with the title lifted above it — underneath **on purpose**, and its own
+  rule says so. The first version reported it **144 times**. A control that declares a position has
+  made a layering decision; one in normal flow has not. The gap this leaves is recorded rather than
+  implied closed: a positioned control that is genuinely covered is not checked.
+
+**And the threshold went down rather than up, which is the part to carry.** "The centre" was too
+strict. "Fewer than half" worked and caught the real bug by **1.5 points of 25** — a margin that thin
+is a coin-flip waiting for a padding change, and it only looked safe because the bug landed on the
+right side of it. Turning it to zero is what exposed the union-box error: 16 findings, none of them
+real. Fixing that left none, and the threshold could go to zero with no margin to defend. **Turn a
+new guard's threshold down until something fires, once, before trusting the number it ships with.**
+
+Mutation-tested both ways at zero tolerance: with the control in the actions row, 2694 controls
+hit-tested and nothing reported; moved back between the hero and the sheet, 12 FAILs naming
+`div.h-sheet`.
+
+### What this does not cover
+
+`/` and `/recipes/blend` are still unrendered, and `/recipes/[id]/edit`, `/cook/[id]` and
+`/invite/[token]` still need a fixture id. The reachability check is blind to positioned controls,
+by the narrowing above.

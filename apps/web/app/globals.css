@@ -389,6 +389,43 @@ button, a.button {
 }
 button:hover, a.button:hover { opacity: 0.88; }
 
+/*
+ * `.photo-upload label` — because `.button` on a `<label>` matches nothing at all.
+ *
+ * The rule below is `button, a.button`. A `<label class="button">` is neither, so the photo
+ * control took the `label` element rule instead — `display: block; font-size: 0.8rem;
+ * color: var(--muted)` — and rendered as a 12.8px line of muted text with no fill, no border and
+ * no tap target, 20.5px tall against a 44px minimum.
+ *
+ * That is the fifth fault from this one unscoped rule and it points the **opposite way** to the
+ * other four. Those were the element selector reaching components that never asked for it. This
+ * is a class that reads like a component API and is not one, because every rule here is keyed on
+ * the element — so adding `className="button"` to anything that is not a `<button>` or an `<a>`
+ * silently does nothing. Worth knowing before the scoping pass: it will *fix* this site rather
+ * than break it, and it is one more call site to find.
+ *
+ * Keyed on `.photo-upload label` rather than widened to `.button`, because widening the selector
+ * here would quietly restyle the 13 non-button elements carrying `quiet` and `danger` — the exact
+ * blast radius the comment above says the real refactor has to account for.
+ */
+.photo-upload label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tap);
+  margin: 0;
+  padding: 0.6rem 1.1rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: normal;
+  cursor: pointer;
+  border: 1px solid var(--secondary);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--secondary);
+  white-space: nowrap;
+}
+
 button.quiet, a.button.quiet {
   background: transparent;
   color: var(--secondary);
@@ -471,11 +508,41 @@ section { margin-bottom: var(--s6); }
 div:first-of-type > .ingredient-heading { margin-top: 0; }
 
 ul.ingredients { list-style: none; padding: 0; margin: 0; }
-ul.ingredients li {
+/*
+ * `> li`, not ` li` — the rule means an ingredient *line* and was saying every `<li>` beneath one.
+ *
+ * `.substitution` renders its own `<ul>` of options **inside** an ingredient line, so as a
+ * descendant selector this reached those too and beat `.substitution li { display: block }` on
+ * specificity (0,1,2 against 0,1,1). Each option became a flex row of three spans that were
+ * written to stack, and "one for one" rendered in a **23px box, 87px tall — one character per
+ * line**, on every width and both themes.
+ *
+ * Fourth instance here of a selector whose subject is wider than its intent: `button` in this file
+ * governing every component written after it, `.h-icon` never resetting that rule's padding,
+ * `.h-check input` clipping a text field to 1px, and this. A rule that means one element names it.
+ *
+ * Found the first time `/recipes/[id]` was ever rendered — it is one of the four screens the note
+ * above says the harness could not see.
+ */
+ul.ingredients > li {
   display: flex;
+  /*
+   * Wrapping, with the substitution on its own line.
+   *
+   * A `<details>` is a block of extra reading about the line above it — `.substitution` sets
+   * `margin-top` for exactly that — and as a flex item beside the text it was squeezed to its
+   * min-content width of 119px. `flex: 1 1 100%` with `min-width: 0` is the pattern
+   * `.h-buy > .h-check` already uses on the shopping row, for the same reason (§85): an item that
+   * can shrink to nothing shrinks instead of letting its siblings wrap.
+   */
+  flex-wrap: wrap;
   gap: var(--s3);
   padding: 0.55rem 0;
   border-bottom: 1px solid var(--line);
+}
+ul.ingredients > li > .substitution {
+  flex: 1 1 100%;
+  min-width: 0;
 }
 .measure {
   display: inline-block;

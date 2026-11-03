@@ -363,6 +363,55 @@ if (classified < made.length) {
   process.exit(2);
 }
 /*
+ * One recipe with a photograph on it, and that is a **state**, not a nicety.
+ *
+ * `/recipes/[id]` was never rendered by this tool — the four screens the `button`-scoping note
+ * names as unchecked include it — and when it was finally rendered, the add-photo control turned
+ * out to have been painted under the sheet and unpressable since it shipped. Shooting only the
+ * no-photo state would have found it anyway, by luck; shooting only the with-photo state would
+ * have too. But the hero is a different element in each (`<img>` against `.h-hero-empty`), the
+ * control's label is different text, and the sheet starts at a different y — so one of them is
+ * not a shot of the other, which is the same reasoning the empty household rests on.
+ *
+ * The JPEG is made by screenshotting a coloured page rather than by adding an image fixture to
+ * the repo: the browser is already here, and a binary in `scripts/` would be one more thing to
+ * explain. It goes through `POST /api/recipes` so the storage policy a client actually needs is
+ * exercised — a photo inserted with the service role would prove the opposite of what it looks
+ * like (CLAUDE.md: a permission nothing has exercised is a permission you do not have).
+ */
+const photoShot = await browser.newContext({ viewport: { width: 1200, height: 800 } });
+const photoPage = await photoShot.newPage();
+await photoPage.setContent(
+  `<body style="margin:0;background:linear-gradient(135deg,#B4532A 0%,#6A6055 55%,#2B2620 100%)"></body>`,
+);
+const jpeg = await photoPage.screenshot({ type: "jpeg", quality: 80 });
+await photoShot.close();
+
+const withPhoto = made[0];
+const withoutPhoto = made[1];
+const uploaded = await setup.request.post(`${base}/api/recipes`, {
+  timeout: API_TIMEOUT,
+  multipart: {
+    recipeId: withPhoto.id,
+    source: "camera",
+    photo: { name: "photo.jpg", mimeType: "image/jpeg", buffer: jpeg },
+  },
+});
+if (!uploaded.ok()) {
+  /*
+   * Exit 2 rather than carrying on, because the failure is invisible in the artefact: a recipe
+   * whose upload was refused renders the *other* state perfectly well, and the run would
+   * photograph the no-photo page twice and report two screens ok. That is this tool's own §86 —
+   * a fixture that fails silently produces a screenshot of the wrong thing.
+   */
+  console.error(
+    `COULD NOT MEASURE: the photo would not upload (HTTP ${uploaded.status()}), so the with-photo ` +
+      `recipe page would be a second shot of the without-photo one`,
+  );
+  process.exit(2);
+}
+
+/*
  * A group with things in it, because the screens that render groups render nothing without one.
  *
  * `/household` grows a "How you group the list" section and `/shopping` groups the typed items
@@ -580,6 +629,13 @@ const SCREENS = [
   { name: "planner", path: "/planner", marker: "Week plan" },
   { name: "shopping", path: "/shopping", marker: "Anything else you need" },
   { name: "household", path: "/household", marker: "Household" },
+  /*
+   * `/recipes/[id]`, in both photo states — the fifth screen this tool reported clean without
+   * opening, and the one where that cost something. The marker is the recipe's own title, which
+   * is the one string only this page renders.
+   */
+  { name: "recipe-with-photo", path: `/recipes/${withPhoto.id}`, marker: withPhoto.title },
+  { name: "recipe-no-photo", path: `/recipes/${withoutPhoto.id}`, marker: withoutPhoto.title },
   { name: "recipe-new", path: "/recipes/new", marker: "Add a recipe" },
   { name: "import", path: "/recipes/import", marker: "One link" },
   /*
@@ -596,6 +652,8 @@ const SCREENS = [
 
 let problems = 0;
 let shots = 0;
+/* how many controls the reachability check actually had to look at, summed over the whole run */
+let reachChecked = 0;
 /* name -> the light shot's bytes, so the dark pass can prove the theme actually changed something */
 const lightBytes = new Map();
 /* how much the selected-state check actually got to compare, summed over every screen and theme */
@@ -830,6 +888,150 @@ for (const fixture of FIXTURES) {
       }
       return out;
     });
+
+    /*
+     * ---------------------------------------------------------------------------
+     * Can a finger actually reach this control?
+     * ---------------------------------------------------------------------------
+     *
+     * "Add a photo" on a recipe page was painted **under the sheet**. `.h-sheet` carries
+     * `margin-top: calc(-1 * var(--radius-sheet))` because §4.2 lays the parchment over the
+     * photograph, and the control had been placed between the hero and the sheet — so 18 of its
+     * 20.5px were covered, `elementFromPoint` returned `div.h-sheet` at its middle in all twelve
+     * width/theme/photo combinations, and the add-photo feature was unreachable from the product
+     * for as long as it has existed.
+     *
+     * **Nothing here could have seen it, and that is the argument for this check rather than a
+     * fourth look at the others.** The element had a correct 408x20 box, so the overflow check
+     * and the squeezed-text check both passed; it was correctly coloured, so contrast passed; its
+     * glyph is text rather than an `svg[width]`, so the undersized-glyph check had no subject.
+     * A control with a perfect box that nobody can press is invisible to every assertion that
+     * measures the control itself — the question is what is painted *on top of* it, and only a
+     * layout engine can answer that.
+     *
+     * Scrolled to the centre first, and the reason is the could-not-measure trap: `elementFromPoint`
+     * reads the viewport, so a control below the fold answers `null`, which is **not** "covered".
+     * The first version of this did not scroll and reported `none` for every control past the
+     * fold — a silence that reads exactly like a pass. The centre also keeps it clear of the
+     * docked bar and the tab bar, which legitimately overlay content while scrolling.
+     */
+    const unreachable = await page.evaluate(() => {
+      const out = [];
+      let examined = 0;
+      const selector =
+        "main button, main a[href], main label, main input, main select, main textarea, main [role=button]";
+      for (const el of document.querySelectorAll(selector)) {
+        const style = getComputedStyle(el);
+        if (style.visibility === "hidden" || style.display === "none") continue;
+        /* visually hidden on purpose — the same `clip-path` test the squeezed-text check uses */
+        if (style.clipPath !== "none") continue;
+        /* declared decorative: not a control, whatever its tag says */
+        if (style.pointerEvents === "none") continue;
+        /*
+         * Only controls in **normal flow**, and this is the narrow condition rather than a
+         * convenience — it is what separates the bug from the pattern that looks identical to it.
+         *
+         * `.h-day-expand` is the planner's whole-row expander: `position: absolute; inset: 0;
+         * z-index: 0`, with the title and facts lifted to `z-index: 1` above it. Its own rule says
+         * so — *"the whole row is the expander, beneath the content rather than wrapping it"* — so
+         * it is underneath **on purpose**, and the first version of this check reported it 144
+         * times across the run, 0 of 25 points reachable. A guard that fires that often on correct
+         * markup is one people switch off within a day, and it would have buried the one real
+         * finding in it.
+         *
+         * A control that declares `position: absolute` has made a layering decision. One in normal
+         * flow has not, and if something is painted over it, nothing chose that. The photo control
+         * was `position: static`.
+         *
+         * **The gap this leaves, recorded rather than implied closed:** a positioned control that
+         * is genuinely covered is not checked. Closing it needs a way to tell "underneath by
+         * design" from "underneath by accident", and the only honest signal for that is an
+         * explicit `z-index`, which is what `.h-day-expand` has and what a mistake would not.
+         */
+        if (style.position !== "static") continue;
+        el.scrollIntoView({ block: "center", inline: "center" });
+        /*
+         * The largest **client rect**, not the bounding box.
+         *
+         * An inline link that wraps across two lines has a bounding box that is the *union* of its
+         * line boxes, and that union covers the blank tail of the first line and the blank head of
+         * the second — where a neighbouring link legitimately sits. Sampling the union reported 16
+         * chapter links as a third covered by a sibling, on markup that is exactly right.
+         *
+         * A false alarm rather than a false ok, which is the cheaper direction, and it surfaced
+         * only because the threshold was turned down until something fired. Worth doing once to
+         * any guard before trusting the number it ships with.
+         */
+        const rects = [...el.getClientRects()];
+        const box = rects.length
+          ? rects.reduce((a, b) => (a.width * a.height >= b.width * b.height ? a : b))
+          : el.getBoundingClientRect();
+        /* the sr-only input pattern is a 1px box; it is reachable by keyboard and not by a finger */
+        if (box.width < 2 || box.height < 2) continue;
+        const STEPS = [0.08, 0.25, 0.5, 0.75, 0.92];
+        let reachable = 0;
+        let sampled = 0;
+        let topReachable = Infinity;
+        let bottomReachable = -Infinity;
+        let coveredBy = null;
+        for (const fy of STEPS) {
+          for (const fx of STEPS) {
+            const x = Math.min(Math.max(box.x + box.width * fx, 1), window.innerWidth - 2);
+            const y = Math.min(Math.max(box.y + box.height * fy, 1), window.innerHeight - 2);
+            const hit = document.elementFromPoint(x, y);
+            if (!hit) continue;
+            sampled += 1;
+            if (el.contains(hit) || hit.contains(el)) {
+              reachable += 1;
+              topReachable = Math.min(topReachable, y);
+              bottomReachable = Math.max(bottomReachable, y);
+            } else if (!coveredBy) {
+              coveredBy = `${hit.tagName.toLowerCase()}.${(hit.className || "").toString().split(" ")[0] || "-"}`;
+            }
+          }
+        }
+        if (sampled === 0) continue;
+        examined += 1;
+        out.push({
+          control: `${el.tagName.toLowerCase()}.${(el.className || "").toString().split(" ")[0] || "-"}`,
+          text: (el.textContent || el.getAttribute("aria-label") || "").trim().slice(0, 32),
+          box: `${Math.round(box.width)}x${Math.round(box.height)}`,
+          reachable,
+          sampled,
+          band: reachable === 0 ? 0 : Math.round(bottomReachable - topReachable),
+          covered: coveredBy,
+        });
+      }
+      return { controls: out, examined };
+    });
+    /*
+     * **Any point at all**, and the route to that number is the useful part of this comment.
+     *
+     * The threshold went *down* rather than up. "The centre" was the first version and is too
+     * strict: a row control with its own label over the middle fails it while being perfectly
+     * pressable at the edges. "Fewer than half" worked, and caught the real bug by **1.5 points of
+     * 25** — a margin that thin is a coin-flip waiting for a padding change, and it only looked
+     * safe because the bug happened to land on the right side of it. So the next question was what
+     * zero tolerance would report: 16 findings, every one of them an inline element's union box
+     * rather than a covered control. Fixing *that* left none, and the threshold could go to zero.
+     *
+     * Nothing in normal flow should have anything painted over it. If this ever fires on markup
+     * that is right, the fix is another narrowing in the filters above — not a looser number here.
+     * A threshold is where a guard goes to stop being falsifiable.
+     *
+     * The band is printed because 5 of 25 in a single row and 5 of 25 spread down the box are
+     * different facts, and the next instance will want to know which it is looking at.
+     */
+    reachChecked += unreachable.examined;
+    for (const row of unreachable.controls) {
+      if (row.reachable === row.sampled) continue;
+      console.error(
+        `  FAIL ${name} (${viewport.name} ${theme}): ${row.control} ${JSON.stringify(row.text)} ` +
+          `has a ${row.box} box and only ${row.reachable} of ${row.sampled} points on it reach it ` +
+          `(reachable band ${row.band}px tall) — the rest land on ${row.covered}. Nobody can press it.`,
+      );
+      problems += 1;
+    }
 
     /*
      * Did this screen render *itself*? An error page, a redirect to sign-in, or a household that
@@ -1233,6 +1435,16 @@ if (coverage) {
 } else {
   console.log(`  screens: COULD NOT MEASURE — ${appDir} is not there, so coverage is unknown.`);
 }
+/*
+ * What the reachability check had to look at, because a clean run from a guard with nothing to
+ * watch is the oldest shape in this project's notes — the undersized-glyph check reported clean
+ * on its first mutation for exactly that reason, having lost its subject to a rewrite.
+ */
+console.log(
+  reachChecked === 0
+    ? "  reachability: NOTHING TO WATCH — no normal-flow control was hit-tested on any screen."
+    : `  reachability: ${reachChecked} normal-flow control(s) hit-tested for something painted over them.`,
+);
 console.log(
   pressedCandidates === 0
     ? "  selected-state: no multi-member pressed/checked group on any screen — nothing to compare."
