@@ -2087,3 +2087,34 @@ guessing.
   overwriting `.next` under a running server: **a long-lived dev server is a stale one**, and a
   timeout that moves between pages is a server symptom rather than a page one. Retry before
   believing it, and restart before retrying twice.
+
+- **A smoke assertion can be date-dependent and fail one day in seven, and the comment defending its
+  date will be about the wrong axis.** Three production checks failed together — the day reads back
+  as planned, the planner link carries the entry, tapping again unplans it — and the app was correct
+  in all three. `DayCircle` prefixes today's name with `"Today, "`, smoke plans on the week's
+  Wednesday, and the checks asserted `aria-label="Wednesday 4, planned"` exactly.
+
+  The comment above that date is the interesting part: *"a boundary day could legitimately fall in
+  the week either side… Wednesday survives a shift in both directions."* **Sound, and about the
+  week's shift rather than the day's.** Mid-week was chosen to dodge a timezone boundary and
+  happens to collide with today every seventh run. So when a check pins a date, ask what else is
+  true of that date — *is it today, is it in the past, is it the last day of a month, is it a
+  Sunday* — because the reason it was chosen only protects the one case its author had in mind.
+
+  Two corollaries worth keeping. **Fix it with a pattern, not by mirroring the component's
+  conditional** — copying `${isToday ? "Today, " : ""}` into the test is how an assertion ends up
+  checking your model of the output instead of the output. And **not by picking a date that is never
+  today**: that removes the coincidence *and* the only coverage of today's row, where the screen
+  legitimately behaves differently.
+
+  The third of the three had a **false premise written beside it** — *"the recipe href is always
+  present (the panel carries one)"* — which is untrue on today's row, where the panel is closed and
+  the title points at cook mode. Printing `/planner` settled it in one call: exactly one link,
+  `/cook/<id>?planned=<entry>`, and no recipe href anywhere. A premise in a comment is not evidence,
+  and this one had quietly made the check a weaker duplicate of the one below it.
+
+  **And the first thing to check was the header, not the failures.** The run said `build 88915aae`
+  while `pnpm ship` had just pushed `152af5d` — the new suite against the old deployment, which this
+  file already records as the more confusing direction. Establishing that, plus `git log` showing
+  neither the suite nor the code under it had moved in five commits, is what made re-running against
+  the right build the first move rather than the last.

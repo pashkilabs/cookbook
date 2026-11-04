@@ -192,6 +192,23 @@ const alive = (result) => result.status !== 0 && result.status < 500;
 const foundDetail = (text, needle, missing) =>
   String(text ?? "").includes(needle) ? `"${needle}"` : (missing ?? `no "${needle}"`);
 
+/**
+ * The same thing for an assertion whose wording legitimately varies, and the reason it exists.
+ *
+ * Three checks in this file asserted a day's accessible name as an **exact** string and failed on
+ * production against a page that was entirely correct. `DayCircle`'s contract is
+ * `${isToday ? "Today, " : ""}${name} ${day}, ${planned ? "planned" : "not planned"}` — so one day
+ * in seven, when the mid-week day these checks plan on *is* today, the real label reads
+ * "Today, Wednesday 4, planned" and an exact match misses it.
+ *
+ * Matching a pattern rather than mirroring the conditional on purpose: copying the app's
+ * string-building into the test is how an assertion ends up checking my model of the output
+ * instead of the output. The pattern says what has to be true — this day, this state — and admits
+ * the prefix the component documents.
+ */
+const matchDetail = (text, pattern, missing) =>
+  pattern.test(String(text ?? "")) ? `matched ${pattern}` : (missing ?? `nothing matching ${pattern}`);
+
 const visible = (html) =>
   String(html ?? "")
     .replace(/<!--.*?-->/g, "")
@@ -525,14 +542,26 @@ try {
     record("plan the recipe on a day this week", planned.status === 200, `HTTP ${planned.status} ${JSON.stringify(planned.body ?? "").slice(0, 80)}`);
 
     const dayName = new Date(`${midweek}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "long", timeZone: "UTC" });
-    const wanted = `${dayName} ${Number(midweek.slice(8, 10))}, planned`;
+    const dayOfMonth = Number(midweek.slice(8, 10));
+    /*
+     * `(?:Today, )?`, because the mid-week day is today one week in seven.
+     *
+     * The comment above explains why this plans mid-week — a boundary day could fall in either
+     * week — and that reasoning is sound and says nothing about *today*. `DayCircle` prefixes
+     * today's name with "Today, ", so on a Wednesday this asserted `aria-label="Wednesday 4,
+     * planned"` against a page correctly rendering `aria-label="Today, Wednesday 4, planned"` and
+     * reported the join broken. Correct answer, wrong axis: the shift it was built to survive was
+     * the week's, not the day's.
+     */
+    const dayLabel = (state) =>
+      new RegExp(`aria-label="(?:Today, )?${dayName} ${dayOfMonth}, ${state}"`);
     const afterPlan = await call("GET", `/recipes/${recipeId}`);
     const planHtml = typeof afterPlan.body === "string" ? afterPlan.body : "";
     record(
       "and that day reads back as planned on the recipe page",
-      planHtml.includes(`aria-label="${wanted}"`),
+      dayLabel("planned").test(planHtml),
       planHtml.includes("h-planit")
-        ? foundDetail(planHtml, `aria-label="${wanted}"`, `panel rendered without "${wanted}"`)
+        ? matchDetail(planHtml, dayLabel("planned"), `panel rendered without ${dayName} ${dayOfMonth} planned`)
         : "the panel did not render at all",
     );
 
@@ -996,10 +1025,29 @@ try {
        * today's row — so on a day that is not today, "tap to cook" must be absent.
        */
       const isToday = midweek === new Date().toISOString().slice(0, 10);
+      /*
+       * The plan **entry** travels in the URL, whichever screen the title points at.
+       *
+       * This asserted `/recipes/<id>?planned=` unconditionally, on the premise written above it —
+       * *"the recipe href is always present (the panel carries one)"* — and that premise is false
+       * on today's row. The panel is closed at rest, so its link is not in the HTML, and today's
+       * title points at cook mode instead. Printed rather than reasoned about: planning on today
+       * and reading `/planner` back gives exactly one link for the recipe,
+       * `/cook/<id>?planned=<entry>`, and no `/recipes/<id>?planned=` anywhere.
+       *
+       * So the invariant is the one the check's own name states — the entry id reaching the next
+       * screen is what makes scaled servings survive — and the destination is the *next* check's
+       * business. Asserting the destination here made this fail one day in seven on a page that
+       * was right, and made it a second, weaker copy of the check below.
+       */
       record(
         "the planner links to the recipe with the plan entry, so scaled servings survive",
-        weekText.includes(`/recipes/${recipeId}?planned=`),
-        foundDetail(weekText, `/recipes/${recipeId}?planned=`),
+        new RegExp(`/(?:recipes|cook)/${recipeId}\\?planned=[0-9a-f-]{36}`).test(weekText),
+        matchDetail(
+          weekText,
+          new RegExp(`/(?:recipes|cook)/${recipeId}\\?planned=[0-9a-f-]{36}`),
+          "no link to this recipe carries its plan entry",
+        ),
       );
       record(
         isToday
@@ -1241,8 +1289,8 @@ try {
       const removeHtml = typeof afterRemove.body === "string" ? afterRemove.body : "";
       record(
         "and tapping it again takes it off the week",
-        removed.status === 200 && removeHtml.includes(`aria-label="${dayName} ${Number(midweek.slice(8, 10))}, not planned"`),
-        `DELETE ${removed.status}`,
+        removed.status === 200 && dayLabel("not planned").test(removeHtml),
+        `DELETE ${removed.status} — ${matchDetail(removeHtml, dayLabel("not planned"), "the day still reads as planned")}`,
       );
     } else {
       record("and tapping it again takes it off the week", null, "no entry id came back from the POST");

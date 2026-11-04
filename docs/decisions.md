@@ -7548,3 +7548,87 @@ anyway — the honest reading is the token resolved at the centre of the viewpor
 whatever wrapper set it. A list naming `cook` would be a snapshot that the next palette-pinning
 screen fails on; the page already states this about itself. The exemption is printed at the end of
 the run, like the reachability one.
+
+## §105 — Three production smoke failures, one cause, and the app was right in all three
+
+`pnpm smoke` reported `3 of 238 FAILED` against `cookbook.pashki.com`. All three were the checks,
+not the app, and all three had the same cause.
+
+```
+FAIL and that day reads back as planned on the recipe page — panel rendered without "Wednesday 4, planned"
+FAIL the planner links to the recipe with the plan entry, so scaled servings survive — no "/recipes/<id>?planned="
+FAIL and tapping it again takes it off the week — DELETE 200
+```
+
+Two things were established before anything was diagnosed. The run's header said
+`build 88915aae` while `pnpm ship` had just pushed `152af5d` — **smoke had run against the previous
+deployment**, which is this project's own named trap and the more confusing direction of it. And
+`scripts/smoke.mjs`, `plan-it.tsx`, `apps/web/app/planner/` and `apps/web/app/api/plan-entries/`
+were all **unchanged across the five commits in the session**, so neither the suite nor the code
+under it had moved. Re-run against `152af5d`, all three reproduced. So: real, and not mine.
+
+### The cause, printed rather than reasoned about
+
+A probe that plans a recipe and dumps the row:
+
+```
+POST /api/plan-entries -> HTTP 200 {"id":"bcfab46d-…"}
+plan_entries: date 2026-11-04, slot dinner, deleted_at null, family_id matches
+meal_plans:   week_start 2026-11-02
+the panel's day labels:
+  Monday 2, not planned
+  Tuesday 3, not planned
+  Today, Wednesday 4, planned      ← the entry is there
+```
+
+**`DayCircle` prefixes today's name with `"Today, "`**, and smoke plans on the week's Wednesday —
+which is today one week in seven. The checks asserted `aria-label="Wednesday 4, planned"` as an
+exact string.
+
+The comment above the date explains why it plans mid-week: *"`family.timezone` decides which Monday
+the page is showing, and this script computes its date in UTC — a boundary day could legitimately
+fall in the week either side… Wednesday survives a shift in both directions."* **That reasoning is
+correct and it is about the week's shift, not the day's.** A correct answer on the wrong axis, in an
+assertion rather than an instrument.
+
+The third failure is the same string a second time — `"Wednesday 4, not planned"` after the DELETE,
+which really returned 200 and really unplanned the day.
+
+### The second one had a false premise written beside it
+
+*"the recipe href is always present (the panel carries one)"*. On today's row the panel is closed at
+rest, so its link is not in the HTML, and the title points at cook mode instead. Printed:
+
+```
+planner hrefs for this recipe:
+  /cook/b680d0db-…?planned=33b6ac50-…
+  /recipes/<id>?planned= present: false
+```
+
+So the check was **a weaker second copy of the one below it**, which already asserts the destination
+by day. The invariant its own name states is the plan entry reaching the next screen — that is what
+makes scaled servings survive — so it now asserts `/(recipes|cook)/<id>?planned=<uuid>`, which holds
+every day and still fails if the id does not travel.
+
+### What changed, and why not the other fix
+
+`matchDetail`, a regex-aware sibling of `foundDetail`, and the day label is now
+`aria-label="(?:Today, )?Wednesday 4, planned"`.
+
+**A pattern rather than mirroring the component's conditional**, deliberately: copying
+`${isToday ? "Today, " : ""}` into the test is how an assertion ends up checking my model of the
+output instead of the output, which is a shape this file already carries twice. The pattern states
+what must be true — this day, this state — and admits the prefix the component documents.
+
+And **not** by choosing a day that is never today. That would remove the coincidence and also remove
+the only coverage of today's row, where the title legitimately behaves differently — the check below
+has an `isToday` branch that exists precisely to exercise both.
+
+Every pattern was then checked against the strings it must accept and reject — the prefix present
+and absent, `not planned` against `planned` in both directions, a different day, a link with no
+entry id, `?planned=` with an empty value, and another recipe's id. Twelve cases, all discriminating.
+
+**236 checks passed against `https://cookbook.pashki.com` at build `152af5d1`, 2 not checked.** One
+of those is an artefact of how the run was invoked rather than a gap: `PASHKI_DRAIN_SECRET` lives in
+`~/.pashki-supabase.env` and this run sourced only `apps/web/.env.local`, so the reaper's
+shared-secret check could not run. It passed in Stephen's run, which sourced both.
