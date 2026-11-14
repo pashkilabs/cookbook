@@ -2195,3 +2195,26 @@ guessing.
 
   `--local` is gone from `pnpm smoke:local`. The script **never read it** — documented in the header,
   matched nowhere — so its name claimed the very thing that was untrue.
+
+
+- **A run has a set of versions, and every one it does not name is one a result can be quietly
+  about.** `SMOKE: 1 of 241 FAILED … servings 200 (wanted 400)` was a true sentence about the
+  previous build: `pnpm ship` had pushed and Vercel had not finished, so the suite carried a check
+  the deployment did not have. **The same command re-run passes** — a control run settled it, not
+  any reading of the route.
+
+  This is §105 verbatim (*"six smoke failures against production, which were the new suite running
+  against the old deployment"*), whose lesson was **"check the header first"** — and the header had
+  printed `build <sha>` the whole time with nothing comparing it to anything. **A reminder failed
+  again hours after I turned the database half of the identical question into a mechanism**, which
+  is the part worth keeping: the rule I wrote was *list every host a verification touches*, and a
+  build is not a host, so the rule did not reach one axis over. Four versions are in play — the
+  code, the schema, the database, the suite — and the one that was printed but never **compared**
+  is the one that bit.
+
+  `smoke.mjs` now reads `git rev-parse HEAD` and relates the deployment to it in the header, in the
+  verdict, and in a block under the failures saying a failure may belong to a check the deployment
+  has not got. Deliberately **not** COULD NOT MEASURE — smoking an older build on purpose is how
+  you check whether a fix is live — and it warns on a **pass** too, because `239 checks passed`
+  against a build that is not your tree is the more seductive of the two. No git, or a commit this
+  clone does not hold, degrades to silence and `differs` rather than blocking.

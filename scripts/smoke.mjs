@@ -416,8 +416,8 @@ try {
           ahead === null
             ? `differs from HEAD ${localHead.slice(0, 8)}`
             : ahead > 0
-              ? `HEAD ${localHead.slice(0, 8)} is ${ahead} commit(s) AHEAD — this suite is newer than the build`
-              : `HEAD ${localHead.slice(0, 8)} is ${behind} commit(s) behind the deployment`;
+              ? `HEAD ${localHead.slice(0, 8)} is ${ahead} commit${ahead === 1 ? "" : "s"} ahead of it`
+              : `HEAD ${localHead.slice(0, 8)} is ${behind} commit${behind === 1 ? "" : "s"} behind it`;
       }
     }
     console.log(
@@ -3256,7 +3256,7 @@ if (failed.length === 0) {
   const note = skipped.length ? `, ${skipped.length} NOT CHECKED` : "";
   console.log(
     `SMOKE: ${results.length} checks passed${note} against ${base} on ${dbHost} (${dbPrint})` +
-      (suiteIsNewer ? ` — but ${buildNote}` : ""),
+      (suiteIsNewer ? ` — but the suite is newer than the build: ${buildNote}` : ""),
   );
   for (const s of skipped) console.log(`  not checked: ${s.name} — ${s.why}`);
   process.exit(PASSED);

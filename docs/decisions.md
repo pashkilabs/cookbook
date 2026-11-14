@@ -7884,3 +7884,67 @@ a configuration behind it.
 The guard is live against a local dev server immediately and becomes real for hosted on the next
 deploy, since the field has to be published before it can be compared. `unknown` until then, which
 does not block — a check that cannot run must not look like one that failed either.
+
+
+## §106b — The same fault one axis over, within the hour: the run had two versions and named one
+
+Reported from a production run:
+
+```
+SMOKE: 1 of 241 FAILED against https://cookbook.pashki.com on vbtjfaiqdzhdjnxfbdev.supabase.co (acb1042210cd)
+  a leftover refuses a servings figure and still moves to another day — servings 200 (wanted 400), move 200 (wanted 200)
+```
+
+**The same command, re-run, passes**: `servings 400 (wanted 400)`. Nothing was changed between them
+— a control run, which is what established it rather than any reading of the route.
+
+`pnpm ship` had pushed and the Vercel build had not finished. The suite carried a check the
+deployment did not have yet, so a PATCH that the shipped code refuses was answered 200 by the code
+before it. §105 is this exact shape (*"six smoke failures against production, which were the new
+suite running against the old deployment"*) and its lesson was **"the first thing to check was the
+header, not the failures"** — a habit, written down, and it failed again hours after I made the
+*database* half of the same question a mechanism.
+
+**That adjacency is the finding.** §106a's rule was *list every host a verification touches and
+check the output names all of them.* A build is not a host, so the rule as written did not reach
+it, and the generalisation it wanted is one word wider: **a run has a set of versions — the code,
+the schema, the database, the suite — and every one of them it does not name is one a result can be
+quietly about.** Three of the four were already named (`schema` via `/api/health`, the database as
+of §106a, the build printed since §105); the one that was never *compared* is the one that bit.
+
+So smoke reads `git rev-parse HEAD` and relates the deployment to it, in three places:
+
+```
+build 7b059df9  env production  — HEAD 9d8f5e48 is 1 commit ahead of it
+SMOKE: 239 checks passed … — but the suite is newer than the build: HEAD 9d8f5e48 is 1 commit ahead of it
+```
+
+and, directly **under the failures** where the next thing to read belongs:
+
+```
+  THE SUITE IS NEWER THAN THE BUILD — HEAD 9d8f5e48 is 1 commit ahead of it.
+  A failure above may belong to a check this deployment has not got yet.
+  Run `pnpm ship`, wait for the build, and smoke again before believing it.
+```
+
+Three decisions worth recording, because each had a tempting opposite:
+
+- **Not COULD NOT MEASURE.** Smoking an older build on purpose is legitimate — it is how you find
+  out whether a fix is live — and exiting 2 would break it. The run is real; what it must not do is
+  let a failure read as a fact about the code in front of you.
+- **It warns on a pass too.** `239 checks passed` against a build that is not your tree is the more
+  seductive of the two, because nobody re-reads a green verdict. Same argument as `check-shipped`
+  printing *ahead by N* under the words "check passed".
+- **It degrades rather than blocks.** No git, or a deployed commit this clone does not hold, gives
+  silence and `differs from HEAD <sha>` — a comparison that cannot run must not look like one that
+  failed, which is this repo's own three-outcome rule applied to a line of output.
+
+**Proved by firing, both branches.** A temporary `record(…, false)` inserted into the suite with
+HEAD one commit ahead printed the block under the failure; removing it and re-running printed the
+pass-line warning. A guard nobody has watched fire is a guard nobody has measured, and this one is
+three `console.log`s whose only interesting part is the boolean above them.
+
+One number in the report was not a discrepancy and is worth stating so nobody chases it: **241
+checks against my 239** is the drain-secret check running in a shell that has `PASHKI_DRAIN_SECRET`
+and skipping in one that does not — a route with two doors, so it contributes two results and
+removes one skip.
