@@ -29,6 +29,7 @@
  * which is used only to create and destroy the fixtures a real user would create.
  */
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
 const PASSED = 0;
@@ -348,6 +349,50 @@ if (appPrint && appPrint !== dbPrint) {
   process.exit(CANNOT_MEASURE);
 }
 
+/*
+ * ---------------------------------------------------------------------------
+ * The suite and the build are two versions, and only one of them was printed
+ * ---------------------------------------------------------------------------
+ *
+ * `git` is the local tree this suite was read from; the deployment is whatever Vercel last
+ * finished building. A `pnpm ship` that pushes and a smoke run started a minute later are
+ * **a new suite against an old build**, and that has now produced a confident false bug report
+ * twice — most recently within hours of this script learning to name its database.
+ *
+ * Same shape, one axis over: the run had two versions and named one. So the comparison is here
+ * rather than in a habit, and it is *not* COULD NOT MEASURE — smoking an older build on purpose
+ * is legitimate, and refusing to run would break it. What it must not do is let a failure read
+ * as a fact about the code in front of you.
+ */
+const localHead = (() => {
+  try {
+    return execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  } catch {
+    return null; // not a checkout, or no git — the comparison simply does not happen
+  }
+})();
+const treeIsDirty = (() => {
+  try {
+    return execFileSync("git", ["status", "--porcelain"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim().length > 0;
+  } catch {
+    return false;
+  }
+})();
+const countBetween = (from, to) => {
+  try {
+    return Number(
+      execFileSync("git", ["rev-list", "--count", `${from}..${to}`], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(),
+    );
+  } catch {
+    return null; // the deployed commit is not in this clone — "differs" is all we can say
+  }
+};
+
+/** Set once health answers; printed in the header and again in the verdict. */
+let buildNote = "";
+/** True only when the deployment is behind this tree, which is the direction that misleads. */
+let suiteIsNewer = false;
+
 /**
  * Which build is answering, before anything else is asked.
  *
@@ -359,7 +404,26 @@ try {
   const health = await call("GET", "/api/health", { auth: false });
   if (health.status === 200) {
     const c = health.body?.configured ?? {};
-    console.log(`build ${String(health.body?.commit ?? "unknown").slice(0, 8)}  env ${health.body?.env}`);
+    const deployed = health.body?.commit ? String(health.body.commit) : null;
+    if (deployed && localHead) {
+      if (deployed === localHead) {
+        buildNote = treeIsDirty ? "matches HEAD, plus uncommitted changes" : "matches HEAD";
+      } else {
+        const ahead = countBetween(deployed, localHead);
+        const behind = countBetween(localHead, deployed);
+        suiteIsNewer = ahead === null || ahead > 0;
+        buildNote =
+          ahead === null
+            ? `differs from HEAD ${localHead.slice(0, 8)}`
+            : ahead > 0
+              ? `HEAD ${localHead.slice(0, 8)} is ${ahead} commit(s) AHEAD — this suite is newer than the build`
+              : `HEAD ${localHead.slice(0, 8)} is ${behind} commit(s) behind the deployment`;
+      }
+    }
+    console.log(
+      `build ${String(health.body?.commit ?? "unknown").slice(0, 8)}  env ${health.body?.env}` +
+        (buildNote ? `  — ${buildNote}` : ""),
+    );
     /*
      * Strings print as their value, not as yes/NO.
      *
@@ -3190,11 +3254,24 @@ const failed = results.filter((r) => !r.ok);
 console.log("-".repeat(72));
 if (failed.length === 0) {
   const note = skipped.length ? `, ${skipped.length} NOT CHECKED` : "";
-  console.log(`SMOKE: ${results.length} checks passed${note} against ${base} on ${dbHost} (${dbPrint})`);
+  console.log(
+    `SMOKE: ${results.length} checks passed${note} against ${base} on ${dbHost} (${dbPrint})` +
+      (suiteIsNewer ? ` — but ${buildNote}` : ""),
+  );
   for (const s of skipped) console.log(`  not checked: ${s.name} — ${s.why}`);
   process.exit(PASSED);
 }
 console.log(`SMOKE: ${failed.length} of ${results.length} FAILED against ${base} on ${dbHost} (${dbPrint})${skipped.length ? `, ${skipped.length} NOT CHECKED` : ""}`);
 for (const f of failed) console.log(`  ${f.name}${f.detail ? `  — ${f.detail}` : ""}`);
+/*
+ * Under the failures, not above them, because this is what to read next. A check that exists in
+ * this tree and not in the deployment fails for a reason that has nothing to do with the code —
+ * and that failure is indistinguishable from a real one until somebody compares two versions.
+ */
+if (suiteIsNewer) {
+  console.log(`\n  THE SUITE IS NEWER THAN THE BUILD — ${buildNote}.`);
+  console.log("  A failure above may belong to a check this deployment has not got yet.");
+  console.log("  Run `pnpm ship`, wait for the build, and smoke again before believing it.");
+}
 for (const s of skipped) console.log(`  not checked: ${s.name} — ${s.why}`);
 process.exit(FAILED);
