@@ -57,7 +57,7 @@ export default async function TodayPage({
   const [planned, recipeRows, ratingRows] = await Promise.all([
     supabase
       .from("plan_entries")
-      .select("id, slot, scale, cooked_at, recipe_id, recipes!inner(id, title, time_minutes, servings)")
+      .select("id, slot, scale, cooked_at, leftover_of, recipe_id, recipes!inner(id, title, time_minutes, servings)")
       .eq("family_id", family.id)
       .eq("date", today)
       .is("deleted_at", null),
@@ -150,6 +150,8 @@ export default async function TodayPage({
       timeMinutes: recipe.time_minutes,
       servings: servingsForScale(scale, recipe.servings),
       cooked: row.cooked_at !== null,
+      /* a leftover is a meal to eat, not a meal to cook — the card says so and offers no steps */
+      isLeftover: row.leftover_of !== null,
     };
   });
 

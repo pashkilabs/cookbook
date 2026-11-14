@@ -412,6 +412,47 @@ if (!uploaded.ok()) {
 }
 
 /*
+ * A meal cooked, and its leftovers logged onto today — the state §106 adds.
+ *
+ * Both halves have to be on screen: a leftover is only a feature if somebody glancing at a day
+ * can tell they are **not cooking**, and that is a claim about a picture. The planner row and
+ * today's card say it in different places (a meta line against an eyebrow above the title), so
+ * one is not a shot of the other.
+ *
+ * Today at dinner, with the slot named in the URL: `/today` otherwise picks the slot from the
+ * hour, so an unqualified shot would photograph breakfast at 8am and dinner at 7pm and neither
+ * reliably. A fixture whose content depends on when it ran is the hard-coded week again.
+ */
+const todayIso = new Date().toISOString().slice(0, 10);
+const leftoverCook = await setup.request.post(`${base}/api/plan-entries`, {
+  timeout: API_TIMEOUT,
+  data: { recipeId: withPhoto.id, date: todayIso, slot: "lunch" },
+});
+const leftoverParent = (await leftoverCook.json().catch(() => ({})))?.id ?? null;
+let leftoverLogged = false;
+if (leftoverParent) {
+  await setup.request.patch(`${base}/api/plan-entries/${leftoverParent}`, {
+    timeout: API_TIMEOUT, data: { cooked: true },
+  });
+  const spare = await setup.request.post(`${base}/api/plan-entries`, {
+    timeout: API_TIMEOUT,
+    data: { leftoverOf: leftoverParent, date: todayIso, slot: "dinner" },
+  });
+  leftoverLogged = spare.ok();
+  if (!leftoverLogged) {
+    console.error(
+      `COULD NOT MEASURE: the leftover would not log (HTTP ${spare.status()}), so the screens ` +
+        `below would photograph an ordinary cook under a leftover's name`,
+    );
+    process.exit(2);
+  }
+}
+if (!leftoverLogged) {
+  console.error("COULD NOT MEASURE: no cooked meal to log leftovers against");
+  process.exit(2);
+}
+
+/*
  * One recipe marked as a blend, so the column above the sheet is rendered with **two** callouts.
  *
  * `/recipes/[id]` can put three optional blocks between the hero and the sheet — a blend's
@@ -691,6 +732,11 @@ const SCREENS = [
    * unsupported all render it.
    */
   { name: "cook", path: `/cook/${withPhoto.id}`, marker: "Cook mode" },
+  /*
+   * Today with a leftover on it. The slot is in the URL because `/today` otherwise chooses one
+   * from the hour, and a screenshot whose subject depends on the clock is not a fixture.
+   */
+  { name: "today-leftover", path: "/today?slot=dinner", marker: "Leftovers" },
   { name: "recipe-new", path: "/recipes/new", marker: "Add a recipe" },
   { name: "import", path: "/recipes/import", marker: "One link" },
   /*

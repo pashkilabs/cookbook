@@ -206,6 +206,13 @@ const foundDetail = (text, needle, missing) =>
  * instead of the output. The pattern says what has to be true — this day, this state — and admits
  * the prefix the component documents.
  */
+/** n days from an ISO date, in UTC like every other date decision here */
+const shiftIso = (iso, days) => {
+  const d = new Date(`${iso}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+};
+
 const matchDetail = (text, pattern, missing) =>
   pattern.test(String(text ?? "")) ? `matched ${pattern}` : (missing ?? `nothing matching ${pattern}`);
 
@@ -597,6 +604,82 @@ try {
         ? foundDetail(listText, `${dayName.slice(0, 3)} · `)
         : "no split row at all",
     );
+
+    /*
+     * ---------------------------------------------------------------------------
+     * A leftover buys nothing (§106)
+     * ---------------------------------------------------------------------------
+     *
+     * The correctness fault of the whole feature, and **nothing else here could see it failing.**
+     * Without the exclusion the list is simply longer — every line correctly consolidated,
+     * correctly grouped, correctly formatted, the quantity quietly doubled. No 500, no missing
+     * marker, no layout problem: the same shapelessness as the entitlement meter and the
+     * unreachable control.
+     *
+     * So the assertion is on the **amount**, read before and after, because that is the only
+     * thing that moves. Asserting "double cream is on the list" would pass with the exclusion
+     * removed — it is on the list either way — which is the absent-versus-empty trap pointed at a
+     * quantity instead of a row.
+     *
+     * Walked rather than unit-tested because `buildShoppingWeek` takes a client and has no other
+     * caller: plan entry → cook → leftover → consolidation → the row on screen is five
+     * boundaries, and a component test cannot see a join.
+     */
+    /*
+     * The **amount**, taken from the element that holds it, not from a window of characters.
+     *
+     * The first version sliced ±60 characters around "double cream" and compared the two slices.
+     * It passed — and the slice it printed was `h-check is-need"><input type="checkbox"…`, which
+     * is the tick box's markup and contains no quantity at all. An assertion that compares two
+     * identical pieces of boilerplate cannot fail, which is this project's oldest shape wearing
+     * a quantity's clothes. The mutation run is what would have caught it; reading the detail it
+     * printed is what did.
+     *
+     * `h-buy-name` is the ingredient and `h-buy-amount` the quantity, so the pair is read by
+     * name: find the row whose name is the cream, then take the amount inside it.
+     */
+    const creamAmount = (html) => {
+      const rows = String(html ?? "").split('class="h-buy"');
+      for (const row of rows) {
+        if (!row.includes("double cream")) continue;
+        const amount = /class="h-buy-amount"[^>]*>([^<]+)</.exec(row);
+        if (amount) return amount[1].trim();
+      }
+      return null;
+    };
+    const listHtml = typeof list.body === "string" ? list.body : "";
+    const beforeLeftover = creamAmount(listHtml);
+    const cooked = await call("PATCH", `/api/plan-entries/${entryId}`, { body: { cooked: true } });
+    const spare = await call("POST", "/api/plan-entries", {
+      body: { leftoverOf: entryId, date: shiftIso(midweek, 2), slot: "lunch" },
+    });
+    const afterList = await call("GET", `/shopping?week=${monday}`);
+    const afterLeftover = creamAmount(typeof afterList.body === "string" ? afterList.body : "");
+    record(
+      "a leftover adds nothing to the shopping list, because it was bought once",
+      cooked.status === 200 &&
+        spare.status === 200 &&
+        beforeLeftover !== null &&
+        afterLeftover === beforeLeftover,
+      spare.status !== 200
+        ? `the leftover would not log — HTTP ${spare.status} ${JSON.stringify(spare.body ?? "").slice(0, 80)}`
+        : beforeLeftover === null
+          ? "NOT MEASURED: no amount for double cream before the leftover, so nothing could move"
+          : afterLeftover === beforeLeftover
+            ? `still ${JSON.stringify(beforeLeftover)} to buy`
+            : `the amount moved: ${JSON.stringify(beforeLeftover)} became ${JSON.stringify(afterLeftover)}`,
+    );
+    const counted = await rest("GET", `/recipes?id=eq.${recipeId}&select=times_made`);
+    const timesMade = counted?.[0]?.times_made;
+    record(
+      "and the recipe is not a second making, because it was cooked once",
+      timesMade === 1,
+      timesMade === undefined
+        ? "NOT MEASURED: times_made did not come back"
+        : `times_made ${timesMade}, wanted 1 — one cook and one leftover`,
+    );
+    if (spare.body?.id) await call("DELETE", `/api/plan-entries/${spare.body.id}`);
+    await call("PATCH", `/api/plan-entries/${entryId}`, { body: { cooked: false } });
 
     /*
      * ---------------------------------------------------------------------------

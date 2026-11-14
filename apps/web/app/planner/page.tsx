@@ -59,7 +59,7 @@ export default async function PlannerPage({
   const [entries, shortlist] = await Promise.all([
     supabase
       .from("plan_entries")
-      .select("id, date, scale, cooked_at, recipe_id, recipes!inner(id, title, servings, time_minutes)")
+      .select("id, date, scale, cooked_at, leftover_of, recipe_id, recipes!inner(id, title, servings, time_minutes)")
       .eq("family_id", family.id)
       .gte("date", days[0]!)
       .lte("date", days[6]!)
@@ -79,6 +79,8 @@ export default async function PlannerPage({
     date: entry.date as string,
     scale: Number(entry.scale),
     cookedAt: (entry.cooked_at as string | null) ?? null,
+    /* the meal this is a leftover of — null for an ordinary cook (§106) */
+    leftoverOf: (entry.leftover_of as string | null) ?? null,
     recipe: entry.recipes as unknown as { id: string; title: string; servings: number | null; time_minutes: number | null },
   }));
 

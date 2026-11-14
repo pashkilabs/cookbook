@@ -601,6 +601,28 @@
  * Under the step count rather than in the header, because the first version put it beside the close
  * control and the screenshot showed five words wrapped to three lines, squeezing a 44px target.
  */
+/*
+ * "Leftovers", above the meal's name.
+ *
+ * An eyebrow rather than a chip beside the title: the title can be long and a chip competing for
+ * that width is what made the day row overcrowded. Secondary colour rather than the chip ground,
+ * because this is a label on the meal and not a state somebody toggled.
+ */
+/* the same label on a planner day row, where it sits in the meta line rather than above a title */
+.h-day-leftover {
+  color: var(--secondary);
+  font-weight: 600;
+}
+
+.h-meal-eyebrow {
+  margin: 0 0 2px;
+  color: var(--secondary);
+  font-size: var(--type-meta-size);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .h-cook-asleep {
   /*
    * Its own gutter, because it is a direct child of `.h-cook` rather than of the header or the

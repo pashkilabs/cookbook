@@ -835,6 +835,7 @@ export type Database = {
           deleted_at: string | null
           family_id: string
           id: string
+          leftover_of: string | null
           meal_plan_id: string
           recipe_id: string
           scale: number
@@ -848,6 +849,7 @@ export type Database = {
           deleted_at?: string | null
           family_id: string
           id?: string
+          leftover_of?: string | null
           meal_plan_id: string
           recipe_id: string
           scale?: number
@@ -861,6 +863,7 @@ export type Database = {
           deleted_at?: string | null
           family_id?: string
           id?: string
+          leftover_of?: string | null
           meal_plan_id?: string
           recipe_id?: string
           scale?: number
@@ -868,6 +871,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "plan_entries_leftover_of"
+            columns: ["leftover_of", "family_id"]
+            isOneToOne: false
+            referencedRelation: "plan_entries"
+            referencedColumns: ["id", "family_id"]
+          },
           {
             foreignKeyName: "plan_entries_meal_plan"
             columns: ["meal_plan_id", "family_id"]

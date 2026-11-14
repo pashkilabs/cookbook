@@ -2118,3 +2118,53 @@ guessing.
   file already records as the more confusing direction. Establishing that, plus `git log` showing
   neither the suite nor the code under it had moved in five commits, is what made re-running against
   the right build the first move rather than the last.
+
+- **§78's rule says to search for the question a control answers rather than the control. A homonym
+  defeats it, and the search comes back confident.** Asked to build *meal* leftovers — Tuesday's
+  dinner eaten Thursday — the brief pointed at §78, which lists "leftovers" under *deliberately
+  elsewhere* with a reason that reads as settled: *"the shopping list owns leftovers because only
+  it knows package sizes, so only it knows what is actually spare."*
+
+  Every word of that is about **ingredient** leftovers. `significantLeftovers()` filters shopping
+  lines by `line.leftover`, the spare quantity once a package is chosen; `alongside.tsx` says *"uses
+  the cream you will have spare"*. The shopping list knows what is spare in the **cupboard**;
+  nothing in the app knew what was spare in the **fridge**. Two questions, one word, and the
+  decision log answered only one of them.
+
+  What makes this worth an entry is that **§78's own procedure produced the wrong answer**. It says
+  to look for the question elsewhere in the app, and the question *was* elsewhere — a different
+  question, under the same name, with a reason good enough to stop on. A grep for the word finds it;
+  only reading what the code it points at actually computes separates them. So the step after
+  "search for the capability elsewhere" is **read the implementation and check it answers your
+  question**, not merely that it exists and has a reason.
+
+  The reason also sat in a component, exactly where §78 says to put it — `planner-week.tsx`'s meta
+  line carried the ingredient-leftovers argument as grounds for not showing meal leftovers. Putting
+  the reason where the next person will look is right, and it means **a reason in the right place
+  can still be about the wrong thing**: correcting that comment was part of the change, because a
+  reader finding it unchanged would conclude meal leftovers belong on the shopping list.
+
+  The useful tell, available before any of this: the prior note that really was about meal leftovers
+  was in the **schema**, not the decision log — `plan_entries.recipe_id`'s comment,
+  *"free-text entries ('leftovers') would need this nullable, and that is a planner feature nobody
+  has asked for yet."* When a feature has two prior mentions that do not agree about what it is, one
+  of them is a different feature.
+
+- **An assertion about a quantity that slices characters around a label is an assertion about
+  markup.** Checking that a leftover adds nothing to the shopping list, the first version took ±60
+  characters around "double cream" and compared the slice before and after. It passed — and the
+  slice it printed was `h-check is-need"><input type="checkbox"…`, the tick box, containing no
+  quantity at all. Two identical pieces of boilerplate compared equal, and it would have passed with
+  the exclusion deleted.
+
+  **The mutation run is what proves this and reading the printed detail is what caught it** — the
+  check prints what it compared, and what it compared was obviously not an amount. So a check that
+  reports a value should report the value it actually read, and somebody should look at it once:
+  `still "600 ml pot" to buy` is a sentence you can audit, and a slice of HTML is not.
+
+  The repaired version finds the row by its own class (`h-buy`, matched on the ingredient) and reads
+  `h-buy-amount` inside it. The mutation then names the fault in its own words — *the amount moved:
+  "600 ml pot" became "2 × 600 ml pot"* — which also settled a second question for free: a leftover
+  reaching `consolidate()` does not add a row, it **merges into the existing one**. The failure has
+  no shape of its own: every line stays correctly consolidated, grouped and formatted, and one
+  number is quietly wrong.

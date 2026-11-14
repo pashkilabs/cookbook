@@ -30,7 +30,7 @@ export function PlannerWeek(props: {
   weekStart: string;
   today: string;
   days: Array<{ date: string; weekday: string; label: string }>;
-  placed: Array<{ id: string; date: string; scale: number; cookedAt: string | null; recipe: Recipe }>;
+  placed: Array<{ id: string; date: string; scale: number; cookedAt: string | null; leftoverOf: string | null; recipe: Recipe }>;
   familyId: string;
   /*
    * Plain data, keyed by recipe. A *function* here is a runtime refusal rather than a type
@@ -347,7 +347,9 @@ export function PlannerWeek(props: {
                       <Link
                         className="h-day-title"
                         href={
-                          day.date === props.today
+                          // a leftover never opens cook mode, today or any day: reheating is not
+                          // cooking, and the steps describe a cook that already happened
+                          day.date === props.today && entry.leftoverOf === null
                             ? `/cook/${entry.recipe.id}?planned=${entry.id}`
                             : `/recipes/${entry.recipe.id}?planned=${entry.id}`
                         }
@@ -356,19 +358,22 @@ export function PlannerWeek(props: {
                       </Link>
                       {/*
                         * §4.4 asks this line to carry "leftovers, shared ingredients" as well as
-                        * the time. It carries the time.
+                        * the time. It now carries the time and **meal** leftovers — and the
+                        * distinction is the whole of why this comment is longer than it looks.
                         *
-                        * Both of the others already live somewhere, for recorded reasons, and
-                        * putting a second copy here would be a second answer to one question —
-                        * the way two parsers came to drift. **Leftovers** are the shopping list's,
-                        * because only it knows package sizes, so only it knows what is actually
-                        * spare; `alongside.tsx` says so in as many words. **Shared ingredients**
-                        * are §67's footnote below the week, and its header argues specifically
-                        * against moving them beside a day.
+                        * There are two different things called leftovers. **Ingredient** leftovers
+                        * — the half pint spare once a package is chosen — are the shopping list's,
+                        * because only it knows package sizes; `alongside.tsx` says so in as many
+                        * words and that is still true. **Meal** leftovers are Tuesday's dinner
+                        * eaten on Thursday, and nothing knew about those until §106. The old
+                        * version of this comment deferred the second on the first's reasoning, and
+                        * the word is all they share.
                         *
-                        * So this is the reference asking for something the app deliberately keeps
-                        * elsewhere, which is a third thing a reference screen can be — not a
-                        * styling choice, and not the app lying either.
+                        * **Shared ingredients** really are elsewhere on purpose: §67's footnote
+                        * below the week, whose header argues specifically against moving them
+                        * beside a day. So one of the two the reference asks for is now here and
+                        * the other is still deliberately not, which is the §78 table with one row
+                        * changed rather than a rule abandoned.
                         */}
                       {/*
                         * The meta line, which is where the cooked mark belongs — "35 min ·
@@ -378,9 +383,22 @@ export function PlannerWeek(props: {
                         * on a phone, which is what overcrowded actually meant.
                         */}
                       <p className="h-day-meta h-day-facts">
-                        {entry.recipe.time_minutes !== null && <span>{entry.recipe.time_minutes} min</span>}
+                        {/*
+                          * A leftover says so first, and loses the cooking time.
+                          *
+                          * "35 min" is how long the dish takes to *make*, which is actively
+                          * misleading beside food that is already in the fridge — a glance at
+                          * Thursday has to say "you are not cooking this" before it says anything
+                          * else about it.
+                          */}
+                        {entry.leftoverOf !== null && <span className="h-day-leftover">Leftovers</span>}
+                        {entry.leftoverOf === null && entry.recipe.time_minutes !== null && (
+                          <span>{entry.recipe.time_minutes} min</span>
+                        )}
                         {/* the cue for the title's other destination — said, not learned */}
-                        {day.date === props.today && <span className="h-day-cook-cue">tap to cook</span>}
+                        {day.date === props.today && entry.leftoverOf === null && (
+                          <span className="h-day-cook-cue">tap to cook</span>
+                        )}
                         <Cooked
                           entryId={entry.id}
                           familyId={props.familyId}
@@ -470,6 +488,52 @@ export function PlannerWeek(props: {
                       <option value={shiftDays(entry.date, 7)}>→ next week</option>
                       <option value={shiftDays(entry.date, -7)}>← last week</option>
                     </select>
+                    {/*
+                      * Logging leftovers, and **only once the meal has been cooked**.
+                      *
+                      * "Log leftovers" is retrospective — it is a record of what is in the fridge
+                      * now, not a plan made on Sunday. Planning for them in advance ("this makes
+                      * six, we're four") is a different feature needing a portions model this one
+                      * deliberately has not got; it is named in the route so the next person
+                      * reaches for it by name rather than by widening this.
+                      *
+                      * Day **and** slot, because the slot is the point: "Tuesday's dinner becomes
+                      * Thursday's lunch" is the pattern, and a control that could only pick a day
+                      * would throw away the half people use. Grouped by day so the list reads as
+                      * a week rather than as twenty-eight options, and only days from this one
+                      * onwards — leftovers do not travel backwards.
+                      */}
+                    {entry.cookedAt !== null && entry.leftoverOf === null && (
+                      <select
+                        aria-label="Log leftovers on another day"
+                        className="quiet"
+                        value=""
+                        disabled={busy !== null}
+                        onChange={(event) => {
+                          const picked = event.target.value;
+                          if (!picked) return;
+                          const [date, slot] = picked.split("|");
+                          call(`leftover-${entry.id}`, "/api/plan-entries", "POST", {
+                            leftoverOf: entry.id,
+                            date,
+                            slot,
+                          });
+                        }}
+                      >
+                        <option value="">Leftovers…</option>
+                        {props.days
+                          .filter((option) => option.date >= entry.date)
+                          .map((option) => (
+                            <optgroup key={option.date} label={option.weekday}>
+                              {(["breakfast", "lunch", "dinner", "snack"] as const).map((slot) => (
+                                <option key={slot} value={`${option.date}|${slot}`}>
+                                  {option.weekday} {slot}
+                                </option>
+                              ))}
+                            </optgroup>
+                          ))}
+                      </select>
+                    )}
                     <button
                       type="button"
                       className="quiet"

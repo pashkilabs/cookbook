@@ -30,6 +30,8 @@ import { SLOTS, SLOT_LABEL, SLOT_NOUN, type Slot } from "@/lib/slots";
 
 export interface PlannedMeal {
   entryId: string;
+  /** this meal was cooked on another day; today it is being eaten again (§106) */
+  isLeftover: boolean;
   recipeId: string;
   slot: Slot;
   title: string;
@@ -154,13 +156,26 @@ export function TodayPlan({
           <article className="h-meal-card" key={meal.entryId}>
             <div className="h-meal-head">
               <div className="h-meal-text">
+                {/*
+                  * A leftover says so **before** the title, not after it.
+                  *
+                  * Somebody glancing at today needs to know they are not cooking, and that is a
+                  * different fact from any of the ones on the meta line below — which is a list
+                  * of properties of the recipe. "35 min" is actively misleading on a reheat, so
+                  * it goes: the number is how long the dish takes to make, and nobody is making
+                  * it. What is left is the name and where it came from.
+                  */}
+                {meal.isLeftover && <p className="h-meal-eyebrow">Leftovers</p>}
                 <h2 className="h-meal-title">{meal.title}</h2>
                 <p className="h-meal-meta">
-                  {[
-                    meal.timeMinutes !== null ? `${meal.timeMinutes} min` : null,
-                    meal.servings !== null ? `serves ${meal.servings}` : null,
-                    meal.cooked ? "cooked" : null,
-                  ]
+                  {(meal.isLeftover
+                    ? [meal.servings !== null ? `serves ${meal.servings}` : null, "already cooked"]
+                    : [
+                        meal.timeMinutes !== null ? `${meal.timeMinutes} min` : null,
+                        meal.servings !== null ? `serves ${meal.servings}` : null,
+                        meal.cooked ? "cooked" : null,
+                      ]
+                  )
                     .filter(Boolean)
                     .join(" · ")}
                 </p>
@@ -198,10 +213,27 @@ export function TodayPlan({
             )}
 
             <div className="h-meal-actions">
-              {/* ?planned= so cook mode shows the amounts this meal was planned at */}
-              <Link className="h-primary" href={`/cook/${meal.recipeId}?planned=${meal.entryId}`}>
-                Start cooking
-              </Link>
+              {/*
+                * Reheating is not cooking, so a leftover does not open cook mode.
+                *
+                * Cook mode walks the method a step at a time with the screen held awake — it is
+                * built for somebody making the dish. Offering it on a leftover would invite
+                * walking six steps for food that is already in the fridge, and the steps would be
+                * *wrong*: they describe a cook that happened on Tuesday.
+                *
+                * The link to the recipe stays, because reading it is still reasonable — checking
+                * what was in it, or rating it. What goes is the primary action that assumes work.
+                */}
+              {meal.isLeftover ? (
+                <Link className="h-secondary" href={`/recipes/${meal.recipeId}`}>
+                  Open the recipe
+                </Link>
+              ) : (
+                /* ?planned= so cook mode shows the amounts this meal was planned at */
+                <Link className="h-primary" href={`/cook/${meal.recipeId}?planned=${meal.entryId}`}>
+                  Start cooking
+                </Link>
+              )}
               {/*
                 * Swap opens the week, which is where a meal moves or comes off — the planner owns
                 * Move and remove. A second mechanism for replacing a meal would be two

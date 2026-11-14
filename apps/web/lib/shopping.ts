@@ -80,6 +80,19 @@ export async function buildShoppingWeek(
   system: MeasurementSystem = "us",
 ): Promise<{ week: ShoppingWeek | null; error: string | null }> {
   const [plan, ingredientRows, packageRows, pantryRows, tickRows, extraRows] = await Promise.all([
+    /*
+     * `.is("leftover_of", null)` — a leftover contributes **nothing** to the shopping list.
+     *
+     * Its ingredients were bought for the cook it came from. Without this the list is simply
+     * longer, with every line correctly consolidated, correctly grouped and correctly formatted:
+     * the failure has no shape of its own, which is the same reason the entitlement meter and
+     * the unreachable control went unnoticed. Nothing on the screen would look wrong.
+     *
+     * Here, at the query, rather than filtered after. `consolidate()` buckets by item key, so a
+     * leftover reaching it would not merely add a line — it would merge into an existing one and
+     * change a quantity, and §92's inverse says the bucket key must never see it. Excluding at
+     * the boundary means the key cannot.
+     */
     supabase
       .from("plan_entries")
       .select("id, date, scale, recipes!inner(id, title)")
@@ -87,6 +100,7 @@ export async function buildShoppingWeek(
       .gte("date", days[0]!)
       .lte("date", days[days.length - 1]!)
       .is("deleted_at", null)
+      .is("leftover_of", null)
       .order("date"),
     supabase.from("ingredients").select(INGREDIENT_COLUMNS),
     supabase.from("grocery_packages").select(GROCERY_PACKAGE_COLUMNS),

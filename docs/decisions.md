@@ -7632,3 +7632,129 @@ entry id, `?planned=` with an empty value, and another recipe's id. Twelve cases
 of those is an artefact of how the run was invoked rather than a gap: `PASHKI_DRAIN_SECRET` lives in
 `~/.pashki-supabase.env` and this run sourced only `apps/web/.env.local`, so the reaper's
 shared-secret check could not run. It passed in Stephen's run, which sourced both.
+
+## §106 — Leftovers: the decision that already existed was about a different feature
+
+### §0 first, and the answer is neither "it still holds" nor "it expired"
+
+§78 lists leftovers under *deliberately elsewhere*:
+
+> **Leftovers** on the week's day meta line ("makes Mon lunch"). The shopping list owns leftovers
+> because only it knows package sizes, so only it knows what is actually spare. `alongside.tsx`
+> says so in as many words.
+
+**That decision is about ingredient leftovers.** `significantLeftovers()` filters shopping lines by
+`line.leftover` — the spare quantity after a package is chosen — and `recipesUsingLeftovers`
+suggests what would finish the cream. `alongside.tsx` says *"uses the cream you will have spare"*.
+Every word of the reason is about package arithmetic, and it is still true.
+
+This request is **meal** leftovers: Tuesday's dinner eaten on Thursday. Same word, different
+question, and the reason does not transfer — the shopping list knows what is spare *in the
+cupboard* and nothing in the app knows what is spare *in the fridge*.
+
+So the gate opens, and not because anything expired. The decision was never about this.
+
+**There was a prior note about meal leftovers**, and it is in the schema rather than the decision
+log — `plan_entries.recipe_id`'s own comment:
+
+> required: an entry is a planned recipe. Free-text entries ("leftovers") would need this
+> nullable, and that is a planner feature nobody has asked for yet.
+
+It imagined leftovers as a free-text row and deferred the migration that would need. Pointing at
+the parent instead keeps `recipe_id` NOT NULL and needs no such migration, which is a point in the
+proposed model's favour that the proposal did not claim for itself.
+
+**Cross-week meal movement is not an open bug.** It was one — *"meals could not move between weeks
+at all — the PATCH updated only `scale`"* — and it is fixed: the move select offers "→ next week"
+and "← last week", and the PATCH reassigns `meal_plan_id` through `findOrCreateWeek`, with the
+reason written beside it (*"an entry left pointing at last week's plan would still render under
+last week while claiming next Tuesday"*). Not a dependency.
+
+### The data model: agreed, and the test it passes
+
+`plan_entries.leftover_of uuid NULL references plan_entries(id)`. Agreed, on the stated test —
+**does it have an identity outside the thing it belongs to?** A shopping group does: named, reused
+across weeks, outliving its items. A leftover does not: it is Tuesday's dinner, on Thursday, with
+no name, no second use and nothing to say once its parent is gone.
+
+The FK is composite — `(leftover_of, family_id)` against `(id, family_id)` — because
+`assert_household_invariants` demands it, which needed a new `plan_entries_id_family_id` unique.
+
+**Slot is the point** and is already there: `plan_entries.slot` has carried breakfast/lunch/dinner/
+snack since §slot, so "Tuesday's dinner becomes Thursday's lunch" needs no new column, and the
+control picks day **and** slot, grouped by day.
+
+### The decisions §2 asked for
+
+| question | answer | where it is enforced |
+|---|---|---|
+| shopping list | a leftover contributes **zero** items | `buildShoppingWeek`'s query, `.is("leftover_of", null)` |
+| `times_made` | does **not** increment | `private.recount_times_made`, which already recomputes from scratch |
+| can it be rated | yes, unchanged | ratings roll up to the recipe; a leftover meal rates the recipe like any other night, and nothing was needed |
+| cook mode | **not offered** | `/today` shows "Open the recipe"; the planner title never links to `/cook` for a leftover |
+| parent deleted | the leftover is **tombstoned with it**, at the same instant | `propagate_soft_delete(…, 'tombstone')` |
+| leftover deleted | the parent is untouched | the trigger is one-directional, and cancelling Thursday is a real action |
+
+The count exclusion is in the **trigger** and not in a route deliberately: the function's own
+comment names five paths that a `+1/-1` scheme would forget, and a route-level exclusion would
+have to be remembered at each of them. Cook mode is refused because the steps describe a cook that
+already happened — walking six steps for food in the fridge is worse than offering nothing.
+
+Two things are refused that the shape would otherwise allow. **A chain** — a leftover of a leftover
+— by trigger, because it is the first step towards a portions model that §3 excludes and allowing
+the shape invites it without anybody deciding. And **re-pointing**: `leftover_of` carries an INSERT
+grant and deliberately no UPDATE one, the same shape `family_id` has (§26). Moving a leftover's day
+is the feature and already granted.
+
+### The correctness fault, asserted and mutated
+
+> Nothing you have can see this failing. The list would simply be longer, with every line correctly
+> consolidated, correctly grouped, correctly formatted.
+
+Exactly so, which is why the assertion is on the **amount** and the mutation is the evidence:
+
+```
+with the exclusion    ok    a leftover adds nothing to the shopping list — still "600 ml pot" to buy
+exclusion removed     FAIL  the amount moved: "600 ml pot" became "2 × 600 ml pot"
+```
+
+The mutation also settles the §92 inverse without a second test: a leftover reaching `consolidate()`
+does not add a row, it **merges into the existing one and changes the quantity** — so the bucket key
+really would see it, and excluding at the query is what stops it.
+
+**The first version of that assertion could not have failed.** It sliced ±60 characters around
+"double cream" and compared the slices; the slice it printed was
+`h-check is-need"><input type="checkbox"…`, the tick box's markup, containing no quantity at all. It
+passed, and would have passed with the exclusion gone. Reading the detail it printed is what caught
+it — the assertion now finds the `h-buy` row by name and reads `h-buy-amount` inside it.
+
+`times_made` stayed at 1 under that mutation, which is the separation working: one exclusion is in
+SQL and the other in a query, and neither covers for the other.
+
+### Rendered, both states
+
+`pnpm shots` grows a `today-leftover` screen, with the slot named in the URL because `/today`
+otherwise picks one from the hour — a fixture whose subject depends on when it ran is the
+hard-coded week again. 188 screenshots, zero layout problems.
+
+The card says **LEFTOVERS** above the title, drops the cooking time (*"70 min" is how long the dish
+takes to make, and nobody is making it*), reads "serves 4 · already cooked", and offers "Open the
+recipe" where a cook offers "Start cooking". The planner row carries the same word in its meta
+line and loses the "tap to cook" cue.
+
+The gap column, printed at 390 and 1024 in both themes and both states: the leftover card is a
+meal card and takes the meal card's rhythm — `margin-top: var(--space-sm)` = **8px**, identical in
+all four, with `.h-board` below it carrying its own `--space-xxl` padding so the 0 margin between
+them is correct rather than tight. No new block, no new rhythm.
+
+### What cannot be measured
+
+**That anybody eats them.** The app records an intention, and the record may be false: food gets
+thrown away, or eaten on a different day, or eaten by one person. Nothing here infers waste from an
+unconsumed entry and nothing should — "you wasted this" from a row nobody deleted would be a
+confident claim built on a record that was never evidence.
+
+### Not shipped
+
+The migration is applied **locally only**. `db:push` is a production deploy and Stephen's to run;
+until it does, `/api/health` will report the missing migration by name, which is what it is for.
