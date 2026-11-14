@@ -27,13 +27,31 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
    */
   const entry = await supabase
     .from("plan_entries")
-    .select("id, scale, recipes!inner(servings)")
+    .select("id, scale, leftover_of, recipes!inner(servings)")
     .eq("id", id)
     .eq("family_id", familyId)
     .is("deleted_at", null)
     .maybeSingle();
   if (!entry.data) return Response.json({ error: "no such entry" }, { status: 404 });
   const recipeServings = (entry.data.recipes as unknown as { servings: number | null }).servings;
+
+  /*
+   * A leftover has no quantity, here as on the way in.
+   *
+   * POST refuses `scale` and `servings` when `leftoverOf` is present and this did not, so the
+   * figure a leftover could not be created with could be set on it a moment later — which is a
+   * control that appears to work, the shape §106 §3 refused outright. The planner's servings
+   * field is hidden for a leftover and that is a screen; this is the rule.
+   *
+   * Moving the day and recording that it was eaten stay allowed: the first is the feature and the
+   * second is what a leftover is for.
+   */
+  if (entry.data.leftover_of !== null && (body.servings !== undefined || body.scale !== undefined)) {
+    return Response.json(
+      { error: "a leftover has no quantity — it is the meal that was already cooked" },
+      { status: 400 },
+    );
+  }
 
   /*
    * Recording that the meal was cooked — the shortest of the three intents, and the one this

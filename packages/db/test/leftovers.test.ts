@@ -122,6 +122,40 @@ describe.skipIf(instance === null)("a leftover of a meal that was cooked", () =>
     expect(chained.error?.message).toMatch(/not at another leftover/);
   });
 
+  it("feeds two days from one pot — siblings, which is the common case and not a chain", async () => {
+    /*
+     * The case the chain refusal must not catch. A big pot of chili cooked on Tuesday becomes
+     * Thursday's lunch *and* Saturday's lunch: two leftovers of **one** cook, both pointing at
+     * the same parent. `refuse_leftover_chain` asks whether the *parent* is a leftover, which a
+     * cook never is, so siblings pass it — and the one-per-slot index is keyed on
+     * `(leftover_of, date, slot)`, so two different days are two different keys.
+     *
+     * Worth its own test because the two mechanisms that refuse the shapes nobody wants are both
+     * one predicate away from refusing the shape everybody wants, and a feature that only works
+     * once would look like it worked.
+     */
+    const before = await timesMade();
+    const pot = await cook("2026-03-23");
+
+    const thursday = await logLeftover(pot, "2026-03-26", "lunch");
+    expect(thursday.error, JSON.stringify(thursday.error)).toBeNull();
+    const saturday = await logLeftover(pot, "2026-03-28", "lunch");
+    expect(saturday.error, "a second day from the same pot is not a chain").toBeNull();
+
+    const { data } = await admin
+      .from("plan_entries")
+      .select("id, date, leftover_of")
+      .eq("leftover_of", pot)
+      .is("deleted_at", null)
+      .order("date");
+    expect((data ?? []).map((row) => row.date), "both days kept their own row").toEqual([
+      "2026-03-26",
+      "2026-03-28",
+    ]);
+
+    expect(await timesMade(), "one pot is one making, however many days it feeds").toBe(before + 1);
+  });
+
   it("cannot be logged twice onto the same meal at the same slot", async () => {
     // the ordinary duplicate — the same recipe twice in a day — stays possible and is answered
     // by the route with an offer to feed more people. A leftover has no quantity to raise, so

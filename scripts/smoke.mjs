@@ -18,7 +18,7 @@
  *
  *   node scripts/smoke.mjs                              # against $SMOKE_URL or production
  *   node scripts/smoke.mjs https://cookbook.pashki.com
- *   node scripts/smoke.mjs http://127.0.0.1:3000 --local
+ *   node scripts/smoke.mjs http://127.0.0.1:3000         # a local app; see the database line
  *
  * Exit codes, the same three this repo uses everywhere:
  *   0  every check passed
@@ -305,7 +305,48 @@ let invitedAccountId = null;
 const madeRecipes = [];
 const madeObjects = [];
 
-console.log(`smoking ${base}\n`);
+/*
+ * ---------------------------------------------------------------------------
+ * Two hosts, and only one of them used to be named
+ * ---------------------------------------------------------------------------
+ *
+ * The app host is an argument; the **database** comes from `apps/web/.env.local` or the
+ * environment, and those are separate decisions. A dev server started against a local Supabase
+ * while this script read the hosted project produced **four failures that moved between runs** —
+ * the harness checking rows the app had never written — and they were reported as flake. Nothing
+ * printed could have shown it: `smoking http://127.0.0.1:3000` is true of both configurations.
+ *
+ * So the database is named, and the app is asked which one it is using. A mismatch is
+ * **COULD NOT MEASURE**, not a failure: a run spread across two databases has not found anything
+ * out, and calling it a failure would be this project's own cry-wolf shape. `unknown` when the
+ * deployment predates `supabaseFingerprint` — which must not block, for the same reason.
+ */
+const dbHost = (() => {
+  try {
+    return new URL(SUPABASE).host;
+  } catch {
+    return SUPABASE;
+  }
+})();
+const dbPrint = createHash("sha256").update(SUPABASE.replace(/\/+$/, "")).digest("hex").slice(0, 12);
+let appPrint = null;
+try {
+  const health = await fetch(`${base}/api/health`, { signal: AbortSignal.timeout(20_000) });
+  appPrint = (await health.json())?.configured?.supabaseFingerprint ?? null;
+} catch {
+  // the checks below will say plenty about a host that does not answer
+}
+console.log(`smoking ${base}`);
+console.log(`  against ${dbHost} (${dbPrint}) — the app reports ${appPrint ?? "unknown"}\n`);
+if (appPrint && appPrint !== dbPrint) {
+  console.error("-".repeat(72));
+  console.error(
+    `COULD NOT MEASURE: ${base} is using a different Supabase project (${appPrint}) than this ` +
+      `harness (${dbPrint}).`,
+  );
+  console.error("  Every check would read one database and write the other. Nothing was checked.");
+  process.exit(CANNOT_MEASURE);
+}
 
 /**
  * Which build is answering, before anything else is asked.
@@ -678,6 +719,29 @@ try {
         ? "NOT MEASURED: times_made did not come back"
         : `times_made ${timesMade}, wanted 1 — one cook and one leftover`,
     );
+    /*
+     * A leftover has no quantity to set, and the refusal needs its positive control.
+     *
+     * POST refuses `scale`/`servings` beside `leftoverOf`; PATCH did not, so the figure a leftover
+     * could not be created with could be written onto it a moment later. Both halves are asserted
+     * together because **a refusal alone is half an answer**: 400 on the servings says the rule
+     * fires, 200 on the move says it did not simply freeze the row — and only the pair says it
+     * discriminates. Moving the day is the feature, so a rule that blocked it would be worse than
+     * the one it replaced.
+     */
+    if (spare.body?.id) {
+      const quantity = await call("PATCH", `/api/plan-entries/${spare.body.id}`, {
+        body: { servings: 8 },
+      });
+      const moved = await call("PATCH", `/api/plan-entries/${spare.body.id}`, {
+        body: { date: shiftIso(midweek, 3) },
+      });
+      record(
+        "a leftover refuses a servings figure and still moves to another day",
+        quantity.status === 400 && moved.status === 200,
+        `servings ${quantity.status} (wanted 400), move ${moved.status} (wanted 200)`,
+      );
+    }
     if (spare.body?.id) await call("DELETE", `/api/plan-entries/${spare.body.id}`);
     await call("PATCH", `/api/plan-entries/${entryId}`, { body: { cooked: false } });
 
@@ -3126,11 +3190,11 @@ const failed = results.filter((r) => !r.ok);
 console.log("-".repeat(72));
 if (failed.length === 0) {
   const note = skipped.length ? `, ${skipped.length} NOT CHECKED` : "";
-  console.log(`SMOKE: ${results.length} checks passed${note} against ${base}`);
+  console.log(`SMOKE: ${results.length} checks passed${note} against ${base} on ${dbHost} (${dbPrint})`);
   for (const s of skipped) console.log(`  not checked: ${s.name} — ${s.why}`);
   process.exit(PASSED);
 }
-console.log(`SMOKE: ${failed.length} of ${results.length} FAILED against ${base}${skipped.length ? `, ${skipped.length} NOT CHECKED` : ""}`);
+console.log(`SMOKE: ${failed.length} of ${results.length} FAILED against ${base} on ${dbHost} (${dbPrint})${skipped.length ? `, ${skipped.length} NOT CHECKED` : ""}`);
 for (const f of failed) console.log(`  ${f.name}${f.detail ? `  — ${f.detail}` : ""}`);
 for (const s of skipped) console.log(`  not checked: ${s.name} — ${s.why}`);
 process.exit(FAILED);

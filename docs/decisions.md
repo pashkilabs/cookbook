@@ -7738,8 +7738,9 @@ otherwise picks one from the hour — a fixture whose subject depends on when it
 hard-coded week again. 188 screenshots, zero layout problems.
 
 The card says **LEFTOVERS** above the title, drops the cooking time (*"70 min" is how long the dish
-takes to make, and nobody is making it*), reads "serves 4 · already cooked", and offers "Open the
-recipe" where a cook offers "Start cooking". The planner row carries the same word in its meta
+takes to make, and nobody is making it*), and offers "Open the recipe" where a cook offers "Start
+cooking". Its meta line read "serves 4 · already cooked" when this was written and now reads
+"From Tuesday's dinner" — §106a has why. The planner row carries the same word in its meta
 line and loses the "tap to cook" cue.
 
 The gap column, printed at 390 and 1024 in both themes and both states: the leftover card is a
@@ -7754,7 +7755,132 @@ thrown away, or eaten on a different day, or eaten by one person. Nothing here i
 unconsumed entry and nothing should — "you wasted this" from a row nobody deleted would be a
 confident claim built on a record that was never evidence.
 
-### Not shipped
+### Shipped
 
-The migration is applied **locally only**. `db:push` is a production deploy and Stephen's to run;
-until it does, `/api/health` will report the missing migration by name, which is what it is for.
+The migration was applied **locally only** when this was written. It is now on hosted —
+`check-migrations-pushed` reports all 62 applied, `/api/health` says `schema: ok` at commit
+`8f32366`, and three runs of `pnpm smoke` against `https://cookbook.pashki.com` pass **238 of 238**
+with the two leftover checks among them.
+
+## §106a — Three follow-ups on leftovers, and the measurement that could not have been evidence
+
+### 1. The card was quoting the recipe's yield as a fact about the fridge
+
+"serves 4" came from `recipes.servings × scale` — what the dish made on Tuesday, some of which was
+eaten on Tuesday. §106 refused quantity tracking outright, so **the app does not know how much is
+left**, and that figure was the one thing on the card somebody would act on. The line now says
+`From Tuesday's dinner`, which the parent row knows exactly.
+
+`today` instead of the weekday when it is the same day, because "From Wednesday's lunch" read on
+Wednesday is ambiguous in a way the other direction is not: the control offers only days from the
+parent onwards inside the displayed week, so the two are at most six days apart and a weekday name
+cannot mean last week.
+
+It costs one query. `leftover_of` references `plan_entries (id, family_id)` — a **composite** key —
+and the day and slot wanted are on the parent *row*, not on the recipe, so the embed would have to
+name the constraint. That is a spelling this repo has been caught guessing at more than once, so
+the ids are read and looked up instead, and only when the visible tab holds a leftover.
+
+Tested as a pure sentence (`leftoverSource`, 5 tests) rather than through the screen, because a
+server component is awkward to drive and one fixture can only ever be on one day — so the
+`today` branch and the weekday branch cannot both be rendered by a single shot. One of the five
+asserts the **rule** rather than a string: no digit reaches that line, for any slot or date. A
+later version reaching for `recipe.servings` again — the obvious move when a card looks sparse —
+fails there and reads why.
+
+### 2. Siblings were already allowed, and both mechanisms were one predicate from refusing them
+
+The case: a big pot on Tuesday feeding Thursday lunch *and* Saturday lunch. Two leftovers of one
+cook, which is the common case and not a chain.
+
+Both of §106's refusals permit it, and neither does so by accident:
+
+- `refuse_leftover_chain` asks whether the **parent** is a leftover. A cook never is, so a second
+  sibling passes it.
+- `plan_entries_one_leftover_per_slot` is keyed on `(leftover_of, date, slot)`, so two days are two
+  keys.
+
+Asserted now (`packages/db/test/leftovers.test.ts`), and **mutation-tested in both directions**,
+because "it works" and "it works for one predicate's reason" are the same green:
+
+| mutant | result |
+|---|---|
+| index narrowed to `(leftover_of)` | FAIL — *a second day from the same pot is not a chain* |
+| trigger refuses a parent that already has a leftover | FAIL — same assertion, plus the chain test |
+
+The second mutant is the plausible one: it is what "no chains" looks like if you implement it by
+asking whether the parent has children rather than whether it *is* a child. It would have shipped a
+feature that works exactly once, which is the shape that reads as working.
+
+One line beyond the ask, found by testing the boundary beside it: the route translated the
+one-per-slot refusal through `refusal()`, which reads `23505` as *"somebody else changed that at the
+same moment"*. True of every other unique index here and false of this one — nobody changed
+anything, the day was picked twice — so a second tap now gets *"those leftovers are already on that
+meal"* and a 409.
+
+### 3. A harness with two hosts, and only one of them was named
+
+The brief: *"a check that varies has no state that constitutes evidence. Record which checks they
+are and whether they ever vary against hosted."* Both halves answered, and the second one dissolves
+the first.
+
+**Against hosted, nothing varies.** Three runs of `pnpm smoke` against
+`https://cookbook.pashki.com`: 238 passed, the same 2 NOT CHECKED, exit 0, three times, character
+for character.
+
+**The four local failures are recorded**, from the two runs that produced them — three stable and
+one slot that held a different check each time:
+
+| check | run A | run B |
+|---|---|---|
+| `GET /api/platform/session` | HTTP 503 | HTTP 503 |
+| `a pasted caption imports` | HTTP 500 | HTTP 500 |
+| `a pasted caption is refused for a stated reason, not a crash` | HTTP 500 | HTTP 500 |
+| `single-URL import runs` | HTTP 500 | passed |
+| `and reads in one system throughout` | passed | imperial on a metric page: 8 oz |
+
+And then the thing worth keeping, which is **not** a fact about any of those five checks.
+
+`smoke.mjs` takes the **app** host as an argument and reads the **database** from
+`apps/web/.env.local` or the environment. Those are two separate decisions, and that session had at
+some point started a dev server with local-Supabase overrides while every `pnpm smoke:local`
+carried none — so those runs may have been reading one database and writing another.
+
+**And it cannot be established either way, which is the finding.** Nothing printed records it:
+`smoking http://127.0.0.1:3000` is true of both configurations, and so is
+`SMOKE: 4 of 237 FAILED against http://127.0.0.1:3000`. I can read the transcript and still not say
+which database those four failures were measured against.
+
+So they are not evidence about the app, and they are **also not evidence of flake** — a flaky check
+at least tells you which check, against what. These are a run whose configuration was never
+recorded, and no amount of re-reading the artefact recovers it. Resisted the temptation to assert a
+mechanism: the mismatch is a plausible cause and an unmeasured one, and the honest claim is that the
+run is unattributable rather than that it was mis-wired.
+
+**Re-measured with both hosts printed and agreeing**, local app against the same hosted project:
+**238 passed, zero failures, three runs**, every one of the five checks above among them. Two
+configurations, six runs, no variance anywhere.
+
+This repo's own §16 answer applies directly — a shared secret set on both sides can still be two
+different secrets, so `/api/health` publishes a fingerprint and the copies get **compared**. The
+database is the same shape of question, and it is every check's subject:
+
+- `/api/health` now publishes `supabaseFingerprint`, six bytes of SHA-256 over the normalised
+  `NEXT_PUBLIC_SUPABASE_URL` — enough to compare, not enough to be a credential, and not the
+  project ref.
+- `smoke.mjs` prints the database it is using beside the app it is smoking, in the opening line
+  **and** in the verdict, so neither a pass nor a failure can be quoted without both hosts.
+- A mismatch is **COULD NOT MEASURE**, exit 2, before any check runs. A run spread across two
+  databases has not found anything out, and calling it a failure would be crying wolf at a
+  configuration.
+- `unknown` does not block, for a deployment older than the field.
+
+`--local` is gone from `pnpm smoke:local`. It was a flag the script **never read** — documented in
+the header, matched nowhere in the code — and its name claimed exactly the thing that was not
+true. A number in a comment that disagrees with the codebase gets "fixed" by the next reader in
+whichever direction they trust more; a flag that does nothing while naming a target is that, with
+a configuration behind it.
+
+The guard is live against a local dev server immediately and becomes real for hosted on the next
+deploy, since the field has to be published before it can be compared. `unknown` until then, which
+does not block — a check that cannot run must not look like one that failed either.

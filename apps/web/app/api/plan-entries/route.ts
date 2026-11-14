@@ -260,7 +260,21 @@ export async function POST(request: Request) {
     })
     .select("id")
     .single();
-  if (error) return Response.json({ error: refusal(error) }, { status: statusFor(error) });
+  if (error) {
+    /*
+     * `refusal()` reads `23505` as *"somebody else changed that at the same moment"*, which is
+     * true of every other unique index here and false of this one: the one-leftover-per-slot
+     * index fires on a **second tap**, where nobody changed anything and reloading would show
+     * the same thing. The shared translator cannot know which index refused; the route can.
+     */
+    if (leftoverOf !== null && error.code === "23505") {
+      return Response.json(
+        { error: "those leftovers are already on that meal" },
+        { status: 409 },
+      );
+    }
+    return Response.json({ error: refusal(error) }, { status: statusFor(error) });
+  }
 
   // Placing it takes it off the shortlist: it is no longer waiting for a day. Best effort — a
   // failure here leaves it listed twice, which is untidy rather than wrong.

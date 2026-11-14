@@ -32,6 +32,8 @@ export interface PlannedMeal {
   entryId: string;
   /** this meal was cooked on another day; today it is being eaten again (§106) */
   isLeftover: boolean;
+  /** "From Tuesday's dinner" — the meal it came from, which is the one quantity-free fact */
+  fromMeal: string | null;
   recipeId: string;
   slot: Slot;
   title: string;
@@ -161,15 +163,19 @@ export function TodayPlan({
                   *
                   * Somebody glancing at today needs to know they are not cooking, and that is a
                   * different fact from any of the ones on the meta line below — which is a list
-                  * of properties of the recipe. "35 min" is actively misleading on a reheat, so
-                  * it goes: the number is how long the dish takes to make, and nobody is making
-                  * it. What is left is the name and where it came from.
+                  * of properties of the **recipe**, and a leftover is a property of the fridge.
+                  *
+                  * So both of the recipe's numbers go. "35 min" is how long the dish takes to
+                  * make and nobody is making it. "serves 6" is what it made on Tuesday, of which
+                  * some was eaten on Tuesday — §106 refused quantity tracking, so the app cannot
+                  * know what is left and must not print a figure as though it did. What replaces
+                  * them is the one thing the row does know: which meal it came from.
                   */}
                 {meal.isLeftover && <p className="h-meal-eyebrow">Leftovers</p>}
                 <h2 className="h-meal-title">{meal.title}</h2>
                 <p className="h-meal-meta">
                   {(meal.isLeftover
-                    ? [meal.servings !== null ? `serves ${meal.servings}` : null, "already cooked"]
+                    ? [meal.fromMeal ?? "already cooked"]
                     : [
                         meal.timeMinutes !== null ? `${meal.timeMinutes} min` : null,
                         meal.servings !== null ? `serves ${meal.servings}` : null,

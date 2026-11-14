@@ -8,7 +8,7 @@ import { buildShoppingWeek } from "@/lib/shopping";
 import { leaderboard, type Rating } from "@/lib/leaderboard";
 import { SLOTS, hourIn, isSlot, showsOnSlot, slotForHour, type Slot } from "@/lib/slots";
 import { readAvoidedAllergens } from "@/lib/allergen-filter";
-import { servingsForScale } from "@/lib/planner";
+import { leftoverSource, servingsForScale } from "@/lib/planner";
 import { Eyebrow, TabBar } from "@/components/harvest";
 import { TodayPlan, type PlannedMeal, type Suggestion } from "./today-plan";
 
@@ -129,9 +129,42 @@ export default async function TodayPage({
         }));
   const hiddenByAllergen = catalogue.length - offerable.length;
 
-  const meals: PlannedMeal[] = rows(planned, "today's meals")
+  const onThisTab = rows(planned, "today's meals")
     // only this tab's meal: the screen is scoped to a slot, header to leaderboard
-    .filter((row) => row.slot === slot)
+    .filter((row) => row.slot === slot);
+
+  /*
+   * The meals today's leftovers came from — a second query, and deliberately not an embed.
+   *
+   * `leftover_of` references `plan_entries (id, family_id)`, a composite key, and the day and
+   * slot being asked for are on the **parent row** rather than on the recipe: the recipe cannot
+   * say which dinner this is left over from. PostgREST would embed it through the constraint
+   * name, which is a spelling this project has been caught guessing at more than once — so the
+   * ids are read and looked up, which is one round trip and no guessing.
+   *
+   * Only when there is a leftover on this tab. With none, the parents of nothing is a query for
+   * an answer of zero.
+   */
+  const parentIds = [
+    ...new Set(
+      onThisTab
+        .map((row) => row.leftover_of as string | null)
+        .filter((id): id is string => id !== null),
+    ),
+  ];
+  const sources = new Map<string, { date: string; slot: string }>();
+  if (parentIds.length > 0) {
+    const parents = await supabase
+      .from("plan_entries")
+      .select("id, date, slot")
+      .eq("family_id", family.id)
+      .in("id", parentIds);
+    for (const row of rows(parents, "the meals today's leftovers came from")) {
+      sources.set(row.id as string, { date: row.date as string, slot: row.slot as string });
+    }
+  }
+
+  const meals: PlannedMeal[] = onThisTab
     .map((row) => {
     const recipe = row.recipes as unknown as {
       id: string;
@@ -140,6 +173,8 @@ export default async function TodayPage({
       servings: number | null;
     };
     const scale = Number(row.scale) || 1;
+    const parent = row.leftover_of as string | null;
+    const from = parent === null ? undefined : sources.get(parent);
     return {
       entryId: row.id as string,
       recipeId: recipe.id,
@@ -152,6 +187,12 @@ export default async function TodayPage({
       cooked: row.cooked_at !== null,
       /* a leftover is a meal to eat, not a meal to cook — the card says so and offers no steps */
       isLeftover: row.leftover_of !== null,
+      /*
+       * Null only if the parent did not come back, which the foreign key makes impossible and a
+       * broken query would have thrown above. The card falls back to "already cooked" — still
+       * true, and still not a quantity.
+       */
+      fromMeal: from === undefined ? null : leftoverSource(from, today),
     };
   });
 

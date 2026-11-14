@@ -440,15 +440,27 @@ export function PlannerWeek(props: {
                     <Link className="h-chip" href={`/recipes/${entry.recipe.id}?planned=${entry.id}`}>
                       Open the recipe
                     </Link>
-                    <ServingsField
-                      entryId={entry.id}
-                      scale={entry.scale}
-                      recipeServings={entry.recipe.servings}
-                      busy={busy !== null}
-                      onSave={(patch) =>
-                        call(`scale-${entry.id}`, `/api/plan-entries/${entry.id}`, "PATCH", patch)
-                      }
-                    />
+                    {/*
+                      * Not for a leftover, which has no quantity to set.
+                      *
+                      * The same refusal the card's meta line makes by dropping "serves 4": the
+                      * recipe's yield is what the dish made on Tuesday, and §106 §3 refused
+                      * quantity tracking, so nothing here knows what is left. A **control** is
+                      * the stronger version of that claim — it does not merely state a figure, it
+                      * invites somebody to correct one — and the route refuses the write, so
+                      * showing it would be a field that answers 400.
+                      */}
+                    {entry.leftoverOf === null && (
+                      <ServingsField
+                        entryId={entry.id}
+                        scale={entry.scale}
+                        recipeServings={entry.recipe.servings}
+                        busy={busy !== null}
+                        onSave={(patch) =>
+                          call(`scale-${entry.id}`, `/api/plan-entries/${entry.id}`, "PATCH", patch)
+                        }
+                      />
+                    )}
                     {/*
                       * Moving a meal, as a select rather than a drag.
                       *

@@ -2168,3 +2168,30 @@ guessing.
   reaching `consolidate()` does not add a row, it **merges into the existing one**. The failure has
   no shape of its own: every line stays correctly consolidated, grouped and formatted, and one
   number is quietly wrong.
+
+- **A harness has as many hosts as it has clients, and `smoke.mjs` had two while naming one.** The
+  app host is an argument; the **database** comes from `apps/web/.env.local` or the environment, and
+  those are separate decisions nothing compared. A session reported **four failures that moved
+  between runs** as flake and carried that sentence into the next brief.
+
+  **The failures are not the finding — the unattributability is.** That session had started a dev
+  server with local-Supabase overrides at some point while every `pnpm smoke:local` carried none, so
+  those runs may have been reading one database and writing another, and **the artefact cannot
+  settle it**: `smoking http://127.0.0.1:3000` is true of both configurations, and so is
+  `4 of 237 FAILED against http://127.0.0.1:3000`. *"A check that varies has no state that
+  constitutes evidence"* is right and a run whose configuration was never recorded is worse than
+  flaky — flake at least tells you which check, against what. Six runs across two known
+  configurations later (hosted app and local app, same project, printed) there is **no variance
+  anywhere**, which is what a measurement looks like. Resisting the causal claim mattered: the
+  mismatch is a plausible mechanism and an unmeasured one.
+
+  The answer was already in this repo: a shared secret set on both sides can still be two different
+  secrets, so `/api/health` publishes a fingerprint and the copies get **compared**. So it now
+  publishes `supabaseFingerprint` too, `smoke.mjs` prints the database beside the app in its opening
+  line *and* its verdict, and a mismatch is **COULD NOT MEASURE** before any check runs. Named per
+  command, as §79 demands — and the question generalises past this script: **list every host a
+  verification touches, and check the output names all of them.** One of them is the one you
+  configured without thinking about it.
+
+  `--local` is gone from `pnpm smoke:local`. The script **never read it** — documented in the header,
+  matched nowhere — so its name claimed the very thing that was untrue.

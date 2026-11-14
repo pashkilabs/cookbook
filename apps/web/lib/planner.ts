@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { IsoDate } from "./week";
+import { weekdayName, type IsoDate } from "./week";
+import { SLOT_NOUN, isSlot } from "./slots";
 
 /**
  * Finding or creating the week's plan.
@@ -127,4 +128,33 @@ export function scaleIngredientAmounts<T extends { amount: number | null }>(
     // an unstated amount is not 1.5 of anything — "salt to taste" stays "salt to taste"
     amount: line.amount === null ? null : line.amount * scale,
   }));
+}
+
+/**
+ * Where a leftover came from: "From Tuesday's dinner".
+ *
+ * The line it replaces was `serves 6 · already cooked`, and the servings half was the **recipe's
+ * yield presented as a fact about the fridge**. §106 refused quantity tracking outright — a
+ * leftover exists or it does not — so the app does not know how much is left, and "serves 6" is
+ * what the dish made on Tuesday when some of it was eaten on Tuesday. A number nobody measured,
+ * in the one place somebody would act on it.
+ *
+ * The parent's day and slot are known exactly, from the row. So the card says that instead, and
+ * "already cooked" goes with it: the eyebrow says Leftovers and a meal can only be left over from
+ * one that was cooked, so three statements of one fact becomes one statement of a different one.
+ *
+ * `today` rather than the weekday name when it is the same day, because "From Wednesday's lunch"
+ * on Wednesday reads as a different Wednesday. The two are at most six days apart — the control
+ * offers only days from the parent onwards within the displayed week — so a weekday name cannot
+ * be ambiguous in the other direction.
+ */
+export function leftoverSource(
+  parent: { date: IsoDate; slot: string },
+  today: IsoDate,
+): string {
+  const day = parent.date === today ? "today" : weekdayName(parent.date);
+  // a CHECK constraint restricts the column to the four, so the fallback is unreachable from the
+  // database — and it is a word rather than a crash if that ever stops being true
+  const meal = isSlot(parent.slot) ? SLOT_NOUN[parent.slot].one : "meal";
+  return `From ${day}'s ${meal}`;
 }

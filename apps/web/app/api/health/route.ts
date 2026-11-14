@@ -143,6 +143,22 @@ export async function GET() {
       env: process.env.VERCEL_ENV ?? "local",
       configured: {
         supabase: present("NEXT_PUBLIC_SUPABASE_URL") && present("SUPABASE_SERVICE_ROLE_KEY"),
+        /*
+         * **Which** database, not whether there is one — the `drainSecret` reasoning applied to
+         * the thing every check writes to.
+         *
+         * `pnpm smoke:local` points the harness at `apps/web/.env.local`'s project and the app at
+         * whatever the dev server was started with, and those are two separate decisions. A
+         * session that pointed the server at a local Supabase while the harness read the hosted
+         * one got **four failures that moved between runs** and reported them as flake: the
+         * harness was reading rows the app had never written. A boolean cannot show that and a
+         * URL would publish the project ref, so this is the same six-byte digest the secrets use
+         * — enough to compare, not enough to be a credential.
+         */
+        supabaseFingerprint: await fingerprint(
+          // normalised, so a trailing slash on one side is not a mismatch on both
+          process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/+$/, ""),
+        ),
         siteUrl: present("NEXT_PUBLIC_SITE_URL"),
         // the two that were wrong in production and invisible for days
         tokenSigner: present("PASHKI_TOKEN_KEY_ID") && present("PASHKI_TOKEN_PRIVATE_KEY"),
