@@ -2218,3 +2218,49 @@ guessing.
   you check whether a fix is live — and it warns on a **pass** too, because `239 checks passed`
   against a build that is not your tree is the more seductive of the two. No git, or a commit this
   clone does not hold, degrades to silence and `differs` rather than blocking.
+
+- **"Still misclassified" was a classifier that was never asked, and the check that would have
+  caught it was green because its own name said what it did not cover.** Reported as bad protein
+  labels, e.g. "Korean Ground Beef Bowls". Sorted before touching the prompt, real households only
+  (4 of 169 families; the other 165 are harness): **22 never classified**, **5 asked and correctly
+  declined**, **1 wrong of 56**, **0 correct-but-hidden**. The classifier was 55 of 56 on what it
+  was asked. It was not being asked.
+
+  **Two gates, and the earlier fix moved one of them.** `classifyIfUnclassified` returned on
+  `if (course || cuisine || dish_form || principal_protein)` with the reason *"a person's own answer
+  is not a gap to fill"* — right about the **field** and applied to the **row**, and the extractor
+  fills `course` on almost every import. So every recipe imported in three weeks returned before
+  asking. The backfill was the backstop and its family-discovery query still filtered
+  `.is("classified_at", null)`, which every insert stamps: run against hosted it found **3 rows in 2
+  households, both harness**, and did nothing, politely. The inner cursor twenty lines below had
+  been corrected to `classified_with` and carried a comment explaining why — **one fix, two gates,
+  and the untouched one was in the same file**.
+
+  **Smoke had a check: `"a recipe saved with no course is classified on save"`.** Accurate, green,
+  mutation-proof — and the branch that broke is the one with a course, which is every import. Eighth
+  instance of a check reporting on a neighbour of its claim, and the cheapest answer was the twin
+  rather than a better check.
+
+  **The tripwire that would have caught it needs no model.** A title or ingredient list naming
+  exactly one animal, against the stored label: 16 flagged, **zero false positives**, all 16
+  unclassified. Precision is bought with recall and the traps are the design — flavourings
+  discounted (`beef broth` in a chicken soup, `duck sauce`, `goat cheese`, `chicken bouillon`),
+  patterns word-anchored (`ham` in hamburger, `sole` in casserole), two animals means silence, and
+  **`egg` excluded entirely** because it is in the enum and in every cake, which costs a real
+  recipe that is correctly `egg`. `check-platform-tables` refused the first version for reading
+  `accounts` to tell harness households from real ones — correctly, and the backfill beside it
+  already says why — so households are named by the caller.
+
+  **Then the backfill introduced two errors and a control run showed the prompt was innocent.**
+  Two shrimp dishes containing no pork came back `pork` — §95's confabulation label on a new class
+  of dish. Re-run three times each, `Garlic Butter Shrimp` answers `seafood` **3 of 3**: the stored
+  value is a bad draw the backfill **froze**, not a belief. A prompt change aimed at it would have
+  been measuring the weather. §96 says a row must be stable before it can carry evidence; that is
+  now a command (`stability:protein`) rather than a habit, because the cheap half is the half that
+  gets skipped.
+
+  **And the signal was already in a column nothing reads.** Of 104 rows, 4 are below unanimous
+  agreement and **2 of those are wrong** — 50% against roughly 1% among the unanimous. Worth a
+  rule; not worth shipping unmeasured, because agreement is a *within-run* measure and the third
+  error sits at 1.0 while moving between runs. §61 again: a per-row consensus is not a run-to-run
+  spread.

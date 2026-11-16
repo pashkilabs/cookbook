@@ -37,15 +37,43 @@ console.log(`writes: ${WRITES.join(", ")}${dryRun ? "  (DRY RUN)" : ""}`);
  * this needs — one household's recipes never reach another's prompt — without asking the
  * platform anything.
  */
-const scoped = await admin
-  .from("recipes")
-  .select("family_id")
-  .is("deleted_at", null)
-  .is("classified_at", null);
-if (scoped.error) throw scoped.error;
+/*
+ * regression: discovery used a gate the inner cursor had already abandoned.
+ *
+ * The loop below asks `!classified_at || classified_with !== current` — the attempt **and** what
+ * it was made with — and its comment explains at length why `classified_at` alone was wrong. This
+ * query, twenty lines above it, still filtered `.is("classified_at", null)`, and
+ * `createRecipeFrom` stamps `classified_at` on **every** insert. So discovery found almost
+ * nothing: run against the hosted project on 2026-11-15 it returned **3 rows in 2 households,
+ * both of them harness**, and not one of the four real households. An unscoped backfill did
+ * nothing at all and said so politely.
+ *
+ * One fix moved one of two gates, which is the shape this repo keeps paying for. The two
+ * predicates are now the same predicate, computed once, because the next person to change the
+ * cursor will change it in one place and the other would go quietly stale again.
+ */
+const current = classificationProvenance(cascade.models[0]!.model);
+const needsWork = (row: { classified_at: string | null; classified_with: string | null }) =>
+  !row.classified_at || row.classified_with !== current;
+
+const eligible: Array<{ family_id: string; classified_at: string | null; classified_with: string | null }> = [];
+for (let offset = 0; ; offset += 1000) {
+  // paged, because a PostgREST read caps at 1000 and a silent truncation here is a household
+  // that never gets looked at
+  const page = await admin
+    .from("recipes")
+    .select("family_id, classified_at, classified_with")
+    .is("deleted_at", null)
+    .order("id")
+    .range(offset, offset + 999);
+  if (page.error) throw page.error;
+  eligible.push(...((page.data ?? []) as typeof eligible));
+  if ((page.data ?? []).length < 1000) break;
+}
 const familyIds = onlyFamily
   ? [onlyFamily]
-  : [...new Set((scoped.data ?? []).map((row) => row.family_id as string))];
+  : [...new Set(eligible.filter(needsWork).map((row) => row.family_id))];
+console.log(`${eligible.filter(needsWork).length} of ${eligible.length} recipes need work, in ${familyIds.length} household(s)`);
 if (onlyFamily) console.log(`scoped to one household: ${onlyFamily}`);
 
 for (const family of familyIds.map((id) => ({ id, name: id.slice(0, 8) }))) {
@@ -67,10 +95,7 @@ for (const family of familyIds.map((id) => ({ id, name: id.slice(0, 8) }))) {
      * as a PostgREST `or(...)`.
      */
     .order("title");
-  const current = classificationProvenance(cascade.models[0]!.model);
-  const todo = (recipes ?? []).filter(
-    (r: any) => !r.classified_at || r.classified_with !== current,
-  );
+  const todo = (recipes ?? []).filter((r: any) => needsWork(r));
   if (!todo.length) { console.log(`${family.name}: nothing to classify`); continue; }
   console.log(
     `\n${family.name}: ${todo.length} of ${recipes!.length} to classify ` +

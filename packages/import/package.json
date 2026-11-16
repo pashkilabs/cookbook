@@ -52,7 +52,9 @@
     "catalog:gap": "tsx scripts/catalog-gap.mts",
     "repair:split-items": "tsx scripts/repair-split-items.mts",
     "kroger:matching": "tsx scripts/kroger-matching.mts",
-    "kroger:propose": "tsx scripts/kroger-propose.mts"
+    "kroger:propose": "tsx scripts/kroger-propose.mts",
+    "tripwire:protein": "tsx scripts/tripwire-protein.mts",
+    "stability:protein": "tsx scripts/stability-protein.mts"
   },
   "devDependencies": {
     "@pashki/db": "workspace:^",

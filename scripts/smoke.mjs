@@ -3150,6 +3150,59 @@ try {
     }
   }
 
+  /*
+   * ---------------------------------------------------------------------------
+   * The same thing again, with a course already set — which is every import
+   * ---------------------------------------------------------------------------
+   *
+   * The check above is named *"saved with **no course**"*, and that is exactly what it covers. It
+   * was green for three weeks while **every imported recipe went unclassified**, because
+   * `classifyIfUnclassified` tested the row rather than the field: *any* of course, cuisine,
+   * dish_form or principal_protein already filled and it returned before asking. The extractor
+   * fills `course` on almost every import, so the branch that broke is the one no check entered.
+   *
+   * 22 recipes, 21 with no protein, "Korean Ground Beef Bowls" among them, and the only thing that
+   * noticed was Stephen opening the Beef chapter. A check reporting on a neighbour of its claim,
+   * again — the eighth on this repo's list — and the cheapest possible answer is the twin: the
+   * same assertion through the door the product actually uses.
+   *
+   * Beef is named in the title and in one ingredient, so if the model is asked at all the answer
+   * is not in doubt. The assertion is still the **stamp** rather than the label: a provider
+   * having an opinion is not what broke, and a check that can be moved by a model's mood is a
+   * check that gets switched off.
+   */
+  const preCoursed = await call("POST", "/api/recipes", {
+    body: {
+      title: "Korean Ground Beef Bowls",
+      course: "main",
+      servings: "4", timeMinutes: "15", sourceName: "", sourceUrl: "",
+      ingredients: "500 g ground beef\n2 tbsp soy sauce\n2 cloves garlic\n2 cups cooked rice",
+      steps: "Brown the beef. Add the sauce. Serve over rice.",
+    },
+  });
+  const preCoursedId = preCoursed.body?.id ?? null;
+  if (preCoursedId) madeRecipes.push(preCoursedId);
+  if (!preCoursedId) {
+    record("a recipe saved WITH a course is still classified", false, `HTTP ${preCoursed.status}`);
+  } else {
+    const stored = await rest(
+      "GET",
+      `/recipes?id=eq.${preCoursedId}&select=course,principal_protein,classified_with,classified_readings`,
+    );
+    const row = stored?.[0] ?? {};
+    record(
+      "a recipe saved WITH a course is still classified — the branch every import takes",
+      Boolean(row.classified_with),
+      `stamp ${row.classified_with ? "present" : "ABSENT"}, course=${row.course}, ` +
+        `protein=${row.principal_protein}`,
+    );
+    record(
+      "and the course it arrived with is kept, not overwritten",
+      row.course === "main",
+      `course=${row.course}, wanted main`,
+    );
+  }
+
   const path = `${familyId}/smoke-${stamp}.jpg`;
   const upload = await fetch(`${SUPABASE}/storage/v1/object/recipe-photos/${path}`, {
     method: "POST",

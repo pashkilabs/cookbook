@@ -336,15 +336,33 @@ export async function classifyIfUnclassified(
   const recipe = maybeRow(
     await supabase
     .from("recipes")
-    .select("id, family_id, title, course, cuisine, dish_form, principal_protein, classified_with")
+    .select("id, family_id, title, course, dish_form, principal_protein, classified_with")
     .eq("id", recipeId)
     .is("deleted_at", null)
     .maybeSingle(),
     "recipe",
   );
   if (!recipe || recipe.classified_with === current) return;
-  // nothing to overwrite is the precondition: a person's own answer is not a gap to fill
-  if (recipe.course || recipe.cuisine || recipe.dish_form || recipe.principal_protein) return;
+
+  /*
+   * ---------------------------------------------------------------------------
+   * regression: the precondition was a row test, and the import fills one field
+   * ---------------------------------------------------------------------------
+   *
+   * This read `if (recipe.course || recipe.cuisine || recipe.dish_form || recipe.principal_protein)
+   * return`, over all four columns, with the reason *"a person's own answer is not a gap to fill"*. The reason is right
+   * and the granularity was wrong: the **extractor** fills `course` on almost every import, so an
+   * imported recipe arrived with one field set and four fields' worth of silence, and this
+   * returned before asking anything. Every recipe imported between 2026-10-25 and 2026-11-15 —
+   * 22 of them, 21 with no protein, "Korean Ground Beef Bowls" among them — was never classified,
+   * and `classified_with` stayed null so nothing re-asked.
+   *
+   * A set field is still not a gap to fill, so the protection stays — per **field** rather than
+   * per row. Nothing already answered is overwritten; everything still null is asked for.
+   */
+  const FILLABLE = ["course", "dish_form", "principal_protein"] as const;
+  const missing = FILLABLE.filter((field) => recipe[field] === null);
+  if (missing.length === 0) return;
 
   const [ings, steps] = await Promise.all([
     supabase.from("recipe_ingredients").select("amount, unit, item_text, note").eq("recipe_id", recipeId).is("deleted_at", null).order("position"),
@@ -366,12 +384,26 @@ export async function classifyIfUnclassified(
     if (!read) return;
     const { error } = await serviceClient()
       .from("recipes")
-      // cuisine included here and not in the backfill: this reads the same stored shape, but a
-      // hand-typed recipe has no prose anywhere, so there is no better moment to ask (§54)
+      /*
+       * `cuisine` is **not** written here, and the comment that used to sit on this line said it
+       * was: *"cuisine included here and not in the backfill … a hand-typed recipe has no prose
+       * anywhere, so there is no better moment to ask"*. The update below has never named the
+       * column. The backfill excludes it by measurement — §54, it stops declining and starts
+       * guessing on stored shape — so the behaviour was right and only the comment was wrong.
+       * Left excluded rather than "restored", because starting to write it would be a change
+       * nothing has measured, argued for by a sentence that was never true.
+       */
       .update({
-        course: read.classification.course,
-        dish_form: read.classification.dishForm,
-        principal_protein: read.classification.principalProtein,
+        /*
+         * Only what was missing. A field somebody (or the extractor) already answered keeps its
+         * answer; the stamp below is written either way, because the row *was* asked with this
+         * prompt and re-asking it would buy nothing.
+         */
+        ...(missing.includes("course") ? { course: read.classification.course } : {}),
+        ...(missing.includes("dish_form") ? { dish_form: read.classification.dishForm } : {}),
+        ...(missing.includes("principal_protein")
+          ? { principal_protein: read.classification.principalProtein }
+          : {}),
         classified_at: new Date().toISOString(),
         /*
          * What produced this answer, so a changed prompt or model makes the row eligible again
